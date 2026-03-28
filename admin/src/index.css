@@ -1,0 +1,106 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+
+@layer base {
+  :root {
+    --background: 210 20% 97%;
+    --foreground: 220 20% 10%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 220 20% 10%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 220 20% 10%;
+
+    --primary: 185 80% 28%;
+    --primary-foreground: 0 0% 100%;
+
+    --secondary: 210 20% 96%;
+    --secondary-foreground: 220 20% 10%;
+
+    --muted: 210 15% 94%;
+    --muted-foreground: 215 15% 50%;
+
+    --accent: 185 80% 28%;
+    --accent-foreground: 0 0% 100%;
+
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 214 20% 90%;
+    --input: 214 20% 90%;
+    --ring: 185 80% 28%;
+
+    --radius: 0.5rem;
+
+    --sidebar-background: 0 0% 100%;
+    --sidebar-foreground: 215 15% 40%;
+    --sidebar-primary: 185 80% 28%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 185 80% 96%;
+    --sidebar-accent-foreground: 185 80% 28%;
+    --sidebar-border: 214 20% 93%;
+    --sidebar-ring: 185 80% 28%;
+
+    --success: 160 60% 40%;
+    --success-foreground: 0 0% 100%;
+    --warning: 38 92% 50%;
+    --warning-foreground: 0 0% 100%;
+    --info: 205 80% 50%;
+    --info-foreground: 0 0% 100%;
+
+    --stat-card: 0 0% 100%;
+    --stat-card-border: 214 20% 92%;
+    --table-header: 215 15% 50%;
+    --table-row-hover: 210 20% 97%;
+    --badge-optimal: 160 60% 92%;
+    --badge-optimal-text: 160 60% 30%;
+    --badge-delay: 38 90% 92%;
+    --badge-delay-text: 38 80% 35%;
+    --badge-transit: 205 80% 92%;
+    --badge-transit-text: 205 80% 35%;
+    --badge-open: 185 80% 92%;
+    --badge-open-text: 185 80% 28%;
+    --badge-settled: 160 60% 92%;
+    --badge-settled-text: 160 60% 30%;
+    --badge-pending: 38 90% 92%;
+    --badge-pending-text: 38 80% 35%;
+    --badge-suspended: 0 72% 92%;
+    --badge-suspended-text: 0 72% 40%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground font-sans antialiased;
+    font-family: 'Inter', system-ui, sans-serif;
+  }
+}
+
+@layer utilities {
+  .stat-card {
+    @apply bg-card rounded-xl border border-border p-5;
+  }
+  .section-card {
+    @apply bg-card rounded-xl border border-border;
+  }
+  .page-header {
+    @apply text-2xl font-bold text-foreground;
+  }
+  .page-subtitle {
+    @apply text-muted-foreground text-sm mt-1;
+  }
+  .table-header-text {
+    @apply text-xs font-semibold uppercase tracking-wider text-muted-foreground;
+  }
+  .sidebar-active {
+    @apply text-primary bg-sidebar-accent border-l-[3px] border-primary font-medium;
+  }
+}
