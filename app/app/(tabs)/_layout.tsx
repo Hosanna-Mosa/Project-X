@@ -44,6 +44,8 @@ function CustomTabBar({ state, descriptors, navigation }: any) {
               return <Feather name="credit-card" size={size} color={color} />;
             case "support":
               return <Feather name="help-circle" size={size} color={color} />;
+            case "profile":
+              return <Feather name="user" size={size} color={color} />;
             default:
               return <Feather name="grid" size={size} color={color} />;
           }
@@ -81,6 +83,7 @@ export default function TabLayout() {
       <Tabs.Screen name="orders" options={{ title: "Orders" }} />
       <Tabs.Screen name="payments" options={{ title: "Payments" }} />
       <Tabs.Screen name="support" options={{ title: "Support" }} />
+      <Tabs.Screen name="profile" options={{ title: "Profile" }} />
     </Tabs>
   );
 }

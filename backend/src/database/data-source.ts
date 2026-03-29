@@ -5,6 +5,7 @@ import { User } from "./entities/User";
 import { Driver } from "./entities/Driver";
 import { Order } from "./entities/Order";
 import { Stop } from "./entities/Stop";
+import { OTP } from "./entities/OTP";
 
 dotenv.config();
 
@@ -15,7 +16,7 @@ export const AppDataSource = new DataSource({
   url: process.env.DATABASE_URL,
   synchronize: process.env.NODE_ENV === "development", // Set to false in production
   logging: false,
-  entities: [User, Driver, Order, Stop],
+  entities: [User, Driver, Order, Stop, OTP],
   migrations: ["src/database/migrations/*.ts"],
   ssl: isProd || !!process.env.DATABASE_URL ? { rejectUnauthorized: false } : false,
   extra: {
