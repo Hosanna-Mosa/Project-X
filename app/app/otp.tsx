@@ -9,13 +9,17 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
-import { router } from "expo-router";
+import { router, useLocalSearchParams } from "expo-router";
 import Colors from "@/constants/colors";
+import { useAuthStore } from "@/contexts/authStore";
+import { Alert } from "react-native";
 
 export default function OTPScreen() {
   const insets = useSafeAreaInsets();
+  const { phone } = useLocalSearchParams<{ phone: string }>();
   const [otp, setOtp] = useState(["", "", "", "", "", ""]);
   const inputs = useRef<Array<TextInput | null>>([]);
+  const { verifyOTP, loading } = useAuthStore();
 
   const handleChange = (text: string, index: number) => {
     const newOtp = [...otp];
@@ -32,10 +36,22 @@ export default function OTPScreen() {
     }
   };
 
-  const handleVerify = () => {
+  const handleVerify = async () => {
     const code = otp.join("");
     if (code.length < 6) return;
-    router.replace("/(tabs)/home");
+    try {
+      const result = await verifyOTP(phone!, code, "USER");
+      if (result.isNewUser) {
+        router.push({
+          pathname: "/signup",
+          params: { phone }
+        });
+      } else {
+        router.replace("/(tabs)/home");
+      }
+    } catch (error: any) {
+      Alert.alert("Error", error.message || "Verification failed");
+    }
   };
 
   const isFilled = otp.every((d) => d.length === 1);
