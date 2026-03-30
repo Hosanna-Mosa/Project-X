@@ -40,8 +40,6 @@ function CustomTabBar({ state, descriptors, navigation }: any) {
               return <Feather name="home" size={size} color={color} />;
             case "orders":
               return <Feather name="box" size={size} color={color} />;
-            case "payments":
-              return <Feather name="credit-card" size={size} color={color} />;
             case "support":
               return <Feather name="help-circle" size={size} color={color} />;
             case "profile":
@@ -81,7 +79,6 @@ export default function TabLayout() {
     >
       <Tabs.Screen name="home" options={{ title: "Home" }} />
       <Tabs.Screen name="orders" options={{ title: "Orders" }} />
-      <Tabs.Screen name="payments" options={{ title: "Payments" }} />
       <Tabs.Screen name="support" options={{ title: "Support" }} />
       <Tabs.Screen name="profile" options={{ title: "Profile" }} />
     </Tabs>

@@ -56,10 +56,15 @@ export default function TrackingScreen() {
           },
         ]}
       >
+        <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
+          <Feather name="arrow-left" size={22} color={Colors.light.text} />
+        </TouchableOpacity>
         <View style={styles.etaBadge}>
           <View style={styles.etaDot} />
           <Text style={styles.etaText}>ETA: {eta} mins away</Text>
         </View>
+        {/* Spacer to keep ETA centered */}
+        <View style={styles.backBtn} />
       </View>
 
       <BottomSheet style={styles.bottomSheet}>
@@ -80,7 +85,7 @@ export default function TrackingScreen() {
               <TouchableOpacity style={styles.actionBtn}>
                 <Feather name="phone" size={18} color={Colors.light.textSecondary} />
               </TouchableOpacity>
-              <TouchableOpacity style={styles.actionBtn}>
+              <TouchableOpacity style={styles.actionBtn} onPress={() => router.push("/chat")}>
                 <Feather name="message-square" size={18} color={Colors.light.primary} />
               </TouchableOpacity>
             </View>
@@ -124,9 +129,24 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.light.background,
   },
   topControls: {
+    flexDirection: "row",
     alignItems: "center",
+    justifyContent: "space-between",
     zIndex: 10,
     paddingHorizontal: 20,
+  },
+  backBtn: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: Colors.light.surface,
+    alignItems: "center",
+    justifyContent: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 10,
+    elevation: 5,
   },
   etaBadge: {
     flexDirection: "row",

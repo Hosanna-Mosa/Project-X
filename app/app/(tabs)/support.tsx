@@ -1,15 +1,14 @@
 import React from "react";
 import {
-  Platform,
   ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
 } from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
 import Colors from "@/constants/colors";
+import { ScreenWrapper } from "@/components/ScreenWrapper";
 
 const FAQ_ITEMS = [
   { q: "How does multi-stop delivery work?", a: "Add up to 10 pickup locations and our algorithm optimizes the route automatically." },
@@ -19,20 +18,13 @@ const FAQ_ITEMS = [
 ];
 
 export default function SupportScreen() {
-  const insets = useSafeAreaInsets();
-
   return (
-    <ScrollView
-      style={styles.root}
-      contentContainerStyle={[
-        styles.content,
-        {
-          paddingTop: insets.top + (Platform.OS === "web" ? 67 : 16),
-          paddingBottom: insets.bottom + (Platform.OS === "web" ? 34 : 90),
-        },
-      ]}
-      showsVerticalScrollIndicator={false}
-    >
+    <ScreenWrapper>
+      <ScrollView
+        style={styles.scrollView}
+        contentContainerStyle={styles.content}
+        showsVerticalScrollIndicator={false}
+      >
       <Text style={styles.title}>Support</Text>
 
       <View style={styles.heroCard}>
@@ -65,17 +57,18 @@ export default function SupportScreen() {
           <Text style={styles.faqA}>{item.a}</Text>
         </View>
       ))}
-    </ScrollView>
+      </ScrollView>
+    </ScreenWrapper>
   );
 }
 
 const styles = StyleSheet.create({
-  root: {
+  scrollView: {
     flex: 1,
-    backgroundColor: Colors.light.background,
   },
   content: {
     paddingHorizontal: 20,
+    paddingTop: 16,
     gap: 16,
   },
   title: {

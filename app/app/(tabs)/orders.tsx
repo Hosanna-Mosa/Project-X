@@ -1,16 +1,15 @@
 import React, { useState } from "react";
 import {
-  Platform,
   ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
 } from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
 import { router } from "expo-router";
 import Colors from "@/constants/colors";
+import { ScreenWrapper } from "@/components/ScreenWrapper";
 
 type FilterType = "all" | "active" | "past";
 
@@ -59,7 +58,6 @@ const STATUS_COLORS: Record<string, string> = {
 };
 
 export default function OrdersScreen() {
-  const insets = useSafeAreaInsets();
   const [filter, setFilter] = useState<FilterType>("all");
 
   const filtered = MOCK_ORDERS.filter((o) => {
@@ -69,14 +67,7 @@ export default function OrdersScreen() {
   });
 
   return (
-    <View
-      style={[
-        styles.root,
-        {
-          paddingTop: insets.top + (Platform.OS === "web" ? 67 : 0),
-        },
-      ]}
-    >
+    <ScreenWrapper>
       <View style={styles.header}>
         <Text style={styles.title}>My Orders</Text>
         <TouchableOpacity style={styles.filterIconBtn}>
@@ -104,12 +95,7 @@ export default function OrdersScreen() {
       </View>
 
       <ScrollView
-        contentContainerStyle={[
-          styles.list,
-          {
-            paddingBottom: insets.bottom + (Platform.OS === "web" ? 34 : 90),
-          },
-        ]}
+        contentContainerStyle={styles.list}
         showsVerticalScrollIndicator={false}
       >
         {filtered.length === 0 ? (
@@ -194,14 +180,13 @@ export default function OrdersScreen() {
           ))
         )}
       </ScrollView>
-    </View>
+    </ScreenWrapper>
   );
 }
 
 const styles = StyleSheet.create({
   root: {
     flex: 1,
-    backgroundColor: Colors.light.background,
   },
   header: {
     flexDirection: "row",
