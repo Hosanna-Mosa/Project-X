@@ -29,7 +29,7 @@ export class OrdersController {
   async getOrder(req: AuthRequest, res: Response) {
     try {
       const { id } = req.params;
-      const order = await ordersService.getOrderById(id);
+      const order = await ordersService.getOrderById(id as string);
 
       if (!order) return res.status(404).json({ message: "Order not found" });
 

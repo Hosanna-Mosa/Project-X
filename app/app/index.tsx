@@ -14,20 +14,29 @@ import { Feather } from "@expo/vector-icons";
 import { router } from "expo-router";
 import Colors from "@/constants/colors";
 import { ScreenWrapper } from "@/components/ScreenWrapper";
+import { useAuthStore } from "@/contexts/authStore";
+import { Alert } from "react-native";
 
 const { width } = Dimensions.get("window");
 
 export default function AuthScreen() {
   const [phone, setPhone] = useState("");
-  const [loading, setLoading] = useState(false);
+  const { requestOTP, loading } = useAuthStore();
 
-  const handleContinue = () => {
-    if (phone.length < 6) return;
-    setLoading(true);
-    setTimeout(() => {
-      setLoading(false);
-      router.push("/otp");
-    }, 500);
+  const handleContinue = async () => {
+    if (phone.length < 10) {
+      Alert.alert("Error", "Please enter a valid phone number");
+      return;
+    }
+    try {
+      await requestOTP(phone);
+      router.push({
+        pathname: "/otp",
+        params: { phone }
+      });
+    } catch (error: any) {
+      Alert.alert("Error", error.message || "Failed to send OTP");
+    }
   };
 
   return (
