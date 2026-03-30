@@ -12,6 +12,7 @@ import { router, useLocalSearchParams } from "expo-router";
 import Colors from "@/constants/colors";
 import { useAuthStore } from "@/contexts/authStore";
 import { Alert } from "react-native";
+import { ScreenWrapper } from "@/components/ScreenWrapper";
 
 export default function OTPScreen() {
   const insets = useSafeAreaInsets();
