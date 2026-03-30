@@ -7,13 +7,12 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
 import { router } from "expo-router";
 import Colors from "@/constants/colors";
+import { ScreenWrapper } from "@/components/ScreenWrapper";
 
 export default function OTPScreen() {
-  const insets = useSafeAreaInsets();
   const [otp, setOtp] = useState(["", "", "", "", "", ""]);
   const inputs = useRef<Array<TextInput | null>>([]);
 
@@ -41,15 +40,7 @@ export default function OTPScreen() {
   const isFilled = otp.every((d) => d.length === 1);
 
   return (
-    <View
-      style={[
-        styles.container,
-        {
-          paddingTop: insets.top + (Platform.OS === "web" ? 67 : 20),
-          paddingBottom: insets.bottom + (Platform.OS === "web" ? 34 : 0),
-        },
-      ]}
-    >
+    <ScreenWrapper style={styles.container}>
       <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
         <Feather name="arrow-left" size={22} color={Colors.light.text} />
       </TouchableOpacity>
@@ -88,7 +79,7 @@ export default function OTPScreen() {
         disabled={!isFilled}
         activeOpacity={0.85}
       >
-        <Text style={styles.verifyBtnText}>Verify & Continue</Text>
+        <Text style={styles.verifyBtnText}>Verify &amp; Continue</Text>
         <Feather name="arrow-right" size={18} color="#fff" />
       </TouchableOpacity>
 
@@ -98,15 +89,14 @@ export default function OTPScreen() {
           <Text style={styles.resendLink}>Resend</Text>
         </Text>
       </TouchableOpacity>
-    </View>
+    </ScreenWrapper>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
-    flex: 1,
-    backgroundColor: Colors.light.background,
     paddingHorizontal: 28,
+    paddingTop: 20,
     gap: 32,
   },
   backBtn: {

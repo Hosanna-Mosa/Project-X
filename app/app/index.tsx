@@ -10,15 +10,14 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
 import { router } from "expo-router";
 import Colors from "@/constants/colors";
+import { ScreenWrapper } from "@/components/ScreenWrapper";
 
 const { width } = Dimensions.get("window");
 
 export default function AuthScreen() {
-  const insets = useSafeAreaInsets();
   const [phone, setPhone] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -32,107 +31,102 @@ export default function AuthScreen() {
   };
 
   return (
-    <KeyboardAvoidingView
-      style={styles.root}
-      behavior={Platform.OS === "ios" ? "padding" : "height"}
-    >
-      <ScrollView
-        contentContainerStyle={[
-          styles.container,
-          {
-            paddingTop: insets.top + (Platform.OS === "web" ? 67 : 0),
-            paddingBottom: insets.bottom + (Platform.OS === "web" ? 34 : 0),
-          },
-        ]}
-        keyboardShouldPersistTaps="handled"
-        showsVerticalScrollIndicator={false}
+    <ScreenWrapper>
+      <KeyboardAvoidingView
+        style={styles.flex}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
       >
-        <View style={styles.logoBox}>
-          <View style={styles.logoIconWrap}>
-            <Feather name="truck" size={28} color="#fff" />
-          </View>
-        </View>
-
-        <View style={styles.headerSection}>
-          <View style={styles.titleRow}>
-            <Text style={styles.title}>Welcome to </Text>
-            <Text style={[styles.title, styles.titleAccent]}>Precision</Text>
-          </View>
-          <Text style={styles.subtitle}>
-            Your global logistics infrastructure, distilled into a single interface.
-          </Text>
-        </View>
-
-        <View style={styles.connectCard}>
-          <View style={styles.connectIconWrap}>
-            <View style={styles.hub}>
-              <View style={styles.centerDot} />
-              {[0, 72, 144, 216, 288].map((angle, i) => (
-                <View
-                  key={i}
-                  style={[
-                    styles.spoke,
-                    {
-                      transform: [{ rotate: `${angle}deg` }],
-                    },
-                  ]}
-                />
-              ))}
+        <ScrollView
+          contentContainerStyle={styles.container}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+        >
+          <View style={styles.logoBox}>
+            <View style={styles.logoIconWrap}>
+              <Feather name="truck" size={28} color="#fff" />
             </View>
           </View>
-          <Text style={styles.connectLabel}>CONNECT & SYNC</Text>
-        </View>
 
-        <View style={styles.formSection}>
-          <Text style={styles.fieldLabel}>Phone Number</Text>
-          <View style={styles.phoneRow}>
-            <View style={styles.countryCode}>
-              <Text style={styles.countryCodeText}>+1</Text>
+          <View style={styles.headerSection}>
+            <View style={styles.titleRow}>
+              <Text style={styles.title}>Welcome to </Text>
+              <Text style={[styles.title, styles.titleAccent]}>Precision</Text>
             </View>
-            <TextInput
-              style={styles.phoneInput}
-              placeholder="Enter mobile number"
-              placeholderTextColor={Colors.light.textMuted}
-              value={phone}
-              onChangeText={setPhone}
-              keyboardType="phone-pad"
-              returnKeyType="done"
-              onSubmitEditing={handleContinue}
-            />
-          </View>
-
-          <TouchableOpacity
-            style={[
-              styles.continueBtn,
-              (!phone.length || loading) && styles.continueBtnDisabled,
-            ]}
-            onPress={handleContinue}
-            activeOpacity={0.85}
-            disabled={!phone.length || loading}
-          >
-            <Text style={styles.continueBtnText}>
-              {loading ? "Please wait..." : "Continue"}
+            <Text style={styles.subtitle}>
+              Your global logistics infrastructure, distilled into a single interface.
             </Text>
-            {!loading && (
-              <Feather name="arrow-right" size={18} color="#fff" />
-            )}
-          </TouchableOpacity>
-        </View>
+          </View>
 
-        <Text style={styles.terms}>
-          By continuing, you agree to the{" "}
-          <Text style={styles.termsLink}>Terms of Service</Text> and{" "}
-          <Text style={styles.termsLink}>Privacy Policy</Text>.
-        </Text>
-      </ScrollView>
-    </KeyboardAvoidingView>
+          <View style={styles.connectCard}>
+            <View style={styles.connectIconWrap}>
+              <View style={styles.hub}>
+                <View style={styles.centerDot} />
+                {[0, 72, 144, 216, 288].map((angle, i) => (
+                  <View
+                    key={i}
+                    style={[
+                      styles.spoke,
+                      {
+                        transform: [{ rotate: `${angle}deg` }],
+                      },
+                    ]}
+                  />
+                ))}
+              </View>
+            </View>
+            <Text style={styles.connectLabel}>CONNECT &amp; SYNC</Text>
+          </View>
+
+          <View style={styles.formSection}>
+            <Text style={styles.fieldLabel}>Phone Number</Text>
+            <View style={styles.phoneRow}>
+              <View style={styles.countryCode}>
+                <Text style={styles.countryCodeText}>+1</Text>
+              </View>
+              <TextInput
+                style={styles.phoneInput}
+                placeholder="Enter mobile number"
+                placeholderTextColor={Colors.light.textMuted}
+                value={phone}
+                onChangeText={setPhone}
+                keyboardType="phone-pad"
+                returnKeyType="done"
+                onSubmitEditing={handleContinue}
+              />
+            </View>
+
+            <TouchableOpacity
+              style={[
+                styles.continueBtn,
+                (!phone.length || loading) && styles.continueBtnDisabled,
+              ]}
+              onPress={handleContinue}
+              activeOpacity={0.85}
+              disabled={!phone.length || loading}
+            >
+              <Text style={styles.continueBtnText}>
+                {loading ? "Please wait..." : "Continue"}
+              </Text>
+              {!loading && (
+                <Feather name="arrow-right" size={18} color="#fff" />
+              )}
+            </TouchableOpacity>
+          </View>
+
+          <Text style={styles.terms}>
+            By continuing, you agree to the{" "}
+            <Text style={styles.termsLink}>Terms of Service</Text> and{" "}
+            <Text style={styles.termsLink}>Privacy Policy</Text>.
+          </Text>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </ScreenWrapper>
   );
 }
 
 const styles = StyleSheet.create({
-  root: {
+  flex: {
     flex: 1,
-    backgroundColor: "#EFF9FF",
   },
   container: {
     flexGrow: 1,

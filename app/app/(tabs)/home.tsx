@@ -104,25 +104,25 @@ export default function HomeScreen() {
               icon="car"
               label="Ride"
               color="#0EA5E9"
-              onPress={() => {}}
+              onPress={() => router.push({ pathname: "/service-selection", params: { label: "Ride" } })}
             />
             <ServiceCategory
               icon="utensils"
               label="Food"
               color="#0EA5E9"
-              onPress={() => {}}
+              onPress={() => router.push({ pathname: "/service-selection", params: { label: "Food" } })}
             />
             <ServiceCategory
               icon="shopping-basket"
               label="Grocery"
               color="#0EA5E9"
-              onPress={() => {}}
+              onPress={() => router.push({ pathname: "/service-selection", params: { label: "Grocery" } })}
             />
             <ServiceCategory
               icon="medkit"
               label="Meds"
               color="#0EA5E9"
-              onPress={() => {}}
+              onPress={() => router.push({ pathname: "/service-selection", params: { label: "Meds" } })}
             />
           </View>
 
