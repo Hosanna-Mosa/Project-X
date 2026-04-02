@@ -25,12 +25,18 @@ export class SocketManager {
 
   private async setupRedis() {
     this.redisClient = createClient({
-      url: `redis://${process.env.REDIS_HOST || "localhost"}:${process.env.REDIS_PORT || "6379"}`,
+      url: process.env.REDIS_URL || "redis://localhost:6379",
     });
 
-    this.redisClient.on("error", (err: any) => console.log("Redis Client Error", err));
-    await this.redisClient.connect();
-    console.log("Redis connected for socket tracking");
+    this.redisClient.on("error", (err: any) => console.log("Redis Client Error (Socket manager)", err.message));
+    
+    try {
+      await this.redisClient.connect();
+      console.log("Redis connected for socket tracking");
+    } catch (err) {
+      console.warn("⚠️  Redis server not found. Socket tracking (location updates) will be disabled. App will continue to run.");
+      this.redisClient = null; // Mark as null so handlers can check
+    }
   }
 
   private initializeHandlers() {
@@ -49,10 +55,13 @@ export class SocketManager {
       // DRIVER LOCATION UPDATE: Store in Redis & Emit to User
       socket.on("driver_location_update", async (data: { driverId: string; orderId?: string; lat: number; lng: number }) => {
         console.log(`[SOCKET] Driver Location Update received: ID=${data.driverId}, OrderID=${data.orderId || "none"}, Lat=${data.lat}, Lng=${data.lng}`);
-        const key = `driver_loc:${data.driverId}`;
-        await this.redisClient.set(key, JSON.stringify({ lat: data.lat, lng: data.lng }), {
-          EX: 30, // Expiry 30 seconds
-        });
+        
+        if (this.redisClient) {
+          const key = `driver_loc:${data.driverId}`;
+          await this.redisClient.set(key, JSON.stringify({ lat: data.lat, lng: data.lng }), {
+            EX: 30, // Expiry 30 seconds
+          });
+        }
 
         if (data.orderId) {
           console.log(`[SOCKET] Forwarding update to room: ${data.orderId}`);

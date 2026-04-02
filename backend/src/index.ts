@@ -5,7 +5,7 @@ import cors from "cors";
 import helmet from "helmet";
 import morgan from "morgan";
 import * as dotenv from "dotenv";
-import { AppDataSource } from "./database/data-source";
+import { connectDB } from "./database/db";
 import { SocketManager } from "./sockets/socket.manager";
 
 // Routes
@@ -34,33 +34,29 @@ app.use(express.json());
 SocketManager.getInstance(server);
 
 // Database Initialization
-AppDataSource.initialize()
-  .then(async () => {
-    console.log("Database connection established");
-
-    // Sample Route
-    app.get("/", (req, res) => {
-      res.json({ message: "Multi-Service Logistics Platform Backend API" });
-    });
-
-    // API Routes
-    app.use("/api/auth", authRoutes);
-    app.use("/api/users", userRoutes);
-    app.use("/api/drivers", driverRoutes);
-    app.use("/api/orders", orderRoutes);
-    app.use("/api/admin", adminRoutes);
-    app.use("/api/places", placesRoutes);
-    app.use("/api/routing", routingRoutes);
-    app.use("/api/payments", paymentRoutes);
-
-    server.listen(PORT, () => {
-      console.log(`Server is running on port ${PORT}`);
-    });
-  })
-  .catch((error) => {
-    console.error("Database initialization failed", error);
-    process.exit(1);
+connectDB().then(async () => {
+  // Sample Route
+  app.get("/", (req, res) => {
+    res.json({ message: "Multi-Service Logistics Platform Backend API" });
   });
+
+  // API Routes
+  app.use("/api/auth", authRoutes);
+  app.use("/api/users", userRoutes);
+  app.use("/api/drivers", driverRoutes);
+  app.use("/api/orders", orderRoutes);
+  app.use("/api/admin", adminRoutes);
+  app.use("/api/places", placesRoutes);
+  app.use("/api/routing", routingRoutes);
+  app.use("/api/payments", paymentRoutes);
+
+  server.listen(PORT, () => {
+    console.log(`Server is running on port ${PORT}`);
+  });
+}).catch((error) => {
+  console.error("Database initialization failed", error);
+  process.exit(1);
+});
 
 // Handle graceful shutdown
 process.on("SIGTERM", () => {

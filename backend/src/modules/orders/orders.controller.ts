@@ -1,7 +1,7 @@
 import { Response } from "express";
 import { OrdersService } from "./orders.service";
 import { AuthRequest } from "../../middleware/auth.middleware";
-import { OrderStatus } from "../../database/entities/Order";
+import { OrderStatus } from "../../database/models/Order";
 
 const ordersService = new OrdersService();
 

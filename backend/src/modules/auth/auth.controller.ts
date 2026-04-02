@@ -1,6 +1,6 @@
 import { Request, Response } from "express";
 import { AuthService } from "./auth.service";
-import { UserRole } from "../../database/entities/User";
+import { UserRole } from "../../database/models/User";
 
 const authService = new AuthService();
 
