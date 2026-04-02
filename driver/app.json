@@ -27,6 +27,14 @@
           "origin": "https://replit.com/"
         }
       ],
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "Allow Driver App to use your location for real-time order tracking and navigation even in background.",
+          "locationWhenInUsePermission": "Allow Driver App to use your location for real-time order tracking and navigation.",
+          "isAndroidBackgroundLocationEnabled": true
+        }
+      ],
       "expo-font",
       "expo-web-browser"
     ],

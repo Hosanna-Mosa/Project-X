@@ -32,6 +32,7 @@ export default function ServiceSelectionScreen() {
             paddingTop: insets.top + (Platform.OS === "web" ? 67 : 0) + 12,
           },
         ]}
+        pointerEvents="box-none"
       >
         <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
           <Feather name="arrow-left" size={24} color={Colors.light.text} />
@@ -42,7 +43,7 @@ export default function ServiceSelectionScreen() {
       </View>
 
       {/* Map Content Overlay (Optional Pin in Center) */}
-      <View style={styles.pinContainer}>
+      <View style={styles.pinContainer} pointerEvents="none">
         <View style={styles.pinShadow} />
         <View style={styles.pin}>
           <View style={styles.pinInner} />

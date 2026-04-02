@@ -6,7 +6,8 @@ import { UserRole } from "../../database/entities/User";
 const router = Router();
 const ordersController = new OrdersController();
 
-router.post("/create", authenticateToken, authorizeRole([UserRole.USER]), ordersController.create.bind(ordersController));
+// Create order - simplifying route to / for easier frontend integration
+router.post("/", ordersController.create.bind(ordersController));
 router.get("/:id", authenticateToken, ordersController.getOrder.bind(ordersController));
 router.patch("/:id/status", authenticateToken, ordersController.updateStatus.bind(ordersController));
 

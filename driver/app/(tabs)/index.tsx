@@ -17,10 +17,9 @@ import IncomingOrderModal from "@/components/IncomingOrderModal";
 import MapView from "@/components/MapView";
 import SOSButton from "@/components/SOSButton";
 import { Colors } from "@/constants/colors";
-import {
-  useDriverStore,
-  useMockIncomingOrder,
-} from "@/store/driverStore";
+import { useDriverStore } from "@/store/driverStore";
+import { socketService } from "@/utils/socketService";
+import * as Location from "expo-location";
 
 export default function HomeScreen() {
   const insets = useSafeAreaInsets();
@@ -35,6 +34,7 @@ export default function HomeScreen() {
     rejectOrder,
     setIncomingOrder,
     driverName,
+    driverPhone,
   } = useDriverStore();
 
   const [toggling, setToggling] = useState(false);
@@ -48,19 +48,93 @@ export default function HomeScreen() {
       useNativeDriver: false,
     }).start();
 
-    if (isOnline && !currentOrder) {
-      mockOrderTimeout.current = setTimeout(() => {
-        const mockOrder = useMockIncomingOrder();
-        setIncomingOrder(mockOrder);
-      }, 6000);
+    let locationInterval: ReturnType<typeof setInterval> | null = null;
+
+    if (isOnline) {
+      // Connect to Real-time Hub
+      socketService.connect();
+      socketService.join(driverPhone || "driver-123", "DRIVER");
+
+      // Listen for New Orders
+      socketService.on("new_order", (order) => {
+        console.log("[SOCKET] New Order Received:", order.id);
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        setIncomingOrder(order);
+      });
+
+      // Start Location Streaming with Permission Check
+      const startStreaming = async () => {
+        console.log("[LOCATION] Starting Location Streaming Service...");
+        const { status } = await Location.requestForegroundPermissionsAsync();
+        console.log("[LOCATION] Permission status:", status);
+        
+        if (status !== 'granted') {
+          console.warn("[LOCATION] Permission not granted. Online status may be limited.");
+          return;
+        }
+
+        locationInterval = setInterval(async () => {
+          try {
+            const hasServices = await Location.hasServicesEnabledAsync();
+            console.log("[LOCATION] Services check:", hasServices);
+            
+            if (!hasServices) {
+              console.warn("[LOCATION] Location services are disabled on this device.");
+              return;
+            }
+
+            // Attempt to get location with a timeout
+            console.log("[LOCATION] Attempting position update...");
+            const location = await Location.getCurrentPositionAsync({ 
+              accuracy: Location.Accuracy.Balanced,
+            });
+
+            if (location) {
+              console.log("[LOCATION] Update obtained successfully:", {
+                lat: location.coords.latitude,
+                lng: location.coords.longitude,
+                accuracy: location.coords.accuracy
+              });
+              
+              socketService.emit("driver_location_update", {
+                driverId: driverPhone || "driver-123",
+                lat: location.coords.latitude,
+                lng: location.coords.longitude,
+                orderId: currentOrder?.id
+              });
+            }
+          } catch (e) {
+            console.warn("[LOCATION] Update failed:", e instanceof Error ? e.message : "Unknown error");
+            console.error("[LOCATION] Error Object:", e);
+            
+            // Fallback to last known position if current is failing
+            console.log("[LOCATION] Trying fallback: getLastKnownPositionAsync");
+            const lastKnown = await Location.getLastKnownPositionAsync();
+            if (lastKnown) {
+              console.log("[LOCATION] Fallback success:", lastKnown.coords.latitude, lastKnown.coords.longitude);
+              socketService.emit("driver_location_update", {
+                driverId: driverPhone || "driver-123",
+                lat: lastKnown.coords.latitude,
+                lng: lastKnown.coords.longitude,
+                orderId: currentOrder?.id
+              });
+            } else {
+              console.warn("[LOCATION] Fallback also failed: No last known position.");
+            }
+          }
+        }, 10000); // Every 10 seconds
+      };
+
+      startStreaming();
+    } else {
+      socketService.disconnect();
     }
 
     return () => {
-      if (mockOrderTimeout.current) {
-        clearTimeout(mockOrderTimeout.current);
-      }
+      if (locationInterval) clearInterval(locationInterval);
+      socketService.disconnect();
     };
-  }, [isOnline]);
+  }, [isOnline, currentOrder, driverPhone]);
 
   const handleToggle = () => {
     if (toggling) return;
@@ -239,6 +313,17 @@ export default function HomeScreen() {
       <IncomingOrderModal
         order={incomingOrder}
         onAccept={() => {
+          if (incomingOrder?.id) {
+            socketService.emit("driver_accepted_order", {
+              orderId: incomingOrder.id,
+              driverInfo: {
+                id: driverPhone || "driver-mock-123",
+                name: driverName || "Mock Driver",
+                phone: driverPhone || "+91 9999999999",
+                rating: "4.8"
+              }
+            });
+          }
           acceptOrder();
           router.push("/order-navigation");
         }}

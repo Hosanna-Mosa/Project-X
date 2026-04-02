@@ -14,6 +14,9 @@ import userRoutes from "./modules/users/users.routes";
 import driverRoutes from "./modules/drivers/drivers.routes";
 import orderRoutes from "./modules/orders/orders.routes";
 import adminRoutes from "./modules/admin/admin.routes";
+import placesRoutes from "./modules/places/places.routes";
+import routingRoutes from "./modules/routing/routing.routes";
+import paymentRoutes from "./modules/payments/payment.routes";
 
 dotenv.config();
 
@@ -46,6 +49,9 @@ AppDataSource.initialize()
     app.use("/api/drivers", driverRoutes);
     app.use("/api/orders", orderRoutes);
     app.use("/api/admin", adminRoutes);
+    app.use("/api/places", placesRoutes);
+    app.use("/api/routing", routingRoutes);
+    app.use("/api/payments", paymentRoutes);
 
     server.listen(PORT, () => {
       console.log(`Server is running on port ${PORT}`);

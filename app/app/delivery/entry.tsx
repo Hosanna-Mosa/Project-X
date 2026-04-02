@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useRef } from "react";
 import {
   Platform,
   ScrollView,
@@ -11,22 +11,104 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
 import { router } from "expo-router";
 import Colors from "@/constants/colors";
-import { MapBackground } from "@/components/MapBackground";
+import { MapBackground, MapBackgroundRef } from "@/components/MapBackground";
+import * as Location from "expo-location";
 import { BottomSheet } from "@/components/BottomSheet";
 import { StopCard } from "@/components/StopCard";
 import { useDeliveryStore } from "@/contexts/deliveryStore";
+import { MapType } from "react-native-maps";
 
 export default function DeliveryEntryScreen() {
   const insets = useSafeAreaInsets();
-  const { stops, currentLocation, addStop, removeStop, scheduling, loadType, setScheduling, setLoadType } = useDeliveryStore();
+  const { 
+    stops, 
+    route,
+    currentLocation, 
+    currentCoords,
+    setCurrentLocation, 
+    setCurrentCoords, 
+    addStop, 
+    removeStop, 
+    setStops,
+    setRoute,
+    scheduling, 
+    loadType, 
+    setScheduling, 
+    setLoadType,
+    calculatePrice
+  } = useDeliveryStore();
   const [showMapControls, setShowMapControls] = useState(false);
+  const [mapType, setMapType] = useState<MapType>("standard");
+  const [isCalculating, setIsCalculating] = useState(false);
+  const mapRef = useRef<MapBackgroundRef>(null);
+
+  const handleRecenter = () => {
+    mapRef.current?.recenter();
+  };
+
+  const toggleMapType = () => {
+    setMapType((prev) => (prev === "standard" ? "satellite" : "standard"));
+  };
 
   const handleAddStop = () => {
     router.push("/delivery/add-stop");
   };
 
-  const handleCalculateRoute = () => {
-    router.push("/delivery/checkout");
+  const handleLocationUpdate = async (coords: { lat: number; lng: number }) => {
+    setCurrentCoords(coords);
+    try {
+      const [place] = await Location.reverseGeocodeAsync({
+        latitude: coords.lat,
+        longitude: coords.lng,
+      });
+
+      if (place) {
+        const address = `${place.name || place.streetNumber || ""} ${place.street || ""}, ${place.city || ""}, ${place.region || ""} ${place.postalCode || ""}`.trim();
+        setCurrentLocation(address || "Current Location Found");
+      }
+    } catch (error) {
+      console.error("Error reverse geocoding:", error);
+    }
+  };
+
+  const handleStopPress = (stop: any) => {
+    if (stop.lat && stop.lng) {
+      mapRef.current?.panTo(stop.lat, stop.lng);
+    }
+  };
+
+  const handleCalculateRoute = async () => {
+    if (stops.length === 0 || !currentCoords) return;
+
+    setIsCalculating(true);
+    try {
+      const response = await fetch(`http://192.168.1.5:5000/api/routing/optimize`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          origin: currentCoords,
+          stops: stops,
+        }),
+      });
+
+      const data = await response.json();
+      if (data.optimizedStops && data.polyline) {
+        setStops(data.optimizedStops);
+        setRoute({
+          totalDistance: data.totalDistance,
+          estimatedTime: data.estimatedTime,
+          polyline: data.polyline,
+        });
+        calculatePrice();
+        
+        // After getting the route, show checkout
+        router.push("/delivery/checkout");
+      }
+    } catch (error) {
+      console.error("Optimization failed:", error);
+    } finally {
+      setIsCalculating(false);
+    }
   };
 
   const schedulingLabel = scheduling === "asap" ? "ASAP Delivery" : "Scheduled";
@@ -34,7 +116,14 @@ export default function DeliveryEntryScreen() {
 
   return (
     <View style={styles.root}>
-      <MapBackground style={StyleSheet.absoluteFill} />
+      <MapBackground 
+        ref={mapRef}
+        mapType={mapType}
+        stops={stops}
+        polyline={route?.polyline}
+        onLocationUpdate={handleLocationUpdate}
+        style={StyleSheet.absoluteFill} 
+      />
 
       <View
         style={[
@@ -59,11 +148,11 @@ export default function DeliveryEntryScreen() {
       </View>
 
       <View style={styles.mapControls}>
-        <TouchableOpacity style={styles.mapControlBtn}>
+        <TouchableOpacity style={styles.mapControlBtn} onPress={handleRecenter}>
           <Feather name="crosshair" size={20} color={Colors.light.text} />
         </TouchableOpacity>
-        <TouchableOpacity style={styles.mapControlBtn}>
-          <Feather name="layers" size={20} color={Colors.light.text} />
+        <TouchableOpacity style={styles.mapControlBtn} onPress={toggleMapType}>
+          <Feather name={mapType === "standard" ? "layers" : "map"} size={20} color={Colors.light.text} />
         </TouchableOpacity>
       </View>
 
@@ -90,6 +179,7 @@ export default function DeliveryEntryScreen() {
                   stop={stop}
                   index={i}
                   onRemove={removeStop}
+                  onPress={handleStopPress}
                 />
               ))}
             </View>
@@ -110,7 +200,7 @@ export default function DeliveryEntryScreen() {
             <Feather name="chevron-right" size={18} color={Colors.light.textMuted} />
           </TouchableOpacity>
 
-          <View style={styles.optionsRow}>
+          {/* <View style={styles.optionsRow}>
             <TouchableOpacity
               style={styles.optionCard}
               onPress={() => setScheduling(scheduling === "asap" ? "scheduled" : "asap")}
@@ -133,19 +223,25 @@ export default function DeliveryEntryScreen() {
                 <Text style={styles.optionValue}>{loadTypeLabel}</Text>
               </View>
             </TouchableOpacity>
-          </View>
+          </View> */}
 
           <TouchableOpacity
             style={[
               styles.calculateBtn,
-              stops.length === 0 && styles.calculateBtnDisabled,
+              (stops.length === 0 || isCalculating) && styles.calculateBtnDisabled,
             ]}
             onPress={handleCalculateRoute}
-            disabled={stops.length === 0}
+            disabled={stops.length === 0 || isCalculating}
             activeOpacity={0.85}
           >
-            <Text style={styles.calculateBtnText}>Calculate Optimized Route</Text>
-            <Feather name="zap" size={18} color="#fff" />
+            <Text style={styles.calculateBtnText}>
+              {isCalculating ? "Optimizing..." : "Calculate Optimized Route"}
+            </Text>
+            {isCalculating ? (
+              <Feather name="loader" size={18} color="#fff" />
+            ) : (
+              <Feather name="zap" size={18} color="#fff" />
+            )}
           </TouchableOpacity>
 
           <View style={{ height: 20 }} />
