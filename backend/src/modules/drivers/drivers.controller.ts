@@ -1,6 +1,7 @@
 import { Response } from "express";
 import { DriverService } from "./drivers.service";
 import { AuthRequest } from "../../middleware/auth.middleware";
+import Driver from "../../database/models/Driver";
 
 const driverService = new DriverService();
 
@@ -10,15 +11,11 @@ export class DriversController {
       const { status } = req.body;
       const { userId } = req.user!;
       
-      // Usually, driver id is separate from user id
-      // For this system, we'll find driver linked to user
-      const driver = await AppDataSource.getRepository("drivers").findOne({
-        where: { user: { id: userId } }
-      });
+      const driver = await Driver.findOne({ user: userId });
 
       if (!driver) return res.status(404).json({ message: "Driver profile not found" });
 
-      await driverService.updateStatus(driver.id, status);
+      await driverService.updateStatus((driver._id as any).toString(), status);
       return res.json({ message: "Status updated", status });
     } catch (error) {
        return res.status(500).json({ message: "Internal server error" });
@@ -46,17 +43,15 @@ export class DriversController {
       
       console.log(`[REST] Driver Location update attempt. User: ${userId}, Lat: ${latitude}, Lng: ${longitude}`);
 
-      const driver = await AppDataSource.getRepository("drivers").findOne({
-        where: { user: { id: userId } }
-      });
+      const driver = await Driver.findOne({ user: userId });
 
       if (!driver) {
         console.warn(`[REST] Driver profile not found for user: ${userId}`);
         return res.status(404).json({ message: "Driver profile not found" });
       }
 
-      await driverService.updateLocation(driver.id, latitude, longitude);
-      console.log(`[REST] Successfully updated location for driver: ${driver.id}`);
+      await driverService.updateLocation((driver._id as any).toString(), latitude, longitude);
+      console.log(`[REST] Successfully updated location for driver: ${driver._id}`);
       return res.json({ message: "Location updated" });
     } catch (error) {
        console.error(`[REST] Error updating location:`, error);
@@ -64,4 +59,3 @@ export class DriversController {
     }
   }
 }
-import { AppDataSource } from "../../database/data-source";

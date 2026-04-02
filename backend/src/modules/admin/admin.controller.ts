@@ -1,18 +1,14 @@
 import { Request, Response } from "express";
-import { AppDataSource } from "../../database/data-source";
-import { Order } from "../../database/entities/Order";
-import { Driver } from "../../database/entities/Driver";
-
-const orderRepository = AppDataSource.getRepository(Order);
-const driverRepository = AppDataSource.getRepository(Driver);
+import Order from "../../database/models/Order";
+import Driver, { DriverStatus } from "../../database/models/Driver";
 
 export class AdminController {
   async getAllOrders(req: Request, res: Response) {
     try {
-      const orders = await orderRepository.find({
-        relations: ["user", "driver", "stops"],
-        order: { createdAt: "DESC" },
-      });
+      const orders = await Order.find()
+        .populate("user")
+        .populate("driver")
+        .sort({ createdAt: -1 });
       return res.json(orders);
     } catch (error) {
       return res.status(500).json({ message: "Internal server error" });
@@ -21,9 +17,7 @@ export class AdminController {
 
   async getAllDrivers(req: Request, res: Response) {
     try {
-      const drivers = await driverRepository.find({
-        relations: ["user"],
-      });
+      const drivers = await Driver.find().populate("user");
       return res.json(drivers);
     } catch (error) {
       return res.status(500).json({ message: "Internal server error" });
@@ -32,18 +26,23 @@ export class AdminController {
 
   async getDashboardStats(req: Request, res: Response) {
     try {
-      const totalOrders = await orderRepository.count();
-      const activeDrivers = await driverRepository.count({
-        where: { status: "ONLINE" as any }
+      const totalOrders = await Order.countDocuments();
+      const activeDrivers = await Driver.countDocuments({
+        status: DriverStatus.ONLINE
       });
-      const totalRevenue = await orderRepository.sum("totalPrice");
+      
+      const revenueData = await Order.aggregate([
+        { $group: { _id: null, total: { $sum: "$totalPrice" } } }
+      ]);
+      const totalRevenue = revenueData.length > 0 ? revenueData[0].total : 0;
 
       return res.json({
         totalOrders,
         activeDrivers,
-        totalRevenue: totalRevenue || 0,
+        totalRevenue,
       });
     } catch (error) {
+      console.error("Dashboard stats error:", error);
       return res.status(500).json({ message: "Internal server error" });
     }
   }

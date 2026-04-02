@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from "express";
 import jwt from "jsonwebtoken";
-import { UserRole } from "../database/entities/User";
+import { UserRole } from "../database/models/User";
 
 export interface AuthRequest extends Request {
   user?: {

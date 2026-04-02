@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { DriversController } from "./drivers.controller";
 import { authenticateToken, authorizeRole } from "../../middleware/auth.middleware";
-import { UserRole } from "../../database/entities/User";
+import { UserRole } from "../../database/models/User";
 
 const router = Router();
 const driversController = new DriversController();

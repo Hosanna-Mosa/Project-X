@@ -1,11 +1,6 @@
 import jwt from "jsonwebtoken";
-import { AppDataSource } from "../../database/data-source";
-import { User, UserRole } from "../../database/entities/User";
-import { OTP } from "../../database/entities/OTP";
-import { MoreThan } from "typeorm";
-
-const userRepository = AppDataSource.getRepository(User);
-const otpRepository = AppDataSource.getRepository(OTP);
+import User, { UserRole } from "../../database/models/User";
+import OTP from "../../database/models/OTP";
 
 export class AuthService {
   async requestOTP(phone: string) {
@@ -14,12 +9,12 @@ export class AuthService {
     const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes expiry
 
     // Save OTP to database
-    const otp = otpRepository.create({
+    const otp = new OTP({
       phone,
       code,
       expiresAt,
     });
-    await otpRepository.save(otp);
+    await otp.save();
 
     console.log(`OTP for ${phone}: ${code}`);
     // In future, send via SMS service here
@@ -27,21 +22,18 @@ export class AuthService {
   }
 
   async verifyOTP(phone: string, code: string, role: UserRole, name?: string) {
-    const otp = await otpRepository.findOne({
-      where: {
-        phone,
-        code,
-        isUsed: false,
-        expiresAt: MoreThan(new Date()),
-      },
-      order: { createdAt: "DESC" },
-    });
+    const otp = await OTP.findOne({
+      phone,
+      code,
+      isUsed: false,
+      expiresAt: { $gt: new Date() },
+    }).sort({ createdAt: -1 });
 
     if (!otp) {
       throw new Error("Invalid or expired OTP");
     }
 
-    let user = await userRepository.findOne({ where: { phone } });
+    let user = await User.findOne({ phone });
 
     if (!user && !name) {
       // User not found and no name provided (initial verification)
@@ -51,7 +43,7 @@ export class AuthService {
 
     // Mark OTP as used
     otp.isUsed = true;
-    await otpRepository.save(otp);
+    await otp.save();
 
     if (!user) {
       if (!name) {
@@ -59,15 +51,15 @@ export class AuthService {
         return { isNewUser: true };
       }
       // Create new user (Signup)
-      user = userRepository.create({
+      user = new User({
         name,
         phone,
         role,
       });
-      await userRepository.save(user);
+      await user.save();
     }
 
-    const token = this.generateToken(user.id, user.role);
+    const token = this.generateToken((user._id as any).toString(), user.role);
     return { user, token, isNewUser: false };
   }
 
