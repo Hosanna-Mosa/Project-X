@@ -14,9 +14,27 @@
       "backgroundColor": "#ffffff"
     },
     "ios": {
-      "supportsTablet": false
+      "supportsTablet": false,
+      "bundleIdentifier": "com.hosanna.triozen.x",
+      "config": {
+        "googleMapsApiKey": "AIzaSyD23mZxzw78gBlz6EGEZ6BMgCwc4fygJMA"
+      },
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "This app uses your location to show nearby services and track your deliveries."
+      }
     },
-    "android": {},
+    "android": {
+      "package": "com.hosanna.triozen.x",
+      "config": {
+        "googleMaps": {
+          "apiKey": "AIzaSyD23mZxzw78gBlz6EGEZ6BMgCwc4fygJMA"
+        }
+      },
+      "permissions": [
+        "ACCESS_COARSE_LOCATION",
+        "ACCESS_FINE_LOCATION"
+      ]
+    },
     "web": {
       "favicon": "./assets/images/icon.png"
     },
@@ -35,7 +53,7 @@
       "reactCompiler": true
     },
     "extra": {
-      "apiUrl": "http://192.168.1.9:5000"
+      "apiUrl": "http://192.168.1.5:5000"
     }
   }
 }

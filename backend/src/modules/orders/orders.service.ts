@@ -4,6 +4,7 @@ import { Stop, StopType } from "../../database/entities/Stop";
 import { User } from "../../database/entities/User";
 import { RoutingService } from "../routing/routing.service";
 import { PricingService } from "../pricing/pricing.service";
+import { SocketManager } from "../../sockets/socket.manager";
 
 const orderRepository = AppDataSource.getRepository(Order);
 const stopRepository = AppDataSource.getRepository(Stop);
@@ -23,11 +24,23 @@ export class OrdersService {
     
     // Simple start point (let's assume first pickup)
     const startPos = { 
-      latitude: stops[0].latitude, 
-      longitude: stops[0].longitude 
+      latitude: stops[0].latitude || stops[0].lat, 
+      longitude: stops[0].longitude || stops[0].lng 
     };
 
-    const optimizationResult = this.routingService.optimizeRoute(startPos, stops);
+    const optimizationResult = await this.routingService.optimizeAndGetRoute(
+      startPos, 
+      stops.map(s => ({
+        id: s.id || Math.random().toString(),
+        address: s.address || "Address",
+        latitude: s.latitude || s.lat,
+        longitude: s.longitude || s.lng,
+        type: s.type,
+      }))
+    );
+
+    if (!optimizationResult) throw new Error("Could not optimize route");
+
     const totalPrice = this.pricingService.calculatePrice(
       optimizationResult.totalDistance, 
       optimizationResult.optimizedStops.length
@@ -42,24 +55,52 @@ export class OrdersService {
 
     const savedOrder = await orderRepository.save(order);
 
-    const stopEntities = optimizationResult.optimizedStops.map((stop, index) => {
+    const stopEntities = optimizationResult.optimizedStops.map((stop: any, index: number) => {
       return stopRepository.create({
         order: savedOrder,
         sequence: index + 1,
         latitude: stop.latitude,
         longitude: stop.longitude,
-        type: stop.type as StopType,
-        items: stop.items,
+        address: stop.address,
+        type: stop.type || StopType.PICKUP,
+        items: stop.items || [],
       });
     });
 
     await stopRepository.save(stopEntities);
 
-    return {
+    const result = {
       ...savedOrder,
       stops: stopEntities,
       estimatedTime: optimizationResult.estimatedTime,
+      polyline: optimizationResult.polyline,
     };
+
+    // BROADCAST to drivers
+    const socketManager = SocketManager.getInstance();
+    if (socketManager) {
+      socketManager.broadcastToDrivers("new_order", {
+        id: savedOrder.id,
+        distance: `${optimizationResult.totalDistance} km`,
+        duration: `${optimizationResult.estimatedTime} min`,
+        earnings: Math.round(savedOrder.totalPrice * 0.8), // 80% to driver
+        customerName: user.name || "Customer",
+        customerPhone: user.phone || "N/A",
+        status: "pending",
+        timestamp: new Date(),
+        stops: stopEntities.map(s => ({
+          id: s.id,
+          type: s.type.toLowerCase(),
+          locationName: s.address.split(',')[0],
+          address: s.address,
+          lat: s.latitude,
+          lng: s.longitude,
+          items: s.items,
+        }))
+      });
+    }
+
+    return result;
   }
 
   async getOrderById(orderId: string) {

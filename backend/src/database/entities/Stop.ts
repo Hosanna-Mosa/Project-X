@@ -23,6 +23,9 @@ export class Stop {
   @Column({ type: "float" })
   longitude!: number;
 
+  @Column({ type: "text", nullable: true })
+  address!: string;
+
   @Column({
     type: "enum",
     enum: StopType,

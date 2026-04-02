@@ -49,7 +49,7 @@ export default function HomeScreen() {
     <View style={styles.root}>
       <MapBackground style={StyleSheet.absoluteFill} />
 
-      <View style={[styles.overlay, { paddingTop: topPadding }]}>
+      <View style={[styles.overlay, { paddingTop: topPadding }]} pointerEvents="box-none">
         <TouchableOpacity 
           style={styles.locationBar} 
           activeOpacity={0.9}
@@ -84,10 +84,10 @@ export default function HomeScreen() {
 
       <ScrollView
         style={styles.scrollView}
+        pointerEvents="box-none"
         contentContainerStyle={[
           styles.scrollContent,
           {
-            paddingTop: topPadding + 180, 
             paddingBottom: 120, // Sit above the floating tab bar
             flexGrow: 1,
             justifyContent: 'flex-end',
@@ -95,60 +95,52 @@ export default function HomeScreen() {
         ]}
         showsVerticalScrollIndicator={false}
       >
+        <View pointerEvents="auto">
+          <View style={styles.contentCard}>
+            <View style={styles.sheetHandle} />
 
-        <View style={styles.contentCard}>
-          <View style={styles.sheetHandle} />
-
-          <View style={styles.categoriesRow}>
-            <ServiceCategory
-              icon="car"
-              label="Ride"
-              color="#0EA5E9"
-              onPress={() => router.push({ pathname: "/service-selection", params: { label: "Ride" } })}
-            />
-            <ServiceCategory
-              icon="utensils"
-              label="Food"
-              color="#0EA5E9"
-              onPress={() => router.push({ pathname: "/service-selection", params: { label: "Food" } })}
-            />
-            <ServiceCategory
-              icon="shopping-basket"
-              label="Grocery"
-              color="#0EA5E9"
-              onPress={() => router.push({ pathname: "/service-selection", params: { label: "Grocery" } })}
-            />
-            <ServiceCategory
-              icon="medkit"
-              label="Meds"
-              color="#0EA5E9"
-              onPress={() => router.push({ pathname: "/service-selection", params: { label: "Meds" } })}
-            />
-          </View>
-
-          <TouchableOpacity
-            style={styles.promoBanner}
-            onPress={() => router.push("/delivery/entry")}
-            activeOpacity={0.9}
-          >
-            <View style={styles.promoIconContainer}>
-              <Feather name="box" size={24} color="#0EA5E9" />
+            <View style={styles.categoriesRow}>
+              <ServiceCategory
+                icon="car"
+                label="Ride"
+                color="#0EA5E9"
+                onPress={() => router.push({ pathname: "/service-selection", params: { label: "Ride" } })}
+              />
+              <ServiceCategory
+                icon="utensils"
+                label="Food"
+                color="#0EA5E9"
+                onPress={() => router.push({ pathname: "/service-selection", params: { label: "Food" } })}
+              />
+              <ServiceCategory
+                icon="shopping-basket"
+                label="Grocery"
+                color="#0EA5E9"
+                onPress={() => router.push({ pathname: "/service-selection", params: { label: "Grocery" } })}
+              />
+              <ServiceCategory
+                icon="medkit"
+                label="Meds"
+                color="#0EA5E9"
+                onPress={() => router.push({ pathname: "/service-selection", params: { label: "Meds" } })}
+              />
             </View>
-            <View style={styles.promoTextGroup}>
-              <Text style={styles.promoTitle}>Multi–Stop Delivery</Text>
-              <Text style={styles.promoSubtitle}>Ship multiple items in one route</Text>
-            </View>
-            <Feather name="chevron-right" size={20} color="#0EA5E9" />
-          </TouchableOpacity>
 
-          {/* <View style={styles.sectionTitleRow}>
-            <Text style={styles.sectionTitleText}>Popular near you</Text>
-            <TouchableOpacity>
-              <Text style={styles.seeAllButton}>SEE ALL</Text>
+            <TouchableOpacity
+              style={styles.promoBanner}
+              onPress={() => router.push("/delivery/entry")}
+              activeOpacity={0.9}
+            >
+              <View style={styles.promoIconContainer}>
+                <Feather name="box" size={24} color="#0EA5E9" />
+              </View>
+              <View style={styles.promoTextGroup}>
+                <Text style={styles.promoTitle}>Multi–Stop Delivery</Text>
+                <Text style={styles.promoSubtitle}>Ship multiple items in one route</Text>
+              </View>
+              <Feather name="chevron-right" size={20} color="#0EA5E9" />
             </TouchableOpacity>
-          </View> */}
-
-          
+          </View>
         </View>
       </ScrollView>
     </View>
@@ -201,10 +193,13 @@ const styles = StyleSheet.create({
     height: "100%",
   },
   scrollView: {
-    flex: 1,
+    position: "absolute",
+    bottom: 0,
+    left: 0,
+    right: 0,
+    maxHeight: "75%", // Limits the scrollview so it doesn't block the top map area
   },
   scrollContent: {
-    gap: 16,
     paddingHorizontal: 0,
   },
   locationBar: {

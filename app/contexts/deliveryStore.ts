@@ -45,7 +45,14 @@ export interface DeliveryState {
   loadType: "parcel" | "grocery" | "fragile" | "mixed";
   paymentMethod: string;
   currentLocation: string;
-  addStop: (address: string, storeName?: string) => void;
+  currentCoords: { lat: number; lng: number } | null;
+  currentOrderId: string | null;
+  driver: any | null;
+  setCurrentLocation: (address: string) => void;
+  setCurrentCoords: (coords: { lat: number; lng: number }) => void;
+  setOrderId: (id: string | null) => void;
+  setDriver: (driver: any) => void;
+  addStop: (address: string, storeName?: string, items?: DeliveryItem[], lat?: number, lng?: number) => void;
   removeStop: (id: string) => void;
   reorderStops: (from: number, to: number) => void;
   addItemToStop: (stopId: string, item: DeliveryItem) => void;
@@ -56,6 +63,8 @@ export interface DeliveryState {
   calculateRoute: () => void;
   calculatePrice: () => void;
   setStatus: (status: OrderStatus) => void;
+  setRoute: (route: RouteInfo) => void;
+  setStops: (stops: DeliveryStop[]) => void;
   resetDelivery: () => void;
 }
 
@@ -71,12 +80,19 @@ const initialState = {
   loadType: "mixed" as const,
   paymentMethod: "**** 4342",
   currentLocation: "340 Main St, San Francisco, CA 94105",
+  currentCoords: null,
+  currentOrderId: null,
+  driver: null,
 };
 
 export const useDeliveryStore = create<DeliveryState>((set, get) => ({
   ...initialState,
+  setCurrentLocation: (currentLocation) => set({ currentLocation }),
+  setCurrentCoords: (currentCoords) => set({ currentCoords }),
+  setOrderId: (currentOrderId) => set({ currentOrderId }),
+  setDriver: (driver) => set({ driver }),
 
-  addStop: (address: string, storeName?: string) => {
+  addStop: (address: string, storeName?: string, items: DeliveryItem[] = [], lat?: number, lng?: number) => {
     set((state) => ({
       stops: [
         ...state.stops,
@@ -84,7 +100,9 @@ export const useDeliveryStore = create<DeliveryState>((set, get) => ({
           id: generateId(),
           address,
           storeName,
-          items: [],
+          items,
+          lat,
+          lng,
         },
       ],
     }));
@@ -156,6 +174,7 @@ export const useDeliveryStore = create<DeliveryState>((set, get) => ({
   },
 
   setStatus: (status) => set({ status }),
-
+  setRoute: (route) => set({ route }),
+  setStops: (stops) => set({ stops }),
   resetDelivery: () => set(initialState),
 }));

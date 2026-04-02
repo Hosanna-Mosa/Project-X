@@ -68,6 +68,17 @@ export class DeliveryService {
       driverPhone: driver.user.phone,
     });
 
+    // Notify all listeners in the order room (Customer tracking screen)
+    socketManager.emitToOrderRoom(orderId, "order_accepted", {
+      orderId,
+      driver: {
+        id: driver.id,
+        name: driver.user.name,
+        phone: driver.user.phone,
+        rating: 4.9, // Mock rating or fetch from driver entity
+      }
+    });
+
     // Join order room for driver
     socketManager.emitToUser(driver.user.id, "order_assigned", {
       orderId,

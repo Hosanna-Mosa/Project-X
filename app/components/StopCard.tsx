@@ -31,7 +31,7 @@ export function StopCard({ stop, index, onRemove, onPress }: Props) {
         <Text style={styles.address} numberOfLines={1}>
           {stop.address}
         </Text>
-        {stop.items.length > 0 && (
+        {stop.items && stop.items.length > 0 && (
           <Text style={styles.itemCount}>
             {stop.items.length} item{stop.items.length !== 1 ? "s" : ""}
           </Text>

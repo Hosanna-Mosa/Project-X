@@ -10,11 +10,13 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
 import { router } from "expo-router";
+import { ActivityIndicator } from "react-native";
 import Colors from "@/constants/colors";
-import { MapBackground } from "@/components/MapBackground";
+import { useDeliveryStore } from "@/contexts/deliveryStore";
+import { socketService } from "@/utils/socketService";
+import { MapBackground, MapBackgroundRef } from "@/components/MapBackground";
 import { BottomSheet } from "@/components/BottomSheet";
 import { OrderStatusTimeline } from "@/components/OrderStatusTimeline";
-import { useDeliveryStore } from "@/contexts/deliveryStore";
 import { OrderStatus } from "@/contexts/deliveryStore";
 
 const STATUS_SEQUENCE: OrderStatus[] = [
@@ -27,18 +29,48 @@ const STATUS_SEQUENCE: OrderStatus[] = [
 
 export default function TrackingScreen() {
   const insets = useSafeAreaInsets();
-  const { status, setStatus } = useDeliveryStore();
+  const { status, setStatus, currentOrderId, route, stops, driver, setDriver } = useDeliveryStore();
   const [eta, setEta] = useState(15);
+  const [driverLocation, setDriverLocation] = useState<{ lat: number, lng: number } | null>(null);
+  const mapRef = React.useRef<MapBackgroundRef>(null);
 
   useEffect(() => {
     if (status === "confirmed") {
       setStatus("driver_assigned");
     }
+
+    if (currentOrderId) {
+      socketService.connect();
+      socketService.trackOrder(currentOrderId);
+
+      socketService.on("order_accepted", (data) => {
+        console.log("Driver accepted the order:", data.driver);
+        setDriver(data.driver);
+        setStatus("driver_assigned");
+      });
+
+      socketService.on("driver_location_update", (data) => {
+        console.log("Driver Moved:", data);
+        setDriverLocation({ lat: data.lat, lng: data.lng });
+        
+        // Update status if it's the first movement
+        if (status === "driver_assigned") {
+          setStatus("on_the_way");
+        }
+
+        // Fit map to show both user/stops and driver
+        setTimeout(() => mapRef.current?.fitToRoute(), 500);
+      });
+    }
+
     const timer = setInterval(() => {
       setEta((prev) => Math.max(1, prev - 1));
     }, 30000);
-    return () => clearInterval(timer);
-  }, []);
+
+    return () => {
+      clearInterval(timer);
+    };
+  }, [currentOrderId, status]);
 
   const handleBack = () => {
     router.replace("/(tabs)/orders");
@@ -46,7 +78,13 @@ export default function TrackingScreen() {
 
   return (
     <View style={styles.root}>
-      <MapBackground style={StyleSheet.absoluteFill} />
+      <MapBackground 
+        ref={mapRef}
+        stops={stops}
+        polyline={route?.polyline}
+        driverLocation={driverLocation}
+        style={StyleSheet.absoluteFill} 
+      />
 
       <View
         style={[
@@ -55,6 +93,7 @@ export default function TrackingScreen() {
             paddingTop: insets.top + (Platform.OS === "web" ? 67 : 0) + 12,
           },
         ]}
+        pointerEvents="box-none"
       >
         <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
           <Feather name="arrow-left" size={22} color={Colors.light.text} />
@@ -69,51 +108,65 @@ export default function TrackingScreen() {
 
       <BottomSheet style={styles.bottomSheet}>
         <ScrollView showsVerticalScrollIndicator={false}>
-          <View style={styles.driverCard}>
-            <View style={styles.driverAvatar}>
-              <Feather name="user" size={28} color={Colors.light.text} />
-            </View>
-            <View style={styles.driverInfo}>
-              <Text style={styles.driverName}>John Doe</Text>
-              <View style={styles.ratingRow}>
-                <Feather name="star" size={12} color="#F59E0B" />
-                <Text style={styles.ratingText}>4.9</Text>
+          {!driver ? (
+            <View style={styles.findingDriverContainer}>
+              <View style={styles.radarContainer}>
+                <View style={styles.radarCircle} />
+                <Feather name="search" size={30} color={Colors.light.primary} />
               </View>
-              <Text style={styles.driverMotto}>Loves delivering on time</Text>
+              <Text style={styles.findingTitle}>Finding your delivery partner...</Text>
+              <Text style={styles.findingSubtitle}>We're connecting you with the nearest professional driver.</Text>
+              <ActivityIndicator color={Colors.light.primary} style={{ marginTop: 24 }} />
             </View>
-            <View style={styles.driverActions}>
-              <TouchableOpacity style={styles.actionBtn}>
-                <Feather name="phone" size={18} color={Colors.light.textSecondary} />
+          ) : (
+            <>
+              <View style={styles.driverCard}>
+                <View style={styles.driverAvatar}>
+                  <Feather name="user" size={28} color={Colors.light.text} />
+                </View>
+                <View style={styles.driverInfo}>
+                  <Text style={styles.driverName}>{driver.name || "Assigned Driver"}</Text>
+                  <View style={styles.ratingRow}>
+                    <Feather name="star" size={12} color="#F59E0B" />
+                    <Text style={styles.ratingText}>{driver.rating || "4.9"}</Text>
+                  </View>
+                  <Text style={styles.driverMotto}>Loves delivering on time</Text>
+                </View>
+                <View style={styles.driverActions}>
+                  <TouchableOpacity style={styles.actionBtn}>
+                    <Feather name="phone" size={18} color={Colors.light.textSecondary} />
+                  </TouchableOpacity>
+                  <TouchableOpacity style={styles.actionBtn} onPress={() => router.push("/chat")}>
+                    <Feather name="message-square" size={18} color={Colors.light.primary} />
+                  </TouchableOpacity>
+                </View>
+              </View>
+
+              <View style={styles.divider} />
+
+              <OrderStatusTimeline currentStatus={status} />
+
+              <TouchableOpacity
+                style={styles.nextStatusBtn}
+                onPress={() => {
+                  const currentIndex = STATUS_SEQUENCE.indexOf(status);
+                  if (currentIndex < STATUS_SEQUENCE.length - 1) {
+                    setStatus(STATUS_SEQUENCE[currentIndex + 1]);
+                  }
+                }}
+              >
+                <Text style={styles.nextStatusText}>
+                  {status === "delivered" ? "Order Delivered!" : "Simulate Next Step"}
+                </Text>
               </TouchableOpacity>
-              <TouchableOpacity style={styles.actionBtn} onPress={() => router.push("/chat")}>
-                <Feather name="message-square" size={18} color={Colors.light.primary} />
-              </TouchableOpacity>
-            </View>
-          </View>
 
-          <View style={styles.divider} />
-
-          <OrderStatusTimeline currentStatus={status} />
-
-          <TouchableOpacity
-            style={styles.nextStatusBtn}
-            onPress={() => {
-              const currentIndex = STATUS_SEQUENCE.indexOf(status);
-              if (currentIndex < STATUS_SEQUENCE.length - 1) {
-                setStatus(STATUS_SEQUENCE[currentIndex + 1]);
-              }
-            }}
-          >
-            <Text style={styles.nextStatusText}>
-              {status === "delivered" ? "Order Delivered!" : "Simulate Next Step"}
-            </Text>
-          </TouchableOpacity>
-
-          {status === "delivered" && (
-            <TouchableOpacity style={styles.doneBtn} onPress={handleBack}>
-              <Text style={styles.doneBtnText}>View Order History</Text>
-              <Feather name="arrow-right" size={18} color="#fff" />
-            </TouchableOpacity>
+              {status === "delivered" && (
+                <TouchableOpacity style={styles.doneBtn} onPress={handleBack}>
+                  <Text style={styles.doneBtnText}>View Order History</Text>
+                  <Feather name="arrow-right" size={18} color="#fff" />
+                </TouchableOpacity>
+              )}
+            </>
           )}
 
           <View style={{ height: 20 }} />
@@ -180,6 +233,42 @@ const styles = StyleSheet.create({
     right: 0,
     maxHeight: "60%",
     paddingBottom: 0,
+  },
+  findingDriverContainer: {
+    paddingVertical: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  radarContainer: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: `${Colors.light.primary}15`,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 20,
+  },
+  radarCircle: {
+    position: 'absolute',
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    borderWidth: 2,
+    borderColor: Colors.light.primary,
+    opacity: 0.3,
+  },
+  findingTitle: {
+    fontSize: 20,
+    fontWeight: '800',
+    color: Colors.light.text,
+    textAlign: 'center',
+    marginBottom: 8,
+  },
+  findingSubtitle: {
+    fontSize: 14,
+    color: Colors.light.textMuted,
+    textAlign: 'center',
+    paddingHorizontal: 40,
   },
   driverCard: {
     flexDirection: "row",
