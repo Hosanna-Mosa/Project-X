@@ -22,55 +22,67 @@ import { OrderStatus } from "@/contexts/deliveryStore";
 const STATUS_SEQUENCE: OrderStatus[] = [
   "confirmed",
   "driver_assigned",
+  "en_route_pickup",
+  "arrived_pickup",
   "picking_items",
-  "on_the_way",
+  "en_route_delivery",
+  "arrived_delivery",
   "delivered",
 ];
 
 export default function TrackingScreen() {
   const insets = useSafeAreaInsets();
-  const { status, setStatus, currentOrderId, route, stops, driver, setDriver } = useDeliveryStore();
+  const { status, setStatus, currentOrderId, route, stops, driver, setDriver, unreadCount, incrementUnreadCount } = useDeliveryStore();
   const [eta, setEta] = useState(15);
   const [driverLocation, setDriverLocation] = useState<{ lat: number, lng: number } | null>(null);
   const mapRef = React.useRef<MapBackgroundRef>(null);
 
   useEffect(() => {
-    if (status === "confirmed") {
-      setStatus("driver_assigned");
-    }
-
     if (currentOrderId) {
       socketService.connect();
       socketService.trackOrder(currentOrderId);
 
-      socketService.on("order_accepted", (data) => {
+      const onOrderAccepted = (data: any) => {
         console.log("Driver accepted the order:", data.driver);
         setDriver(data.driver);
         setStatus("driver_assigned");
-      });
+      };
 
-      socketService.on("driver_location_update", (data) => {
-        console.log("Driver Moved:", data);
+      const onLocationUpdate = (data: any) => {
         setDriverLocation({ lat: data.lat, lng: data.lng });
-        
-        // Update status if it's the first movement
-        if (status === "driver_assigned") {
-          setStatus("on_the_way");
-        }
-
-        // Fit map to show both user/stops and driver
         setTimeout(() => mapRef.current?.fitToRoute(), 500);
-      });
+      };
+
+      const onStatusUpdate = (data: any) => {
+        if (data.status) {
+          setStatus(data.status as OrderStatus);
+        }
+      };
+
+      const onMessage = (msg: any) => {
+        if (msg.from === "driver") {
+          incrementUnreadCount();
+        }
+      };
+
+      socketService.on("order_accepted", onOrderAccepted);
+      socketService.on("driver_location_update", onLocationUpdate);
+      socketService.on("order_status_update", onStatusUpdate);
+      socketService.on("receive_message", onMessage);
+
+      const timer = setInterval(() => {
+        setEta((prev) => Math.max(1, prev - 1));
+      }, 30000);
+
+      return () => {
+        clearInterval(timer);
+        socketService.off("order_accepted", onOrderAccepted);
+        socketService.off("driver_location_update", onLocationUpdate);
+        socketService.off("order_status_update", onStatusUpdate);
+        socketService.off("receive_message", onMessage);
+      };
     }
-
-    const timer = setInterval(() => {
-      setEta((prev) => Math.max(1, prev - 1));
-    }, 30000);
-
-    return () => {
-      clearInterval(timer);
-    };
-  }, [currentOrderId, status]);
+  }, [currentOrderId]);
 
   const handleBack = () => {
     router.replace("/(tabs)/orders");
@@ -138,6 +150,11 @@ export default function TrackingScreen() {
                   </TouchableOpacity>
                   <TouchableOpacity style={styles.actionBtn} onPress={() => router.push("/chat")}>
                     <Feather name="message-square" size={18} color={Colors.light.primary} />
+                    {unreadCount > 0 && (
+                      <View style={styles.badge}>
+                        <Text style={styles.badgeText}>{unreadCount}</Text>
+                      </View>
+                    )}
                   </TouchableOpacity>
                 </View>
               </View>
@@ -320,6 +337,26 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.light.surfaceSecondary,
     alignItems: "center",
     justifyContent: "center",
+    position: "relative",
+  },
+  badge: {
+    position: "absolute",
+    top: -5,
+    right: -5,
+    backgroundColor: Colors.light.error,
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 2,
+    borderColor: Colors.light.surface,
+    elevation: 4,
+  },
+  badgeText: {
+    color: "#fff",
+    fontSize: 10,
+    fontWeight: "800",
   },
   divider: {
     height: 1,

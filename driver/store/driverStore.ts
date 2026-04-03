@@ -26,8 +26,10 @@ export interface Stop {
 export type OrderStatus =
   | "pending"
   | "accepted"
+  | "driver_assigned"
   | "en_route_pickup"
   | "arrived_pickup"
+  | "picking_items"
   | "picked_up"
   | "en_route_delivery"
   | "arrived_delivery"
@@ -55,6 +57,13 @@ export interface CompletedOrder {
   completedAt: Date;
 }
 
+export interface ChatMessage {
+  id: string;
+  sender: "customer" | "driver";
+  text: string;
+  timestamp: string;
+}
+
 export interface EarningsData {
   today: number;
   week: number;
@@ -69,11 +78,13 @@ interface DriverState {
   currentStep: number;
   earnings: EarningsData;
   orderHistory: CompletedOrder[];
-  driverLocation: { lat: number; lng: number };
+  driverLocation: { lat: number; lng: number } | null;
   driverName: string;
   driverPhone: string;
   token: string | null;
   isAuthenticated: boolean;
+  activeChat: ChatMessage[];
+  unreadCount: number;
 
   goOnline: () => void;
   goOffline: () => void;
@@ -85,6 +96,10 @@ interface DriverState {
   updateDriverLocation: (lat: number, lng: number) => void;
   setAuthenticated: (name: string, phone: string, token: string) => void;
   logout: () => void;
+  addChatMessage: (msg: ChatMessage) => void;
+  clearChat: () => void;
+  setUnreadCount: (count: number) => void;
+  incrementUnreadCount: () => void;
 }
 
 export const useMockIncomingOrder = (): Order => ({
@@ -141,11 +156,13 @@ export const useDriverStore = create<DriverState>()(
       currentOrder: null,
       incomingOrder: null,
       currentStep: 0,
-      driverLocation: { lat: 12.971, lng: 77.594 },
+      driverLocation: null,
       driverName: "",
       driverPhone: "",
       token: null,
       isAuthenticated: false,
+      activeChat: [],
+      unreadCount: 0,
       earnings: {
         today: 342,
         week: 2180,
@@ -205,6 +222,8 @@ export const useDriverStore = create<DriverState>()(
             currentOrder: { ...incomingOrder, status: "accepted" },
             incomingOrder: null,
             currentStep: 0,
+            activeChat: [],
+            unreadCount: 0,
           });
         }
       },
@@ -233,6 +252,8 @@ export const useDriverStore = create<DriverState>()(
         set({
           currentOrder: null,
           currentStep: 0,
+          activeChat: [],
+          unreadCount: 0,
           orderHistory: [completed, ...orderHistory],
           earnings: {
             ...earnings,
@@ -263,6 +284,16 @@ export const useDriverStore = create<DriverState>()(
           incomingOrder: null,
         });
       },
+
+      addChatMessage: (msg) => set((state) => ({ 
+        activeChat: [...state.activeChat, msg] 
+      })),
+
+      clearChat: () => set({ activeChat: [], unreadCount: 0 }),
+
+      setUnreadCount: (unreadCount) => set({ unreadCount }),
+
+      incrementUnreadCount: () => set((state) => ({ unreadCount: state.unreadCount + 1 })),
     }),
     {
       name: "driver-store",
@@ -274,6 +305,7 @@ export const useDriverStore = create<DriverState>()(
         token: state.token,
         earnings: state.earnings,
         orderHistory: state.orderHistory,
+        activeChat: state.activeChat,
       }),
     }
   )

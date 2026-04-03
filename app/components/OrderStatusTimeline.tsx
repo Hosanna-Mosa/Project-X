@@ -14,21 +14,26 @@ interface StatusStep {
 const STEPS: StatusStep[] = [
   { key: "confirmed", label: "Order Confirmed", time: "12:30 PM" },
   { key: "driver_assigned", label: "Driver Assigned", time: "12:32 PM" },
+  { key: "en_route_pickup", label: "On the Way to Store" },
+  { key: "arrived_pickup", label: "Arrived at Store" },
   {
     key: "picking_items",
     label: "Picking Items",
-    description: "John is verifying your items at the store",
-    time: "12:38 PM",
+    description: "Driver is verifying your items at the store",
   },
-  { key: "on_the_way", label: "On the Way" },
+  { key: "en_route_delivery", label: "On the Way to You" },
+  { key: "arrived_delivery", label: "Arrived at Delivery" },
   { key: "delivered", label: "Delivered" },
 ];
 
 const STATUS_ORDER: OrderStatus[] = [
   "confirmed",
   "driver_assigned",
+  "en_route_pickup",
+  "arrived_pickup",
   "picking_items",
-  "on_the_way",
+  "en_route_delivery",
+  "arrived_delivery",
   "delivered",
 ];
 

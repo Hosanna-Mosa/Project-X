@@ -15,6 +15,8 @@ import { SafeAreaProvider } from "react-native-safe-area-context";
 
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { useDriverStore } from "@/store/driverStore";
+import { LocationHandler } from "@/components/LocationHandler";
+import { socketService } from "@/utils/socketService";
 
 SplashScreen.preventAutoHideAsync();
 
@@ -41,6 +43,7 @@ function RootLayoutNav() {
         name="profile"
         options={{ headerShown: false, presentation: "modal" }}
       />
+      <LocationHandler />
     </Stack>
   );
 }

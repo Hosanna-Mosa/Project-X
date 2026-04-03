@@ -5,6 +5,7 @@ import React, { useEffect, useRef, useState } from "react";
 import {
   Alert,
   Animated,
+  Linking,
   Platform,
   ScrollView,
   StyleSheet,
@@ -18,78 +19,118 @@ import SlideButton from "@/components/SlideButton";
 import SOSButton from "@/components/SOSButton";
 import StopCard from "@/components/StopCard";
 import { Colors } from "@/constants/colors";
-import { useDriverStore } from "@/store/driverStore";
+import { useDriverStore, OrderStatus } from "@/store/driverStore";
+import { socketService } from "@/utils/socketService";
 
 const STEP_ACTIONS: {
   label: string;
   icon: "navigation" | "check-circle" | "package" | "arrow-right" | "home";
   color: string;
   subLabel: string;
+  status: OrderStatus;
 }[] = [
   {
-    label: "Slide to Arrived",
+    label: "Slide to Start Journey",
     icon: "navigation",
     color: Colors.primary,
-    subLabel: "At Pickup Location",
+    subLabel: "Ready to go",
+    status: "driver_assigned",
+  },
+  {
+    label: "Slide to Arrive",
+    icon: "navigation",
+    color: Colors.primary,
+    subLabel: "Heading to Store",
+    status: "en_route_pickup",
   },
   {
     label: "Slide to Picked Items",
     icon: "package",
     color: "#8B5CF6",
-    subLabel: "Items Collected",
+    subLabel: "At the Store",
+    status: "arrived_pickup",
   },
   {
-    label: "Slide to Next Stop",
+    label: "Slide to Start Delivery",
     icon: "arrow-right",
     color: Colors.warning,
-    subLabel: "Heading to Next Stop",
-  },
-  {
-    label: "Slide to Arrived",
-    icon: "navigation",
-    color: Colors.primary,
-    subLabel: "At Second Pickup",
-  },
-  {
-    label: "Slide to Picked Items",
-    icon: "package",
-    color: "#8B5CF6",
     subLabel: "Items Collected",
+    status: "picking_items",
   },
   {
-    label: "Slide to Next Stop",
-    icon: "arrow-right",
-    color: Colors.warning,
-    subLabel: "Heading to Delivery",
-  },
-  {
-    label: "Slide to Arrived",
+    label: "Slide to Arrive",
     icon: "home",
     color: Colors.success,
-    subLabel: "At Delivery Location",
+    subLabel: "Heading to You",
+    status: "en_route_delivery",
   },
   {
     label: "Slide to Delivered",
     icon: "check-circle",
     color: Colors.success,
-    subLabel: "Order Complete!",
+    subLabel: "At Delivery Location",
+    status: "arrived_delivery",
   },
 ];
 
 export default function OrderNavigationScreen() {
   const insets = useSafeAreaInsets();
-  const { currentOrder, currentStep, updateStep, completeOrder } =
+  const { currentOrder, currentStep, updateStep, completeOrder, unreadCount } =
     useDriverStore();
   const [eta, setEta] = useState("12 min");
   const [distance, setDistance] = useState("2.4 km");
   const [showDetails, setShowDetails] = useState(false);
   const etaAnim = useRef(new Animated.Value(1)).current;
+  
+  const handleNavigate = (lat: number, lng: number, label: string) => {
+    const scheme = Platform.select({ ios: 'maps:0,0?q=', android: 'geo:0,0?q=' });
+    const latLng = `${lat},${lng}`;
+    const url = Platform.select({
+      ios: `${scheme}${label}@${latLng}`,
+      android: `${scheme}${latLng}(${label})`
+    });
+
+    if (url) {
+      Linking.openURL(url);
+    }
+  };
+
+  const broadcastStatus = (stepIndex: number) => {
+    const action = STEP_ACTIONS[stepIndex];
+    if (action && currentOrder) {
+      console.log(`[SOCKET] Broadcasting Status: ${action.status}`);
+      socketService.emit("order_status_update", {
+        orderId: currentOrder.id,
+        status: action.status
+      });
+    } else if (stepIndex >= STEP_ACTIONS.length && currentOrder) {
+      // Final step
+      socketService.emit("order_status_update", {
+        orderId: currentOrder.id,
+        status: "delivered"
+      });
+    }
+  };
 
   useEffect(() => {
     if (!currentOrder) {
       router.replace("/(tabs)");
       return;
     }
+
+    // Join order room for real-time status & chat syncing
+    console.log(`[SOCKET] Joining order room: ${currentOrder.id}`);
+    socketService.emit("track_order", currentOrder.id);
+
+    // Listen for incoming messages to increment unread count
+    const onMessage = (msg: any) => {
+      if (msg.from === "user") {
+        useDriverStore.getState().incrementUnreadCount();
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      }
+    };
+
+    socketService.on("receive_message", onMessage);
 
     const interval = setInterval(() => {
       const minutes = Math.max(1, parseInt(eta) - 1);
@@ -111,8 +152,11 @@ export default function OrderNavigationScreen() {
       ]).start();
     }, 8000);
 
-    return () => clearInterval(interval);
-  }, [eta, distance, currentOrder]);
+    return () => {
+      clearInterval(interval);
+      socketService.off("receive_message", onMessage);
+    };
+  }, [eta, distance, currentOrder?.id]);
 
   if (!currentOrder) return null;
 
@@ -141,7 +185,9 @@ export default function OrderNavigationScreen() {
       return;
     }
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    updateStep(currentStep + 1);
+    const nextStep = currentStep + 1;
+    updateStep(nextStep);
+    broadcastStatus(nextStep);
   };
 
   const progress = ((currentStep + 1) / totalSteps) * 100;
@@ -173,7 +219,20 @@ export default function OrderNavigationScreen() {
         <View style={styles.headerCenter}>
           <Text style={styles.orderIdText}>{currentOrder.id}</Text>
         </View>
-        <SOSButton />
+        <View style={styles.headerRight}>
+          <TouchableOpacity
+            style={styles.chatBtn}
+            onPress={() => router.push("/chat")}
+          >
+            <Feather name="message-circle" size={20} color={Colors.primary} />
+            {unreadCount > 0 && (
+              <View style={styles.chatBadge}>
+                <Text style={styles.chatBadgeText}>{unreadCount}</Text>
+              </View>
+            )}
+          </TouchableOpacity>
+          <SOSButton />
+        </View>
       </View>
 
       <View
@@ -248,6 +307,13 @@ export default function OrderNavigationScreen() {
                 {activeStop.address}
               </Text>
             </View>
+            <TouchableOpacity 
+              style={styles.navigateBtn} 
+              onPress={() => handleNavigate(activeStop.lat, activeStop.lng, activeStop.locationName)}
+            >
+              <Feather name="navigation" size={16} color={Colors.white} />
+              <Text style={styles.navigateBtnText}>Navigate Now</Text>
+            </TouchableOpacity>
           </View>
         )}
 
@@ -263,7 +329,7 @@ export default function OrderNavigationScreen() {
                 index={idx}
                 isActive={idx === currentStopIndex}
                 isCompleted={idx < currentStopIndex}
-                onNavigate={() => {}}
+                onNavigate={() => handleNavigate(stop.lat, stop.lng, stop.locationName)}
               />
             ))}
           </ScrollView>
@@ -317,7 +383,44 @@ const styles = StyleSheet.create({
   },
   headerCenter: {
     flex: 1,
+    alignItems: "flex-start",
+    marginLeft: 4,
+  },
+  headerRight: {
+    flexDirection: "row",
     alignItems: "center",
+    gap: 8,
+  },
+  chatBtn: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: Colors.white,
+    justifyContent: "center",
+    alignItems: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 6,
+    elevation: 4,
+    position: "relative",
+  },
+  chatBadge: {
+    position: "absolute",
+    top: 10,
+    right: 10,
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: Colors.error,
+    justifyContent: "center",
+    alignItems: "center",
+    elevation: 4,
+  },
+  chatBadgeText: {
+    color: Colors.white,
+    fontSize: 10,
+    fontWeight: "700",
   },
   orderIdText: {
     fontSize: 14,
@@ -438,6 +541,26 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: Colors.textSecondary,
     flex: 1,
+  },
+  navigateBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: Colors.primary,
+    borderRadius: 12,
+    paddingVertical: 12,
+    gap: 8,
+    marginTop: 12,
+    shadowColor: Colors.primary,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  navigateBtnText: {
+    fontSize: 15,
+    fontWeight: "700",
+    color: Colors.white,
   },
   stopsScroll: {
     maxHeight: 220,

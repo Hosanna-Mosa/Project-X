@@ -47,6 +47,10 @@ class SocketService {
     this.socket?.emit(event, data);
   }
 
+  public off(event: string, callback: (data: any) => void) {
+    this.socket?.off(event, callback);
+  }
+
   public disconnect() {
     this.socket?.disconnect();
     this.socket = null;
