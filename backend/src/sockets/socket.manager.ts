@@ -102,11 +102,11 @@ export class SocketManager {
       });
 
       // CHAT MESSAGES: Forward messages within the order room
-      socket.on("send_message", (data: { orderId: string; senderId: string; role: string; text: string }) => {
+      socket.on("send_message", (data: { orderId: string; senderId: string; role: string; text: string; id?: string }) => {
         console.log(`[CHAT] Message in ${data.orderId} from ${data.role}: ${data.text}`);
         if (data.orderId) {
           this.io.to(data.orderId).emit("receive_message", {
-            id: Date.now().toString(),
+            id: data.id || Date.now().toString(),
             text: data.text,
             from: data.role.toLowerCase(), // 'user' or 'driver'
             time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),

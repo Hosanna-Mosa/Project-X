@@ -19,7 +19,7 @@ import SlideButton from "@/components/SlideButton";
 import SOSButton from "@/components/SOSButton";
 import StopCard from "@/components/StopCard";
 import { Colors } from "@/constants/colors";
-import { useDriverStore } from "@/store/driverStore";
+import { useDriverStore, OrderStatus } from "@/store/driverStore";
 import { socketService } from "@/utils/socketService";
 
 const STEP_ACTIONS: {
@@ -27,60 +27,55 @@ const STEP_ACTIONS: {
   icon: "navigation" | "check-circle" | "package" | "arrow-right" | "home";
   color: string;
   subLabel: string;
+  status: OrderStatus;
 }[] = [
   {
-    label: "Slide to Arrived",
+    label: "Slide to Start Journey",
     icon: "navigation",
     color: Colors.primary,
-    subLabel: "At Pickup Location",
+    subLabel: "Ready to go",
+    status: "driver_assigned",
+  },
+  {
+    label: "Slide to Arrive",
+    icon: "navigation",
+    color: Colors.primary,
+    subLabel: "Heading to Store",
+    status: "en_route_pickup",
   },
   {
     label: "Slide to Picked Items",
     icon: "package",
     color: "#8B5CF6",
-    subLabel: "Items Collected",
+    subLabel: "At the Store",
+    status: "arrived_pickup",
   },
   {
-    label: "Slide to Next Stop",
+    label: "Slide to Start Delivery",
     icon: "arrow-right",
     color: Colors.warning,
-    subLabel: "Heading to Next Stop",
-  },
-  {
-    label: "Slide to Arrived",
-    icon: "navigation",
-    color: Colors.primary,
-    subLabel: "At Second Pickup",
-  },
-  {
-    label: "Slide to Picked Items",
-    icon: "package",
-    color: "#8B5CF6",
     subLabel: "Items Collected",
+    status: "picking_items",
   },
   {
-    label: "Slide to Next Stop",
-    icon: "arrow-right",
-    color: Colors.warning,
-    subLabel: "Heading to Delivery",
-  },
-  {
-    label: "Slide to Arrived",
+    label: "Slide to Arrive",
     icon: "home",
     color: Colors.success,
-    subLabel: "At Delivery Location",
+    subLabel: "Heading to You",
+    status: "en_route_delivery",
   },
   {
     label: "Slide to Delivered",
     icon: "check-circle",
     color: Colors.success,
-    subLabel: "Order Complete!",
+    subLabel: "At Delivery Location",
+    status: "arrived_delivery",
   },
 ];
 
 export default function OrderNavigationScreen() {
   const insets = useSafeAreaInsets();
-  const { currentOrder, currentStep, updateStep, completeOrder } =
+  const { currentOrder, currentStep, updateStep, completeOrder, unreadCount } =
     useDriverStore();
   const [eta, setEta] = useState("12 min");
   const [distance, setDistance] = useState("2.4 km");
@@ -100,23 +95,19 @@ export default function OrderNavigationScreen() {
     }
   };
 
-  const broadcastStatus = (step: number) => {
-    let statusToBroadCast = "";
-    switch (step) {
-      case 0: statusToBroadCast = "en_route_pickup"; break;
-      case 1: statusToBroadCast = "arrived_pickup"; break;
-      case 2: statusToBroadCast = "picking_items"; break;
-      case 3: statusToBroadCast = "en_route_pickup"; break; // second pickup
-      case 4: statusToBroadCast = "arrived_pickup"; break;
-      case 5: statusToBroadCast = "picking_items"; break;
-      case 6: statusToBroadCast = "en_route_delivery"; break;
-      case 7: statusToBroadCast = "delivered"; break;
-      default: statusToBroadCast = "en_route_pickup";
-    }
-    if (statusToBroadCast && currentOrder) {
+  const broadcastStatus = (stepIndex: number) => {
+    const action = STEP_ACTIONS[stepIndex];
+    if (action && currentOrder) {
+      console.log(`[SOCKET] Broadcasting Status: ${action.status}`);
       socketService.emit("order_status_update", {
         orderId: currentOrder.id,
-        status: statusToBroadCast
+        status: action.status
+      });
+    } else if (stepIndex >= STEP_ACTIONS.length && currentOrder) {
+      // Final step
+      socketService.emit("order_status_update", {
+        orderId: currentOrder.id,
+        status: "delivered"
       });
     }
   };
@@ -126,6 +117,20 @@ export default function OrderNavigationScreen() {
       router.replace("/(tabs)");
       return;
     }
+
+    // Join order room for real-time status & chat syncing
+    console.log(`[SOCKET] Joining order room: ${currentOrder.id}`);
+    socketService.emit("track_order", currentOrder.id);
+
+    // Listen for incoming messages to increment unread count
+    const onMessage = (msg: any) => {
+      if (msg.from === "user") {
+        useDriverStore.getState().incrementUnreadCount();
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      }
+    };
+
+    socketService.on("receive_message", onMessage);
 
     const interval = setInterval(() => {
       const minutes = Math.max(1, parseInt(eta) - 1);
@@ -147,8 +152,11 @@ export default function OrderNavigationScreen() {
       ]).start();
     }, 8000);
 
-    return () => clearInterval(interval);
-  }, [eta, distance, currentOrder]);
+    return () => {
+      clearInterval(interval);
+      socketService.off("receive_message", onMessage);
+    };
+  }, [eta, distance, currentOrder?.id]);
 
   if (!currentOrder) return null;
 
@@ -217,7 +225,11 @@ export default function OrderNavigationScreen() {
             onPress={() => router.push("/chat")}
           >
             <Feather name="message-circle" size={20} color={Colors.primary} />
-            <View style={styles.chatBadge} />
+            {unreadCount > 0 && (
+              <View style={styles.chatBadge}>
+                <Text style={styles.chatBadgeText}>{unreadCount}</Text>
+              </View>
+            )}
           </TouchableOpacity>
           <SOSButton />
         </View>
@@ -401,8 +413,14 @@ const styles = StyleSheet.create({
     height: 8,
     borderRadius: 4,
     backgroundColor: Colors.error,
-    borderWidth: 1.5,
-    borderColor: Colors.white,
+    justifyContent: "center",
+    alignItems: "center",
+    elevation: 4,
+  },
+  chatBadgeText: {
+    color: Colors.white,
+    fontSize: 10,
+    fontWeight: "700",
   },
   orderIdText: {
     fontSize: 14,

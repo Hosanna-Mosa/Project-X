@@ -16,22 +16,6 @@ import Colors from "@/constants/colors";
 import { socketService } from "@/utils/socketService";
 import { useDeliveryStore } from "@/contexts/deliveryStore";
 
-type Message = {
-  id: string;
-  text: string;
-  from: "user" | "driver";
-  time: string;
-};
-
-const INITIAL_MESSAGES: Message[] = [
-  {
-    id: "1",
-    text: "Hi! I'm on my way to pick up your order 🚗",
-    from: "driver",
-    time: "9:51 AM",
-  }
-];
-
 const QUICK_REPLIES = [
   "On my way! 👋",
   "Running late, sorry",
@@ -41,23 +25,34 @@ const QUICK_REPLIES = [
 
 export default function ChatScreen() {
   const insets = useSafeAreaInsets();
-  const { currentOrderId, driver } = useDeliveryStore();
-  const [messages, setMessages] = useState<Message[]>(INITIAL_MESSAGES);
+  const { currentOrderId, driver, activeChat, addChatMessage, setUnreadCount } = useDeliveryStore();
   const [inputText, setInputText] = useState("");
   const flatListRef = useRef<FlatList>(null);
 
   useEffect(() => {
     if (!currentOrderId) return;
 
+    // Clear unread count when entering chat
+    setUnreadCount(0);
+
     // Ensure we are in the order room
     socketService.trackOrder(currentOrderId);
 
-    const onMessage = (msg: Message) => {
-      setMessages((prev) => {
-        if (prev.find((m) => m.id === msg.id)) return prev;
-        return [...prev, msg];
-      });
-      setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100);
+    const onMessage = (msg: any) => {
+      // Logic for incoming message
+      const formattedMsg: any = {
+        id: msg.id,
+        text: msg.text,
+        sender: msg.from === "driver" ? "driver" : "customer",
+        timestamp: msg.time || new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      };
+      
+      // Use getState to get current messages and avoid stale closures
+      const currentMessages = useDeliveryStore.getState().activeChat;
+      if (!currentMessages.find((m: any) => m.id === formattedMsg.id)) {
+        addChatMessage(formattedMsg);
+        setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100);
+      }
     };
 
     socketService.on("receive_message", onMessage);
@@ -70,18 +65,31 @@ export default function ChatScreen() {
   const sendMessage = (text: string) => {
     if (!text.trim() || !currentOrderId) return;
 
+    const msgId = Date.now().toString();
+    const newMsg: any = {
+      id: msgId,
+      text: text.trim(),
+      sender: "customer",
+      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+    };
+
+    // Add to local store for instant UI
+    addChatMessage(newMsg);
+
     socketService.emit("send_message", {
       orderId: currentOrderId,
       senderId: "customer-123", // Ideally from auth
       role: "USER",
-      text: text.trim()
+      text: text.trim(),
+      id: msgId
     });
 
     setInputText("");
+    setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100);
   };
 
-  const renderItem = ({ item }: { item: Message }) => {
-    const isUser = item.from === "user";
+  const renderItem = ({ item }: { item: any }) => {
+    const isUser = item.sender === "customer";
     return (
       <View
         style={[
@@ -104,7 +112,7 @@ export default function ChatScreen() {
             {item.text}
           </Text>
           <Text style={isUser ? styles.timeUser : styles.timeDriver}>
-            {item.time}
+            {item.timestamp}
           </Text>
         </View>
       </View>
@@ -140,7 +148,7 @@ export default function ChatScreen() {
       {/* Messages */}
       <FlatList
         ref={flatListRef}
-        data={messages}
+        data={activeChat}
         keyExtractor={(item) => item.id}
         renderItem={renderItem}
         contentContainerStyle={styles.messagesList}

@@ -28,6 +28,13 @@ export interface PriceBreakdown {
   total: number;
 }
 
+export interface ChatMessage {
+  id: string;
+  sender: "customer" | "driver";
+  text: string;
+  timestamp: string;
+}
+
 export type OrderStatus =
   | "pending"
   | "confirmed"
@@ -51,6 +58,8 @@ export interface DeliveryState {
   currentCoords: { lat: number; lng: number } | null;
   currentOrderId: string | null;
   driver: any | null;
+  activeChat: ChatMessage[];
+  unreadCount: number;
   setCurrentLocation: (address: string) => void;
   setCurrentCoords: (coords: { lat: number; lng: number }) => void;
   setOrderId: (id: string | null) => void;
@@ -69,6 +78,10 @@ export interface DeliveryState {
   setRoute: (route: RouteInfo) => void;
   setStops: (stops: DeliveryStop[]) => void;
   resetDelivery: () => void;
+  addChatMessage: (msg: ChatMessage) => void;
+  clearChat: () => void;
+  setUnreadCount: (count: number) => void;
+  incrementUnreadCount: () => void;
 }
 
 const generateId = () =>
@@ -86,6 +99,8 @@ const initialState = {
   currentCoords: null,
   currentOrderId: null,
   driver: null,
+  activeChat: [],
+  unreadCount: 0,
 };
 
 export const useDeliveryStore = create<DeliveryState>((set, get) => ({
@@ -180,4 +195,10 @@ export const useDeliveryStore = create<DeliveryState>((set, get) => ({
   setRoute: (route) => set({ route }),
   setStops: (stops) => set({ stops }),
   resetDelivery: () => set(initialState),
+  addChatMessage: (msg) => set((state) => ({ 
+    activeChat: [...state.activeChat, msg] 
+  })),
+  clearChat: () => set({ activeChat: [], unreadCount: 0 }),
+  setUnreadCount: (unreadCount) => set({ unreadCount }),
+  incrementUnreadCount: () => set((state) => ({ unreadCount: state.unreadCount + 1 })),
 }));

@@ -13,24 +13,8 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
 import { Colors } from "@/constants/colors";
-import { useDriverStore } from "@/store/driverStore";
+import { useDriverStore, ChatMessage } from "@/store/driverStore";
 import { socketService } from "@/utils/socketService";
-
-type Message = {
-  id: string;
-  text: string;
-  from: "user" | "driver";
-  time: string;
-};
-
-const INITIAL_MESSAGES: Message[] = [
-  {
-    id: "1",
-    text: "Hi! I'm on my way to pick up your order 🚗",
-    from: "driver",
-    time: "9:51 AM",
-  }
-];
 
 const QUICK_REPLIES = [
   "On my way! 👋",
@@ -42,9 +26,8 @@ const QUICK_REPLIES = [
 
 export default function ChatScreen() {
   const insets = useSafeAreaInsets();
-  const { currentOrder, driverPhone } = useDriverStore();
+  const { currentOrder, driverPhone, activeChat, addChatMessage, setUnreadCount } = useDriverStore();
   const params = useLocalSearchParams();
-  const [messages, setMessages] = useState<Message[]>(INITIAL_MESSAGES);
   const [inputText, setInputText] = useState("");
   const flatListRef = useRef<FlatList>(null);
 
@@ -53,15 +36,27 @@ export default function ChatScreen() {
   useEffect(() => {
     if (!currentOrder) return;
 
+    // Clear unread count when entering chat
+    setUnreadCount(0);
+
     // Join the order room for chat context
     socketService.emit("track_order", currentOrder.id);
 
-    const onMessage = (msg: Message) => {
-      setMessages((prev) => {
-        if (prev.find((m) => m.id === msg.id)) return prev;
-        return [...prev, msg];
-      });
-      setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100);
+    const onMessage = (msg: any) => {
+      // Logic for incoming message
+      const formattedMsg: ChatMessage = {
+        id: msg.id,
+        text: msg.text,
+        sender: msg.from === "driver" ? "driver" : "customer",
+        timestamp: msg.time || new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      };
+      
+      // Use getState to avoid stale closures
+      const currentMessages = useDriverStore.getState().activeChat;
+      if (!currentMessages.find(m => m.id === formattedMsg.id)) {
+        addChatMessage(formattedMsg);
+        setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100);
+      }
     };
 
     socketService.on("receive_message", onMessage);
@@ -69,24 +64,37 @@ export default function ChatScreen() {
     return () => {
       socketService.off("receive_message", onMessage);
     };
-  }, [currentOrder]);
+  }, [currentOrder?.id]);
 
   const sendMessage = (text: string) => {
     if (!text.trim() || !currentOrder) return;
     
+    const msgId = Date.now().toString();
+    const newMsg: ChatMessage = {
+        id: msgId,
+        text: text.trim(),
+        sender: "driver",
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+    };
+
+    // Add to local store immediately UX
+    addChatMessage(newMsg);
+
     // Emit to backend
     socketService.emit("send_message", {
       orderId: currentOrder.id,
       senderId: driverPhone || "driver-123",
       role: "DRIVER",
-      text: text.trim()
+      text: text.trim(),
+      id: msgId
     });
 
     setInputText("");
+    setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100);
   };
 
-  const renderItem = ({ item }: { item: Message }) => {
-    const isMe = item.from === "driver";
+  const renderItem = ({ item }: { item: ChatMessage }) => {
+    const isMe = item.sender === "driver";
     return (
       <View
         style={[
@@ -109,7 +117,7 @@ export default function ChatScreen() {
             {item.text}
           </Text>
           <Text style={isMe ? styles.timeMe : styles.timeOther}>
-            {item.time}
+            {item.timestamp}
           </Text>
         </View>
       </View>
@@ -145,7 +153,7 @@ export default function ChatScreen() {
       {/* Messages */}
       <FlatList
         ref={flatListRef}
-        data={messages}
+        data={activeChat}
         keyExtractor={(item) => item.id}
         renderItem={renderItem}
         contentContainerStyle={styles.messagesList}

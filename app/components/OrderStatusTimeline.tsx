@@ -22,6 +22,7 @@ const STEPS: StatusStep[] = [
     description: "Driver is verifying your items at the store",
   },
   { key: "en_route_delivery", label: "On the Way to You" },
+  { key: "arrived_delivery", label: "Arrived at Delivery" },
   { key: "delivered", label: "Delivered" },
 ];
 
@@ -32,6 +33,7 @@ const STATUS_ORDER: OrderStatus[] = [
   "arrived_pickup",
   "picking_items",
   "en_route_delivery",
+  "arrived_delivery",
   "delivered",
 ];
 
