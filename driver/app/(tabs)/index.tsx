@@ -96,6 +96,10 @@ export default function HomeScreen() {
                 accuracy: location.coords.accuracy
               });
               
+              // Update local store
+              const { updateDriverLocation } = useDriverStore.getState();
+              updateDriverLocation(location.coords.latitude, location.coords.longitude);
+
               socketService.emit("driver_location_update", {
                 driverId: driverPhone || "driver-123",
                 lat: location.coords.latitude,
@@ -112,6 +116,11 @@ export default function HomeScreen() {
             const lastKnown = await Location.getLastKnownPositionAsync();
             if (lastKnown) {
               console.log("[LOCATION] Fallback success:", lastKnown.coords.latitude, lastKnown.coords.longitude);
+              
+              // Update local store
+              const { updateDriverLocation } = useDriverStore.getState();
+              updateDriverLocation(lastKnown.coords.latitude, lastKnown.coords.longitude);
+
               socketService.emit("driver_location_update", {
                 driverId: driverPhone || "driver-123",
                 lat: lastKnown.coords.latitude,

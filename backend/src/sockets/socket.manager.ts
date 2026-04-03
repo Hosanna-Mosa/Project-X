@@ -83,10 +83,34 @@ export class SocketManager {
       socket.on("driver_accepted_order", (data: { orderId: string; driverInfo: any }) => {
         console.log(`[SOCKET] Driver accepted order: ${data.orderId}`, data.driverInfo);
         if (data.orderId) {
+          // Join the order room as well
+          socket.join(data.orderId);
           // Emit 'order_accepted' to the customer in the order room
           this.io.to(data.orderId).emit("order_accepted", {
             orderId: data.orderId,
             driver: data.driverInfo,
+          });
+        }
+      });
+
+      // ORDER STATUS UPDATE: Broadcast to all in the order room
+      socket.on("order_status_update", (data: { orderId: string; status: string }) => {
+        console.log(`[SOCKET] Order Status Update: ${data.orderId} -> ${data.status}`);
+        if (data.orderId) {
+          this.io.to(data.orderId).emit("order_status_update", data);
+        }
+      });
+
+      // CHAT MESSAGES: Forward messages within the order room
+      socket.on("send_message", (data: { orderId: string; senderId: string; role: string; text: string }) => {
+        console.log(`[CHAT] Message in ${data.orderId} from ${data.role}: ${data.text}`);
+        if (data.orderId) {
+          this.io.to(data.orderId).emit("receive_message", {
+            id: Date.now().toString(),
+            text: data.text,
+            from: data.role.toLowerCase(), // 'user' or 'driver'
+            time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+            senderId: data.senderId
           });
         }
       });

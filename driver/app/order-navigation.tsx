@@ -5,6 +5,7 @@ import React, { useEffect, useRef, useState } from "react";
 import {
   Alert,
   Animated,
+  Linking,
   Platform,
   ScrollView,
   StyleSheet,
@@ -19,6 +20,7 @@ import SOSButton from "@/components/SOSButton";
 import StopCard from "@/components/StopCard";
 import { Colors } from "@/constants/colors";
 import { useDriverStore } from "@/store/driverStore";
+import { socketService } from "@/utils/socketService";
 
 const STEP_ACTIONS: {
   label: string;
@@ -84,6 +86,40 @@ export default function OrderNavigationScreen() {
   const [distance, setDistance] = useState("2.4 km");
   const [showDetails, setShowDetails] = useState(false);
   const etaAnim = useRef(new Animated.Value(1)).current;
+  
+  const handleNavigate = (lat: number, lng: number, label: string) => {
+    const scheme = Platform.select({ ios: 'maps:0,0?q=', android: 'geo:0,0?q=' });
+    const latLng = `${lat},${lng}`;
+    const url = Platform.select({
+      ios: `${scheme}${label}@${latLng}`,
+      android: `${scheme}${latLng}(${label})`
+    });
+
+    if (url) {
+      Linking.openURL(url);
+    }
+  };
+
+  const broadcastStatus = (step: number) => {
+    let statusToBroadCast = "";
+    switch (step) {
+      case 0: statusToBroadCast = "en_route_pickup"; break;
+      case 1: statusToBroadCast = "arrived_pickup"; break;
+      case 2: statusToBroadCast = "picking_items"; break;
+      case 3: statusToBroadCast = "en_route_pickup"; break; // second pickup
+      case 4: statusToBroadCast = "arrived_pickup"; break;
+      case 5: statusToBroadCast = "picking_items"; break;
+      case 6: statusToBroadCast = "en_route_delivery"; break;
+      case 7: statusToBroadCast = "delivered"; break;
+      default: statusToBroadCast = "en_route_pickup";
+    }
+    if (statusToBroadCast && currentOrder) {
+      socketService.emit("order_status_update", {
+        orderId: currentOrder.id,
+        status: statusToBroadCast
+      });
+    }
+  };
 
   useEffect(() => {
     if (!currentOrder) {
@@ -141,7 +177,9 @@ export default function OrderNavigationScreen() {
       return;
     }
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    updateStep(currentStep + 1);
+    const nextStep = currentStep + 1;
+    updateStep(nextStep);
+    broadcastStatus(nextStep);
   };
 
   const progress = ((currentStep + 1) / totalSteps) * 100;
@@ -173,7 +211,16 @@ export default function OrderNavigationScreen() {
         <View style={styles.headerCenter}>
           <Text style={styles.orderIdText}>{currentOrder.id}</Text>
         </View>
-        <SOSButton />
+        <View style={styles.headerRight}>
+          <TouchableOpacity
+            style={styles.chatBtn}
+            onPress={() => router.push("/chat")}
+          >
+            <Feather name="message-circle" size={20} color={Colors.primary} />
+            <View style={styles.chatBadge} />
+          </TouchableOpacity>
+          <SOSButton />
+        </View>
       </View>
 
       <View
@@ -248,6 +295,13 @@ export default function OrderNavigationScreen() {
                 {activeStop.address}
               </Text>
             </View>
+            <TouchableOpacity 
+              style={styles.navigateBtn} 
+              onPress={() => handleNavigate(activeStop.lat, activeStop.lng, activeStop.locationName)}
+            >
+              <Feather name="navigation" size={16} color={Colors.white} />
+              <Text style={styles.navigateBtnText}>Navigate Now</Text>
+            </TouchableOpacity>
           </View>
         )}
 
@@ -263,7 +317,7 @@ export default function OrderNavigationScreen() {
                 index={idx}
                 isActive={idx === currentStopIndex}
                 isCompleted={idx < currentStopIndex}
-                onNavigate={() => {}}
+                onNavigate={() => handleNavigate(stop.lat, stop.lng, stop.locationName)}
               />
             ))}
           </ScrollView>
@@ -317,7 +371,38 @@ const styles = StyleSheet.create({
   },
   headerCenter: {
     flex: 1,
+    alignItems: "flex-start",
+    marginLeft: 4,
+  },
+  headerRight: {
+    flexDirection: "row",
     alignItems: "center",
+    gap: 8,
+  },
+  chatBtn: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: Colors.white,
+    justifyContent: "center",
+    alignItems: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 6,
+    elevation: 4,
+    position: "relative",
+  },
+  chatBadge: {
+    position: "absolute",
+    top: 10,
+    right: 10,
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: Colors.error,
+    borderWidth: 1.5,
+    borderColor: Colors.white,
   },
   orderIdText: {
     fontSize: 14,
@@ -438,6 +523,26 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: Colors.textSecondary,
     flex: 1,
+  },
+  navigateBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: Colors.primary,
+    borderRadius: 12,
+    paddingVertical: 12,
+    gap: 8,
+    marginTop: 12,
+    shadowColor: Colors.primary,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  navigateBtnText: {
+    fontSize: 15,
+    fontWeight: "700",
+    color: Colors.white,
   },
   stopsScroll: {
     maxHeight: 220,

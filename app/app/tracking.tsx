@@ -22,8 +22,10 @@ import { OrderStatus } from "@/contexts/deliveryStore";
 const STATUS_SEQUENCE: OrderStatus[] = [
   "confirmed",
   "driver_assigned",
+  "en_route_pickup",
+  "arrived_pickup",
   "picking_items",
-  "on_the_way",
+  "en_route_delivery",
   "delivered",
 ];
 
@@ -35,10 +37,6 @@ export default function TrackingScreen() {
   const mapRef = React.useRef<MapBackgroundRef>(null);
 
   useEffect(() => {
-    if (status === "confirmed") {
-      setStatus("driver_assigned");
-    }
-
     if (currentOrderId) {
       socketService.connect();
       socketService.trackOrder(currentOrderId);
@@ -53,13 +51,16 @@ export default function TrackingScreen() {
         console.log("Driver Moved:", data);
         setDriverLocation({ lat: data.lat, lng: data.lng });
         
-        // Update status if it's the first movement
-        if (status === "driver_assigned") {
-          setStatus("on_the_way");
-        }
-
-        // Fit map to show both user/stops and driver
+        // Re-fit map to show latest location
         setTimeout(() => mapRef.current?.fitToRoute(), 500);
+      });
+
+      // Listen for explicit status updates from driver
+      socketService.on("order_status_update", (data) => {
+        console.log("Order status update:", data.status);
+        if (data.status) {
+          setStatus(data.status as OrderStatus);
+        }
       });
     }
 
@@ -70,7 +71,7 @@ export default function TrackingScreen() {
     return () => {
       clearInterval(timer);
     };
-  }, [currentOrderId, status]);
+  }, [currentOrderId]);
 
   const handleBack = () => {
     router.replace("/(tabs)/orders");

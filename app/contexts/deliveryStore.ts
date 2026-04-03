@@ -32,8 +32,11 @@ export type OrderStatus =
   | "pending"
   | "confirmed"
   | "driver_assigned"
+  | "en_route_pickup"
+  | "arrived_pickup"
   | "picking_items"
-  | "on_the_way"
+  | "en_route_delivery"
+  | "arrived_delivery"
   | "delivered";
 
 export interface DeliveryState {

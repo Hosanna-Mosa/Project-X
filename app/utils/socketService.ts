@@ -38,6 +38,15 @@ class SocketService {
     this.socket?.on(event, callback);
   }
 
+  public off(event: string, callback: (data: any) => void) {
+    this.socket?.off(event, callback);
+  }
+
+  public emit(event: string, data: any) {
+    if (!this.socket) this.connect();
+    this.socket?.emit(event, data);
+  }
+
   public disconnect() {
     this.socket?.disconnect();
     this.socket = null;

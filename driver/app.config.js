@@ -14,9 +14,25 @@ export default {
       "backgroundColor": "#ffffff"
     },
     "ios": {
-      "supportsTablet": false
+      "supportsTablet": false,
+      "bundleIdentifier": "com.hosanna.triozen.driver",
+      "config": {
+        "googleMapsApiKey": process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY
+      }
     },
-    "android": {},
+    "android": {
+      "package": "com.hosanna.triozen.driver",
+      "config": {
+        "googleMaps": {
+          "apiKey": process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY
+        }
+      },
+      "permissions": [
+        "ACCESS_COARSE_LOCATION",
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_BACKGROUND_LOCATION"
+      ]
+    },
     "web": {
       "favicon": "./assets/images/icon.png"
     },
