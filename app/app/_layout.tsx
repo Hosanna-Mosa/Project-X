@@ -14,6 +14,7 @@ import { KeyboardProvider } from "react-native-keyboard-controller";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 
 import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { useAuthStore } from "@/contexts/authStore";
 
 SplashScreen.preventAutoHideAsync();
 
@@ -44,9 +45,13 @@ export default function RootLayout() {
     Inter_700Bold,
   });
 
+  const initializeAuth = useAuthStore((s) => s.initializeAuth);
+
   useEffect(() => {
     if (fontsLoaded || fontError) {
-      SplashScreen.hideAsync();
+      initializeAuth().then(() => {
+        SplashScreen.hideAsync();
+      });
     }
   }, [fontsLoaded, fontError]);
 

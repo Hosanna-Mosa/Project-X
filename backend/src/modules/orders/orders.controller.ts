@@ -9,12 +9,12 @@ export class OrdersController {
   async create(req: AuthRequest, res: Response) {
     console.log("Creating Order - Payload:", req.body);
     try {
-      const { stops, userId: bodyUserId } = req.body;
-      const userId = req.user?.userId || bodyUserId;
+      const { stops } = req.body;
+      const userId = req.user?.userId;
 
       if (!userId || !stops || stops.length === 0) {
         console.warn("Incomplete Order Data Received.", { userId, stopsCount: stops?.length });
-        return res.status(400).json({ message: "Invalid request data. userId and stops are required." });
+        return res.status(400).json({ message: "Incomplete order data. User and stops are required." });
       }
 
       const order = await ordersService.createOrder(userId, stops);

@@ -15,6 +15,9 @@ import { useDeliveryStore } from "@/contexts/deliveryStore";
 import { useAuthStore } from "@/contexts/authStore";
 import { RazorpayIntegration } from "@/utils/razorpay";
 import { Alert, ActivityIndicator } from "react-native";
+import Constants from "expo-constants";
+
+const apiUrl = process.env.EXPO_PUBLIC_API_URL;
 
 export default function CheckoutScreen() {
   const insets = useSafeAreaInsets();
@@ -23,12 +26,16 @@ export default function CheckoutScreen() {
   const { user } = useAuthStore();
 
   const handleConfirm = async () => {
+    if (!user) {
+      Alert.alert("Authentication Required", "Please log in to confirm your order.");
+      return;
+    }
     if (!price || stops.length === 0) return;
     
     setIsProcessing(true);
     try {
       // 1. Create Razorpay Order on Backend
-      const orderResponse = await fetch(`http://192.168.1.5:5000/api/payments/create-order`, {
+      const orderResponse = await fetch(`${apiUrl}/api/payments/create-order`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ amount: price.total }),
@@ -37,47 +44,44 @@ export default function CheckoutScreen() {
 
       // 2. Open Razorpay Gateway
       const paymentResult = await RazorpayIntegration.open({
-        key: "rzp_test_YourKeyId",
+        key: razorpayOrder.key,
         amount: razorpayOrder.amount,
         currency: razorpayOrder.currency,
-        name: "Precision Logistics",
+        name: razorpayOrder.name || "Precision Logistics",
         order_id: razorpayOrder.id,
         prefill: {
-          email: user?.email || "customer@example.com",
-          contact: user?.phone || "9999999999",
+          email: user?.email || razorpayOrder.prefill?.email || "customer@example.com",
+          contact: user?.phone || "",
         },
-        theme: { color: Colors.light.primary },
+        theme: razorpayOrder.theme || { color: Colors.light.primary },
       });
 
-      // 3. Verify Payment
-      const verifyResponse = await fetch(`http://192.168.1.5:5000/api/payments/verify`, {
+      // 3. Verify Payment AND Create Order
+      const verifyResponse = await fetch(`${apiUrl}/api/payments/verify`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(paymentResult),
-      });
-
-      if (verifyResponse.ok) {
-        // 4. Create the final delivery order in DB
-        const createOrderResponse = await fetch(`http://192.168.1.5:5000/api/orders`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            userId: user?.id || "anonymous",
+        headers: { 
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${useAuthStore.getState().token}`
+        },
+        body: JSON.stringify({
+          ...paymentResult,
+          orderData: {
             stops: stops.map(s => ({ ...s, items: s.items || [] })),
             totalDistance: route?.totalDistance,
             totalPrice: price.total,
-          }),
-        });
+          }
+        }),
+      });
 
-        if (createOrderResponse.ok) {
-          const finalOrder = await createOrderResponse.json();
-          setOrderId(finalOrder.id);
-          setStatus("confirmed");
-          Alert.alert("Success", "Delivery confirmed and paid!");
-          router.push("/tracking");
-        }
+      if (verifyResponse.ok) {
+        const data = await verifyResponse.json();
+        const finalOrder = data.order;
+        setOrderId(finalOrder._id || finalOrder.id);
+        setStatus("confirmed");
+        Alert.alert("Success", "Delivery confirmed and paid!");
+        router.push("/tracking");
       } else {
-        throw new Error("Payment verification failed");
+        throw new Error("Payment verification or order creation failed");
       }
     } catch (error: any) {
       console.error("Order Creation Failed:", error);

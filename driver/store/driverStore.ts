@@ -1,6 +1,9 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
+import Constants from "expo-constants";
+
+const apiUrl = process.env.EXPO_PUBLIC_API_URL;
 
 export type StopType = "pickup" | "delivery";
 
@@ -69,6 +72,7 @@ interface DriverState {
   driverLocation: { lat: number; lng: number };
   driverName: string;
   driverPhone: string;
+  token: string | null;
   isAuthenticated: boolean;
 
   goOnline: () => void;
@@ -79,7 +83,7 @@ interface DriverState {
   completeOrder: () => void;
   setIncomingOrder: (order: Order | null) => void;
   updateDriverLocation: (lat: number, lng: number) => void;
-  setAuthenticated: (name: string, phone: string) => void;
+  setAuthenticated: (name: string, phone: string, token: string) => void;
   logout: () => void;
 }
 
@@ -140,6 +144,7 @@ export const useDriverStore = create<DriverState>()(
       driverLocation: { lat: 12.971, lng: 77.594 },
       driverName: "",
       driverPhone: "",
+      token: null,
       isAuthenticated: false,
       earnings: {
         today: 342,
@@ -242,19 +247,22 @@ export const useDriverStore = create<DriverState>()(
 
       updateDriverLocation: (lat, lng) =>
         set({ driverLocation: { lat, lng } }),
-
-      setAuthenticated: (name, phone) =>
-        set({ isAuthenticated: true, driverName: name, driverPhone: phone }),
-
-      logout: () =>
+  
+      setAuthenticated: (name: string, phone: string, token: string) =>
+        set({ isAuthenticated: true, driverName: name, driverPhone: phone, token }),
+  
+      logout: () => {
+        AsyncStorage.removeItem("driver-store"); // Clear persistence on logout
         set({
           isAuthenticated: false,
           driverName: "",
           driverPhone: "",
+          token: null,
           isOnline: false,
           currentOrder: null,
           incomingOrder: null,
-        }),
+        });
+      },
     }),
     {
       name: "driver-store",
@@ -263,6 +271,7 @@ export const useDriverStore = create<DriverState>()(
         isAuthenticated: state.isAuthenticated,
         driverName: state.driverName,
         driverPhone: state.driverPhone,
+        token: state.token,
         earnings: state.earnings,
         orderHistory: state.orderHistory,
       }),

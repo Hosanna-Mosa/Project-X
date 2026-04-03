@@ -1,7 +1,8 @@
 import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { router } from "expo-router";
-import React, { useRef, useState } from "react";
+import * as React from "react";
+import { useRef, useState } from "react";
 import {
   Animated,
   KeyboardAvoidingView,
@@ -16,10 +17,12 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Colors } from "@/constants/colors";
 import { useDriverStore } from "@/store/driverStore";
+import Constants from "expo-constants";
+
+const apiUrl = process.env.EXPO_PUBLIC_API_URL;
+const MOCK_OTP = "123456";
 
 type AuthStep = "phone" | "otp";
-
-const MOCK_OTP = "123456";
 
 export default function AuthScreen() {
   const insets = useSafeAreaInsets();
@@ -32,7 +35,7 @@ export default function AuthScreen() {
   const slideAnim = useRef(new Animated.Value(0)).current;
   const setAuthenticated = useDriverStore((s) => s.setAuthenticated);
 
-  const handleSendOTP = () => {
+  const handleSendOTP = async () => {
     if (phone.length < 10) {
       Alert.alert("Invalid Phone", "Please enter a valid 10-digit phone number");
       return;
@@ -43,8 +46,15 @@ export default function AuthScreen() {
     }
     setLoading(true);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    setTimeout(() => {
-      setLoading(false);
+    try {
+      const response = await fetch(`${apiUrl}/api/auth/request-otp`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ phone: `+91${phone}` }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.message || "Failed to send OTP");
+      
       setStep("otp");
       Animated.spring(slideAnim, {
         toValue: 1,
@@ -52,7 +62,11 @@ export default function AuthScreen() {
         tension: 60,
         friction: 10,
       }).start();
-    }, 1200);
+    } catch (err: any) {
+      Alert.alert("Error", err.message);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleOTPChange = (text: string, idx: number) => {
@@ -74,23 +88,35 @@ export default function AuthScreen() {
     }
   };
 
-  const handleVerifyOTP = (enteredOtp?: string) => {
+  const handleVerifyOTP = async (enteredOtp?: string) => {
     const fullOtp = enteredOtp || otp.join("");
     if (fullOtp.length < 6) return;
     setLoading(true);
-    setTimeout(() => {
+    try {
+      const response = await fetch(`${apiUrl}/api/auth/verify-otp`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ 
+          phone: `+91${phone}`, 
+          code: fullOtp, 
+          role: "DRIVER",
+          name: name
+        }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.message || "Verification failed");
+
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      setAuthenticated(data.user.name, data.user.phone, data.token);
+      router.replace("/(tabs)");
+    } catch (err: any) {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      Alert.alert("Invalid OTP", err.message);
+      setOtp(["", "", "", "", "", ""]);
+      otpRefs.current[0]?.focus();
+    } finally {
       setLoading(false);
-      if (fullOtp === MOCK_OTP) {
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-        setAuthenticated(name, `+91 ${phone}`);
-        router.replace("/(tabs)");
-      } else {
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-        Alert.alert("Invalid OTP", `Use ${MOCK_OTP} for demo`);
-        setOtp(["", "", "", "", "", ""]);
-        otpRefs.current[0]?.focus();
-      }
-    }, 1000);
+    }
   };
 
   return (
@@ -204,7 +230,9 @@ export default function AuthScreen() {
               {otp.map((digit, idx) => (
                 <TextInput
                   key={idx}
-                  ref={(r) => (otpRefs.current[idx] = r)}
+                  ref={(r) => {
+                    otpRefs.current[idx] = r;
+                  }}
                   style={[styles.otpBox, digit ? styles.otpBoxFilled : null]}
                   value={digit}
                   onChangeText={(t) => handleOTPChange(t.slice(-1), idx)}
