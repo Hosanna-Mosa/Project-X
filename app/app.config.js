@@ -1,4 +1,4 @@
-{
+export default {
   "expo": {
     "name": "ProjectX",
     "slug": "mobile",
@@ -17,7 +17,7 @@
       "supportsTablet": false,
       "bundleIdentifier": "com.hosanna.triozen.x",
       "config": {
-        "googleMapsApiKey": "AIzaSyD23mZxzw78gBlz6EGEZ6BMgCwc4fygJMA"
+        "googleMapsApiKey": process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY
       },
       "infoPlist": {
         "NSLocationWhenInUseUsageDescription": "This app uses your location to show nearby services and track your deliveries."
@@ -27,7 +27,7 @@
       "package": "com.hosanna.triozen.x",
       "config": {
         "googleMaps": {
-          "apiKey": "AIzaSyD23mZxzw78gBlz6EGEZ6BMgCwc4fygJMA"
+          "apiKey": process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY
         }
       },
       "permissions": [
@@ -53,7 +53,10 @@
       "reactCompiler": true
     },
     "extra": {
-      "apiUrl": "http://10.192.9.42:5000"
+      "apiUrl": process.env.EXPO_PUBLIC_API_URL,
+      "eas": {
+        "projectId": "728cb440-8f89-4730-98d1-98283051650a"
+      }
     }
   }
 }

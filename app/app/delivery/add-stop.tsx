@@ -18,9 +18,9 @@ import { router } from "expo-router";
 import Colors from "@/constants/colors";
 import { useDeliveryStore, DeliveryItem } from "@/contexts/deliveryStore";
 
-const BACKEND_URL = "http://192.168.1.5:5000";
+const BACKEND_URL = process.env.EXPO_PUBLIC_API_URL;
 
-const GOOGLE_MAPS_APIKEY = "AIzaSyD23mZxzw78gBlz6EGEZ6BMgCwc4fygJMA";
+const GOOGLE_MAPS_APIKEY = process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY;
 
 // Dynamic suggestions will be fetched from backend
 

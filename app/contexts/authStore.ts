@@ -3,7 +3,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import Constants from "expo-constants";
 
 // The API URL should be retrieved from app.json/Constants
-const apiUrl = Constants.expoConfig?.extra?.apiUrl || "http://localhost:5000";
+const apiUrl = process.env.EXPO_PUBLIC_API_URL;
 
 interface AuthState {
   user: any | null;
@@ -15,6 +15,7 @@ interface AuthState {
   logout: () => Promise<void>;
   requestOTP: (phone: string) => Promise<{ success: boolean; message: string }>;
   verifyOTP: (phone: string, code: string, role: string, name?: string) => Promise<{ success: boolean; isNewUser?: boolean }>;
+  initializeAuth: () => Promise<void>;
 }
 
 export const useAuthStore = create<AuthState>((set, get) => ({
@@ -29,9 +30,27 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     AsyncStorage.setItem("token", token);
   },
 
+  initializeAuth: async () => {
+    try {
+      const [token, userStr] = await Promise.all([
+        AsyncStorage.getItem("token"),
+        AsyncStorage.getItem("user"),
+      ]);
+      
+      if (token && userStr) {
+        set({ token, user: JSON.parse(userStr) });
+      }
+    } catch (err) {
+      console.error("Failed to initialize auth", err);
+    }
+  },
+
   logout: async () => {
     set({ user: null, token: null });
-    await AsyncStorage.removeItem("token");
+    await Promise.all([
+      AsyncStorage.removeItem("token"),
+      AsyncStorage.removeItem("user"),
+    ]);
   },
 
   requestOTP: async (phone: string) => {
@@ -70,7 +89,10 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       }
 
       set({ user: data.user, token: data.token });
-      await AsyncStorage.setItem("token", data.token);
+      await Promise.all([
+        AsyncStorage.setItem("token", data.token),
+        AsyncStorage.setItem("user", JSON.stringify(data.user)),
+      ]);
       return { success: true, isNewUser: false };
     } catch (err: any) {
       set({ loading: false, error: err.message });

@@ -1,3 +1,4 @@
+import mongoose from "mongoose";
 import Order, { OrderStatus, StopType } from "../../database/models/Order";
 import User from "../../database/models/User";
 import { RoutingService } from "../routing/routing.service";
@@ -9,6 +10,9 @@ export class OrdersService {
   private pricingService = new PricingService();
 
   async createOrder(userId: string, stopsData: any[]) {
+    if (!mongoose.Types.ObjectId.isValid(userId)) {
+      throw new Error("Invalid User ID format");
+    }
     const user = await User.findById(userId);
     if (!user) throw new Error("User not found");
 
@@ -90,6 +94,9 @@ export class OrdersService {
   }
 
   async getOrderById(orderId: string) {
+    if (!mongoose.Types.ObjectId.isValid(orderId)) {
+      return null;
+    }
     return Order.findById(orderId).populate("user").populate("driver");
   }
 

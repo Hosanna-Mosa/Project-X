@@ -1,6 +1,6 @@
 import { io, Socket } from "socket.io-client";
 
-const SOCKET_URL = "http://192.168.1.5:5000";
+const SOCKET_URL = process.env.EXPO_PUBLIC_API_URL || "";
 
 class SocketService {
   private socket: Socket | null = null;
