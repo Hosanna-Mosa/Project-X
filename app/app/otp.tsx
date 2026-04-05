@@ -48,7 +48,7 @@ export default function OTPScreen() {
           params: { phone }
         });
       } else {
-        router.replace("/(tabs)/home");
+        router.replace("/(tabs)");
       }
     } catch (error: any) {
       Alert.alert("Error", error.message || "Verification failed");

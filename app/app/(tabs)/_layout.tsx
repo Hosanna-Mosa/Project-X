@@ -17,6 +17,8 @@ function CustomTabBar({ state, descriptors, navigation }: any) {
     <View style={[styles.tabBarContainer, { paddingBottom: insets.bottom + 8 }]}>
       {state.routes.map((route: any, index: number) => {
         const { options } = descriptors[route.key];
+        if (options.href === null) return null;
+
         const label = options.tabBarLabel !== undefined ? options.tabBarLabel : options.title !== undefined ? options.title : route.name;
         const isFocused = state.index === index;
 
@@ -36,16 +38,14 @@ function CustomTabBar({ state, descriptors, navigation }: any) {
           const color = isFocused ? "#0EA5E9" : "#94A3B8";
           const size = 24;
           switch (route.name) {
-            case "home":
+            case "index":
               return <Feather name="home" size={size} color={color} />;
             case "orders":
               return <Feather name="box" size={size} color={color} />;
-            case "support":
-              return <Feather name="help-circle" size={size} color={color} />;
             case "profile":
               return <Feather name="user" size={size} color={color} />;
             default:
-              return <Feather name="grid" size={size} color={color} />;
+              return null;
           }
         };
 
@@ -77,13 +77,14 @@ export default function TabLayout() {
         headerShown: false,
       }}
     >
-      <Tabs.Screen name="home" options={{ title: "Home" }} />
+      <Tabs.Screen name="index" options={{ title: "Home" }} />
       <Tabs.Screen name="orders" options={{ title: "Orders" }} />
-      <Tabs.Screen name="support" options={{ title: "Support" }} />
       <Tabs.Screen name="profile" options={{ title: "Profile" }} />
     </Tabs>
   );
 }
+
+
 
 const styles = StyleSheet.create({
   tabBarContainer: {

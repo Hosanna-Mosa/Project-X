@@ -44,7 +44,7 @@ export default function SignupScreen() {
       // Wait, let's just make it simpler: Add a 'register' endpoint in backend and store.
       const result = await verifyOTP(phone!, "123456", "USER", name);
       if (result.success) {
-        router.replace("/(tabs)/home");
+        router.replace("/(tabs)");
       }
     } catch (error: any) {
       Alert.alert("Error", error.message || "Registration failed");
