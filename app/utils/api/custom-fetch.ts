@@ -1,5 +1,6 @@
 export type CustomFetchOptions = RequestInit & {
   responseType?: "json" | "text" | "blob" | "auto";
+  isFormData?: boolean;
 };
 
 export type ErrorType<T = unknown> = ApiError<T>;
@@ -335,6 +336,7 @@ export async function customFetch<T = unknown>(
   const headers = mergeHeaders(isRequest(input) ? input.headers : undefined, headersInit);
 
   if (
+    !options.isFormData &&
     typeof init.body === "string" &&
     !headers.has("content-type") &&
     looksLikeJson(init.body)

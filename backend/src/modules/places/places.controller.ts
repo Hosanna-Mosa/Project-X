@@ -4,30 +4,38 @@ const GOOGLE_MAPS_APIKEY = process.env.GOOGLE_MAPS_API_KEY || "AIzaSyD23mZxzw78g
 
 export class PlacesController {
   static async getNearbyPlaces(req: Request, res: Response) {
-    const { lat, lng, radius = 2000, type = "restaurant" } = req.query;
+    const { lat, lng, radius = 5000, type, keyword } = req.query;
 
     if (!lat || !lng) {
       return res.status(400).json({ message: "Latitude and longitude are required" });
     }
 
     try {
-      const url = `https://maps.googleapis.com/maps/api/place/nearbysearch/json?location=${lat},${lng}&radius=${radius}&type=${type}&key=${GOOGLE_MAPS_APIKEY}`;
+      const typeParam = type ? `&type=${type}` : "";
+      const keywordParam = keyword ? `&keyword=${encodeURIComponent(keyword as string)}` : "";
+      
+      const url = `https://maps.googleapis.com/maps/api/place/nearbysearch/json?location=${lat},${lng}&radius=${radius}${typeParam}${keywordParam}&key=${GOOGLE_MAPS_APIKEY}`;
       
       const response = await fetch(url);
       const data = await response.json();
 
       if (data.status !== "OK" && data.status !== "ZERO_RESULTS") {
+        console.error("GOOGLE NEARBY ERROR:", data);
         return res.status(500).json({ message: "Error fetching from Google Places", status: data.status });
       }
 
       const places = (data.results || []).map((item: any) => ({
         id: item.place_id,
         name: item.name,
-        address: item.vicinity,
+        address: item.vicinity || item.formatted_address,
         lat: item.geometry.location.lat,
         lng: item.geometry.location.lng,
         rating: item.rating,
-        type: item.types?.[0] || 'place'
+        user_ratings_total: item.user_ratings_total,
+        type: item.types?.[0] || 'place',
+        open_now: item.opening_hours?.open_now,
+        price_level: item.price_level,
+        photo_reference: item.photos?.[0]?.photo_reference
       }));
 
       res.json(places);
@@ -36,6 +44,7 @@ export class PlacesController {
       res.status(500).json({ message: "Internal server error fetching places" });
     }
   }
+
 
   static async getAutocompleteSuggestions(req: Request, res: Response) {
     const { input, lat, lng, radius = 10000 } = req.query;
@@ -98,5 +107,37 @@ export class PlacesController {
       res.status(500).json({ message: "Internal server error" });
     }
   }
+  static async reverseGeocode(req: Request, res: Response) {
+    const { lat, lng } = req.query;
+
+    if (!lat || !lng) {
+      return res.status(400).json({ message: "Latitude and longitude are required" });
+    }
+
+    try {
+      const url = `https://maps.googleapis.com/maps/api/geocode/json?latlng=${lat},${lng}&key=${GOOGLE_MAPS_APIKEY}`;
+      const response = await fetch(url);
+      const data = await response.json();
+
+      if (data.status !== "OK" && data.status !== "ZERO_RESULTS") {
+        console.error("GOOGLE GEOCODE ERROR:", data);
+        return res.status(500).json({ message: "Error from Google Geocoding", status: data.status, detail: data.error_message });
+      }
+
+
+      const results = (data.results || []).map((r: any) => ({
+        address: r.formatted_address || r.vicinity || "Unknown location",
+        placeId: r.place_id,
+        raw: r // Temporary for debugging
+      }));
+
+      console.log(`Geocoded ${lat},${lng} to:`, results[0]?.address);
+      res.json(results);
+    } catch (error) {
+      console.error("Geocoding API Error:", error);
+      res.status(500).json({ message: "Internal server error" });
+    }
+  }
 }
+
 

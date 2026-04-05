@@ -14,13 +14,18 @@ interface Props {
   polyline?: string;
   driverLocation?: { lat: number; lng: number } | null;
   onLocationUpdate?: (coords: { lat: number, lng: number }) => void;
+  markers?: any[];
+  initialRegion?: Region;
+  onMarkerPress?: (marker: any) => void;
 }
 
 export interface MapBackgroundRef {
   recenter: () => void;
-  panTo: (lat: number, lng: number) => void;
+  panTo: (lat: number, lng: number, delta?: number) => void;
   fitToRoute: () => void;
+  fitToMarkers: (markers: any[]) => void;
 }
+
 
 // Minimalist, premium map style
 const mapStyle: MapStyleElement[] = [
@@ -95,20 +100,23 @@ export const MapBackground = forwardRef<MapBackgroundRef, Props>(({
   children, 
   style, 
   mapType = 'standard', 
-  stops = [], 
+  stops = [],
+  markers = [], 
+  initialRegion,
   polyline, 
   driverLocation,
-  onLocationUpdate 
+  onLocationUpdate,
+  onMarkerPress 
 }, ref) => {
-  const [initialRegion, setInitialRegion] = useState<Region | undefined>(undefined);
+  const [region, setRegion] = useState<Region | undefined>(initialRegion);
   const internalMapRef = useRef<MapView>(null);
   const locationRef = useRef<{lat: number, lng: number} | null>(null);
 
-  const getRegionForLocation = (lat: number, lng: number): Region => ({
-    latitude: lat - 0.005,
+  const getRegionForLocation = (lat: number, lng: number, latDelta = 0.015, lngDelta = 0.015): Region => ({
+    latitude: lat - (latDelta / 3), // offset slightly so pins are visible above bottom sheet
     longitude: lng,
-    latitudeDelta: 0.015,
-    longitudeDelta: 0.015,
+    latitudeDelta: latDelta,
+    longitudeDelta: lngDelta,
   });
 
   useImperativeHandle(ref, () => ({
@@ -117,14 +125,9 @@ export const MapBackground = forwardRef<MapBackgroundRef, Props>(({
         internalMapRef.current.animateToRegion(getRegionForLocation(locationRef.current.lat, locationRef.current.lng), 1000);
       }
     },
-    panTo: (lat: number, lng: number) => {
+    panTo: (lat: number, lng: number, delta = 0.005) => {
       if (internalMapRef.current && lat && lng) {
-        internalMapRef.current.animateToRegion({
-          latitude: lat,
-          longitude: lng,
-          latitudeDelta: 0.005,
-          longitudeDelta: 0.005,
-        }, 1000);
+        internalMapRef.current.animateToRegion(getRegionForLocation(lat, lng, delta, delta), 1000);
       }
     },
     fitToRoute: () => {
@@ -152,14 +155,30 @@ export const MapBackground = forwardRef<MapBackgroundRef, Props>(({
           animated: true,
         });
       }
+    },
+    fitToMarkers: (markerList: any[]) => {
+      if (!internalMapRef.current || markerList.length === 0) return;
+      const coords = markerList.map(m => ({ latitude: m.lat, longitude: m.lng }));
+      if (locationRef.current) {
+        coords.push({ latitude: locationRef.current.lat, longitude: locationRef.current.lng });
+      }
+      internalMapRef.current.fitToCoordinates(coords, {
+        edgePadding: { top: 150, right: 80, bottom: 400, left: 80 },
+        animated: true,
+      });
     }
   }));
 
   useEffect(() => {
+    if (initialRegion) {
+      setRegion(initialRegion);
+      return;
+    }
+
     (async () => {
       let { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== 'granted') {
-        setInitialRegion({
+        setRegion({
           latitude: 28.6139,
           longitude: 77.2090,
           latitudeDelta: 0.05,
@@ -170,21 +189,21 @@ export const MapBackground = forwardRef<MapBackgroundRef, Props>(({
 
       let location = await Location.getCurrentPositionAsync({});
       locationRef.current = { lat: location.coords.latitude, lng: location.coords.longitude };
-      setInitialRegion(getRegionForLocation(location.coords.latitude, location.coords.longitude));
+      setRegion(getRegionForLocation(location.coords.latitude, location.coords.longitude));
       if (onLocationUpdate) {
         onLocationUpdate({ lat: location.coords.latitude, lng: location.coords.longitude });
       }
     })();
-  }, []);
+  }, [initialRegion]);
 
   return (
     <View style={[styles.container, style]} pointerEvents="box-none">
-      {initialRegion && (
+      {region && (
         <MapView
           ref={internalMapRef}
           provider={PROVIDER_GOOGLE}
           style={StyleSheet.absoluteFill}
-          initialRegion={initialRegion}
+          initialRegion={region}
           mapType={mapType}
           customMapStyle={Platform.OS === 'web' || mapType === 'satellite' ? undefined : mapStyle}
           showsUserLocation={true}
@@ -193,6 +212,16 @@ export const MapBackground = forwardRef<MapBackgroundRef, Props>(({
           showsMyLocationButton={false}
           pointerEvents="auto"
         >
+          {markers.map((item) => (
+            <Marker
+              key={item.id}
+              coordinate={{ latitude: item.lat, longitude: item.lng }}
+              onPress={() => onMarkerPress?.(item)}
+              pinColor="#EF4444" // Standard red color for reliability
+              tracksViewChanges={true}
+            />
+          ))}
+
           {stops.map((stop, index) => (
             stop.lat && stop.lng && (
               <Marker
@@ -200,14 +229,7 @@ export const MapBackground = forwardRef<MapBackgroundRef, Props>(({
                 coordinate={{ latitude: stop.lat, longitude: stop.lng }}
                 title={stop.storeName || `Pickup ${index + 1}`}
                 description={stop.address}
-              >
-                <View style={styles.markerContainer}>
-                  <View style={styles.markerBadge}>
-                    <Text style={styles.markerBadgeText}>{index + 1}</Text>
-                  </View>
-                  <View style={styles.markerPin} />
-                </View>
-              </Marker>
+              />
             )
           ))}
           
@@ -236,9 +258,9 @@ export const MapBackground = forwardRef<MapBackgroundRef, Props>(({
           )}
         </MapView>
       )}
-      <View style={styles.mapOverlay} pointerEvents="none" />
       {children}
     </View>
+
   );
 });
 
@@ -342,5 +364,26 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     backgroundColor: `${Colors.light.primary}30`,
     zIndex: 1,
+  },
+  redMarkerContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: 40,
+    height: 40,
+  },
+  redMarkerDot: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    backgroundColor: '#EF4444',
+    borderWidth: 2,
+    borderColor: '#fff',
+    zIndex: 2,
+  },
+  redMarkerPin: {
+    width: 2,
+    height: 8,
+    backgroundColor: '#EF4444',
+    marginTop: -2,
   }
 });

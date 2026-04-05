@@ -15,6 +15,19 @@ import { SafeAreaProvider } from "react-native-safe-area-context";
 
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { useAuthStore } from "@/contexts/authStore";
+import { setAuthTokenGetter, setBaseUrl } from "@/utils/api/custom-fetch";
+
+// The API URL should be retrieved from environment variables
+const apiUrl = process.env.EXPO_PUBLIC_API_URL;
+if (apiUrl) {
+  setBaseUrl(apiUrl);
+}
+
+// Register token getter for automated Authorization headers
+setAuthTokenGetter(() => {
+  return useAuthStore.getState().token;
+});
+
 
 SplashScreen.preventAutoHideAsync();
 

@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import {
   Platform,
   StyleSheet,
@@ -6,23 +6,91 @@ import {
   TextInput,
   TouchableOpacity,
   View,
+  ActivityIndicator,
+  Image,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Feather } from "@expo/vector-icons";
+import { Feather, FontAwesome5 } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
+import * as Location from "expo-location";
 import Colors from "@/constants/colors";
-import { MapBackground } from "@/components/MapBackground";
+import { MapBackground, MapBackgroundRef } from "@/components/MapBackground";
 import { BottomSheet } from "@/components/BottomSheet";
+import { customFetch } from "@/utils/api/custom-fetch";
 
 export default function ServiceSelectionScreen() {
   const insets = useSafeAreaInsets();
   const { label } = useLocalSearchParams<{ label: string }>();
+  const [mapType, setMapType] = useState<"standard" | "satellite">("standard");
   const [searchText, setSearchText] = useState("");
+  const [nearbyPlaces, setNearbyPlaces] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [selectedPlace, setSelectedPlace] = useState<any | null>(null);
+  const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(null);
+  const mapRef = useRef<MapBackgroundRef>(null);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        let { status } = await Location.requestForegroundPermissionsAsync();
+        if (status !== 'granted') return;
+
+        setLoading(true);
+        const location = await Location.getCurrentPositionAsync({});
+        const currentCoords = { lat: location.coords.latitude, lng: location.coords.longitude };
+        setCoords(currentCoords);
+
+        if (["Food", "Grocery", "Meds"].includes(label as string)) {
+          let keyword = "food";
+          if (label === "Grocery") keyword = "grocery supermarket";
+          if (label === "Meds") keyword = "pharmacy medical shop";
+          
+          fetchNearby(currentCoords.lat, currentCoords.lng, keyword);
+        }
+      } catch (err) {
+        console.error("Location/Fetch error:", err);
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, [label]);
+
+  const fetchNearby = async (lat: number, lng: number, keyword: string) => {
+    try {
+      const data = await customFetch<any[]>(`/api/places/nearby?lat=${lat}&lng=${lng}&radius=5000&keyword=${encodeURIComponent(keyword)}`);
+      setNearbyPlaces(data);
+      if (data.length > 0) {
+        setTimeout(() => mapRef.current?.fitToMarkers(data), 1000);
+      }
+    } catch (err) {
+      console.error("Fetch nearby error:", err);
+    }
+  };
+
+  const handleMarkerPress = (place: any) => {
+    setSelectedPlace(place);
+    mapRef.current?.panTo(place.lat, place.lng, 0.005);
+  };
 
   return (
     <View style={styles.root}>
-      {/* Real map would go here, currently using the placeholder MapBackground */}
-      <MapBackground style={StyleSheet.absoluteFill} />
+      <MapBackground 
+        ref={mapRef}
+        style={StyleSheet.absoluteFill} 
+        markers={nearbyPlaces}
+        onMarkerPress={handleMarkerPress}
+        mapType={mapType}
+      />
+
+      {/* Map Action Buttons */}
+      <View style={[styles.mapActions, { top: insets.top + (Platform.OS === 'web' ? 70 : 10) + 70 }]}>
+        <TouchableOpacity 
+          style={styles.actionBtn} 
+          onPress={() => setMapType(m => m === 'standard' ? 'satellite' : 'standard')}
+        >
+          <Feather name="layers" size={20} color={mapType === 'satellite' ? Colors.light.primary : Colors.light.text} />
+        </TouchableOpacity>
+      </View>
 
       {/* Top Header */}
       <View
@@ -42,13 +110,40 @@ export default function ServiceSelectionScreen() {
         </View>
       </View>
 
-      {/* Map Content Overlay (Optional Pin in Center) */}
-      <View style={styles.pinContainer} pointerEvents="none">
-        <View style={styles.pinShadow} />
-        <View style={styles.pin}>
-          <View style={styles.pinInner} />
+      {/* Detail Card Overlay when place is selected */}
+      {selectedPlace && (
+        <View style={[styles.detailOverlay, { bottom: 340 }]}>
+          <TouchableOpacity 
+            style={styles.closeDetail}
+            onPress={() => setSelectedPlace(null)}
+          >
+            <Feather name="x" size={20} color="#fff" />
+          </TouchableOpacity>
+          <View style={styles.detailCard}>
+            <View style={styles.detailInfo}>
+              <Text style={styles.detailName}>{selectedPlace.name}</Text>
+              <Text style={styles.detailAddress} numberOfLines={2}>{selectedPlace.address}</Text>
+              <View style={styles.ratingRow}>
+                <View style={styles.starBox}>
+                  <Feather name="star" size={14} color="#EAB308" />
+                  <Text style={styles.ratingText}>{selectedPlace.rating || 'N/A'}</Text>
+                </View>
+                <Text style={styles.userCount}>({selectedPlace.user_ratings_total || 0} reviews)</Text>
+                {selectedPlace.open_now !== undefined && (
+                  <View style={[styles.statusTag, { backgroundColor: selectedPlace.open_now ? '#DCFCE7' : '#FEE2E2' }]}>
+                    <Text style={[styles.statusText, { color: selectedPlace.open_now ? '#166534' : '#991B1B' }]}>
+                      {selectedPlace.open_now ? 'OPEN' : 'CLOSED'}
+                    </Text>
+                  </View>
+                )}
+              </View>
+            </View>
+            <TouchableOpacity style={styles.orderBtn} onPress={() => router.push({ pathname: "/chat", params: { placeId: selectedPlace.id } })}>
+              <Text style={styles.orderBtnText}>Order Now</Text>
+            </TouchableOpacity>
+          </View>
         </View>
-      </View>
+      )}
 
       {/* Bottom Sheet with Search Bar */}
       <BottomSheet style={styles.bottomSheet}>
@@ -59,41 +154,66 @@ export default function ServiceSelectionScreen() {
           </Text>
 
           <View style={styles.searchContainer}>
-            <Feather name="search" size={20} color={Colors.light.textMuted} />
+            {loading ? <ActivityIndicator size="small" color={Colors.light.primary} /> : <Feather name="search" size={20} color={Colors.light.textMuted} />}
             <TextInput
               style={styles.searchInput}
               placeholder="Search for area, street name..."
               placeholderTextColor={Colors.light.textMuted}
               value={searchText}
               onChangeText={setSearchText}
-              autoFocus
             />
           </View>
 
           {/* Location Suggestions (Mock) */}
           <View style={styles.suggestions}>
-            <TouchableOpacity style={styles.suggestionItem}>
-              <View style={styles.suggestionIconBox}>
-                <Feather name="map-pin" size={18} color={Colors.light.textSecondary} />
-              </View>
-              <View style={styles.suggestionText}>
-                <Text style={styles.suggestionTitle}>Set location on map</Text>
-              </View>
-              <Feather name="chevron-right" size={20} color={Colors.light.textMuted} />
-            </TouchableOpacity>
-            
-            <View style={styles.divider} />
+             {/* If we have nearby places, maybe show them in list too? */}
+             {["Food", "Grocery", "Meds"].includes(label as string) && nearbyPlaces.length > 0 ? (
+               nearbyPlaces.slice(0, 5).map((place) => (
+                <TouchableOpacity 
+                  key={place.id} 
+                  style={styles.suggestionItem}
+                  onPress={() => handleMarkerPress(place)}
+                >
+                  <View style={[styles.suggestionIconBox, { backgroundColor: label === 'Meds' ? '#FEF2F2' : label === 'Grocery' ? '#F0FDF4' : '#F0F9FF' }]}>
+                    <Feather 
+                      name={label === 'Meds' ? 'plus-square' : label === 'Grocery' ? 'shopping-cart' : 'shopping-bag'} 
+                      size={18} 
+                      color={label === 'Meds' ? '#EF4444' : label === 'Grocery' ? '#22C55E' : '#0EA5E9'} 
+                    />
+                  </View>
+                  <View style={styles.suggestionText}>
+                    <Text style={styles.suggestionTitle}>{place.name}</Text>
+                    <Text style={styles.suggestionSubtitle} numberOfLines={1}>{place.address}</Text>
+                  </View>
+                  <Feather name="chevron-right" size={20} color={Colors.light.textMuted} />
+                </TouchableOpacity>
+               ))
+             ) : (
+                <>
+                  <TouchableOpacity style={styles.suggestionItem}>
+                    <View style={styles.suggestionIconBox}>
+                      <Feather name="map-pin" size={18} color={Colors.light.textSecondary} />
+                    </View>
+                    <View style={styles.suggestionText}>
+                      <Text style={styles.suggestionTitle}>Set location on map</Text>
+                    </View>
+                    <Feather name="chevron-right" size={20} color={Colors.light.textMuted} />
+                  </TouchableOpacity>
+                  
+                  <View style={styles.divider} />
 
-            <TouchableOpacity style={styles.suggestionItem}>
-              <View style={[styles.suggestionIconBox, { backgroundColor: '#F0F9FF' }]}>
-                <Feather name="home" size={18} color="#0EA5E9" />
-              </View>
-              <View style={styles.suggestionText}>
-                <Text style={styles.suggestionTitle}>Home</Text>
-                <Text style={styles.suggestionSubtitle}>221B Baker Street, London</Text>
-              </View>
-              <Feather name="chevron-right" size={20} color={Colors.light.textMuted} />
-            </TouchableOpacity>
+                  <TouchableOpacity style={styles.suggestionItem}>
+                    <View style={[styles.suggestionIconBox, { backgroundColor: '#F0F9FF' }]}>
+                      <Feather name="home" size={18} color="#0EA5E9" />
+                    </View>
+                    <View style={styles.suggestionText}>
+                      <Text style={styles.suggestionTitle}>Home</Text>
+                      <Text style={styles.suggestionSubtitle}>221B Baker Street, London</Text>
+                    </View>
+                    <Feather name="chevron-right" size={20} color={Colors.light.textMuted} />
+                  </TouchableOpacity>
+                </>
+             )}
           </View>
         </View>
       </BottomSheet>
@@ -176,13 +296,9 @@ const styles = StyleSheet.create({
     transform: [{ scaleX: 2 }],
   },
   bottomSheet: {
-    position: "absolute",
-    bottom: 0,
-    left: 0,
-    right: 0,
-    minHeight: 320,
     paddingBottom: 40,
   },
+
   sheetContent: {
     gap: 16,
   },
@@ -252,5 +368,113 @@ const styles = StyleSheet.create({
     height: 1,
     backgroundColor: "#F1F5F9",
     marginLeft: 54,
+  },
+  detailOverlay: {
+    position: "absolute",
+    left: 20,
+    right: 20,
+    zIndex: 100,
+  },
+  closeDetail: {
+    position: "absolute",
+    top: -45,
+    right: 0,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: "rgba(15, 23, 42, 0.6)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  detailCard: {
+    backgroundColor: "#fff",
+    borderRadius: 24,
+    padding: 20,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 16,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.15,
+    shadowRadius: 20,
+    elevation: 10,
+  },
+  detailInfo: {
+    flex: 1,
+    gap: 4,
+  },
+  detailName: {
+    fontSize: 18,
+    fontWeight: "800",
+    color: Colors.light.text,
+  },
+  detailAddress: {
+    fontSize: 13,
+    color: Colors.light.textSecondary,
+    fontWeight: "500",
+  },
+  ratingRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginTop: 4,
+  },
+  starBox: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    backgroundColor: "#FEF9C3",
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+  ratingText: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: "#854D0E",
+  },
+  userCount: {
+    fontSize: 12,
+    color: Colors.light.textMuted,
+    fontWeight: "500",
+  },
+  statusTag: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+  },
+  statusText: {
+    fontSize: 10,
+    fontWeight: "800",
+  },
+  orderBtn: {
+    backgroundColor: Colors.light.primary,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 12,
+  },
+  orderBtnText: {
+    color: "#fff",
+    fontSize: 14,
+    fontWeight: "800",
+  },
+  mapActions: {
+    position: 'absolute',
+    right: 20,
+    zIndex: 10,
+    gap: 12,
+  },
+  actionBtn: {
+    width: 44,
+    height: 44,
+    borderRadius: 12,
+    backgroundColor: Colors.light.surface,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 10,
+    elevation: 5,
   },
 });

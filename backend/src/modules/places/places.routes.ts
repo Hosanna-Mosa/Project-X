@@ -7,4 +7,7 @@ router.get("/nearby", PlacesController.getNearbyPlaces);
 router.get("/autocomplete", PlacesController.getAutocompleteSuggestions);
 router.get("/details/:placeId", PlacesController.getPlaceDetails);
 
+router.get("/reverse-geocode", PlacesController.reverseGeocode);
+
 export default router;
+
