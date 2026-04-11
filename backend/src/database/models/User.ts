@@ -9,6 +9,7 @@ export enum UserRole {
 export interface IAddress {
   _id?: any;
   label: string; // Home, Work, etc.
+  receiverName?: string;
   addressLine: string;
   phone: string;
   location: {
@@ -59,6 +60,7 @@ const UserSchema: Schema = new Schema(
     addresses: [
       {
         label: { type: String, required: true },
+        receiverName: { type: String },
         addressLine: { type: String, required: true },
         phone: { type: String, required: true },
         location: {

@@ -26,9 +26,17 @@ export class SocketManager {
   private async setupRedis() {
     this.redisClient = createClient({
       url: process.env.REDIS_URL || "redis://localhost:6379",
+      socket: {
+        reconnectStrategy: false
+      }
     });
 
-    this.redisClient.on("error", (err: any) => console.log("Redis Client Error (Socket manager)", err.message));
+    this.redisClient.on("error", (err: any) => {
+      // Only log if we expect redis to be active
+      if (this.redisClient) {
+        console.log("Redis Client Error:", err.message);
+      }
+    });
     
     try {
       await this.redisClient.connect();

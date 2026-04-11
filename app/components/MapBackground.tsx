@@ -176,22 +176,33 @@ export const MapBackground = forwardRef<MapBackgroundRef, Props>(({
     }
 
     (async () => {
-      let { status } = await Location.requestForegroundPermissionsAsync();
-      if (status !== 'granted') {
+      try {
+        let { status } = await Location.requestForegroundPermissionsAsync();
+        if (status !== 'granted') {
+          setRegion({
+            latitude: 28.6139,
+            longitude: 77.2090,
+            latitudeDelta: 0.05,
+            longitudeDelta: 0.05,
+          });
+          return;
+        }
+
+        let location = await Location.getCurrentPositionAsync({});
+        locationRef.current = { lat: location.coords.latitude, lng: location.coords.longitude };
+        setRegion(getRegionForLocation(location.coords.latitude, location.coords.longitude));
+        if (onLocationUpdate) {
+          onLocationUpdate({ lat: location.coords.latitude, lng: location.coords.longitude });
+        }
+      } catch (error) {
+        // Graceful fallback if device GPS is fully disabled
+        console.warn("Location services unavailable:", error);
         setRegion({
           latitude: 28.6139,
           longitude: 77.2090,
           latitudeDelta: 0.05,
           longitudeDelta: 0.05,
         });
-        return;
-      }
-
-      let location = await Location.getCurrentPositionAsync({});
-      locationRef.current = { lat: location.coords.latitude, lng: location.coords.longitude };
-      setRegion(getRegionForLocation(location.coords.latitude, location.coords.longitude));
-      if (onLocationUpdate) {
-        onLocationUpdate({ lat: location.coords.latitude, lng: location.coords.longitude });
       }
     })();
   }, [initialRegion]);

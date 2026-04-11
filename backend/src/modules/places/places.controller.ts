@@ -54,9 +54,9 @@ export class PlacesController {
     }
 
     try {
-      // locationbias=circle enforces strict proximity ranking
+      // locationrestriction enforces strict filtering limits, origin calculates precise distances
       const locationBias = lat && lng
-        ? `&locationbias=circle:${radius}@${lat},${lng}`
+        ? `&locationrestriction=circle:${radius}@${lat},${lng}&origin=${lat},${lng}`
         : "";
 
       const url = `https://maps.googleapis.com/maps/api/place/autocomplete/json?input=${encodeURIComponent(input as string)}${locationBias}&language=en&key=${GOOGLE_MAPS_APIKEY}`;
@@ -74,6 +74,7 @@ export class PlacesController {
         address: p.description,
         main_text: p.structured_formatting?.main_text,
         secondary_text: p.structured_formatting?.secondary_text,
+        distance_meters: p.distance_meters,
       }));
 
       res.json(results);
