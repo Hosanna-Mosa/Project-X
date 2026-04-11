@@ -81,47 +81,9 @@ export function LocationPickerSheet({ isOpen, onClose, onSelectAddress }: Props)
     }
   };
 
-  const handleUseCurrentLocation = async () => {
-    try {
-      setLocationLoading(true);
-      setDetectedLocation(null);
-      let { status } = await Location.requestForegroundPermissionsAsync();
-      if (status !== "granted") {
-        Alert.alert("Permission denied", "Allow location access to use this feature.");
-        return;
-      }
-
-      console.log("Fetching current position...");
-      const location = await Location.getCurrentPositionAsync({
-        accuracy: Location.Accuracy.High, // Increased for better accuracy
-      });
-      const { latitude, longitude } = location.coords;
-      console.log(`Current coords: ${latitude}, ${longitude}`);
-      
-      const response = (await customFetch(`/api/places/reverse-geocode?lat=${latitude}&lng=${longitude}`)) as any[];
-      console.log("Raw response from geocode:", JSON.stringify(response[0], null, 2));
-      
-      if (response && response.length > 0) {
-        // Fallback chain for address property
-        const addressLine = response[0].address || response[0].formatted_address || "Unnamed location";
-        console.log("Resolved address line:", addressLine);
-        
-        setDetectedLocation({
-          addressLine: addressLine,
-          coordinates: { lat: latitude, lng: longitude },
-          label: "Current Location",
-          phone: "0000000000"
-        });
-      } else {
-        console.warn("No geocoding results found for these coordinates.");
-        Alert.alert("Location Found", "We found your coordinates, but couldn't get a clear address. Please use 'Add new address' to pick manually.");
-      }
-    } catch (error: any) {
-      console.error("Location detection failed:", error);
-      Alert.alert("Error", error.message || "Could not get your location. Please ensure GPS is enabled.");
-    } finally {
-      setLocationLoading(false);
-    }
+  const handleUseCurrentLocation = () => {
+    onClose();
+    router.push("/delivery/add-address?step=1");
   };
 
   const handleSaveLocation = async () => {
@@ -183,7 +145,7 @@ export function LocationPickerSheet({ isOpen, onClose, onSelectAddress }: Props)
           <Feather 
             name={item.label === "Home" ? "home" : item.label === "Work" ? "briefcase" : "map-pin"} 
             size={20} 
-            color="#F59E0B" 
+            color="#06B6D4" 
           />
         </View>
         <View style={styles.addressContent}>
@@ -238,25 +200,24 @@ export function LocationPickerSheet({ isOpen, onClose, onSelectAddress }: Props)
           onPress={onClose} 
         />
         <View style={styles.sheet}>
-          <TouchableOpacity 
-            style={styles.floatingCloseBtn}
-            onPress={onClose}
-          >
-            <Feather name="x" size={24} color="#FFFFFF" />
-          </TouchableOpacity>
-
-          <Text style={styles.title}>Select delivery location</Text>
+          <View style={styles.dragHandle} />
+          <View style={styles.headerRow}>
+            <Text style={styles.title}>Select a location</Text>
+            <TouchableOpacity onPress={onClose} style={styles.closeBtn}>
+              <Feather name="x" size={20} color="#000000" />
+            </TouchableOpacity>
+          </View>
           
           <View style={styles.searchRow}>
-            <Feather name="search" size={18} color={Colors.light.textMuted} />
+            <Feather name="search" size={20} color="#06B6D4" style={styles.searchIcon} />
             <TextInput 
               style={styles.searchInput} 
               placeholder="Search for area, street name..."
-              placeholderTextColor={Colors.light.textMuted}
+              placeholderTextColor="#9CA3AF"
               value={search}
               onChangeText={handleSearch}
             />
-            {searching && <ActivityIndicator size="small" color={Colors.light.tint} />}
+            {searching && <ActivityIndicator size="small" color="#F87171" />}
           </View>
 
           {search.length > 2 ? (
@@ -267,51 +228,43 @@ export function LocationPickerSheet({ isOpen, onClose, onSelectAddress }: Props)
               style={styles.searchResultsContainer}
             />
           ) : (
-            <View style={{ flex: 1 }}>
-              <View style={styles.quickActionBox}>
-                <TouchableOpacity style={styles.actionRow} onPress={handleUseCurrentLocation} disabled={locationLoading}>
-                  <View style={[styles.iconBox, { backgroundColor: '#F0FDF4' }]}>
-                    {locationLoading ? (
-                      <ActivityIndicator size="small" color="#166534" />
-                    ) : (
-                      <FontAwesome5 name="crosshairs" size={16} color="#166534" />
-                    )}
-                  </View>
-                  <Text style={[styles.actionText, { color: '#166534' }]}>
-                    {locationLoading ? "Finding location..." : "Use current location"}
-                  </Text>
-                  {!locationLoading && <Feather name="chevron-right" size={18} color={Colors.light.textMuted} />}
-                </TouchableOpacity>
+            <View style={{ flexShrink: 1 }}>
+              <TouchableOpacity style={styles.blinkitActionRow} onPress={handleUseCurrentLocation}>
+                <View style={styles.actionIconLeft}>
+                  <Feather name="crosshair" size={22} color="#06B6D4" />
+                </View>
+                <View style={styles.actionTextContainer}>
+                  <Text style={styles.actionTitle}>Use current location</Text>
+                  <Text style={styles.actionSubtitle}>Using GPS</Text>
+                </View>
+                <Feather name="chevron-right" size={20} color="#D1D5DB" />
+              </TouchableOpacity>
 
-                
-                <View style={styles.divider} />
+              <View style={styles.divider} />
 
-                <TouchableOpacity 
-                  style={styles.actionRow}
-                  onPress={() => {
-                    onClose();
-                    router.push("/delivery/add-address");
-                  }}
-                >
-                  <View style={[styles.iconBox, { backgroundColor: '#F0FDF4' }]}>
-                    <Feather name="plus" size={18} color="#166534" />
-                  </View>
-                  <Text style={[styles.actionText, { color: '#166534' }]}>Add new address</Text>
-                  <Feather name="chevron-right" size={18} color={Colors.light.textMuted} />
-                </TouchableOpacity>
-              </View>
+              <TouchableOpacity 
+                style={styles.blinkitActionRow}
+                onPress={() => {
+                  onClose();
+                  router.push("/delivery/add-address?step=2");
+                }}
+              >
+                <View style={styles.actionIconLeft}>
+                  <Feather name="plus" size={22} color="#06B6D4" />
+                </View>
+                <View style={styles.actionTextContainer}>
+                  <Text style={styles.actionTitle}>Add new address</Text>
+                  <Text style={styles.actionSubtitle}>Enter location details manually</Text>
+                </View>
+                <Feather name="chevron-right" size={20} color="#D1D5DB" />
+              </TouchableOpacity>
+
+              <View style={styles.dividerFull} />
 
               {detectedLocation && (
                 <View style={styles.detectedBox}>
-                  <View style={styles.addressMain}>
-                    <View style={styles.addressIconWrap}>
-                      <FontAwesome5 name="map-marker-alt" size={20} color="#059669" />
-                    </View>
-                    <View style={styles.addressContent}>
-                      <Text style={styles.detectedTitle}>Detected Location</Text>
-                      <Text style={styles.addressText}>{detectedLocation.addressLine}</Text>
-                    </View>
-                  </View>
+                  <Text style={styles.detectedTitle}>Detected Location</Text>
+                  <Text style={styles.addressText}>{detectedLocation.addressLine}</Text>
                   <TouchableOpacity 
                     style={[styles.saveActionBtn, savingLocation && { opacity: 0.7 }]}
                     onPress={handleSaveLocation}
@@ -320,22 +273,16 @@ export function LocationPickerSheet({ isOpen, onClose, onSelectAddress }: Props)
                     {savingLocation ? (
                       <ActivityIndicator size="small" color="#FFFFFF" />
                     ) : (
-                      <>
-                        <Feather name="save" size={16} color="#FFFFFF" />
-                        <Text style={styles.saveActionText}>Save to profile</Text>
-                      </>
+                      <Text style={styles.saveActionText}>Save & Proceed</Text>
                     )}
                   </TouchableOpacity>
                 </View>
               )}
 
-              <View style={styles.sectionHeader}>
-
-                <Text style={styles.sectionText}>Your saved addresses</Text>
-              </View>
+              <Text style={styles.sectionText}>Saved Addresses</Text>
 
               {loading ? (
-                <ActivityIndicator size="large" color={Colors.light.tint} style={{ marginTop: 20 }} />
+                <ActivityIndicator size="large" color="#E11D48" style={{ marginTop: 20 }} />
               ) : (
                 <FlatList
                   data={savedAddresses}
@@ -344,7 +291,7 @@ export function LocationPickerSheet({ isOpen, onClose, onSelectAddress }: Props)
                   ListEmptyComponent={
                     <Text style={styles.emptyText}>No saved addresses found.</Text>
                   }
-                  contentContainerStyle={{ gap: 12, paddingBottom: 20 }}
+                  contentContainerStyle={{ paddingBottom: 24 }}
                 />
               )}
             </View>
@@ -355,247 +302,205 @@ export function LocationPickerSheet({ isOpen, onClose, onSelectAddress }: Props)
   );
 }
 
-
 const styles = StyleSheet.create({
   overlay: {
-    flex: 1, // Full screen for Modal
-    backgroundColor: 'rgba(15, 23, 42, 0.7)',
-    justifyContent: "flex-end", // Align sheet to bottom
+    flex: 1, 
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: "flex-end", 
   },
   sheet: {
     backgroundColor: "#FFFFFF",
-    borderTopLeftRadius: 40,
-    borderTopRightRadius: 40,
-    padding: 24,
-    paddingBottom: 50,
-    gap: 20,
-    position: "absolute",
-    bottom: 0,
-    left: 0,
-    right: 0,
-    maxHeight: '88%',
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: -15 },
-    shadowOpacity: 0.1,
-    shadowRadius: 25,
-    elevation: 30,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    paddingTop: 12,
+    maxHeight: '90%',
   },
-  floatingCloseBtn: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: "#0F172A",
-    alignItems: "center",
-    justifyContent: "center",
-    position: "absolute",
-    top: -68,
+  dragHandle: {
+    width: 36,
+    height: 5,
+    borderRadius: 3,
+    backgroundColor: "#D1D5DB",
     alignSelf: "center",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.2,
-    shadowRadius: 12,
-    elevation: 10,
+    marginBottom: 16,
+  },
+  headerRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 16,
+    marginBottom: 16,
+  },
+  closeBtn: {
+    padding: 4,
   },
   title: {
-    fontSize: 24,
-    fontWeight: "900",
-    color: "#0F172A",
-    letterSpacing: -0.8,
-    marginBottom: 4,
+    fontSize: 18,
+    fontWeight: "700",
+    color: "#111827",
   },
   searchRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 12,
-    backgroundColor: "#F8FAFC",
-    paddingHorizontal: 18,
-    paddingVertical: 16,
-    borderRadius: 22,
-    borderWidth: 1.5,
-    borderColor: "#F1F5F9",
-    marginBottom: 4,
+    backgroundColor: "#FFFFFF",
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+    marginHorizontal: 16,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    borderRadius: 12,
+    marginBottom: 20,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  searchIcon: {
+    marginRight: 10,
   },
   searchInput: {
     flex: 1,
-    fontSize: 16,
-    fontWeight: "600",
-    color: "#0F172A",
+    fontSize: 15,
+    fontWeight: "500",
+    color: "#111827",
   },
-  quickActionBox: {
-    backgroundColor: "#FFFFFF",
-    borderRadius: 24,
-    borderWidth: 1.5,
-    borderColor: "#F1F5F9",
-    overflow: "hidden",
-  },
-  actionRow: {
+  blinkitActionRow: {
     flexDirection: "row",
     alignItems: "center",
-    padding: 18,
-    gap: 16,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
   },
-  iconBox: {
-    width: 40,
-    height: 40,
-    borderRadius: 14,
+  actionIconLeft: {
+    width: 24,
     alignItems: "center",
+    marginRight: 16,
+  },
+  actionTextContainer: {
+    flex: 1,
     justifyContent: "center",
   },
-  actionText: {
-    flex: 1,
-    fontSize: 16,
-    fontWeight: "700",
-    letterSpacing: -0.2,
+  actionTitle: {
+    fontSize: 15,
+    fontWeight: "600",
+    color: "#06B6D4",
+    marginBottom: 2,
+  },
+  actionSubtitle: {
+    fontSize: 13,
+    color: "#6B7280",
   },
   divider: {
     height: 1,
-    backgroundColor: "#F1F5F9",
-    marginLeft: 74,
+    backgroundColor: "#F3F4F6",
+    marginLeft: 56,
   },
-  sectionHeader: {
-    marginTop: 12,
-    marginBottom: 4,
+  dividerFull: {
+    height: 6,
+    backgroundColor: "#F3F4F6",
+    marginTop: 8,
+    marginBottom: 16,
   },
   sectionText: {
-    fontSize: 14,
-    fontWeight: "800",
-    color: "#94A3B8",
+    fontSize: 13,
+    fontWeight: "600",
+    color: "#6B7280",
     textTransform: "uppercase",
-    letterSpacing: 1,
+    letterSpacing: 0.5,
+    paddingHorizontal: 16,
+    marginBottom: 12,
   },
   addressCard: {
-    backgroundColor: "#FFFFFF",
-    borderRadius: 22,
-    borderWidth: 1.5,
-    borderColor: "#F1F5F9",
-    padding: 16, // Reduced from 20
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.02,
-    shadowRadius: 10,
+    flexDirection: "row",
+    paddingVertical: 16,
+    paddingHorizontal: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: "#F3F4F6",
   },
   addressMain: {
     flexDirection: "row",
-    gap: 14, // Reduced from 18
+    flex: 1,
   },
   addressIconWrap: {
-    width: 40, // Reduced from 48
-    height: 40, // Reduced from 48
-    borderRadius: 12, // Reduced from 16
-    backgroundColor: "#FFFBEB",
+    width: 24,
     alignItems: "center",
-    justifyContent: "center",
+    marginRight: 16,
+    marginTop: 2,
   },
   addressContent: {
     flex: 1,
-    gap: 2, // Reduced from 6
   },
   addressTitleRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 8,
+    marginBottom: 4,
   },
   addressType: {
-    fontSize: 16, // Reduced from 18
-    fontWeight: "800",
-    color: "#0F172A",
-    letterSpacing: -0.3,
-  },
-  addressDistance: {
-    fontSize: 10, // Reduced from 12
-    fontWeight: "800",
-    color: "#059669",
-    backgroundColor: "#ECFDF5",
-    paddingHorizontal: 6,
-    paddingVertical: 1,
-    borderRadius: 5,
+    fontSize: 15,
+    fontWeight: "600",
+    color: "#111827",
   },
   addressText: {
-    fontSize: 13, // Reduced from 14
-    color: "#64748B", 
+    fontSize: 13,
+    color: "#6B7280", 
     lineHeight: 18,
-    fontWeight: "500",
   },
   addressPhone: {
-    fontSize: 12, // Reduced from 13
-    color: "#94A3B8",
-    marginTop: 1,
-    fontWeight: "600",
-  },
-  addressActions: {
-    flexDirection: "row",
-    gap: 10, // Reduced from 14
-    marginTop: 8, // Reduced from 12
-  },
-  circleBtn: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    borderWidth: 1.5,
-    borderColor: "#F1F5F9",
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "#F8FAFC",
+    fontSize: 13,
+    color: "#4B5563",
+    marginTop: 4,
   },
   searchResultsContainer: {
     flex: 1,
-    marginTop: 8,
+    paddingHorizontal: 16,
   },
   searchResultItem: {
     flexDirection: "row",
     alignItems: "center",
-    paddingVertical: 14,
-    paddingHorizontal: 4,
+    paddingVertical: 16,
     borderBottomWidth: 1,
-    borderBottomColor: "#F1F5F9",
-    gap: 12,
+    borderBottomColor: "#F3F4F6",
   },
   searchResultName: {
-    fontSize: 16,
-    fontWeight: "700",
-    color: "#0F172A",
+    fontSize: 15,
+    fontWeight: "600",
+    color: "#111827",
+    marginBottom: 2,
   },
   searchResultAddress: {
     fontSize: 13,
-    color: "#64748B",
-    fontWeight: "500",
+    color: "#6B7280",
   },
   emptyText: {
     textAlign: "center",
-    color: "#94A3B8",
-    marginTop: 40,
+    color: "#9CA3AF",
+    marginTop: 20,
     fontSize: 14,
-    fontWeight: "600",
   },
   detectedBox: {
-    backgroundColor: "#ECFDF5",
-    borderRadius: 24,
-    padding: 20,
-    borderWidth: 1.5,
-    borderColor: "#10B98120",
-    gap: 16,
-    marginTop: -4,
+    backgroundColor: "#FFF1F2",
+    marginHorizontal: 16,
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 20,
   },
   detectedTitle: {
-    fontSize: 13,
-    fontWeight: "800",
-    color: "#059669",
-    textTransform: "uppercase",
-    letterSpacing: 1,
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#BE123C",
+    marginBottom: 8,
   },
   saveActionBtn: {
-    backgroundColor: "#059669",
-    flexDirection: "row",
+    backgroundColor: "#E11D48",
     alignItems: "center",
     justifyContent: "center",
-    paddingVertical: 12,
-    borderRadius: 14,
-    gap: 8,
+    paddingVertical: 14,
+    borderRadius: 8,
+    marginTop: 16,
   },
   saveActionText: {
     color: "#FFFFFF",
     fontSize: 15,
-    fontWeight: "700",
+    fontWeight: "600",
   },
 });
 

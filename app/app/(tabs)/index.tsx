@@ -44,44 +44,70 @@ export default function HomeScreen() {
   const topPadding = insets.top + (Platform.OS === "web" ? 67 : 0);
 
   const [isLocationSheetOpen, setIsLocationSheetOpen] = useState(false);
-  const [selectedAddress, setSelectedAddress] = useState("221B Baker Street, London");
+  const [selectedAddress, setSelectedAddress] = useState<any>(null);
 
   return (
     <View style={styles.root}>
       <MapBackground style={StyleSheet.absoluteFill} />
 
-      <View style={[styles.overlay, { paddingTop: topPadding }]} pointerEvents="box-none">
-        <TouchableOpacity 
-          style={styles.locationBar} 
-          activeOpacity={0.9}
-          onPress={() => setIsLocationSheetOpen(true)}
-        >
-          <View style={styles.locationIconBox}>
-            <Feather name="map-pin" size={20} color="#0EA5E9" />
+      <View style={styles.overlay} pointerEvents="box-none">
+        <View style={[styles.flushHeader, { paddingTop: topPadding + 8 }]}>
+          <View style={styles.headerTopRow}>
+            <View style={styles.locationInfoBox}>
+              <View style={styles.deliveryTitleRow}>
+                <FontAwesome5 name="map-marker-alt" size={14} color="#06B6D4" style={{marginRight: 6}} />
+                <Text style={styles.deliveryTitle}>Delivery to</Text>
+              </View>
+              <TouchableOpacity 
+                style={styles.addressSelector} 
+                activeOpacity={0.7}
+                onPress={() => setIsLocationSheetOpen(true)}
+              >
+                {selectedAddress ? (
+                  <View style={{flexDirection: 'row', alignItems: 'center', flexShrink: 1}}>
+                    <Text style={{fontWeight: '800', color: '#111827', marginRight: 6, fontSize: 14}}>
+                      {selectedAddress.label === "Home" || selectedAddress.label === "Work" 
+                        ? selectedAddress.label 
+                        : (selectedAddress.receiverName || (selectedAddress.label !== "Other" ? selectedAddress.label : "Other"))}
+                    </Text>
+                    <Text style={[styles.addressText, {flexShrink: 1}]} numberOfLines={1}>
+                      {selectedAddress.addressLine}
+                    </Text>
+                  </View>
+                ) : (
+                  <Text style={[styles.addressText, { color: "#06B6D4", fontWeight: "800", fontSize: 14 }]} numberOfLines={1}>
+                    Add address
+                  </Text>
+                )}
+                <Feather name="chevron-down" size={18} color="#4B5563" style={{marginLeft: 6}} />
+              </TouchableOpacity>
+            </View>
+            <TouchableOpacity style={styles.avatarBtnCircle}>
+                <Feather name="user" size={18} color="#111827" />
+            </TouchableOpacity>
           </View>
-          <View style={styles.locationText}>
-            <Text style={styles.locationLabel}>DELIVERING TO</Text>
-            <Text style={styles.locationValue} numberOfLines={1}>{selectedAddress}</Text>
-          </View>
-          <Feather name="chevron-down" size={20} color={Colors.light.textSecondary} />
-        </TouchableOpacity>
 
-        <View style={styles.searchBar}>
-          <Feather name="search" size={20} color={Colors.light.textMuted} />
-          <TextInput
-            style={styles.searchInput}
-            placeholder="Search for places or items"
-            placeholderTextColor={Colors.light.textMuted}
-            value={searchText}
-            onChangeText={setSearchText}
-          />
+          <View style={styles.searchBar}>
+            <Feather name="search" size={20} color="#06B6D4" />
+            <TextInput
+              style={styles.searchInput}
+              placeholder='Search "milk", "eggs", "bread"'
+              placeholderTextColor="#9CA3AF"
+              value={searchText}
+              onChangeText={setSearchText}
+            />
+            <View style={styles.micBtnDivider} />
+            <TouchableOpacity hitSlop={{top:10, bottom:10, left:10, right:10}}>
+              <Feather name="mic" size={20} color="#06B6D4" />
+            </TouchableOpacity>
+          </View>
         </View>
       </View>
 
       <LocationPickerSheet 
         isOpen={isLocationSheetOpen} 
         onClose={() => setIsLocationSheetOpen(false)} 
-        onSelectAddress={(address) => setSelectedAddress(address.addressLine)}
+        onSelectAddress={(address) => setSelectedAddress(address)}
       />
 
 
@@ -161,107 +187,95 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     zIndex: 10,
-    paddingHorizontal: 20,
-    gap: 12,
-  },
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingVertical: 12,
-  },
-  menuBtn: {
-    width: 44,
-    height: 44,
-    borderRadius: 12,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  brandName: {
-    fontSize: 22,
-    fontWeight: "800",
-    color: Colors.light.text,
-    letterSpacing: -0.5,
-  },
-  avatarBtn: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    overflow: "hidden",
-    borderWidth: 1.5,
-    borderColor: "#E2E8F0",
-  },
-  avatar: {
-    width: "100%",
-    height: "100%",
   },
   scrollView: {
     position: "absolute",
     bottom: 0,
     left: 0,
     right: 0,
-    maxHeight: "75%", // Limits the scrollview so it doesn't block the top map area
+    maxHeight: "75%",
   },
   scrollContent: {
     paddingHorizontal: 0,
   },
-  locationBar: {
+  flushHeader: {
+    backgroundColor: '#FFFFFF',
+    paddingBottom: 14,
+    paddingHorizontal: 16,
+    borderBottomLeftRadius: 24,
+    borderBottomRightRadius: 24,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.08,
+    shadowRadius: 16,
+    elevation: 8,
+  },
+  headerTopRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 12,
-    backgroundColor: Colors.light.surface,
-    padding: 16,
-    borderRadius: 35,
-    marginHorizontal: 20,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.04,
-    shadowRadius: 10,
-    elevation: 2,
+    justifyContent: "space-between",
+    marginBottom: 16,
   },
-  locationIconBox: {
+  locationInfoBox: {
+    flex: 1,
+    marginRight: 16,
+  },
+  deliveryTitleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 4,
+  },
+  deliveryTitle: {
+    fontSize: 15,
+    fontWeight: "800",
+    color: "#111827",
+    letterSpacing: 0.2,
+  },
+  addressSelector: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  addressText: {
+    fontSize: 13,
+    fontWeight: "500",
+    color: "#4B5563",
+    maxWidth: "85%",
+  },
+  avatarBtnCircle: {
     width: 40,
     height: 40,
-    borderRadius: 12,
-    backgroundColor: "#F0F9FF",
+    borderRadius: 20,
+    backgroundColor: "#F3F4F6",
     alignItems: "center",
     justifyContent: "center",
-  },
-  locationText: {
-    flex: 1,
-    gap: 2,
-  },
-  locationLabel: {
-    fontSize: 10,
-    fontWeight: "700",
-    color: Colors.light.textMuted,
-    letterSpacing: 1,
-  },
-  locationValue: {
-    fontSize: 16,
-    fontWeight: "700",
-    color: Colors.light.text,
   },
   searchBar: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 12,
-    backgroundColor: Colors.light.surface,
-    paddingHorizontal: 18,
-    paddingVertical: 16,
-    borderRadius: 20,
-    marginHorizontal: 20,
+    backgroundColor: "#FFFFFF",
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.04,
-    shadowRadius: 10,
+    shadowRadius: 4,
     elevation: 2,
   },
   searchInput: {
     flex: 1,
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: "500",
     color: Colors.light.text,
+    marginLeft: 12,
+  },
+  micBtnDivider: {
+    width: 1,
+    height: 20,
+    backgroundColor: "#E5E7EB",
+    marginHorizontal: 12,
   },
   contentCard: {
     backgroundColor: Colors.light.surface,
