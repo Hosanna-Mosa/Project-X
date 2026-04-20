@@ -115,16 +115,16 @@ const styles = StyleSheet.create({
   },
   stepRow: {
     flexDirection: "row",
-    minHeight: 60,
+    minHeight: 40,
   },
   indicatorCol: {
     width: 32,
     alignItems: "center",
   },
   circle: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
+    width: 18,
+    height: 18,
+    borderRadius: 9,
     alignItems: "center",
     justifyContent: "center",
     borderWidth: 2,
@@ -144,9 +144,9 @@ const styles = StyleSheet.create({
     borderColor: Colors.light.border,
   },
   innerDot: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
+    width: 6,
+    height: 6,
+    borderRadius: 3,
     backgroundColor: "#fff",
   },
   connector: {
@@ -170,7 +170,7 @@ const styles = StyleSheet.create({
     paddingTop: 4,
   },
   label: {
-    fontSize: 15,
+    fontSize: 12,
     fontWeight: "600",
     color: Colors.light.textMuted,
   },
@@ -196,12 +196,12 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
   },
   time: {
-    fontSize: 12,
+    fontSize: 10,
     color: Colors.light.textMuted,
     marginTop: 2,
   },
   description: {
-    fontSize: 13,
+    fontSize: 11,
     color: Colors.light.textSecondary,
     marginTop: 4,
   },

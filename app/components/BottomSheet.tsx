@@ -6,11 +6,12 @@ import Animated, {
   useSharedValue,
   withSpring,
 } from "react-native-reanimated";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Colors from "@/constants/colors";
 
 const { height: SCREEN_HEIGHT } = Dimensions.get("window");
 // Clamping points
-const COLLAPSED_HEIGHT = 320;
+const COLLAPSED_HEIGHT = 220;
 const MAX_TRANSLATE_Y = -SCREEN_HEIGHT + 100; // Almost full page
 const MIN_TRANSLATE_Y = -COLLAPSED_HEIGHT; // Default view
 
@@ -20,10 +21,13 @@ interface Props {
 }
 
 export function BottomSheet({ children, style }: Props) {
+  const insets = useSafeAreaInsets();
   const translateY = useSharedValue(MIN_TRANSLATE_Y);
   const context = useSharedValue({ y: 0 });
 
   const gesture = Gesture.Pan()
+    .activeOffsetY([-10, 10])
+    .failOffsetX([-20, 20])
     .onStart(() => {
       context.value = { y: translateY.value };
     })
@@ -31,7 +35,7 @@ export function BottomSheet({ children, style }: Props) {
       translateY.value = event.translationY + context.value.y;
       // Clamp values so it doesn't go off screen
       translateY.value = Math.max(translateY.value, MAX_TRANSLATE_Y);
-      translateY.value = Math.min(translateY.value, -100);
+      translateY.value = Math.min(translateY.value, MIN_TRANSLATE_Y);
     })
     .onEnd((event) => {
       // Determine snap point based on velocity and position
@@ -50,7 +54,7 @@ export function BottomSheet({ children, style }: Props) {
 
   return (
     <GestureDetector gesture={gesture}>
-      <Animated.View style={[styles.container, style, animatedStyle]}>
+      <Animated.View style={[styles.container, style, animatedStyle, { paddingBottom: insets.bottom }]}>
         <View style={styles.line} />
         {children}
       </Animated.View>

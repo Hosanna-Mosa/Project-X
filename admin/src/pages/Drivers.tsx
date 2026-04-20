@@ -1,24 +1,25 @@
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { StatCard } from "@/components/shared/StatCard";
 import { Truck, Users as UsersIcon, Star, DollarSign, SlidersHorizontal, UserPlus, Eye, PhoneOff, ChevronLeft, ChevronRight, MapPin } from "lucide-react";
-
-const drivers = [
-  { name: "Marcus Rodriguez", id: "DX-92102", status: "Online", online: true, location: "North Bay District, Sector 4", earnings: "$4,280.50", earningsNote: "12% above avg", rating: 4.92, suspended: false },
-  { name: "Sarah Jenkins", id: "DX-92105", status: "Offline", online: false, location: "Last active: 2h ago", earnings: "$3,120.00", earningsNote: "Target met", rating: 4.75, suspended: false },
-  { name: "David Miller", id: "DX-92110", status: "Online", online: true, location: "South Industrial Loop", earnings: "$5,540.20", earningsNote: "Top Earner", rating: 4.98, suspended: false },
-  { name: "Kevin Thorne", id: "DX-91882", status: "Suspended", online: false, location: "Since Mar 12", earnings: "$0.00", earningsNote: "", rating: 3.20, suspended: true },
-];
-
+import { useQuery } from "@tanstack/react-query";
+import { adminFetch } from "@/lib/api-client";
 export default function Drivers() {
+  const { data: drivers = [], isLoading } = useQuery({
+    queryKey: ["admin", "drivers"],
+    queryFn: () => adminFetch<any[]>("/admin/drivers"),
+  });
+
+  const onlineDrivers = drivers.filter((d: any) => d.status === "ONLINE").length;
+
   return (
     <DashboardLayout searchPlaceholder="Search drivers, vehicle IDs, or regions...">
       <div className="space-y-6">
         {/* Stat Cards */}
         <div className="grid grid-cols-4 gap-4">
-          <StatCard icon={<Truck className="h-5 w-5" />} label="Total Active Drivers" value="1,284" badge="+12% vs last week" badgeColor="success" />
-          <StatCard icon={<UsersIcon className="h-5 w-5" />} label="On-Duty Fleet" value="942" badge="Stable" badgeColor="muted" />
-          <StatCard icon={<Star className="h-5 w-5" />} label="Avg. Rating" value="4.85" badge="Top Rated" badgeColor="success" />
-          <StatCard icon={<DollarSign className="h-5 w-5" />} label="Weekly Payouts" value="$38.5k" badge="$42k target" badgeColor="muted" />
+          <StatCard icon={<Truck className="h-5 w-5" />} label="Total Registered" value={drivers.length.toString()} badge="Overall" badgeColor="success" />
+          <StatCard icon={<UsersIcon className="h-5 w-5" />} label="On-Duty" value={onlineDrivers.toString()} badge="Active" badgeColor="success" />
+          <StatCard icon={<Star className="h-5 w-5" />} label="Avg. Rating" value="4.8" badge="System" badgeColor="success" />
+          <StatCard icon={<DollarSign className="h-5 w-5" />} label="Fleet Status" value="Healthy" badge="Stable" badgeColor="muted" />
         </div>
 
         {/* Fleet Overview */}
@@ -50,72 +51,71 @@ export default function Drivers() {
               </tr>
             </thead>
             <tbody>
-              {drivers.map((d) => (
-                <tr key={d.id} className="border-t border-border hover:bg-muted/30 transition-colors">
-                  <td className="px-6 py-4">
-                    <div className="flex items-center gap-3">
-                      <div className="relative">
-                        <div className="h-10 w-10 rounded-full bg-muted flex items-center justify-center text-sm font-semibold text-foreground">
-                          {d.name.split(" ").map(n => n[0]).join("")}
+              {isLoading ? (
+                <tr>
+                  <td colSpan={6} className="px-6 py-10 text-center text-muted-foreground">Loading drivers...</td>
+                </tr>
+              ) : drivers.length === 0 ? (
+                <tr>
+                  <td colSpan={6} className="px-6 py-10 text-center text-muted-foreground">No drivers found.</td>
+                </tr>
+              ) : (
+                drivers.map((d: any) => (
+                  <tr key={d._id} className="border-t border-border hover:bg-muted/30 transition-colors">
+                    <td className="px-6 py-4">
+                      <div className="flex items-center gap-3">
+                        <div className="relative">
+                          <div className="h-10 w-10 rounded-full bg-muted flex items-center justify-center text-sm font-semibold text-foreground">
+                            {d.user?.name?.split(" ").map((n: string) => n[0]).join("") || "D"}
+                          </div>
+                          <span className={`absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-card ${d.status === "ONLINE" ? "bg-success" : "bg-muted-foreground"}`} />
                         </div>
-                        <span className={`absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-card ${d.online ? "bg-success" : d.suspended ? "bg-destructive" : "bg-muted-foreground"}`} />
+                        <div>
+                          <p className="text-sm font-semibold text-foreground">{d.user?.name}</p>
+                          <p className="text-xs text-muted-foreground">Phone: {d.user?.phone}</p>
+                        </div>
                       </div>
-                      <div>
-                        <p className="text-sm font-semibold text-foreground">{d.name}</p>
-                        <p className="text-xs text-muted-foreground">ID: #{d.id}</p>
-                      </div>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4">
-                    {d.suspended ? (
-                      <span className="px-2.5 py-1 rounded text-xs font-semibold bg-[hsl(var(--badge-suspended))] text-[hsl(var(--badge-suspended-text))]">Suspended</span>
-                    ) : (
+                    </td>
+                    <td className="px-6 py-4">
                       <div className="flex items-center gap-2">
-                        <span className={`h-2 w-2 rounded-full ${d.online ? "bg-success" : "bg-muted-foreground"}`} />
+                        <span className={`h-2 w-2 rounded-full ${d.status === "ONLINE" ? "bg-success" : "bg-muted-foreground"}`} />
                         <span className="text-sm text-foreground">{d.status}</span>
-                        <div className={`w-9 h-5 rounded-full flex items-center ${d.online ? "bg-primary justify-end" : "bg-muted justify-start"} p-0.5`}>
-                          <div className="h-4 w-4 rounded-full bg-card shadow-sm" />
-                        </div>
                       </div>
-                    )}
-                  </td>
-                  <td className="px-6 py-4">
-                    <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
-                      <MapPin className="h-3.5 w-3.5 text-primary" />
-                      {d.location}
-                    </div>
-                  </td>
-                  <td className="px-6 py-4">
-                    <p className="text-sm font-semibold text-foreground">{d.earnings}</p>
-                    {d.earningsNote && <p className="text-xs text-primary">{d.earningsNote}</p>}
-                  </td>
-                  <td className="px-6 py-4">
-                    <div className="flex items-center gap-1">
-                      <span className="text-sm font-semibold text-foreground">{d.rating}</span>
-                      <Star className="h-3.5 w-3.5 fill-warning text-warning" />
-                    </div>
-                  </td>
-                  <td className="px-6 py-4">
-                    <div className="flex items-center gap-2">
-                      <button className="p-1.5 rounded-full bg-primary/10 text-primary hover:bg-primary/20 transition-colors">
-                        <Eye className="h-4 w-4" />
-                      </button>
-                      {d.suspended ? (
-                        <button className="px-3 py-1 border border-primary text-primary rounded-full text-xs font-medium hover:bg-primary/5">Activate</button>
-                      ) : (
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
+                        <MapPin className="h-3.5 w-3.5 text-primary" />
+                        {d.currentLocation?.coordinates?.join(", ") || "Unknown"}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <p className="text-sm font-semibold text-foreground">$0.00</p>
+                      <p className="text-xs text-primary">Target: $0</p>
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="flex items-center gap-1">
+                        <span className="text-sm font-semibold text-foreground">4.8</span>
+                        <Star className="h-3.5 w-3.5 fill-warning text-warning" />
+                      </div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="flex items-center gap-2">
+                        <button className="p-1.5 rounded-full bg-primary/10 text-primary hover:bg-primary/20 transition-colors">
+                          <Eye className="h-4 w-4" />
+                        </button>
                         <button className="p-1.5 rounded-full bg-primary/10 text-primary hover:bg-primary/20 transition-colors">
                           <PhoneOff className="h-4 w-4" />
                         </button>
-                      )}
-                    </div>
-                  </td>
-                </tr>
-              ))}
+                      </div>
+                    </td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
 
           <div className="flex items-center justify-between px-6 py-4 border-t border-border">
-            <p className="text-sm text-muted-foreground">Showing 1 to 4 of 1,284 drivers</p>
+            <p className="text-sm text-muted-foreground">Showing {drivers.length} drivers</p>
             <div className="flex items-center gap-1">
               <button className="p-1.5 border border-border rounded text-muted-foreground hover:bg-muted/50"><ChevronLeft className="h-4 w-4" /></button>
               <button className="h-8 w-8 rounded bg-primary text-primary-foreground text-sm font-medium">1</button>

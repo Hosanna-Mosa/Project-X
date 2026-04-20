@@ -1,25 +1,26 @@
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { StatCard } from "@/components/shared/StatCard";
 import { Users as UsersIcon, UserCheck, UserX, Shield, SlidersHorizontal, UserPlus, Eye, Ban, ChevronLeft, ChevronRight, Mail } from "lucide-react";
-
-const users = [
-  { name: "Emily Carter", email: "emily.carter@email.com", id: "UX-40021", role: "Customer", status: "Active", active: true, orders: 34, joined: "Jan 15, 2024", lastActive: "2 mins ago" },
-  { name: "James O'Brien", email: "james.obrien@email.com", id: "UX-40035", role: "Customer", status: "Active", active: true, orders: 12, joined: "Feb 02, 2024", lastActive: "1 hour ago" },
-  { name: "Priya Sharma", email: "priya.sharma@email.com", id: "UX-40042", role: "Business", status: "Active", active: true, orders: 89, joined: "Nov 20, 2023", lastActive: "5 mins ago" },
-  { name: "Tom Henderson", email: "t.henderson@email.com", id: "UX-40050", role: "Customer", status: "Suspended", active: false, orders: 3, joined: "Mar 18, 2024", lastActive: "5 days ago" },
-  { name: "Lucia Fernandez", email: "lucia.f@email.com", id: "UX-40061", role: "Business", status: "Active", active: true, orders: 56, joined: "Dec 01, 2023", lastActive: "30 mins ago" },
-  { name: "Alex Kim", email: "alex.kim@email.com", id: "UX-40078", role: "Customer", status: "Inactive", active: false, orders: 0, joined: "Apr 10, 2024", lastActive: "2 weeks ago" },
-];
+import { useQuery } from "@tanstack/react-query";
+import { adminFetch } from "@/lib/api-client";
 
 export default function Users() {
+  const { data: users = [], isLoading } = useQuery({
+    queryKey: ["admin", "users"],
+    queryFn: () => adminFetch<any[]>("/admin/users"),
+  });
+
+  const activeUsersCount = users.filter((u: any) => u.role === "USER").length;
+  const driverCount = users.filter((u: any) => u.role === "DRIVER").length;
+  const adminCount = users.filter((u: any) => u.role === "ADMIN").length;
   return (
     <DashboardLayout searchPlaceholder="Search users by name, email, or ID...">
       <div className="space-y-6">
         <div className="grid grid-cols-4 gap-4">
-          <StatCard icon={<UsersIcon className="h-5 w-5" />} label="Total Users" value="24,812" badge="+8% this month" badgeColor="success" />
-          <StatCard icon={<UserCheck className="h-5 w-5" />} label="Active Users" value="21,490" badge="86.6% active" badgeColor="success" />
-          <StatCard icon={<UserX className="h-5 w-5" />} label="Suspended" value="142" badge="-3 this week" badgeColor="muted" />
-          <StatCard icon={<Shield className="h-5 w-5" />} label="Business Accounts" value="3,180" badge="+24 new" badgeColor="success" />
+          <StatCard icon={<UsersIcon className="h-5 w-5" />} label="Total Users" value={users.length.toString()} badge="+8% this month" badgeColor="success" />
+          <StatCard icon={<UserCheck className="h-5 w-5" />} label="Customers" value={activeUsersCount.toString()} badge="Active" badgeColor="success" />
+          <StatCard icon={<UserX className="h-5 w-5" />} label="Drivers" value={driverCount.toString()} badge="Verified" badgeColor="muted" />
+          <StatCard icon={<Shield className="h-5 w-5" />} label="Admins" value={adminCount.toString()} badge="System" badgeColor="success" />
         </div>
 
         <div className="section-card">
@@ -51,63 +52,73 @@ export default function Users() {
               </tr>
             </thead>
             <tbody>
-              {users.map((u) => (
-                <tr key={u.id} className="border-t border-border hover:bg-muted/30 transition-colors">
-                  <td className="px-6 py-4">
-                    <div className="flex items-center gap-3">
-                      <div className="h-10 w-10 rounded-full bg-muted flex items-center justify-center text-sm font-semibold text-foreground">
-                        {u.name.split(" ").map(n => n[0]).join("")}
+              {isLoading ? (
+                <tr>
+                  <td colSpan={7} className="px-6 py-10 text-center text-muted-foreground">
+                    Loading users...
+                  </td>
+                </tr>
+              ) : users.length === 0 ? (
+                <tr>
+                  <td colSpan={7} className="px-6 py-10 text-center text-muted-foreground">
+                    No users found.
+                  </td>
+                </tr>
+              ) : (
+                users.map((u: any) => (
+                  <tr key={u._id} className="border-t border-border hover:bg-muted/30 transition-colors">
+                    <td className="px-6 py-4">
+                      <div className="flex items-center gap-3">
+                        <div className="h-10 w-10 rounded-full bg-muted flex items-center justify-center text-sm font-semibold text-foreground">
+                          {u.name.split(" ").map((n: string) => n[0]).join("")}
+                        </div>
+                        <div>
+                          <p className="text-sm font-semibold text-foreground">{u.name}</p>
+                          <p className="text-xs text-muted-foreground">{u.email || u.phone}</p>
+                        </div>
                       </div>
-                      <div>
-                        <p className="text-sm font-semibold text-foreground">{u.name}</p>
-                        <p className="text-xs text-muted-foreground">{u.email}</p>
+                    </td>
+                    <td className="px-6 py-4">
+                      <span className={`px-2.5 py-1 rounded text-xs font-semibold ${u.role === "ADMIN" ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground"}`}>
+                        {u.role}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="flex items-center gap-2">
+                        <span className={`h-2 w-2 rounded-full bg-success`} />
+                        <span className="text-sm text-foreground">Active</span>
                       </div>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4">
-                    <span className={`px-2.5 py-1 rounded text-xs font-semibold ${u.role === "Business" ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground"}`}>
-                      {u.role}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4">
-                    <div className="flex items-center gap-2">
-                      <span className={`h-2 w-2 rounded-full ${u.status === "Active" ? "bg-success" : u.status === "Suspended" ? "bg-destructive" : "bg-muted-foreground"}`} />
-                      <span className="text-sm text-foreground">{u.status}</span>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4">
-                    <span className="text-sm font-semibold text-foreground">{u.orders}</span>
-                  </td>
-                  <td className="px-6 py-4">
-                    <span className="text-sm text-muted-foreground">{u.joined}</span>
-                  </td>
-                  <td className="px-6 py-4">
-                    <span className="text-sm text-muted-foreground">{u.lastActive}</span>
-                  </td>
-                  <td className="px-6 py-4">
-                    <div className="flex items-center gap-2">
-                      <button className="p-1.5 rounded-full bg-primary/10 text-primary hover:bg-primary/20 transition-colors">
-                        <Eye className="h-4 w-4" />
-                      </button>
-                      <button className="p-1.5 rounded-full bg-primary/10 text-primary hover:bg-primary/20 transition-colors">
-                        <Mail className="h-4 w-4" />
-                      </button>
-                      {u.status === "Suspended" ? (
-                        <button className="px-3 py-1 border border-primary text-primary rounded-full text-xs font-medium hover:bg-primary/5">Activate</button>
-                      ) : (
+                    </td>
+                    <td className="px-6 py-4">
+                      <span className="text-sm font-semibold text-foreground">{u.addresses?.length || 0}</span>
+                    </td>
+                    <td className="px-6 py-4">
+                      <span className="text-sm text-muted-foreground">{new Date(u.createdAt).toLocaleDateString()}</span>
+                    </td>
+                    <td className="px-6 py-4">
+                      <span className="text-sm text-muted-foreground">{new Date(u.updatedAt).toLocaleDateString()}</span>
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="flex items-center gap-2">
+                        <button className="p-1.5 rounded-full bg-primary/10 text-primary hover:bg-primary/20 transition-colors">
+                          <Eye className="h-4 w-4" />
+                        </button>
+                        <button className="p-1.5 rounded-full bg-primary/10 text-primary hover:bg-primary/20 transition-colors">
+                          <Mail className="h-4 w-4" />
+                        </button>
                         <button className="p-1.5 rounded-full bg-primary/10 text-primary hover:bg-primary/20 transition-colors">
                           <Ban className="h-4 w-4" />
                         </button>
-                      )}
-                    </div>
-                  </td>
-                </tr>
-              ))}
+                      </div>
+                    </td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
 
           <div className="flex items-center justify-between px-6 py-4 border-t border-border">
-            <p className="text-sm text-muted-foreground">Showing 1 to 6 of 24,812 users</p>
+            <p className="text-sm text-muted-foreground">Showing {users.length} users</p>
             <div className="flex items-center gap-1">
               <button className="p-1.5 border border-border rounded text-muted-foreground hover:bg-muted/50"><ChevronLeft className="h-4 w-4" /></button>
               <button className="h-8 w-8 rounded bg-primary text-primary-foreground text-sm font-medium">1</button>

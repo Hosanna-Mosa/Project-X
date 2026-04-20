@@ -2,16 +2,17 @@ import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { StatCard } from "@/components/shared/StatCard";
 import { StatusBadge } from "@/components/shared/StatusBadge";
 import { RefreshCw, Timer, Truck, SlidersHorizontal, Plus, Download, MoreVertical, Star, GitBranch, MapPin } from "lucide-react";
-
-const orders = [
-  { id: "#ORD-9402", user: "James D. Miller", stops: "4 stops", status: "DRIVER ASSIGNED", statusVariant: "assigned" as const, driver: "Carlos Rodriguez", rating: 4.9, eta: "12:45 PM", etaNote: "Late 5m", etaNoteColor: "text-destructive" },
-  { id: "#ORD-9403", user: "Sarah McNamara", stops: "1 stop", status: "PICKING ITEMS", statusVariant: "picking" as const, driver: "Elena Kostic", rating: 5.0, eta: "1:15 PM", etaNote: "On schedule", etaNoteColor: "text-success" },
-  { id: "#ORD-9404", user: "Ben Thompson", stops: "2 stops", status: "ON THE WAY", statusVariant: "transit" as const, driver: "Marcus Aurelius", rating: 4.7, eta: "12:55 PM", etaNote: "Near destin.", etaNoteColor: "text-primary" },
-  { id: "#ORD-9405", user: "Linda Wu", stops: "1 stop", status: "CONFIRMED", statusVariant: "confirmed" as const, driver: "Awaiting assignment...", rating: 0, eta: "--:--", etaNote: "", etaNoteColor: "" },
-  { id: "#ORD-9406", user: "Robert Kim", stops: "3 stops", status: "DELIVERED", statusVariant: "delivered" as const, driver: "Sandra Bullock", rating: 4.8, eta: "12:30 PM", etaNote: "Completed", etaNoteColor: "text-success" },
-];
+import { useQuery } from "@tanstack/react-query";
+import { adminFetch } from "@/lib/api-client";
 
 export default function LiveOrders() {
+  const { data: orders = [], isLoading } = useQuery({
+    queryKey: ["admin", "orders"],
+    queryFn: () => adminFetch<any[]>("/admin/orders"),
+  });
+
+  const activeOrdersCount = orders.filter((o: any) => ["SEARCHING_DRIVER", "DRIVER_ASSIGNED", "PICKED_UP"].includes(o.status)).length;
+
   return (
     <DashboardLayout searchPlaceholder="Search orders, drivers...">
       <div className="space-y-6">
@@ -33,9 +34,9 @@ export default function LiveOrders() {
 
         {/* Stat Cards */}
         <div className="grid grid-cols-3 gap-4">
-          <StatCard icon={<RefreshCw className="h-5 w-5" />} label="Active Shipments" value="1,284" badge="+12.5%" badgeColor="success" />
-          <StatCard icon={<Timer className="h-5 w-5" />} label="Avg. Fulfillment" value="24 min" />
-          <StatCard icon={<Truck className="h-5 w-5" />} label="On Road" value="452" />
+          <StatCard icon={<RefreshCw className="h-5 w-5" />} label="Total Orders" value={orders.length.toString()} badge="Overall" badgeColor="success" />
+          <StatCard icon={<Timer className="h-5 w-5" />} label="Active Operations" value={activeOrdersCount.toString()} />
+          <StatCard icon={<Truck className="h-5 w-5" />} label="Live In-Transit" value={orders.filter((o: any) => o.status === "PICKED_UP").length.toString()} />
         </div>
 
         {/* Table */}
@@ -67,49 +68,59 @@ export default function LiveOrders() {
               </tr>
             </thead>
             <tbody>
-              {orders.map((o) => (
-                <tr key={o.id} className="border-t border-border hover:bg-muted/30 transition-colors">
-                  <td className="px-6 py-4 text-sm font-medium text-primary">{o.id}</td>
-                  <td className="px-6 py-4">
-                    <div className="flex items-center gap-3">
-                      <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center text-xs font-semibold text-primary">
-                        {o.user.split(" ").map(n => n[0]).join("").slice(0, 2)}
-                      </div>
-                      <span className="text-sm text-foreground">{o.user}</span>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4">
-                    <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
-                      {o.stops.includes("1") ? <MapPin className="h-3.5 w-3.5" /> : <GitBranch className="h-3.5 w-3.5" />}
-                      {o.stops}
-                    </div>
-                  </td>
-                  <td className="px-6 py-4">
-                    <StatusBadge status={o.status} variant={o.statusVariant} />
-                  </td>
-                  <td className="px-6 py-4">
-                    <div className="flex items-center gap-2">
-                      <span className={`text-sm ${o.rating === 0 ? "italic text-muted-foreground" : "text-foreground"}`}>{o.driver}</span>
-                      {o.rating > 0 && (
-                        <span className="flex items-center gap-0.5 text-xs text-muted-foreground">
-                          <Star className="h-3 w-3 fill-warning text-warning" /> {o.rating}
-                        </span>
-                      )}
-                    </div>
-                  </td>
-                  <td className="px-6 py-4">
-                    <div>
-                      <p className="text-sm font-medium text-foreground">{o.eta}</p>
-                      {o.etaNote && <p className={`text-xs ${o.etaNoteColor}`}>{o.etaNote}</p>}
-                    </div>
-                  </td>
+              {isLoading ? (
+                <tr>
+                  <td colSpan={6} className="px-6 py-10 text-center text-muted-foreground">Loading orders...</td>
                 </tr>
-              ))}
+              ) : orders.length === 0 ? (
+                <tr>
+                  <td colSpan={6} className="px-6 py-10 text-center text-muted-foreground">No orders found.</td>
+                </tr>
+              ) : (
+                orders.map((o: any) => (
+                  <tr key={o._id} className="border-t border-border hover:bg-muted/30 transition-colors">
+                    <td className="px-6 py-4 text-sm font-medium text-primary">#{o._id.substring(o._id.length - 6).toUpperCase()}</td>
+                    <td className="px-6 py-4">
+                      <div className="flex items-center gap-3">
+                        <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center text-xs font-semibold text-primary">
+                          {o.user?.name?.split(" ").map((n: string) => n[0]).join("").slice(0, 2) || "U"}
+                        </div>
+                        <span className="text-sm text-foreground">{o.user?.name || "Unknown User"}</span>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
+                        {o.stops?.length === 1 ? <MapPin className="h-3.5 w-3.5" /> : <GitBranch className="h-3.5 w-3.5" />}
+                        {o.stops?.length || 0} stops
+                      </div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <StatusBadge status={o.status} variant={o.status === "DELIVERED" ? "delivered" : o.status === "PICKED_UP" ? "transit" : "assigned"} />
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="flex items-center gap-2">
+                        <span className={`text-sm ${!o.driver ? "italic text-muted-foreground" : "text-foreground"}`}>{o.driver?.user?.name || "Awaiting assignment..."}</span>
+                        {o.driver && (
+                          <span className="flex items-center gap-0.5 text-xs text-muted-foreground">
+                            <Star className="h-3 w-3 fill-warning text-warning" /> 4.8
+                          </span>
+                        )}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <div>
+                        <p className="text-sm font-medium text-foreground">{new Date(o.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
+                        <p className={`text-xs text-muted-foreground`}>Created</p>
+                      </div>
+                    </td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
 
           <div className="flex items-center justify-between px-6 py-4 border-t border-border">
-            <p className="text-sm text-muted-foreground">Showing <span className="font-semibold text-foreground">5</span> of 24 results</p>
+            <p className="text-sm text-muted-foreground">Showing <span className="font-semibold text-foreground">{orders.length}</span> results</p>
             <div className="flex gap-1">
               <button className="px-3 py-1.5 text-sm border border-border rounded-lg text-muted-foreground hover:bg-muted/50">Previous</button>
               <button className="px-3 py-1.5 text-sm bg-primary text-primary-foreground rounded-lg font-medium">Next</button>

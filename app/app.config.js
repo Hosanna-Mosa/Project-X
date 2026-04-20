@@ -53,7 +53,7 @@ export default {
       "reactCompiler": true
     },
     "extra": {
-      "apiUrl": process.env.EXPO_PUBLIC_API_URL,
+      "apiUrl": "http://192.168.31.135:5000",
       "eas": {
         "projectId": "728cb440-8f89-4730-98d1-98283051650a"
       }

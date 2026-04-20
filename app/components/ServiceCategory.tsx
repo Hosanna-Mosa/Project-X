@@ -21,7 +21,7 @@ export function ServiceCategory({
   return (
     <TouchableOpacity style={styles.container} onPress={onPress} activeOpacity={0.8}>
       <View style={[styles.iconBox, { backgroundColor }]}>
-        <FontAwesome5 name={icon as any} size={24} color={color} />
+        <FontAwesome5 name={icon as any} size={14} color={color} />
       </View>
       <Text style={styles.label}>{label}</Text>
     </TouchableOpacity>
@@ -34,9 +34,9 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   iconBox: {
-    width: 64,
-    height: 64,
-    borderRadius: 20,
+    width: 36,
+    height: 36,
+    borderRadius: 10,
     backgroundColor: Colors.light.surface,
     alignItems: "center",
     justifyContent: "center",
@@ -47,7 +47,7 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   label: {
-    fontSize: 13,
+    fontSize: 11,
     fontWeight: "600",
     color: Colors.light.text,
     textAlign: "center",
