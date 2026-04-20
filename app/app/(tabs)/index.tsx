@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   Image,
   Platform,
@@ -8,47 +8,65 @@ import {
   TextInput,
   TouchableOpacity,
   View,
+  ActivityIndicator,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather, FontAwesome5 } from "@expo/vector-icons";
 import { router } from "expo-router";
+import { MapType } from "react-native-maps";
 import Colors from "@/constants/colors";
 import { MapBackground } from "@/components/MapBackground";
 import { ServiceCategory } from "@/components/ServiceCategory";
 import { FoodCard } from "@/components/FoodCard";
 import { LocationPickerSheet } from "@/components/LocationPickerSheet";
-
-const RESTAURANTS = [
-  {
-    id: "1",
-    name: "The Green Kitchen",
-    time: "15-20 min",
-    category: "Healthy",
-    rating: 4.8,
-    image: require("@/assets/images/food-1.png"),
-  },
-  {
-    id: "2",
-    name: "Pizza Roma",
-    time: "25-30 min",
-    category: "Italian",
-    rating: 4.6,
-    image: require("@/assets/images/food-2.png"),
-  },
-];
+import { BottomSheet } from "@/components/BottomSheet";
+import { customFetch } from "@/utils/api/custom-fetch";
+import * as Location from "expo-location";
 
 export default function HomeScreen() {
   const insets = useSafeAreaInsets();
   const [searchText, setSearchText] = useState("");
+  const [restaurants, setRestaurants] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [mapType, setMapType] = useState<MapType>("standard");
 
   const topPadding = insets.top + (Platform.OS === "web" ? 67 : 0);
 
   const [isLocationSheetOpen, setIsLocationSheetOpen] = useState(false);
   const [selectedAddress, setSelectedAddress] = useState<any>(null);
 
+  useEffect(() => {
+    fetchNearbyRestaurants();
+  }, []);
+
+  const fetchNearbyRestaurants = async () => {
+    try {
+      setLoading(true);
+      let { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== 'granted') return;
+
+      const location = await Location.getCurrentPositionAsync({});
+      const data = await customFetch<any[]>(`/api/places/nearby?lat=${location.coords.latitude}&lng=${location.coords.longitude}&radius=5000&keyword=restaurant`);
+      if (data) setRestaurants(data);
+    } catch (err) {
+      console.error("Fetch restaurants error:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <View style={styles.root}>
-      <MapBackground style={StyleSheet.absoluteFill} />
+      <MapBackground style={StyleSheet.absoluteFill} mapType={mapType} />
+
+      <View style={[styles.mapActions, { top: topPadding + 130 }]}>
+        <TouchableOpacity 
+          style={styles.actionBtn} 
+          onPress={() => setMapType(m => m === 'standard' ? 'satellite' : 'standard')}
+        >
+          <Feather name={mapType === 'satellite' ? "map" : "layers"} size={18} color={Colors.light.text} />
+        </TouchableOpacity>
+      </View>
 
       <View style={styles.overlay} pointerEvents="box-none">
         <View style={[styles.flushHeader, { paddingTop: topPadding + 8 }]}>
@@ -88,7 +106,7 @@ export default function HomeScreen() {
           </View>
 
           <View style={styles.searchBar}>
-            <Feather name="search" size={20} color="#06B6D4" />
+            <Feather name="search" size={18} color="#06B6D4" />
             <TextInput
               style={styles.searchInput}
               placeholder='Search "milk", "eggs", "bread"'
@@ -98,7 +116,7 @@ export default function HomeScreen() {
             />
             <View style={styles.micBtnDivider} />
             <TouchableOpacity hitSlop={{top:10, bottom:10, left:10, right:10}}>
-              <Feather name="mic" size={20} color="#06B6D4" />
+              <Feather name="mic" size={18} color="#06B6D4" />
             </TouchableOpacity>
           </View>
         </View>
@@ -110,68 +128,79 @@ export default function HomeScreen() {
         onSelectAddress={(address) => setSelectedAddress(address)}
       />
 
+      <BottomSheet style={styles.bottomSheet}>
+        <View style={styles.sheetContent}>
+          <View style={styles.categoriesRow}>
+            <ServiceCategory
+              icon="car"
+              label="Ride"
+              color="#0EA5E9"
+              onPress={() => router.push({ pathname: "/service-selection", params: { label: "Ride" } })}
+            />
+            <ServiceCategory
+              icon="utensils"
+              label="Food"
+              color="#0EA5E9"
+              onPress={() => router.push({ pathname: "/service-selection", params: { label: "Food" } })}
+            />
+            <ServiceCategory
+              icon="shopping-basket"
+              label="Grocery"
+              color="#0EA5E9"
+              onPress={() => router.push({ pathname: "/service-selection", params: { label: "Grocery" } })}
+            />
+            <ServiceCategory
+              icon="medkit"
+              label="Meds"
+              color="#0EA5E9"
+              onPress={() => router.push({ pathname: "/service-selection", params: { label: "Meds" } })}
+            />
+          </View>
 
-      <ScrollView
-        style={styles.scrollView}
-        pointerEvents="box-none"
-        contentContainerStyle={[
-          styles.scrollContent,
-          {
-            paddingBottom: 120, // Sit above the floating tab bar
-            flexGrow: 1,
-            justifyContent: 'flex-end',
-          },
-        ]}
-        showsVerticalScrollIndicator={false}
-      >
-        <View pointerEvents="auto">
-          <View style={styles.contentCard}>
-            <View style={styles.sheetHandle} />
-
-            <View style={styles.categoriesRow}>
-              <ServiceCategory
-                icon="car"
-                label="Ride"
-                color="#0EA5E9"
-                onPress={() => router.push({ pathname: "/service-selection", params: { label: "Ride" } })}
-              />
-              <ServiceCategory
-                icon="utensils"
-                label="Food"
-                color="#0EA5E9"
-                onPress={() => router.push({ pathname: "/service-selection", params: { label: "Food" } })}
-              />
-              <ServiceCategory
-                icon="shopping-basket"
-                label="Grocery"
-                color="#0EA5E9"
-                onPress={() => router.push({ pathname: "/service-selection", params: { label: "Grocery" } })}
-              />
-              <ServiceCategory
-                icon="medkit"
-                label="Meds"
-                color="#0EA5E9"
-                onPress={() => router.push({ pathname: "/service-selection", params: { label: "Meds" } })}
-              />
+          <TouchableOpacity
+            style={styles.promoBanner}
+            onPress={() => router.push("/delivery/entry")}
+            activeOpacity={0.9}
+          >
+            <View style={styles.promoIconContainer}>
+              <Feather name="box" size={18} color="#0EA5E9" />
             </View>
+            <View style={styles.promoTextGroup}>
+              <Text style={styles.promoTitle}>Multi–Stop Delivery</Text>
+              <Text style={styles.promoSubtitle}>Ship multiple items in one route</Text>
+            </View>
+            <Feather name="chevron-right" size={16} color="#0EA5E9" />
+          </TouchableOpacity>
 
-            <TouchableOpacity
-              style={styles.promoBanner}
-              onPress={() => router.push("/delivery/entry")}
-              activeOpacity={0.9}
-            >
-              <View style={styles.promoIconContainer}>
-                <Feather name="box" size={24} color="#0EA5E9" />
-              </View>
-              <View style={styles.promoTextGroup}>
-                <Text style={styles.promoTitle}>Multi–Stop Delivery</Text>
-                <Text style={styles.promoSubtitle}>Ship multiple items in one route</Text>
-              </View>
-              <Feather name="chevron-right" size={20} color="#0EA5E9" />
+          <View style={styles.sectionTitleRow}>
+            <Text style={styles.sectionTitleText}>Nearby Restaurants</Text>
+            <TouchableOpacity>
+              <Text style={styles.seeAllButton}>See all</Text>
             </TouchableOpacity>
           </View>
+
+          {loading ? (
+            <ActivityIndicator size="small" color="#0EA5E9" />
+          ) : (
+            <ScrollView 
+              horizontal 
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.horizontalScrollList}
+            >
+              {restaurants.map((item) => (
+                <FoodCard
+                  key={item.id}
+                  name={item.name}
+                  time="15-20 min"
+                  rating={item.rating || 4.5}
+                  category="Restaurant"
+                  image={{ uri: `https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=400&h=300&fit=crop` }}
+                />
+              ))}
+            </ScrollView>
+          )}
         </View>
-      </ScrollView>
+      </BottomSheet>
     </View>
   );
 }
@@ -200,51 +229,51 @@ const styles = StyleSheet.create({
   },
   flushHeader: {
     backgroundColor: '#FFFFFF',
-    paddingBottom: 14,
+    paddingBottom: 10,
     paddingHorizontal: 16,
-    borderBottomLeftRadius: 24,
-    borderBottomRightRadius: 24,
+    borderBottomLeftRadius: 20,
+    borderBottomRightRadius: 20,
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.08,
-    shadowRadius: 16,
-    elevation: 8,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.05,
+    shadowRadius: 10,
+    elevation: 6,
   },
   headerTopRow: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    marginBottom: 16,
+    marginBottom: 10,
   },
   locationInfoBox: {
     flex: 1,
-    marginRight: 16,
+    marginRight: 12,
   },
   deliveryTitleRow: {
     flexDirection: "row",
     alignItems: "center",
-    marginBottom: 4,
+    marginBottom: 2,
   },
   deliveryTitle: {
-    fontSize: 15,
+    fontSize: 11,
     fontWeight: "800",
     color: "#111827",
-    letterSpacing: 0.2,
+    letterSpacing: 0.1,
   },
   addressSelector: {
     flexDirection: "row",
     alignItems: "center",
   },
   addressText: {
-    fontSize: 13,
+    fontSize: 11,
     fontWeight: "500",
     color: "#4B5563",
     maxWidth: "85%",
   },
   avatarBtnCircle: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 34,
+    height: 34,
+    borderRadius: 17,
     backgroundColor: "#F3F4F6",
     alignItems: "center",
     justifyContent: "center",
@@ -253,50 +282,31 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     backgroundColor: "#FFFFFF",
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    borderRadius: 16,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 10,
     borderWidth: 1,
     borderColor: "#E5E7EB",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.04,
-    shadowRadius: 4,
-    elevation: 2,
   },
   searchInput: {
     flex: 1,
-    fontSize: 15,
+    fontSize: 12,
     fontWeight: "500",
     color: Colors.light.text,
-    marginLeft: 12,
+    marginLeft: 8,
   },
   micBtnDivider: {
     width: 1,
-    height: 20,
+    height: 16,
     backgroundColor: "#E5E7EB",
-    marginHorizontal: 12,
+    marginHorizontal: 10,
   },
-  contentCard: {
-    backgroundColor: Colors.light.surface,
-    borderTopLeftRadius: 40,
-    borderTopRightRadius: 40,
-    padding: 24,
+  bottomSheet: {
+    paddingHorizontal: 16,
+  },
+  sheetContent: {
+    gap: 16,
     paddingBottom: 40,
-    gap: 24,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: -10 },
-    shadowOpacity: 0.05,
-    shadowRadius: 20,
-    elevation: 20,
-    width: '100%',
-  },
-  sheetHandle: {
-    width: 36,
-    height: 4,
-    backgroundColor: "#E2E8F0",
-    borderRadius: 10,
-    alignSelf: "center",
   },
   categoriesRow: {
     flexDirection: "row",
@@ -305,32 +315,32 @@ const styles = StyleSheet.create({
   promoBanner: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 16,
-    borderWidth: 2,
-    borderColor: "#0EA5E930",
-    borderRadius: 20,
-    padding: 18,
+    gap: 12,
+    borderWidth: 1.5,
+    borderColor: "#0EA5E920",
+    borderRadius: 16,
+    padding: 12,
     backgroundColor: "#F0F9FF50",
   },
   promoIconContainer: {
-    width: 48,
-    height: 48,
-    borderRadius: 14,
+    width: 36,
+    height: 36,
+    borderRadius: 10,
     backgroundColor: "#0EA5E915",
     alignItems: "center",
     justifyContent: "center",
   },
   promoTextGroup: {
     flex: 1,
-    gap: 2,
+    gap: 1,
   },
   promoTitle: {
-    fontSize: 17,
+    fontSize: 13,
     fontWeight: "700",
     color: Colors.light.text,
   },
   promoSubtitle: {
-    fontSize: 13,
+    fontSize: 11,
     color: Colors.light.textSecondary,
     fontWeight: "500",
   },
@@ -340,18 +350,38 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   sectionTitleText: {
-    fontSize: 20,
-    fontWeight: "800",
-    color: Colors.light.text,
-    letterSpacing: -0.5,
-  },
-  seeAllButton: {
     fontSize: 13,
     fontWeight: "800",
+    color: Colors.light.text,
+    letterSpacing: -0.3,
+  },
+  seeAllButton: {
+    fontSize: 11,
+    fontWeight: "800",
     color: "#0EA5E9",
-    letterSpacing: 0.5,
   },
   horizontalScrollList: {
-    paddingBottom: 8,
+    paddingBottom: 4,
+  },
+  mapActions: {
+    position: 'absolute',
+    right: 16,
+    zIndex: 10,
+    gap: 12,
+  },
+  actionBtn: {
+    width: 38,
+    height: 38,
+    borderRadius: 12,
+    backgroundColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 10,
+    elevation: 8,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
   },
 });

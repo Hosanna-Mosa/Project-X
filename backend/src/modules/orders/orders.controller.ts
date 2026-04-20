@@ -56,4 +56,16 @@ export class OrdersController {
       return res.status(500).json({ message: "Internal server error" });
     }
   }
+
+  async getUserOrders(req: AuthRequest, res: Response) {
+    try {
+      const userId = req.user?.userId;
+      if (!userId) return res.status(401).json({ message: "Unauthorized" });
+
+      const orders = await ordersService.getUserOrders(userId);
+      return res.json(orders);
+    } catch (error) {
+      return res.status(500).json({ message: "Internal server error" });
+    }
+  }
 }

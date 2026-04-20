@@ -107,4 +107,8 @@ export class OrdersService {
     order.status = status;
     return order.save();
   }
+
+  async getUserOrders(userId: string) {
+    return Order.find({ user: userId }).sort({ createdAt: -1 });
+  }
 }

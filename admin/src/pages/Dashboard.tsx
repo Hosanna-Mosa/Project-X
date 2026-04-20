@@ -3,6 +3,8 @@ import { StatCard } from "@/components/shared/StatCard";
 import { StatusBadge } from "@/components/shared/StatusBadge";
 import { Package, Truck, Users, DollarSign, CheckCircle, AlertTriangle, UserPlus, Banknote, MoreVertical } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Tooltip } from "recharts";
+import { useQuery } from "@tanstack/react-query";
+import { adminFetch } from "@/lib/api-client";
 
 const barData = [
   { time: "08:00", delivered: 45, target: 60 },
@@ -34,6 +36,11 @@ const priorityStyles: Record<string, string> = {
 };
 
 export default function Dashboard() {
+  const { data: stats } = useQuery({
+    queryKey: ["admin", "stats"],
+    queryFn: () => adminFetch<any>("/admin/stats"),
+  });
+
   return (
     <DashboardLayout searchPlaceholder="Search orders, drivers, or routes...">
       <div className="space-y-6">
@@ -50,10 +57,10 @@ export default function Dashboard() {
 
         {/* Stat Cards */}
         <div className="grid grid-cols-4 gap-4">
-          <StatCard icon={<Package className="h-5 w-5" />} label="Total Orders Today" value="1,284" badge="↗ 12%" badgeColor="success" />
-          <StatCard icon={<Truck className="h-5 w-5" />} label="Active Deliveries" value="432" badge="↗ 5%" badgeColor="success" />
-          <StatCard icon={<Users className="h-5 w-5" />} label="Available Drivers" value="87" badge="↘ 3%" badgeColor="destructive" />
-          <StatCard icon={<DollarSign className="h-5 w-5" />} label="Revenue Today" value="$42,890" badge="↗ 24%" badgeColor="success" />
+          <StatCard icon={<Package className="h-5 w-5" />} label="Total Orders" value={stats?.totalOrders?.toString() || "0"} badge="all time" badgeColor="success" />
+          <StatCard icon={<Truck className="h-5 w-5" />} label="Active Drivers" value={stats?.activeDrivers?.toString() || "0"} badge="Online" badgeColor="success" />
+          <StatCard icon={<Users className="h-5 w-5" />} label="Total Users" value={stats?.totalUsers?.toString() || "0"} badge="System" badgeColor="muted" />
+          <StatCard icon={<DollarSign className="h-5 w-5" />} label="Total Revenue" value={`$${stats?.totalRevenue?.toLocaleString() || "0"}`} badge="USD" badgeColor="success" />
         </div>
 
         {/* Charts Row */}

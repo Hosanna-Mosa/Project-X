@@ -8,6 +8,7 @@ const ordersController = new OrdersController();
 
 // Create order - simplifying route to / for easier frontend integration
 router.post("/", authenticateToken, ordersController.create.bind(ordersController));
+router.get("/", authenticateToken, ordersController.getUserOrders.bind(ordersController));
 router.get("/:id", authenticateToken, ordersController.getOrder.bind(ordersController));
 router.patch("/:id/status", authenticateToken, ordersController.updateStatus.bind(ordersController));
 

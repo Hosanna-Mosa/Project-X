@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   ScrollView,
   StyleSheet,
@@ -10,44 +10,10 @@ import { Feather } from "@expo/vector-icons";
 import { router } from "expo-router";
 import Colors from "@/constants/colors";
 import { ScreenWrapper } from "@/components/ScreenWrapper";
+import { customFetch } from "@/utils/api/custom-fetch";
+import { ActivityIndicator } from "react-native";
 
 type FilterType = "all" | "active" | "past";
-
-const MOCK_ORDERS = [
-  {
-    id: "ORD-001",
-    type: "Multi-Stop Delivery",
-    stops: 2,
-    status: "picking_items",
-    statusLabel: "Picking Items",
-    address: "Artisan Bakery & Co. → The Green Grocer",
-    amount: 9.50,
-    date: "Today, 12:30 PM",
-    isActive: true,
-  },
-  {
-    id: "ORD-002",
-    type: "Food Delivery",
-    stops: 1,
-    status: "delivered",
-    statusLabel: "Delivered",
-    address: "The Green Kitchen",
-    amount: 18.75,
-    date: "Yesterday, 6:45 PM",
-    isActive: false,
-  },
-  {
-    id: "ORD-003",
-    type: "Grocery",
-    stops: 1,
-    status: "delivered",
-    statusLabel: "Delivered",
-    address: "City Market, London",
-    amount: 34.20,
-    date: "Mar 26, 3:15 PM",
-    isActive: false,
-  },
-];
 
 const STATUS_COLORS: Record<string, string> = {
   picking_items: Colors.light.primary,
@@ -55,14 +21,46 @@ const STATUS_COLORS: Record<string, string> = {
   delivered: Colors.light.success,
   confirmed: Colors.light.warning,
   driver_assigned: "#8B5CF6",
+  SEARCHING_DRIVER: Colors.light.warning,
+  DRIVER_ASSIGNED: "#8B5CF6",
+  PICKED_UP: Colors.light.teal,
+  DELIVERED: Colors.light.success,
+  CANCELLED: Colors.light.error,
+};
+
+const STATUS_LABELS: Record<string, string> = {
+  SEARCHING_DRIVER: "Searching Driver",
+  DRIVER_ASSIGNED: "Driver Assigned",
+  PICKED_UP: "Picked Up",
+  DELIVERED: "Delivered",
+  CANCELLED: "Cancelled",
 };
 
 export default function OrdersScreen() {
   const [filter, setFilter] = useState<FilterType>("all");
+  const [orders, setOrders] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const filtered = MOCK_ORDERS.filter((o) => {
-    if (filter === "active") return o.isActive;
-    if (filter === "past") return !o.isActive;
+  useEffect(() => {
+    fetchOrders();
+  }, []);
+
+  const fetchOrders = async () => {
+    try {
+      setLoading(true);
+      const data = await customFetch<any[]>("/api/orders");
+      if (data) setOrders(data);
+    } catch (err) {
+      console.error("Fetch orders error:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const filtered = orders.filter((o) => {
+    const isActive = ["SEARCHING_DRIVER", "DRIVER_ASSIGNED", "PICKED_UP"].includes(o.status);
+    if (filter === "active") return isActive;
+    if (filter === "past") return !isActive;
     return true;
   });
 
@@ -98,86 +96,100 @@ export default function OrdersScreen() {
         contentContainerStyle={styles.list}
         showsVerticalScrollIndicator={false}
       >
-        {filtered.length === 0 ? (
+        {loading ? (
+          <View style={styles.emptyState}>
+            <ActivityIndicator size="large" color={Colors.light.primary} />
+            <Text style={styles.emptySubtitle}>Loading your orders...</Text>
+          </View>
+        ) : filtered.length === 0 ? (
           <View style={styles.emptyState}>
             <Feather name="box" size={48} color={Colors.light.textMuted} />
             <Text style={styles.emptyTitle}>No Orders</Text>
             <Text style={styles.emptySubtitle}>Your orders will appear here</Text>
           </View>
         ) : (
-          filtered.map((order) => (
-            <TouchableOpacity
-              key={order.id}
-              style={styles.orderCard}
-              onPress={() => {
-                if (order.isActive) {
-                  router.push("/tracking");
-                }
-              }}
-              activeOpacity={0.88}
-            >
-              <View style={styles.orderCardTop}>
-                <View style={styles.orderTypeIcon}>
-                  <Feather
-                    name={order.type === "Multi-Stop Delivery" ? "git-branch" : "shopping-bag"}
-                    size={16}
-                    color={Colors.light.primary}
-                  />
-                </View>
-                <View style={styles.orderInfo}>
-                  <Text style={styles.orderType}>{order.type}</Text>
-                  <Text style={styles.orderId}>{order.id}</Text>
-                </View>
-                <View
-                  style={[
-                    styles.statusBadge,
-                    { backgroundColor: `${STATUS_COLORS[order.status]}15` },
-                  ]}
-                >
+          filtered.map((order) => {
+            const isActive = ["SEARCHING_DRIVER", "DRIVER_ASSIGNED", "PICKED_UP"].includes(order.status);
+            return (
+              <TouchableOpacity
+                key={order._id}
+                style={styles.orderCard}
+                onPress={() => {
+                  if (isActive) {
+                    router.push({
+                      pathname: "/tracking",
+                      params: { orderId: order._id }
+                    });
+                  }
+                }}
+                activeOpacity={0.88}
+              >
+                <View style={styles.orderCardTop}>
+                  <View style={styles.orderTypeIcon}>
+                    <Feather
+                      name={order.stops?.length > 1 ? "git-branch" : "shopping-bag"}
+                      size={16}
+                      color={Colors.light.primary}
+                    />
+                  </View>
+                  <View style={styles.orderInfo}>
+                    <Text style={styles.orderType}>{order.stops?.length > 1 ? "Multi-Stop Delivery" : "Single Stop Delivery"}</Text>
+                    <Text style={styles.orderId}>{order._id.substring(order._id.length - 8).toUpperCase()}</Text>
+                  </View>
                   <View
                     style={[
-                      styles.statusDot,
-                      { backgroundColor: STATUS_COLORS[order.status] },
-                    ]}
-                  />
-                  <Text
-                    style={[
-                      styles.statusText,
-                      { color: STATUS_COLORS[order.status] },
+                      styles.statusBadge,
+                      { backgroundColor: `${STATUS_COLORS[order.status] || Colors.light.textMuted}15` },
                     ]}
                   >
-                    {order.statusLabel}
-                  </Text>
+                    <View
+                      style={[
+                        styles.statusDot,
+                        { backgroundColor: STATUS_COLORS[order.status] || Colors.light.textMuted },
+                      ]}
+                    />
+                    <Text
+                      style={[
+                        styles.statusText,
+                        { color: STATUS_COLORS[order.status] || Colors.light.textMuted },
+                      ]}
+                    >
+                      {STATUS_LABELS[order.status] || order.status}
+                    </Text>
+                  </View>
                 </View>
-              </View>
 
-              <View style={styles.orderDetails}>
-                <View style={styles.detailRow}>
-                  <Feather name="map-pin" size={12} color={Colors.light.textMuted} />
-                  <Text style={styles.detailText} numberOfLines={1}>
-                    {order.address}
-                  </Text>
+                <View style={styles.orderDetails}>
+                  <View style={styles.detailRow}>
+                    <Feather name="map-pin" size={12} color={Colors.light.textMuted} />
+                    <Text style={styles.detailText} numberOfLines={1}>
+                      {order.stops?.map((s: any) => s.address).join(" → ")}
+                    </Text>
+                  </View>
+                  <View style={styles.detailRow}>
+                    <Feather name="clock" size={12} color={Colors.light.textMuted} />
+                    <Text style={styles.detailText}>{new Date(order.createdAt).toLocaleString()}</Text>
+                  </View>
                 </View>
-                <View style={styles.detailRow}>
-                  <Feather name="clock" size={12} color={Colors.light.textMuted} />
-                  <Text style={styles.detailText}>{order.date}</Text>
-                </View>
-              </View>
 
-              <View style={styles.orderCardBottom}>
-                <Text style={styles.orderAmount}>${order.amount.toFixed(2)}</Text>
-                {order.isActive && (
-                  <TouchableOpacity
-                    style={styles.trackBtn}
-                    onPress={() => router.push("/tracking")}
-                  >
-                    <Text style={styles.trackBtnText}>Track Order</Text>
-                    <Feather name="arrow-right" size={12} color={Colors.light.primary} />
-                  </TouchableOpacity>
-                )}
-              </View>
-            </TouchableOpacity>
-          ))
+                <View style={styles.orderCardBottom}>
+                  <Text style={styles.orderAmount}>${(order.totalPrice || 0).toFixed(2)}</Text>
+                  {isActive && (
+                    <TouchableOpacity
+                      style={styles.trackBtn}
+                      onPress={() => router.push({
+                        pathname: "/tracking",
+                        params: { orderId: order._id }
+                      })}
+                    >
+                      <Text style={styles.trackBtnText}>Track Order</Text>
+                      <Feather name="arrow-right" size={12} color={Colors.light.primary} />
+                    </TouchableOpacity>
+                  )}
+                </View>
+              </TouchableOpacity>
+            );
+          })
         )}
       </ScrollView>
     </ScreenWrapper>
@@ -196,15 +208,15 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
   },
   title: {
-    fontSize: 28,
+    fontSize: 18,
     fontWeight: "800",
     color: Colors.light.text,
     letterSpacing: -0.3,
   },
   filterIconBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
+    width: 30,
+    height: 30,
+    borderRadius: 8,
     backgroundColor: Colors.light.surface,
     alignItems: "center",
     justifyContent: "center",
@@ -218,9 +230,9 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   filterBtn: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+    borderRadius: 15,
     backgroundColor: Colors.light.surface,
     borderWidth: 1,
     borderColor: Colors.light.border,
@@ -230,7 +242,7 @@ const styles = StyleSheet.create({
     borderColor: Colors.light.primary,
   },
   filterBtnText: {
-    fontSize: 13,
+    fontSize: 11,
     fontWeight: "600",
     color: Colors.light.textSecondary,
   },
@@ -257,9 +269,9 @@ const styles = StyleSheet.create({
   },
   orderCard: {
     backgroundColor: Colors.light.surface,
-    borderRadius: 18,
-    padding: 16,
-    gap: 12,
+    borderRadius: 12,
+    padding: 10,
+    gap: 10,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.06,
@@ -272,9 +284,9 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   orderTypeIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
+    width: 32,
+    height: 32,
+    borderRadius: 8,
     backgroundColor: `${Colors.light.primary}15`,
     alignItems: "center",
     justifyContent: "center",
@@ -284,21 +296,21 @@ const styles = StyleSheet.create({
     gap: 2,
   },
   orderType: {
-    fontSize: 14,
+    fontSize: 12,
     fontWeight: "700",
     color: Colors.light.text,
   },
   orderId: {
-    fontSize: 12,
+    fontSize: 10,
     color: Colors.light.textMuted,
   },
   statusBadge: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 5,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 20,
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 12,
   },
   statusDot: {
     width: 6,
@@ -306,7 +318,7 @@ const styles = StyleSheet.create({
     borderRadius: 3,
   },
   statusText: {
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: "700",
   },
   orderDetails: {
@@ -319,7 +331,7 @@ const styles = StyleSheet.create({
   },
   detailText: {
     flex: 1,
-    fontSize: 13,
+    fontSize: 11,
     color: Colors.light.textSecondary,
   },
   orderCardBottom: {
@@ -331,7 +343,7 @@ const styles = StyleSheet.create({
     paddingTop: 10,
   },
   orderAmount: {
-    fontSize: 18,
+    fontSize: 14,
     fontWeight: "800",
     color: Colors.light.text,
   },
@@ -341,7 +353,7 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   trackBtnText: {
-    fontSize: 13,
+    fontSize: 11,
     fontWeight: "600",
     color: Colors.light.primary,
   },

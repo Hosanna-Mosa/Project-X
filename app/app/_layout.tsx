@@ -12,13 +12,16 @@ import React, { useEffect } from "react";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { KeyboardProvider } from "react-native-keyboard-controller";
 import { SafeAreaProvider } from "react-native-safe-area-context";
+import Constants from "expo-constants";
 
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { useAuthStore } from "@/contexts/authStore";
 import { setAuthTokenGetter, setBaseUrl } from "@/utils/api/custom-fetch";
 
-// The API URL should be retrieved from environment variables
-const apiUrl = process.env.EXPO_PUBLIC_API_URL;
+// The API URL should be retrieved from environment variables or app config
+const apiUrl = process.env.EXPO_PUBLIC_API_URL || Constants.expoConfig?.extra?.apiUrl;
+console.log("[DEBUG] API URL:", apiUrl);
+
 if (apiUrl) {
   setBaseUrl(apiUrl);
 }
