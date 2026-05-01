@@ -8,6 +8,7 @@ import Animated, {
 } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Colors from "@/constants/colors";
+import { useThemeStore } from "@/contexts/themeStore";
 
 const { height: SCREEN_HEIGHT } = Dimensions.get("window");
 // Clamping points
@@ -22,6 +23,10 @@ interface Props {
 
 export function BottomSheet({ children, style }: Props) {
   const insets = useSafeAreaInsets();
+  const { theme } = useThemeStore();
+  const colors = Colors[theme];
+  const styles = React.useMemo(() => createStyles(colors), [theme]);
+
   const translateY = useSharedValue(MIN_TRANSLATE_Y);
   const context = useSharedValue({ y: 0 });
 
@@ -62,11 +67,11 @@ export function BottomSheet({ children, style }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: typeof Colors.light) => StyleSheet.create({
   container: {
     height: SCREEN_HEIGHT,
     width: "100%",
-    backgroundColor: Colors.light.surface,
+    backgroundColor: colors.surface,
     position: "absolute",
     top: SCREEN_HEIGHT,
     borderRadius: 30,
@@ -81,11 +86,10 @@ const styles = StyleSheet.create({
   line: {
     width: 40,
     height: 4,
-    backgroundColor: "#E2E8F0",
+    backgroundColor: colors.border,
     alignSelf: "center",
     marginVertical: 15,
     borderRadius: 2,
   },
 });
-
 

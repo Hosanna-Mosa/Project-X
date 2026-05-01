@@ -2,6 +2,7 @@ import React from "react";
 import { Image, ImageSourcePropType, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { Feather } from "@expo/vector-icons";
 import Colors from "@/constants/colors";
+import { useThemeStore } from "@/contexts/themeStore";
 
 interface Props {
   image: ImageSourcePropType;
@@ -13,6 +14,10 @@ interface Props {
 }
 
 export function FoodCard({ image, name, rating, time, category, onPress }: Props) {
+  const { theme } = useThemeStore();
+  const colors = Colors[theme];
+  const styles = React.useMemo(() => createStyles(colors), [theme]);
+
   return (
     <TouchableOpacity style={styles.container} onPress={onPress} activeOpacity={0.9}>
       <View style={styles.imageContainer}>
@@ -25,7 +30,7 @@ export function FoodCard({ image, name, rating, time, category, onPress }: Props
       <View style={styles.content}>
         <Text style={styles.name} numberOfLines={1}>{name}</Text>
         <View style={styles.meta}>
-          <Feather name="clock" size={11} color={Colors.light.textMuted} />
+          <Feather name="clock" size={11} color={colors.textMuted} />
           <Text style={styles.metaText}>{time}</Text>
           <Text style={styles.dot}>•</Text>
           <Text style={styles.metaText}>{category}</Text>
@@ -35,16 +40,16 @@ export function FoodCard({ image, name, rating, time, category, onPress }: Props
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: typeof Colors.light) => StyleSheet.create({
   container: {
     width: 140,
     marginRight: 10,
-    backgroundColor: Colors.light.surface,
+    backgroundColor: colors.surfaceSecondary,
     borderRadius: 12,
     overflow: "hidden",
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.06,
+    shadowOpacity: colors.surface === "#FFFFFF" ? 0.06 : 0.2,
     shadowRadius: 10,
     elevation: 3,
   },
@@ -64,19 +69,19 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 2,
-    backgroundColor: "rgba(255,255,255,0.95)",
+    backgroundColor: colors.surface,
     paddingHorizontal: 6,
     paddingVertical: 3,
     borderRadius: 8,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
+    shadowOpacity: colors.surface === "#FFFFFF" ? 0.05 : 0.2,
     shadowRadius: 4,
   },
   ratingText: {
     fontSize: 10,
     fontWeight: "700",
-    color: Colors.light.text,
+    color: colors.text,
   },
   content: {
     padding: 10,
@@ -85,7 +90,7 @@ const styles = StyleSheet.create({
   name: {
     fontSize: 12,
     fontWeight: "700",
-    color: Colors.light.text,
+    color: colors.text,
   },
   meta: {
     flexDirection: "row",
@@ -95,10 +100,10 @@ const styles = StyleSheet.create({
   metaText: {
     fontSize: 10,
     fontWeight: "500",
-    color: Colors.light.textSecondary,
+    color: colors.textSecondary,
   },
   dot: {
     fontSize: 11,
-    color: Colors.light.textMuted,
+    color: colors.textMuted,
   },
 });

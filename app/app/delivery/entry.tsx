@@ -16,6 +16,7 @@ import * as Location from "expo-location";
 import { BottomSheet } from "@/components/BottomSheet";
 import { StopCard } from "@/components/StopCard";
 import { useDeliveryStore } from "@/contexts/deliveryStore";
+import { useThemeStore } from "@/contexts/themeStore";
 import { MapType } from "react-native-maps";
 
 export default function DeliveryEntryScreen() {
@@ -41,6 +42,10 @@ export default function DeliveryEntryScreen() {
   const [mapType, setMapType] = useState<MapType>("standard");
   const [isCalculating, setIsCalculating] = useState(false);
   const mapRef = useRef<MapBackgroundRef>(null);
+  
+  const { theme } = useThemeStore();
+  const colors = Colors[theme];
+  const styles = React.useMemo(() => createStyles(colors), [theme]);
 
   const handleRecenter = () => {
     mapRef.current?.recenter();
@@ -134,7 +139,7 @@ export default function DeliveryEntryScreen() {
         ]}
       >
         <TouchableOpacity style={styles.closeBtn} onPress={() => router.back()}>
-          <Feather name="x" size={20} color={Colors.light.text} />
+          <Feather name="x" size={20} color={colors.text} />
         </TouchableOpacity>
         <View style={styles.topTitleCol}>
           <Text style={styles.topTitle}>Create Multi-Stop Delivery</Text>
@@ -143,16 +148,16 @@ export default function DeliveryEntryScreen() {
           <Text style={styles.betaText}>BETA</Text>
         </View>
         <TouchableOpacity style={styles.avatarSm}>
-          <Feather name="user" size={18} color={Colors.light.primary} />
+          <Feather name="user" size={18} color={colors.primary} />
         </TouchableOpacity>
       </View>
 
       <View style={styles.mapControls}>
         <TouchableOpacity style={styles.mapControlBtn} onPress={handleRecenter}>
-          <Feather name="crosshair" size={20} color={Colors.light.text} />
+          <Feather name="crosshair" size={20} color={colors.text} />
         </TouchableOpacity>
         <TouchableOpacity style={styles.mapControlBtn} onPress={toggleMapType}>
-          <Feather name={mapType === "standard" ? "layers" : "map"} size={20} color={Colors.light.text} />
+          <Feather name={mapType === "standard" ? "layers" : "map"} size={20} color={colors.text} />
         </TouchableOpacity>
       </View>
 
@@ -164,7 +169,7 @@ export default function DeliveryEntryScreen() {
           </Text>
 
           <View style={styles.currentLocationCard}>
-            <Feather name="map-pin" size={16} color={Colors.light.primary} />
+            <Feather name="map-pin" size={16} color={colors.primary} />
             <View style={styles.currentLocationText}>
               <Text style={styles.currentLocationLabel}>CURRENT LOCATION</Text>
               <Text style={styles.currentLocationValue}>{currentLocation}</Text>
@@ -197,7 +202,7 @@ export default function DeliveryEntryScreen() {
               <Text style={styles.addStopTitle}>Add Pickup Location</Text>
               <Text style={styles.addStopSubtitle}>Scan QR or enter address manually</Text>
             </View>
-            <Feather name="chevron-right" size={18} color={Colors.light.textMuted} />
+            <Feather name="chevron-right" size={18} color={colors.textMuted} />
           </TouchableOpacity>
 
           {/* <View style={styles.optionsRow}>
@@ -251,10 +256,10 @@ export default function DeliveryEntryScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: typeof Colors.light) => StyleSheet.create({
   root: {
     flex: 1,
-    backgroundColor: Colors.light.background,
+    backgroundColor: colors.background,
   },
   topBar: {
     flexDirection: "row",
@@ -267,7 +272,7 @@ const styles = StyleSheet.create({
     width: 30,
     height: 30,
     borderRadius: 8,
-    backgroundColor: Colors.light.surface,
+    backgroundColor: colors.surface,
     alignItems: "center",
     justifyContent: "center",
     shadowColor: "#000",
@@ -282,10 +287,10 @@ const styles = StyleSheet.create({
   topTitle: {
     fontSize: 13,
     fontWeight: "700",
-    color: Colors.light.text,
+    color: colors.text,
   },
   betaBadge: {
-    backgroundColor: Colors.light.primary,
+    backgroundColor: colors.primary,
     paddingHorizontal: 8,
     paddingVertical: 3,
     borderRadius: 6,
@@ -300,11 +305,11 @@ const styles = StyleSheet.create({
     width: 28,
     height: 28,
     borderRadius: 14,
-    backgroundColor: `${Colors.light.primary}15`,
+    backgroundColor: `${colors.primary}15`,
     alignItems: "center",
     justifyContent: "center",
     borderWidth: 2,
-    borderColor: Colors.light.primary,
+    borderColor: colors.primary,
   },
   mapControls: {
     position: "absolute",
@@ -317,7 +322,7 @@ const styles = StyleSheet.create({
     width: 34,
     height: 34,
     borderRadius: 8,
-    backgroundColor: Colors.light.surface,
+    backgroundColor: colors.surface,
     alignItems: "center",
     justifyContent: "center",
     shadowColor: "#000",
@@ -332,13 +337,13 @@ const styles = StyleSheet.create({
   sheetTitle: {
     fontSize: 18,
     fontWeight: "800",
-    color: Colors.light.text,
+    color: colors.text,
     marginBottom: 4,
     letterSpacing: -0.3,
   },
   sheetSubtitle: {
     fontSize: 11,
-    color: Colors.light.textSecondary,
+    color: colors.textSecondary,
     marginBottom: 16,
     lineHeight: 15,
   },
@@ -346,11 +351,11 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "flex-start",
     gap: 8,
-    backgroundColor: Colors.light.surface,
+    backgroundColor: colors.surface,
     borderRadius: 10,
     padding: 10,
     borderWidth: 1,
-    borderColor: Colors.light.border,
+    borderColor: colors.border,
     marginBottom: 12,
   },
   currentLocationText: {
@@ -360,13 +365,13 @@ const styles = StyleSheet.create({
   currentLocationLabel: {
     fontSize: 10,
     fontWeight: "600",
-    color: Colors.light.textMuted,
+    color: colors.textMuted,
     letterSpacing: 0.5,
   },
   currentLocationValue: {
     fontSize: 12,
     fontWeight: "600",
-    color: Colors.light.text,
+    color: colors.text,
   },
   stopsList: {
     marginBottom: 8,
@@ -377,17 +382,17 @@ const styles = StyleSheet.create({
     gap: 12,
     borderWidth: 1.5,
     borderStyle: "dashed",
-    borderColor: Colors.light.primary,
+    borderColor: colors.primary,
     borderRadius: 12,
     padding: 10,
     marginBottom: 14,
-    backgroundColor: `${Colors.light.primary}06`,
+    backgroundColor: `${colors.primary}06`,
   },
   addStopIcon: {
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: Colors.light.primary,
+    backgroundColor: colors.primary,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -398,11 +403,11 @@ const styles = StyleSheet.create({
   addStopTitle: {
     fontSize: 13,
     fontWeight: "700",
-    color: Colors.light.primary,
+    color: colors.primary,
   },
   addStopSubtitle: {
     fontSize: 10,
-    color: Colors.light.textSecondary,
+    color: colors.textSecondary,
   },
   optionsRow: {
     flexDirection: "row",
@@ -414,28 +419,28 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 10,
-    backgroundColor: Colors.light.surface,
+    backgroundColor: colors.surface,
     borderRadius: 14,
     padding: 14,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.06,
+    shadowOpacity: colors.surface === "#FFFFFF" ? 0.06 : 0.2,
     shadowRadius: 4,
     elevation: 2,
   },
   optionLabel: {
     fontSize: 10,
     fontWeight: "600",
-    color: Colors.light.textMuted,
+    color: colors.textMuted,
     letterSpacing: 0.5,
   },
   optionValue: {
     fontSize: 13,
     fontWeight: "600",
-    color: Colors.light.text,
+    color: colors.text,
   },
   calculateBtn: {
-    backgroundColor: Colors.light.textSecondary,
+    backgroundColor: colors.textSecondary,
     borderRadius: 12,
     paddingVertical: 12,
     flexDirection: "row",
@@ -449,7 +454,7 @@ const styles = StyleSheet.create({
     elevation: 6,
   },
   calculateBtnDisabled: {
-    backgroundColor: Colors.light.textMuted,
+    backgroundColor: colors.textMuted,
     shadowOpacity: 0,
   },
   calculateBtnText: {

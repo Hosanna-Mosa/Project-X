@@ -12,10 +12,12 @@ import React, { useEffect } from "react";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { KeyboardProvider } from "react-native-keyboard-controller";
 import { SafeAreaProvider } from "react-native-safe-area-context";
+import { Appearance } from "react-native";
 import Constants from "expo-constants";
 
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { useAuthStore } from "@/contexts/authStore";
+import { useThemeStore } from "@/contexts/themeStore";
 import { setAuthTokenGetter, setBaseUrl } from "@/utils/api/custom-fetch";
 
 // The API URL should be retrieved from environment variables or app config
@@ -62,6 +64,14 @@ export default function RootLayout() {
   });
 
   const initializeAuth = useAuthStore((s) => s.initializeAuth);
+  const setTheme = useThemeStore((s) => s.setTheme);
+
+  useEffect(() => {
+    const subscription = Appearance.addChangeListener(({ colorScheme }) => {
+      setTheme(colorScheme === "dark" ? "dark" : "light");
+    });
+    return () => subscription.remove();
+  }, [setTheme]);
 
   useEffect(() => {
     if (fontsLoaded || fontError) {

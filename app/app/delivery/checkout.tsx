@@ -13,6 +13,7 @@ import { router } from "expo-router";
 import Colors from "@/constants/colors";
 import { useDeliveryStore } from "@/contexts/deliveryStore";
 import { useAuthStore } from "@/contexts/authStore";
+import { useThemeStore } from "@/contexts/themeStore";
 import { RazorpayIntegration } from "@/utils/razorpay";
 import { Alert, ActivityIndicator } from "react-native";
 import Constants from "expo-constants";
@@ -24,6 +25,10 @@ export default function CheckoutScreen() {
   const [isProcessing, setIsProcessing] = React.useState(false);
   const { stops, price, paymentMethod, setStatus, route, resetDelivery, setOrderId } = useDeliveryStore();
   const { user } = useAuthStore();
+
+  const { theme } = useThemeStore();
+  const colors = Colors[theme];
+  const styles = React.useMemo(() => createStyles(colors), [theme]);
 
   const handleConfirm = async () => {
     if (!user) {
@@ -53,7 +58,7 @@ export default function CheckoutScreen() {
           email: user?.email || razorpayOrder.prefill?.email || "customer@example.com",
           contact: user?.phone || "",
         },
-        theme: razorpayOrder.theme || { color: Colors.light.primary },
+        theme: razorpayOrder.theme || { color: colors.primary },
       });
 
       // 3. Verify Payment AND Create Order
@@ -102,11 +107,11 @@ export default function CheckoutScreen() {
         ]}
       >
         <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
-          <Feather name="arrow-left" size={20} color={Colors.light.text} />
+          <Feather name="arrow-left" size={18} color={colors.text} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Precision Logistics</Text>
         <TouchableOpacity style={styles.avatarSm}>
-          <Feather name="user" size={18} color={Colors.light.primary} />
+          <Feather name="user" size={16} color={colors.primary} />
         </TouchableOpacity>
       </View>
 
@@ -132,7 +137,7 @@ export default function CheckoutScreen() {
 
           {stops.length === 0 ? (
             <View style={styles.emptyStops}>
-              <Feather name="map-pin" size={24} color={Colors.light.textMuted} />
+              <Feather name="map-pin" size={20} color={colors.textMuted} />
               <Text style={styles.emptyText}>No stops added</Text>
             </View>
           ) : (
@@ -141,7 +146,7 @@ export default function CheckoutScreen() {
                 <View key={stop.id} style={styles.stopEntry}>
                   <View style={styles.stopTimeline}>
                     <View style={styles.stopDot}>
-                      <Feather name="map-pin" size={12} color={Colors.light.primary} />
+                      <Feather name="map-pin" size={10} color={colors.primary} />
                     </View>
                     {i < stops.length - 1 && <View style={styles.stopLine} />}
                   </View>
@@ -173,17 +178,17 @@ export default function CheckoutScreen() {
           <Text style={styles.cardTitle}>Delivery Breakdown</Text>
           <View style={styles.feeRows}>
             <View style={styles.feeRow}>
-              <Feather name="monitor" size={14} color={Colors.light.textMuted} />
+              <Feather name="monitor" size={12} color={colors.textMuted} />
               <Text style={styles.feeName}>Base Fee</Text>
               <Text style={styles.feeAmount}>${price?.baseFee.toFixed(2) ?? "2.00"}</Text>
             </View>
             <View style={styles.feeRow}>
-              <Feather name="map-pin" size={14} color={Colors.light.textMuted} />
+              <Feather name="map-pin" size={12} color={colors.textMuted} />
               <Text style={styles.feeName}>Distance Cost</Text>
               <Text style={styles.feeAmount}>${price?.distanceCost.toFixed(2) ?? "4.50"}</Text>
             </View>
             <View style={styles.feeRow}>
-              <Feather name="git-branch" size={14} color={Colors.light.textMuted} />
+              <Feather name="git-branch" size={12} color={colors.textMuted} />
               <Text style={styles.feeName}>Stop Charges ({stops.length})</Text>
               <Text style={styles.feeAmount}>${price?.stopCharges.toFixed(2) ?? "3.00"}</Text>
             </View>
@@ -194,7 +199,7 @@ export default function CheckoutScreen() {
           </View>
 
           <View style={styles.infoBox}>
-            <Feather name="info" size={14} color="#F59E0B" />
+            <Feather name="info" size={12} color="#F59E0B" />
             <Text style={styles.infoText}>
               Pay stores directly for items upon delivery. This total reflects the logistics service fee only.
             </Text>
@@ -202,7 +207,7 @@ export default function CheckoutScreen() {
         </View>
 
         <View style={styles.paymentRow}>
-          <Feather name="credit-card" size={18} color={Colors.light.textSecondary} />
+          <Feather name="credit-card" size={16} color={colors.textSecondary} />
           <View style={styles.paymentInfo}>
             <Text style={styles.paymentLabel}>PAYMENT METHOD</Text>
             <Text style={styles.paymentValue}>•••• {paymentMethod.split(" ").pop()}</Text>
@@ -232,7 +237,7 @@ export default function CheckoutScreen() {
           ) : (
             <>
               <Text style={styles.confirmBtnText}>Confirm & Pay ${price?.total.toFixed(2) ?? "0.00"}</Text>
-              <Feather name="shield" size={18} color="#fff" />
+              <Feather name="shield" size={16} color="#fff" />
             </>
           )}
         </TouchableOpacity>
@@ -242,10 +247,10 @@ export default function CheckoutScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: typeof Colors.light) => StyleSheet.create({
   root: {
     flex: 1,
-    backgroundColor: Colors.light.background,
+    backgroundColor: colors.background,
   },
   header: {
     flexDirection: "row",
@@ -253,61 +258,61 @@ const styles = StyleSheet.create({
     gap: 10,
     paddingHorizontal: 20,
     paddingBottom: 12,
-    backgroundColor: Colors.light.background,
+    backgroundColor: colors.background,
     borderBottomWidth: 1,
-    borderBottomColor: Colors.light.border,
+    borderBottomColor: colors.border,
   },
   backBtn: {
-    width: 44,
-    height: 44,
-    borderRadius: 12,
-    backgroundColor: Colors.light.surface,
+    width: 34,
+    height: 34,
+    borderRadius: 10,
+    backgroundColor: colors.surface,
     alignItems: "center",
     justifyContent: "center",
     borderWidth: 1,
-    borderColor: Colors.light.border,
+    borderColor: colors.border,
   },
   headerTitle: {
     flex: 1,
-    fontSize: 17,
+    fontSize: 15,
     fontWeight: "700",
-    color: Colors.light.text,
+    color: colors.text,
   },
   avatarSm: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: `${Colors.light.primary}15`,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: `${colors.primary}15`,
     alignItems: "center",
     justifyContent: "center",
     borderWidth: 2,
-    borderColor: Colors.light.primary,
+    borderColor: colors.primary,
   },
   content: {
-    padding: 20,
-    gap: 16,
+    padding: 16,
+    gap: 12,
   },
   titleSection: {
     gap: 4,
   },
   title: {
-    fontSize: 28,
+    fontSize: 22,
     fontWeight: "800",
-    color: Colors.light.text,
+    color: colors.text,
     letterSpacing: -0.3,
   },
   subtitle: {
-    fontSize: 14,
-    color: Colors.light.textSecondary,
+    fontSize: 12,
+    color: colors.textSecondary,
   },
   card: {
-    backgroundColor: Colors.light.surface,
-    borderRadius: 18,
-    padding: 18,
-    gap: 14,
+    backgroundColor: colors.surface,
+    borderRadius: 14,
+    padding: 14,
+    gap: 12,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
+    shadowOpacity: colors.surface === "#FFFFFF" ? 0.06 : 0.2,
     shadowRadius: 10,
     elevation: 4,
   },
@@ -317,24 +322,24 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   activeDot: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    backgroundColor: Colors.light.primary,
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: colors.primary,
   },
   cardTitle: {
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: "700",
-    color: Colors.light.text,
+    color: colors.text,
   },
   emptyStops: {
     alignItems: "center",
     gap: 8,
-    paddingVertical: 20,
+    paddingVertical: 16,
   },
   emptyText: {
-    color: Colors.light.textMuted,
-    fontSize: 14,
+    color: colors.textMuted,
+    fontSize: 12,
   },
   stopsList: {
     gap: 16,
@@ -348,17 +353,17 @@ const styles = StyleSheet.create({
     width: 24,
   },
   stopDot: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    backgroundColor: `${Colors.light.primary}15`,
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: `${colors.primary}15`,
     alignItems: "center",
     justifyContent: "center",
   },
   stopLine: {
     width: 2,
     flex: 1,
-    backgroundColor: Colors.light.border,
+    backgroundColor: colors.border,
     marginTop: 4,
     minHeight: 20,
   },
@@ -368,44 +373,44 @@ const styles = StyleSheet.create({
     paddingBottom: 8,
   },
   stopOrderLabel: {
-    fontSize: 10,
+    fontSize: 9,
     fontWeight: "700",
-    color: Colors.light.textMuted,
+    color: colors.textMuted,
     letterSpacing: 1,
   },
   stopStoreName: {
-    fontSize: 15,
+    fontSize: 13,
     fontWeight: "700",
-    color: Colors.light.text,
+    color: colors.text,
   },
   stopAddress: {
-    fontSize: 13,
-    color: Colors.light.textSecondary,
+    fontSize: 11,
+    color: colors.textSecondary,
     marginBottom: 4,
   },
   itemRow: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    backgroundColor: Colors.light.surfaceSecondary,
+    backgroundColor: colors.surfaceSecondary,
     borderRadius: 8,
     paddingHorizontal: 10,
     paddingVertical: 6,
     marginTop: 2,
   },
   itemName: {
-    fontSize: 12,
-    color: Colors.light.text,
+    fontSize: 11,
+    color: colors.text,
     fontWeight: "500",
   },
   itemPayment: {
-    fontSize: 11,
-    color: Colors.light.textMuted,
+    fontSize: 10,
+    color: colors.textMuted,
     fontStyle: "italic",
   },
   noItemsText: {
-    fontSize: 12,
-    color: Colors.light.textMuted,
+    fontSize: 11,
+    color: colors.textMuted,
     fontStyle: "italic",
   },
   feeRows: {
@@ -414,36 +419,36 @@ const styles = StyleSheet.create({
   feeRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 10,
+    gap: 8,
   },
   feeName: {
     flex: 1,
-    fontSize: 14,
-    color: Colors.light.textSecondary,
+    fontSize: 12,
+    color: colors.textSecondary,
   },
   feeAmount: {
-    fontSize: 14,
+    fontSize: 12,
     fontWeight: "600",
-    color: Colors.light.text,
+    color: colors.text,
   },
   totalRow: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
     borderTopWidth: 1,
-    borderTopColor: Colors.light.border,
+    borderTopColor: colors.border,
     paddingTop: 12,
     marginTop: 4,
   },
   totalLabel: {
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: "700",
-    color: Colors.light.text,
+    color: colors.text,
   },
   totalAmount: {
-    fontSize: 22,
+    fontSize: 18,
     fontWeight: "800",
-    color: Colors.light.primary,
+    color: colors.primary,
   },
   infoBox: {
     flexDirection: "row",
@@ -455,80 +460,80 @@ const styles = StyleSheet.create({
   },
   infoText: {
     flex: 1,
-    fontSize: 12,
+    fontSize: 10,
     color: "#92400E",
-    lineHeight: 18,
+    lineHeight: 16,
   },
   paymentRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 12,
-    backgroundColor: Colors.light.surface,
-    borderRadius: 14,
-    padding: 16,
+    gap: 10,
+    backgroundColor: colors.surface,
+    borderRadius: 12,
+    padding: 12,
     borderWidth: 1,
-    borderColor: Colors.light.border,
+    borderColor: colors.border,
   },
   paymentInfo: {
     flex: 1,
     gap: 2,
   },
   paymentLabel: {
-    fontSize: 10,
+    fontSize: 9,
     fontWeight: "600",
-    color: Colors.light.textMuted,
+    color: colors.textMuted,
     letterSpacing: 0.5,
   },
   paymentValue: {
-    fontSize: 15,
+    fontSize: 13,
     fontWeight: "600",
-    color: Colors.light.text,
+    color: colors.text,
   },
   changeLink: {
-    fontSize: 14,
+    fontSize: 12,
     fontWeight: "700",
-    color: Colors.light.primary,
+    color: colors.primary,
   },
   footer: {
     position: "absolute",
     bottom: 0,
     left: 0,
     right: 0,
-    backgroundColor: Colors.light.background,
-    paddingHorizontal: 20,
+    backgroundColor: colors.background,
+    paddingHorizontal: 16,
     paddingTop: 16,
     borderTopWidth: 1,
-    borderTopColor: Colors.light.border,
+    borderTopColor: colors.border,
     gap: 8,
   },
   confirmBtn: {
-    backgroundColor: Colors.light.primary,
-    borderRadius: 16,
-    paddingVertical: 18,
+    backgroundColor: colors.primary,
+    borderRadius: 14,
+    paddingVertical: 14,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
     gap: 8,
-    shadowColor: Colors.light.primary,
+    shadowColor: colors.primary,
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.35,
     shadowRadius: 16,
     elevation: 8,
   },
   confirmBtnDisabled: {
-    backgroundColor: Colors.light.textMuted,
+    backgroundColor: colors.textMuted,
     shadowOpacity: 0,
   },
   confirmBtnText: {
     color: "#fff",
-    fontSize: 17,
+    fontSize: 15,
     fontWeight: "700",
   },
   secureText: {
     textAlign: "center",
-    fontSize: 10,
+    fontSize: 9,
     fontWeight: "600",
-    color: Colors.light.textMuted,
+    color: colors.textMuted,
     letterSpacing: 1,
   },
 });

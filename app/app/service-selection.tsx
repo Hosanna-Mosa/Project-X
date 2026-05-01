@@ -13,6 +13,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather, FontAwesome5 } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
 import * as Location from "expo-location";
+import { useThemeStore } from "@/contexts/themeStore";
 import Colors from "@/constants/colors";
 import { MapBackground, MapBackgroundRef } from "@/components/MapBackground";
 import { BottomSheet } from "@/components/BottomSheet";
@@ -28,6 +29,10 @@ export default function ServiceSelectionScreen() {
   const [selectedPlace, setSelectedPlace] = useState<any | null>(null);
   const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(null);
   const mapRef = useRef<MapBackgroundRef>(null);
+
+  const { theme } = useThemeStore();
+  const colors = Colors[theme];
+  const styles = React.useMemo(() => createStyles(colors), [theme]);
 
   useEffect(() => {
     (async () => {
@@ -88,7 +93,7 @@ export default function ServiceSelectionScreen() {
           style={styles.actionBtn} 
           onPress={() => setMapType(m => m === 'standard' ? 'satellite' : 'standard')}
         >
-          <Feather name="layers" size={20} color={mapType === 'satellite' ? Colors.light.primary : Colors.light.text} />
+          <Feather name="layers" size={20} color={mapType === 'satellite' ? colors.primary : colors.text} />
         </TouchableOpacity>
       </View>
 
@@ -103,7 +108,7 @@ export default function ServiceSelectionScreen() {
         pointerEvents="box-none"
       >
         <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
-          <Feather name="arrow-left" size={24} color={Colors.light.text} />
+          <Feather name="arrow-left" size={24} color={colors.text} />
         </TouchableOpacity>
         <View style={styles.titleContainer}>
           <Text style={styles.titleText}>{label || "Select Location"}</Text>
@@ -154,11 +159,11 @@ export default function ServiceSelectionScreen() {
           </Text>
 
           <View style={styles.searchContainer}>
-            {loading ? <ActivityIndicator size="small" color={Colors.light.primary} /> : <Feather name="search" size={20} color={Colors.light.textMuted} />}
+            {loading ? <ActivityIndicator size="small" color={colors.primary} /> : <Feather name="search" size={20} color={colors.textMuted} />}
             <TextInput
               style={styles.searchInput}
               placeholder="Search for area, street name..."
-              placeholderTextColor={Colors.light.textMuted}
+              placeholderTextColor={colors.textMuted}
               value={searchText}
               onChangeText={setSearchText}
             />
@@ -185,19 +190,19 @@ export default function ServiceSelectionScreen() {
                     <Text style={styles.suggestionTitle}>{place.name}</Text>
                     <Text style={styles.suggestionSubtitle} numberOfLines={1}>{place.address}</Text>
                   </View>
-                  <Feather name="chevron-right" size={20} color={Colors.light.textMuted} />
+                  <Feather name="chevron-right" size={20} color={colors.textMuted} />
                 </TouchableOpacity>
                ))
              ) : (
                 <>
                   <TouchableOpacity style={styles.suggestionItem}>
                     <View style={styles.suggestionIconBox}>
-                      <Feather name="map-pin" size={18} color={Colors.light.textSecondary} />
+                      <Feather name="map-pin" size={18} color={colors.textSecondary} />
                     </View>
                     <View style={styles.suggestionText}>
                       <Text style={styles.suggestionTitle}>Set location on map</Text>
                     </View>
-                    <Feather name="chevron-right" size={20} color={Colors.light.textMuted} />
+                    <Feather name="chevron-right" size={20} color={colors.textMuted} />
                   </TouchableOpacity>
                   
                   <View style={styles.divider} />
@@ -210,7 +215,7 @@ export default function ServiceSelectionScreen() {
                       <Text style={styles.suggestionTitle}>Home</Text>
                       <Text style={styles.suggestionSubtitle}>221B Baker Street, London</Text>
                     </View>
-                    <Feather name="chevron-right" size={20} color={Colors.light.textMuted} />
+                    <Feather name="chevron-right" size={20} color={colors.textMuted} />
                   </TouchableOpacity>
                 </>
              )}
@@ -221,10 +226,10 @@ export default function ServiceSelectionScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: typeof Colors.light) => StyleSheet.create({
   root: {
     flex: 1,
-    backgroundColor: Colors.light.background,
+    backgroundColor: colors.background,
   },
   topBar: {
     flexDirection: "row",
@@ -240,7 +245,7 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: Colors.light.surface,
+    backgroundColor: colors.surface,
     alignItems: "center",
     justifyContent: "center",
     shadowColor: "#000",
@@ -256,7 +261,7 @@ const styles = StyleSheet.create({
   titleText: {
     fontSize: 18,
     fontWeight: "800",
-    color: Colors.light.text,
+    color: colors.text,
     letterSpacing: -0.5,
   },
   pinContainer: {
@@ -269,9 +274,9 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: Colors.light.primary,
+    backgroundColor: colors.primary,
     borderWidth: 4,
-    borderColor: "#fff",
+    borderColor: colors.surface,
     alignItems: "center",
     justifyContent: "center",
     shadowColor: "#000",
@@ -284,7 +289,7 @@ const styles = StyleSheet.create({
     width: 12,
     height: 12,
     borderRadius: 6,
-    backgroundColor: "#fff",
+    backgroundColor: colors.surface,
   },
   pinShadow: {
     width: 8,
@@ -305,12 +310,12 @@ const styles = StyleSheet.create({
   sheetTitle: {
     fontSize: 24,
     fontWeight: "900",
-    color: Colors.light.text,
+    color: colors.text,
     letterSpacing: -1,
   },
   sheetSubtitle: {
     fontSize: 14,
-    color: Colors.light.textSecondary,
+    color: colors.textSecondary,
     fontWeight: "500",
     lineHeight: 20,
   },
@@ -318,22 +323,22 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 12,
-    backgroundColor: "#F1F5F9",
+    backgroundColor: colors.surfaceSecondary,
     paddingHorizontal: 16,
     paddingVertical: 14,
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: "#E2E8F0",
+    borderColor: colors.border,
   },
   searchInput: {
     flex: 1,
     fontSize: 16,
     fontWeight: "600",
-    color: Colors.light.text,
+    color: colors.text,
   },
   suggestions: {
     marginTop: 8,
-    backgroundColor: Colors.light.surface,
+    backgroundColor: colors.surface,
     borderRadius: 20,
   },
   suggestionItem: {
@@ -346,7 +351,7 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 12,
-    backgroundColor: "#F8FAFC",
+    backgroundColor: colors.surfaceSecondary,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -357,16 +362,16 @@ const styles = StyleSheet.create({
   suggestionTitle: {
     fontSize: 15,
     fontWeight: "700",
-    color: Colors.light.text,
+    color: colors.text,
   },
   suggestionSubtitle: {
     fontSize: 13,
-    color: Colors.light.textSecondary,
+    color: colors.textSecondary,
     fontWeight: "500",
   },
   divider: {
     height: 1,
-    backgroundColor: "#F1F5F9",
+    backgroundColor: colors.borderLight,
     marginLeft: 54,
   },
   detailOverlay: {
@@ -387,7 +392,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   detailCard: {
-    backgroundColor: "#fff",
+    backgroundColor: colors.surface,
     borderRadius: 24,
     padding: 20,
     flexDirection: "row",
@@ -406,11 +411,11 @@ const styles = StyleSheet.create({
   detailName: {
     fontSize: 18,
     fontWeight: "800",
-    color: Colors.light.text,
+    color: colors.text,
   },
   detailAddress: {
     fontSize: 13,
-    color: Colors.light.textSecondary,
+    color: colors.textSecondary,
     fontWeight: "500",
   },
   ratingRow: {
@@ -435,7 +440,7 @@ const styles = StyleSheet.create({
   },
   userCount: {
     fontSize: 12,
-    color: Colors.light.textMuted,
+    color: colors.textMuted,
     fontWeight: "500",
   },
   statusTag: {
@@ -448,7 +453,7 @@ const styles = StyleSheet.create({
     fontWeight: "800",
   },
   orderBtn: {
-    backgroundColor: Colors.light.primary,
+    backgroundColor: colors.primary,
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderRadius: 12,
@@ -468,7 +473,7 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 12,
-    backgroundColor: Colors.light.surface,
+    backgroundColor: colors.surface,
     alignItems: 'center',
     justifyContent: 'center',
     shadowColor: "#000",

@@ -3,6 +3,7 @@ import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { Feather } from "@expo/vector-icons";
 import Colors from "@/constants/colors";
 import { DeliveryStop } from "@/contexts/deliveryStore";
+import { useThemeStore } from "@/contexts/themeStore";
 
 interface Props {
   stop: DeliveryStop;
@@ -12,6 +13,10 @@ interface Props {
 }
 
 export function StopCard({ stop, index, onRemove, onPress }: Props) {
+  const { theme } = useThemeStore();
+  const colors = Colors[theme];
+  const styles = React.useMemo(() => createStyles(colors), [theme]);
+
   return (
     <TouchableOpacity
       style={styles.container}
@@ -42,19 +47,19 @@ export function StopCard({ stop, index, onRemove, onPress }: Props) {
         onPress={() => onRemove(stop.id)}
         hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
       >
-        <Feather name="x" size={16} color={Colors.light.textMuted} />
+        <Feather name="x" size={16} color={colors.textMuted} />
       </TouchableOpacity>
     </TouchableOpacity>
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: typeof Colors.light) => StyleSheet.create({
   container: {
     flexDirection: "row",
     alignItems: "flex-start",
     paddingVertical: 8,
     paddingHorizontal: 12,
-    backgroundColor: Colors.light.surface,
+    backgroundColor: colors.surface,
     borderRadius: 8,
     marginBottom: 6,
     shadowColor: "#000",
@@ -71,7 +76,7 @@ const styles = StyleSheet.create({
     width: 20,
     height: 20,
     borderRadius: 10,
-    backgroundColor: Colors.light.primary,
+    backgroundColor: colors.primary,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -83,7 +88,7 @@ const styles = StyleSheet.create({
   line: {
     width: 2,
     height: 16,
-    backgroundColor: Colors.light.primaryLight,
+    backgroundColor: colors.primaryLight,
     marginTop: 4,
   },
   content: {
@@ -92,16 +97,16 @@ const styles = StyleSheet.create({
   storeName: {
     fontSize: 12,
     fontWeight: "600",
-    color: Colors.light.text,
+    color: colors.text,
     marginBottom: 2,
   },
   address: {
     fontSize: 11,
-    color: Colors.light.textSecondary,
+    color: colors.textSecondary,
   },
   itemCount: {
     fontSize: 10,
-    color: Colors.light.primary,
+    color: colors.primary,
     marginTop: 4,
     fontWeight: "500",
   },

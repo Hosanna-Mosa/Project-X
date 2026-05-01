@@ -3,6 +3,7 @@ import { StyleSheet, Text, View } from "react-native";
 import { Feather } from "@expo/vector-icons";
 import Colors from "@/constants/colors";
 import { OrderStatus } from "@/contexts/deliveryStore";
+import { useThemeStore } from "@/contexts/themeStore";
 
 interface StatusStep {
   key: OrderStatus;
@@ -43,6 +44,9 @@ interface Props {
 
 export function OrderStatusTimeline({ currentStatus }: Props) {
   const currentIndex = STATUS_ORDER.indexOf(currentStatus);
+  const { theme } = useThemeStore();
+  const colors = Colors[theme];
+  const styles = React.useMemo(() => createStyles(colors), [theme]);
 
   return (
     <View style={styles.container}>
@@ -109,7 +113,7 @@ export function OrderStatusTimeline({ currentStatus }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: typeof Colors.light) => StyleSheet.create({
   container: {
     paddingVertical: 8,
   },
@@ -128,20 +132,20 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     borderWidth: 2,
-    borderColor: Colors.light.border,
-    backgroundColor: Colors.light.surface,
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
   },
   circleDone: {
-    backgroundColor: Colors.light.primary,
-    borderColor: Colors.light.primary,
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
   },
   circleActive: {
-    backgroundColor: Colors.light.primary,
-    borderColor: Colors.light.primary,
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
   },
   circlePending: {
-    backgroundColor: Colors.light.surfaceSecondary,
-    borderColor: Colors.light.border,
+    backgroundColor: colors.surfaceSecondary,
+    borderColor: colors.border,
   },
   innerDot: {
     width: 6,
@@ -152,11 +156,11 @@ const styles = StyleSheet.create({
   connector: {
     width: 2,
     flex: 1,
-    backgroundColor: Colors.light.border,
+    backgroundColor: colors.border,
     marginVertical: 4,
   },
   connectorDone: {
-    backgroundColor: Colors.light.primary,
+    backgroundColor: colors.primary,
   },
   textCol: {
     flex: 1,
@@ -172,19 +176,19 @@ const styles = StyleSheet.create({
   label: {
     fontSize: 12,
     fontWeight: "600",
-    color: Colors.light.textMuted,
+    color: colors.textMuted,
   },
   labelDone: {
-    color: Colors.light.text,
+    color: colors.text,
   },
   labelActive: {
-    color: Colors.light.primary,
+    color: colors.primary,
   },
   labelPending: {
-    color: Colors.light.textMuted,
+    color: colors.textMuted,
   },
   liveBadge: {
-    backgroundColor: Colors.light.primary,
+    backgroundColor: colors.primary,
     borderRadius: 4,
     paddingHorizontal: 6,
     paddingVertical: 2,
@@ -197,12 +201,12 @@ const styles = StyleSheet.create({
   },
   time: {
     fontSize: 10,
-    color: Colors.light.textMuted,
+    color: colors.textMuted,
     marginTop: 2,
   },
   description: {
     fontSize: 11,
-    color: Colors.light.textSecondary,
+    color: colors.textSecondary,
     marginTop: 4,
   },
 });

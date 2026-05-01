@@ -9,6 +9,7 @@ import {
 import { Feather } from "@expo/vector-icons";
 import { router } from "expo-router";
 import Colors from "@/constants/colors";
+import { useThemeStore } from "@/contexts/themeStore";
 import { ScreenWrapper } from "@/components/ScreenWrapper";
 import { customFetch } from "@/utils/api/custom-fetch";
 import { ActivityIndicator } from "react-native";
@@ -37,6 +38,10 @@ const STATUS_LABELS: Record<string, string> = {
 };
 
 export default function OrdersScreen() {
+  const { theme } = useThemeStore();
+  const colors = Colors[theme];
+  const styles = React.useMemo(() => createStyles(colors), [theme]);
+
   const [filter, setFilter] = useState<FilterType>("all");
   const [orders, setOrders] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -69,7 +74,7 @@ export default function OrdersScreen() {
       <View style={styles.header}>
         <Text style={styles.title}>My Orders</Text>
         <TouchableOpacity style={styles.filterIconBtn}>
-          <Feather name="sliders" size={18} color={Colors.light.text} />
+          <Feather name="sliders" size={18} color={colors.text} />
         </TouchableOpacity>
       </View>
 
@@ -98,12 +103,12 @@ export default function OrdersScreen() {
       >
         {loading ? (
           <View style={styles.emptyState}>
-            <ActivityIndicator size="large" color={Colors.light.primary} />
+            <ActivityIndicator size="large" color={colors.primary} />
             <Text style={styles.emptySubtitle}>Loading your orders...</Text>
           </View>
         ) : filtered.length === 0 ? (
           <View style={styles.emptyState}>
-            <Feather name="box" size={48} color={Colors.light.textMuted} />
+            <Feather name="box" size={48} color={colors.textMuted} />
             <Text style={styles.emptyTitle}>No Orders</Text>
             <Text style={styles.emptySubtitle}>Your orders will appear here</Text>
           </View>
@@ -129,7 +134,7 @@ export default function OrdersScreen() {
                     <Feather
                       name={order.stops?.length > 1 ? "git-branch" : "shopping-bag"}
                       size={16}
-                      color={Colors.light.primary}
+                      color={colors.primary}
                     />
                   </View>
                   <View style={styles.orderInfo}>
@@ -139,19 +144,19 @@ export default function OrdersScreen() {
                   <View
                     style={[
                       styles.statusBadge,
-                      { backgroundColor: `${STATUS_COLORS[order.status] || Colors.light.textMuted}15` },
+                      { backgroundColor: `${STATUS_COLORS[order.status] || colors.textMuted}15` },
                     ]}
                   >
                     <View
                       style={[
                         styles.statusDot,
-                        { backgroundColor: STATUS_COLORS[order.status] || Colors.light.textMuted },
+                        { backgroundColor: STATUS_COLORS[order.status] || colors.textMuted },
                       ]}
                     />
                     <Text
                       style={[
                         styles.statusText,
-                        { color: STATUS_COLORS[order.status] || Colors.light.textMuted },
+                        { color: STATUS_COLORS[order.status] || colors.textMuted },
                       ]}
                     >
                       {STATUS_LABELS[order.status] || order.status}
@@ -161,13 +166,13 @@ export default function OrdersScreen() {
 
                 <View style={styles.orderDetails}>
                   <View style={styles.detailRow}>
-                    <Feather name="map-pin" size={12} color={Colors.light.textMuted} />
+                    <Feather name="map-pin" size={12} color={colors.textMuted} />
                     <Text style={styles.detailText} numberOfLines={1}>
                       {order.stops?.map((s: any) => s.address).join(" → ")}
                     </Text>
                   </View>
                   <View style={styles.detailRow}>
-                    <Feather name="clock" size={12} color={Colors.light.textMuted} />
+                    <Feather name="clock" size={12} color={colors.textMuted} />
                     <Text style={styles.detailText}>{new Date(order.createdAt).toLocaleString()}</Text>
                   </View>
                 </View>
@@ -183,7 +188,7 @@ export default function OrdersScreen() {
                       })}
                     >
                       <Text style={styles.trackBtnText}>Track Order</Text>
-                      <Feather name="arrow-right" size={12} color={Colors.light.primary} />
+                      <Feather name="arrow-right" size={12} color={colors.primary} />
                     </TouchableOpacity>
                   )}
                 </View>
@@ -196,7 +201,7 @@ export default function OrdersScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: typeof Colors.light) => StyleSheet.create({
   root: {
     flex: 1,
   },
@@ -210,18 +215,18 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 18,
     fontWeight: "800",
-    color: Colors.light.text,
+    color: colors.text,
     letterSpacing: -0.3,
   },
   filterIconBtn: {
     width: 30,
     height: 30,
     borderRadius: 8,
-    backgroundColor: Colors.light.surface,
+    backgroundColor: colors.surface,
     alignItems: "center",
     justifyContent: "center",
     borderWidth: 1,
-    borderColor: Colors.light.border,
+    borderColor: colors.border,
   },
   filterRow: {
     flexDirection: "row",
@@ -233,18 +238,18 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 5,
     borderRadius: 15,
-    backgroundColor: Colors.light.surface,
+    backgroundColor: colors.surface,
     borderWidth: 1,
-    borderColor: Colors.light.border,
+    borderColor: colors.border,
   },
   filterBtnActive: {
-    backgroundColor: Colors.light.primary,
-    borderColor: Colors.light.primary,
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
   },
   filterBtnText: {
     fontSize: 11,
     fontWeight: "600",
-    color: Colors.light.textSecondary,
+    color: colors.textSecondary,
   },
   filterBtnTextActive: {
     color: "#fff",
@@ -261,20 +266,20 @@ const styles = StyleSheet.create({
   emptyTitle: {
     fontSize: 20,
     fontWeight: "700",
-    color: Colors.light.text,
+    color: colors.text,
   },
   emptySubtitle: {
     fontSize: 14,
-    color: Colors.light.textMuted,
+    color: colors.textMuted,
   },
   orderCard: {
-    backgroundColor: Colors.light.surface,
+    backgroundColor: colors.surface,
     borderRadius: 12,
     padding: 10,
     gap: 10,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
+    shadowOpacity: colors.surface === "#FFFFFF" ? 0.06 : 0.2,
     shadowRadius: 8,
     elevation: 3,
   },
@@ -287,7 +292,7 @@ const styles = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: 8,
-    backgroundColor: `${Colors.light.primary}15`,
+    backgroundColor: `${colors.primary}15`,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -298,11 +303,11 @@ const styles = StyleSheet.create({
   orderType: {
     fontSize: 12,
     fontWeight: "700",
-    color: Colors.light.text,
+    color: colors.text,
   },
   orderId: {
     fontSize: 10,
-    color: Colors.light.textMuted,
+    color: colors.textMuted,
   },
   statusBadge: {
     flexDirection: "row",
@@ -332,20 +337,20 @@ const styles = StyleSheet.create({
   detailText: {
     flex: 1,
     fontSize: 11,
-    color: Colors.light.textSecondary,
+    color: colors.textSecondary,
   },
   orderCardBottom: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
     borderTopWidth: 1,
-    borderTopColor: Colors.light.borderLight,
+    borderTopColor: colors.borderLight,
     paddingTop: 10,
   },
   orderAmount: {
     fontSize: 14,
     fontWeight: "800",
-    color: Colors.light.text,
+    color: colors.text,
   },
   trackBtn: {
     flexDirection: "row",
@@ -355,6 +360,6 @@ const styles = StyleSheet.create({
   trackBtnText: {
     fontSize: 11,
     fontWeight: "600",
-    color: Colors.light.primary,
+    color: colors.primary,
   },
 });

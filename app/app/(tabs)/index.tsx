@@ -15,6 +15,7 @@ import { Feather, FontAwesome5 } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { MapType } from "react-native-maps";
 import Colors from "@/constants/colors";
+import { useThemeStore } from "@/contexts/themeStore";
 import { MapBackground } from "@/components/MapBackground";
 import { ServiceCategory } from "@/components/ServiceCategory";
 import { FoodCard } from "@/components/FoodCard";
@@ -29,6 +30,9 @@ export default function HomeScreen() {
   const [restaurants, setRestaurants] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [mapType, setMapType] = useState<MapType>("standard");
+  const { theme, toggleTheme } = useThemeStore();
+  const colors = Colors[theme];
+  const styles = React.useMemo(() => createStyles(colors), [theme]);
 
   const topPadding = insets.top + (Platform.OS === "web" ? 67 : 0);
 
@@ -64,7 +68,7 @@ export default function HomeScreen() {
           style={styles.actionBtn} 
           onPress={() => setMapType(m => m === 'standard' ? 'satellite' : 'standard')}
         >
-          <Feather name={mapType === 'satellite' ? "map" : "layers"} size={18} color={Colors.light.text} />
+          <Feather name={mapType === 'satellite' ? "map" : "layers"} size={18} color={colors.text} />
         </TouchableOpacity>
       </View>
 
@@ -83,7 +87,7 @@ export default function HomeScreen() {
               >
                 {selectedAddress ? (
                   <View style={{flexDirection: 'row', alignItems: 'center', flexShrink: 1}}>
-                    <Text style={{fontWeight: '800', color: '#111827', marginRight: 6, fontSize: 14}}>
+                    <Text style={{fontWeight: '800', color: colors.text, marginRight: 6, fontSize: 14}}>
                       {selectedAddress.label === "Home" || selectedAddress.label === "Work" 
                         ? selectedAddress.label 
                         : (selectedAddress.receiverName || (selectedAddress.label !== "Other" ? selectedAddress.label : "Other"))}
@@ -97,12 +101,17 @@ export default function HomeScreen() {
                     Add address
                   </Text>
                 )}
-                <Feather name="chevron-down" size={18} color="#4B5563" style={{marginLeft: 6}} />
+                <Feather name="chevron-down" size={18} color={colors.textSecondary} style={{marginLeft: 6}} />
               </TouchableOpacity>
             </View>
-            <TouchableOpacity style={styles.avatarBtnCircle}>
-                <Feather name="user" size={18} color="#111827" />
-            </TouchableOpacity>
+            <View style={{flexDirection: 'row', gap: 10, alignItems: 'center'}}>
+              <TouchableOpacity style={styles.avatarBtnCircle} onPress={toggleTheme}>
+                  <Feather name={theme === 'dark' ? 'sun' : 'moon'} size={18} color={colors.text} />
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.avatarBtnCircle}>
+                  <Feather name="user" size={18} color={colors.text} />
+              </TouchableOpacity>
+            </View>
           </View>
 
           <View style={styles.searchBar}>
@@ -110,7 +119,7 @@ export default function HomeScreen() {
             <TextInput
               style={styles.searchInput}
               placeholder='Search "milk", "eggs", "bread"'
-              placeholderTextColor="#9CA3AF"
+              placeholderTextColor={colors.textSecondary}
               value={searchText}
               onChangeText={setSearchText}
             />
@@ -205,10 +214,10 @@ export default function HomeScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: typeof Colors.light) => StyleSheet.create({
   root: {
     flex: 1,
-    backgroundColor: Colors.light.background,
+    backgroundColor: colors.background,
   },
   overlay: {
     position: "absolute",
@@ -228,14 +237,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: 0,
   },
   flushHeader: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.surface,
     paddingBottom: 10,
     paddingHorizontal: 16,
     borderBottomLeftRadius: 20,
     borderBottomRightRadius: 20,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.05,
+    shadowOpacity: colors.surface === "#FFFFFF" ? 0.05 : 0.3,
     shadowRadius: 10,
     elevation: 6,
   },
@@ -257,7 +266,7 @@ const styles = StyleSheet.create({
   deliveryTitle: {
     fontSize: 11,
     fontWeight: "800",
-    color: "#111827",
+    color: colors.textSecondary,
     letterSpacing: 0.1,
   },
   addressSelector: {
@@ -267,38 +276,38 @@ const styles = StyleSheet.create({
   addressText: {
     fontSize: 11,
     fontWeight: "500",
-    color: "#4B5563",
+    color: colors.textSecondary,
     maxWidth: "85%",
   },
   avatarBtnCircle: {
     width: 34,
     height: 34,
     borderRadius: 17,
-    backgroundColor: "#F3F4F6",
+    backgroundColor: colors.surfaceSecondary,
     alignItems: "center",
     justifyContent: "center",
   },
   searchBar: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#FFFFFF",
+    backgroundColor: colors.surfaceSecondary,
     paddingHorizontal: 12,
     paddingVertical: 8,
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: "#E5E7EB",
+    borderColor: colors.border,
   },
   searchInput: {
     flex: 1,
     fontSize: 12,
     fontWeight: "500",
-    color: Colors.light.text,
+    color: colors.text,
     marginLeft: 8,
   },
   micBtnDivider: {
     width: 1,
     height: 16,
-    backgroundColor: "#E5E7EB",
+    backgroundColor: colors.border,
     marginHorizontal: 10,
   },
   bottomSheet: {
@@ -317,10 +326,10 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 12,
     borderWidth: 1.5,
-    borderColor: "#0EA5E920",
+    borderColor: "#0EA5E930",
     borderRadius: 16,
     padding: 12,
-    backgroundColor: "#F0F9FF50",
+    backgroundColor: "#0EA5E910",
   },
   promoIconContainer: {
     width: 36,
@@ -337,11 +346,11 @@ const styles = StyleSheet.create({
   promoTitle: {
     fontSize: 13,
     fontWeight: "700",
-    color: Colors.light.text,
+    color: colors.text,
   },
   promoSubtitle: {
     fontSize: 11,
-    color: Colors.light.textSecondary,
+    color: colors.textSecondary,
     fontWeight: "500",
   },
   sectionTitleRow: {
@@ -352,7 +361,7 @@ const styles = StyleSheet.create({
   sectionTitleText: {
     fontSize: 13,
     fontWeight: "800",
-    color: Colors.light.text,
+    color: colors.text,
     letterSpacing: -0.3,
   },
   seeAllButton: {
@@ -373,15 +382,15 @@ const styles = StyleSheet.create({
     width: 38,
     height: 38,
     borderRadius: 12,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.surface,
     alignItems: 'center',
     justifyContent: 'center',
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
+    shadowOpacity: colors.surface === "#FFFFFF" ? 0.1 : 0.3,
     shadowRadius: 10,
     elevation: 8,
     borderWidth: 1,
-    borderColor: '#E5E7EB',
+    borderColor: colors.border,
   },
 });

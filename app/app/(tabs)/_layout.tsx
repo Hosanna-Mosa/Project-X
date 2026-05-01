@@ -9,9 +9,13 @@ import { Platform, StyleSheet, Text, TouchableOpacity, View, useColorScheme } fr
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import Colors from "@/constants/colors";
+import { useThemeStore } from "@/contexts/themeStore";
 
 function CustomTabBar({ state, descriptors, navigation }: any) {
   const insets = useSafeAreaInsets();
+  const { theme } = useThemeStore();
+  const colors = Colors[theme];
+  const styles = React.useMemo(() => createStyles(colors), [theme]);
 
   return (
     <View style={[styles.tabBarContainer, { paddingBottom: insets.bottom + 8 }]}>
@@ -35,7 +39,7 @@ function CustomTabBar({ state, descriptors, navigation }: any) {
         };
 
         const renderIcon = () => {
-          const color = isFocused ? "#0EA5E9" : "#94A3B8";
+          const color = isFocused ? colors.primary : colors.textMuted;
           const size = 24;
           switch (route.name) {
             case "index":
@@ -59,7 +63,7 @@ function CustomTabBar({ state, descriptors, navigation }: any) {
             <View style={[styles.iconContainer, isFocused && styles.activeIconContainer]}>
               {renderIcon()}
             </View>
-            <Text style={[styles.tabLabel, isFocused && styles.activeTabLabel]}>
+            <Text style={[styles.tabLabel, isFocused && { color: colors.primary }]}>
               {label.charAt(0).toUpperCase() + label.slice(1)}
             </Text>
           </TouchableOpacity>
@@ -84,13 +88,11 @@ export default function TabLayout() {
   );
 }
 
-
-
-const styles = StyleSheet.create({
+const createStyles = (colors: typeof Colors.light) => StyleSheet.create({
   tabBarContainer: {
     flexDirection: "row",
-    backgroundColor: "#FFFFFF",
-  
+    backgroundColor: colors.surface,
+
     paddingTop: 15,
     paddingHorizontal: 10,
     position: "absolute",
@@ -99,11 +101,11 @@ const styles = StyleSheet.create({
     right: 0,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: -10 },
-    shadowOpacity: 0.05,
+    shadowOpacity: colors.surface === "#FFFFFF" ? 0.05 : 0.3,
     shadowRadius: 20,
     elevation: 20,
     borderWidth: 1,
-    borderColor: "#F1F5F9",
+    borderColor: colors.border,
   },
   tabItem: {
     flex: 1,
@@ -119,14 +121,11 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   activeIconContainer: {
-    backgroundColor: "#F0FDFA", // Light teal/blue pearl background
+    backgroundColor: colors.surface === "#FFFFFF" ? "#F0FDFA" : colors.surfaceSecondary,
   },
   tabLabel: {
     fontSize: 12,
     fontWeight: "600",
-    color: "#94A3B8",
-  },
-  activeTabLabel: {
-    color: "#0EA5E9",
+    color: colors.textMuted,
   },
 });
