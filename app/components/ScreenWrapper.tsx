@@ -2,6 +2,7 @@ import React from "react";
 import { StyleSheet, ViewStyle } from "react-native";
 import { SafeAreaView, Edge } from "react-native-safe-area-context";
 import Colors from "@/constants/colors";
+import { useThemeStore } from "@/contexts/themeStore";
 
 interface ScreenWrapperProps {
   children: React.ReactNode;
@@ -26,11 +27,14 @@ export function ScreenWrapper({
   children,
   style,
   edges = ["top", "left", "right", "bottom"],
-  backgroundColor = Colors.light.background,
+  backgroundColor,
 }: ScreenWrapperProps) {
+  const { theme } = useThemeStore();
+  const colors = Colors[theme];
+  const finalBg = backgroundColor || colors.background;
   return (
     <SafeAreaView
-      style={[styles.root, { backgroundColor }, style]}
+      style={[styles.root, { backgroundColor: finalBg }, style]}
       edges={edges}
     >
       {children}

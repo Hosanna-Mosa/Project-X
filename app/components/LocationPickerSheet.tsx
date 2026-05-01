@@ -13,6 +13,7 @@ import {
 import { Feather, FontAwesome5 } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import Colors from "@/constants/colors";
+import { useThemeStore } from "@/contexts/themeStore";
 import * as Location from "expo-location";
 import { customFetch } from "@/utils/api/custom-fetch";
 
@@ -24,6 +25,10 @@ interface Props {
 
 export function LocationPickerSheet({ isOpen, onClose, onSelectAddress }: Props) {
   const router = useRouter();
+  const { theme } = useThemeStore();
+  const colors = Colors[theme];
+  const styles = React.useMemo(() => createStyles(colors), [theme]);
+
   const [search, setSearch] = useState("");
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [savedAddresses, setSavedAddresses] = useState<any[]>([]);
@@ -178,7 +183,7 @@ export function LocationPickerSheet({ isOpen, onClose, onSelectAddress }: Props)
         }
       }}
     >
-      <Feather name="map-pin" size={16} color={Colors.light.textMuted} />
+      <Feather name="map-pin" size={16} color={colors.textMuted} />
       <View style={{ flex: 1 }}>
         <Text style={styles.searchResultName}>{item.name}</Text>
         <Text style={styles.searchResultAddress} numberOfLines={1}>{item.address}</Text>
@@ -204,7 +209,7 @@ export function LocationPickerSheet({ isOpen, onClose, onSelectAddress }: Props)
           <View style={styles.headerRow}>
             <Text style={styles.title}>Select a location</Text>
             <TouchableOpacity onPress={onClose} style={styles.closeBtn}>
-              <Feather name="x" size={20} color="#000000" />
+              <Feather name="x" size={20} color={colors.text} />
             </TouchableOpacity>
           </View>
           
@@ -213,7 +218,7 @@ export function LocationPickerSheet({ isOpen, onClose, onSelectAddress }: Props)
             <TextInput 
               style={styles.searchInput} 
               placeholder="Search for area, street name..."
-              placeholderTextColor="#9CA3AF"
+              placeholderTextColor={colors.textSecondary}
               value={search}
               onChangeText={handleSearch}
             />
@@ -302,14 +307,14 @@ export function LocationPickerSheet({ isOpen, onClose, onSelectAddress }: Props)
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: typeof Colors.light) => StyleSheet.create({
   overlay: {
     flex: 1, 
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
     justifyContent: "flex-end", 
   },
   sheet: {
-    backgroundColor: "#FFFFFF",
+    backgroundColor: colors.surface,
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
     paddingTop: 12,
@@ -319,7 +324,7 @@ const styles = StyleSheet.create({
     width: 36,
     height: 5,
     borderRadius: 3,
-    backgroundColor: "#D1D5DB",
+    backgroundColor: colors.border,
     alignSelf: "center",
     marginBottom: 16,
   },
@@ -336,14 +341,14 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 18,
     fontWeight: "700",
-    color: "#111827",
+    color: colors.text,
   },
   searchRow: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#FFFFFF",
+    backgroundColor: colors.surfaceSecondary,
     borderWidth: 1,
-    borderColor: "#E5E7EB",
+    borderColor: colors.border,
     marginHorizontal: 16,
     paddingHorizontal: 12,
     paddingVertical: 12,
@@ -351,7 +356,7 @@ const styles = StyleSheet.create({
     marginBottom: 20,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.04,
+    shadowOpacity: colors.surface === "#FFFFFF" ? 0.04 : 0.2,
     shadowRadius: 4,
     elevation: 2,
   },
@@ -362,7 +367,7 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 15,
     fontWeight: "500",
-    color: "#111827",
+    color: colors.text,
   },
   blinkitActionRow: {
     flexDirection: "row",
@@ -387,23 +392,23 @@ const styles = StyleSheet.create({
   },
   actionSubtitle: {
     fontSize: 13,
-    color: "#6B7280",
+    color: colors.textSecondary,
   },
   divider: {
     height: 1,
-    backgroundColor: "#F3F4F6",
+    backgroundColor: colors.border,
     marginLeft: 56,
   },
   dividerFull: {
     height: 6,
-    backgroundColor: "#F3F4F6",
+    backgroundColor: colors.surfaceSecondary,
     marginTop: 8,
     marginBottom: 16,
   },
   sectionText: {
     fontSize: 13,
     fontWeight: "600",
-    color: "#6B7280",
+    color: colors.textSecondary,
     textTransform: "uppercase",
     letterSpacing: 0.5,
     paddingHorizontal: 16,
@@ -414,7 +419,7 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     paddingHorizontal: 16,
     borderBottomWidth: 1,
-    borderBottomColor: "#F3F4F6",
+    borderBottomColor: colors.border,
   },
   addressMain: {
     flexDirection: "row",
@@ -437,16 +442,16 @@ const styles = StyleSheet.create({
   addressType: {
     fontSize: 15,
     fontWeight: "600",
-    color: "#111827",
+    color: colors.text,
   },
   addressText: {
     fontSize: 13,
-    color: "#6B7280", 
+    color: colors.textSecondary, 
     lineHeight: 18,
   },
   addressPhone: {
     fontSize: 13,
-    color: "#4B5563",
+    color: colors.textMuted,
     marginTop: 4,
   },
   searchResultsContainer: {
@@ -458,26 +463,26 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingVertical: 16,
     borderBottomWidth: 1,
-    borderBottomColor: "#F3F4F6",
+    borderBottomColor: colors.border,
   },
   searchResultName: {
     fontSize: 15,
     fontWeight: "600",
-    color: "#111827",
+    color: colors.text,
     marginBottom: 2,
   },
   searchResultAddress: {
     fontSize: 13,
-    color: "#6B7280",
+    color: colors.textSecondary,
   },
   emptyText: {
     textAlign: "center",
-    color: "#9CA3AF",
+    color: colors.textMuted,
     marginTop: 20,
     fontSize: 14,
   },
   detectedBox: {
-    backgroundColor: "#FFF1F2",
+    backgroundColor: colors.surfaceSecondary,
     marginHorizontal: 16,
     borderRadius: 12,
     padding: 16,

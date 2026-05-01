@@ -13,6 +13,7 @@ import { router } from "expo-router";
 import { ActivityIndicator } from "react-native";
 import Colors from "@/constants/colors";
 import { useDeliveryStore } from "@/contexts/deliveryStore";
+import { useThemeStore } from "@/contexts/themeStore";
 import { socketService } from "@/utils/socketService";
 import { MapBackground, MapBackgroundRef } from "@/components/MapBackground";
 import { BottomSheet } from "@/components/BottomSheet";
@@ -36,6 +37,10 @@ export default function TrackingScreen() {
   const [eta, setEta] = useState(15);
   const [driverLocation, setDriverLocation] = useState<{ lat: number, lng: number } | null>(null);
   const mapRef = React.useRef<MapBackgroundRef>(null);
+
+  const { theme } = useThemeStore();
+  const colors = Colors[theme];
+  const styles = React.useMemo(() => createStyles(colors), [theme]);
 
   useEffect(() => {
     if (currentOrderId) {
@@ -108,7 +113,7 @@ export default function TrackingScreen() {
         pointerEvents="box-none"
       >
         <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
-          <Feather name="arrow-left" size={22} color={Colors.light.text} />
+          <Feather name="arrow-left" size={22} color={colors.text} />
         </TouchableOpacity>
         <View style={styles.etaBadge}>
           <View style={styles.etaDot} />
@@ -124,17 +129,17 @@ export default function TrackingScreen() {
             <View style={styles.findingDriverContainer}>
               <View style={styles.radarContainer}>
                 <View style={styles.radarCircle} />
-                <Feather name="search" size={30} color={Colors.light.primary} />
+                <Feather name="search" size={30} color={colors.primary} />
               </View>
               <Text style={styles.findingTitle}>Finding your delivery partner...</Text>
               <Text style={styles.findingSubtitle}>We're connecting you with the nearest professional driver.</Text>
-              <ActivityIndicator color={Colors.light.primary} style={{ marginTop: 24 }} />
+              <ActivityIndicator color={colors.primary} style={{ marginTop: 24 }} />
             </View>
           ) : (
             <>
               <View style={styles.driverCard}>
                 <View style={styles.driverAvatar}>
-                  <Feather name="user" size={28} color={Colors.light.text} />
+                  <Feather name="user" size={28} color={colors.text} />
                 </View>
                 <View style={styles.driverInfo}>
                   <Text style={styles.driverName}>{driver.name || "Assigned Driver"}</Text>
@@ -146,10 +151,10 @@ export default function TrackingScreen() {
                 </View>
                 <View style={styles.driverActions}>
                   <TouchableOpacity style={styles.actionBtn}>
-                    <Feather name="phone" size={18} color={Colors.light.textSecondary} />
+                    <Feather name="phone" size={18} color={colors.textSecondary} />
                   </TouchableOpacity>
                   <TouchableOpacity style={styles.actionBtn} onPress={() => router.push("/chat")}>
-                    <Feather name="message-square" size={18} color={Colors.light.primary} />
+                    <Feather name="message-square" size={18} color={colors.primary} />
                     {unreadCount > 0 && (
                       <View style={styles.badge}>
                         <Text style={styles.badgeText}>{unreadCount}</Text>
@@ -193,10 +198,10 @@ export default function TrackingScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: typeof Colors.light) => StyleSheet.create({
   root: {
     flex: 1,
-    backgroundColor: Colors.light.background,
+    backgroundColor: colors.background,
   },
   topControls: {
     flexDirection: "row",
@@ -209,7 +214,7 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: Colors.light.surface,
+    backgroundColor: colors.surface,
     alignItems: "center",
     justifyContent: "center",
     shadowColor: "#000",
@@ -222,7 +227,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
-    backgroundColor: Colors.light.surface,
+    backgroundColor: colors.surface,
     paddingHorizontal: 20,
     paddingVertical: 14,
     borderRadius: 30,
@@ -236,12 +241,12 @@ const styles = StyleSheet.create({
     width: 10,
     height: 10,
     borderRadius: 5,
-    backgroundColor: Colors.light.success,
+    backgroundColor: colors.success,
   },
   etaText: {
     fontSize: 17,
     fontWeight: "700",
-    color: Colors.light.text,
+    color: colors.text,
   },
   bottomSheet: {
     position: "absolute",
@@ -259,7 +264,7 @@ const styles = StyleSheet.create({
     width: 80,
     height: 80,
     borderRadius: 40,
-    backgroundColor: `${Colors.light.primary}15`,
+    backgroundColor: `${colors.primary}15`,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 20,
@@ -270,19 +275,19 @@ const styles = StyleSheet.create({
     height: 60,
     borderRadius: 30,
     borderWidth: 2,
-    borderColor: Colors.light.primary,
+    borderColor: colors.primary,
     opacity: 0.3,
   },
   findingTitle: {
     fontSize: 20,
     fontWeight: '800',
-    color: Colors.light.text,
+    color: colors.text,
     textAlign: 'center',
     marginBottom: 8,
   },
   findingSubtitle: {
     fontSize: 14,
-    color: Colors.light.textMuted,
+    color: colors.textMuted,
     textAlign: 'center',
     paddingHorizontal: 40,
   },
@@ -296,11 +301,11 @@ const styles = StyleSheet.create({
     width: 64,
     height: 64,
     borderRadius: 16,
-    backgroundColor: Colors.light.surfaceSecondary,
+    backgroundColor: colors.surfaceSecondary,
     alignItems: "center",
     justifyContent: "center",
     borderWidth: 2,
-    borderColor: Colors.light.border,
+    borderColor: colors.border,
   },
   driverInfo: {
     flex: 1,
@@ -309,7 +314,7 @@ const styles = StyleSheet.create({
   driverName: {
     fontSize: 18,
     fontWeight: "700",
-    color: Colors.light.text,
+    color: colors.text,
   },
   ratingRow: {
     flexDirection: "row",
@@ -319,11 +324,11 @@ const styles = StyleSheet.create({
   ratingText: {
     fontSize: 13,
     fontWeight: "600",
-    color: Colors.light.text,
+    color: colors.text,
   },
   driverMotto: {
     fontSize: 12,
-    color: Colors.light.textSecondary,
+    color: colors.textSecondary,
   },
   driverActions: {
     flexDirection: "row",
@@ -333,7 +338,7 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 12,
-    backgroundColor: Colors.light.surfaceSecondary,
+    backgroundColor: colors.surfaceSecondary,
     alignItems: "center",
     justifyContent: "center",
     position: "relative",
@@ -342,14 +347,14 @@ const styles = StyleSheet.create({
     position: "absolute",
     top: -5,
     right: -5,
-    backgroundColor: Colors.light.error,
+    backgroundColor: colors.error,
     width: 20,
     height: 20,
     borderRadius: 10,
     alignItems: "center",
     justifyContent: "center",
     borderWidth: 2,
-    borderColor: Colors.light.surface,
+    borderColor: colors.surface,
     elevation: 4,
   },
   badgeText: {
@@ -359,12 +364,12 @@ const styles = StyleSheet.create({
   },
   divider: {
     height: 1,
-    backgroundColor: Colors.light.border,
+    backgroundColor: colors.border,
     marginBottom: 16,
   },
   nextStatusBtn: {
     borderWidth: 1,
-    borderColor: Colors.light.border,
+    borderColor: colors.border,
     borderRadius: 12,
     paddingVertical: 12,
     alignItems: "center",
@@ -372,11 +377,11 @@ const styles = StyleSheet.create({
   },
   nextStatusText: {
     fontSize: 13,
-    color: Colors.light.textSecondary,
+    color: colors.textSecondary,
     fontWeight: "500",
   },
   doneBtn: {
-    backgroundColor: Colors.light.primary,
+    backgroundColor: colors.primary,
     borderRadius: 16,
     paddingVertical: 16,
     flexDirection: "row",
@@ -384,7 +389,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     gap: 8,
     marginTop: 10,
-    shadowColor: Colors.light.primary,
+    shadowColor: colors.primary,
     shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.3,
     shadowRadius: 12,

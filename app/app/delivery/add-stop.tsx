@@ -15,8 +15,9 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
 import { router } from "expo-router";
-import Colors from "@/constants/colors";
 import { useDeliveryStore, DeliveryItem } from "@/contexts/deliveryStore";
+import { useThemeStore } from "@/contexts/themeStore";
+import Colors from "@/constants/colors";
 
 const BACKEND_URL = process.env.EXPO_PUBLIC_API_URL;
 
@@ -38,6 +39,10 @@ export default function AddStopScreen() {
   const [showDropdown, setShowDropdown] = useState(false);
   const { addStop, currentCoords } = useDeliveryStore();
   const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const { theme } = useThemeStore();
+  const colors = Colors[theme];
+  const styles = React.useMemo(() => createStyles(colors), [theme]);
 
   React.useEffect(() => {
     if (currentCoords) {
@@ -163,7 +168,7 @@ export default function AddStopScreen() {
         ]}
       >
         <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
-          <Feather name="arrow-left" size={20} color={Colors.light.text} />
+          <Feather name="arrow-left" size={20} color={colors.text} />
         </TouchableOpacity>
         <Text style={styles.title}>Add Pickup Location</Text>
         <View style={{ width: 44 }} />
@@ -181,11 +186,11 @@ export default function AddStopScreen() {
         <View style={styles.inputGroup}>
           <Text style={styles.inputLabel}>Store Name (optional)</Text>
           <View style={styles.inputRow}>
-            <Feather name="shopping-bag" size={16} color={Colors.light.textMuted} />
+            <Feather name="shopping-bag" size={16} color={colors.textMuted} />
             <TextInput
               style={styles.input}
               placeholder="e.g. Artisan Bakery & Co."
-              placeholderTextColor={Colors.light.textMuted}
+              placeholderTextColor={colors.textMuted}
               value={storeName}
               onChangeText={setStoreName}
             />
@@ -196,19 +201,19 @@ export default function AddStopScreen() {
           <Text style={styles.inputLabel}>Pickup Address</Text>
           <View style={styles.autocompleteWrapper}>
             <View style={[styles.placesInputContainer, showDropdown && styles.placesInputContainerActive]}>
-              <Feather name="map-pin" size={16} color={address ? Colors.light.primary : Colors.light.textMuted} />
+              <Feather name="map-pin" size={16} color={address ? colors.primary : colors.textMuted} />
               <TextInput
                 style={styles.placesInput}
                 placeholder="Search nearby store or address"
-                placeholderTextColor={Colors.light.textMuted}
+                placeholderTextColor={colors.textMuted}
                 value={addressInput}
                 onChangeText={handleAddressInput}
                 onFocus={() => autocompleteSuggestions.length > 0 && setShowDropdown(true)}
                 returnKeyType="search"
               />
-              {isSearching && <ActivityIndicator size="small" color={Colors.light.primary} />}
+              {isSearching && <ActivityIndicator size="small" color={colors.primary} />}
               {address && !isSearching && (
-                <Feather name="check-circle" size={16} color={Colors.light.primary} />
+                <Feather name="check-circle" size={16} color={colors.primary} />
               )}
             </View>
 
@@ -222,7 +227,7 @@ export default function AddStopScreen() {
                     activeOpacity={0.7}
                   >
                     <View style={styles.dropdownIcon}>
-                      <Feather name="map-pin" size={12} color={Colors.light.primary} />
+                      <Feather name="map-pin" size={12} color={colors.primary} />
                     </View>
                     <View style={styles.dropdownTextContainer}>
                       <Text style={styles.dropdownMainText} numberOfLines={1}>
@@ -251,7 +256,7 @@ export default function AddStopScreen() {
             <TextInput
               style={styles.input}
               placeholder="e.g. 2x Milk, 1kg Flour..."
-              placeholderTextColor={Colors.light.textMuted}
+              placeholderTextColor={colors.textMuted}
               value={newItemName}
               onChangeText={setNewItemName}
               onSubmitEditing={addItemToLocal}
@@ -261,7 +266,7 @@ export default function AddStopScreen() {
               <Feather 
                 name="plus-circle" 
                 size={24} 
-                color={newItemName.trim() ? Colors.light.primary : Colors.light.textMuted} 
+                color={newItemName.trim() ? colors.primary : colors.textMuted} 
               />
             </TouchableOpacity>
           </View>
@@ -273,7 +278,7 @@ export default function AddStopScreen() {
               <View key={item.id} style={styles.itemBadge}>
                 <Text style={styles.itemBadgeText}>{item.name}</Text>
                 <TouchableOpacity onPress={() => removeItemFromLocal(item.id)}>
-                  <Feather name="x" size={14} color={Colors.light.primary} />
+                  <Feather name="x" size={14} color={colors.primary} />
                 </TouchableOpacity>
               </View>
             ))}
@@ -293,13 +298,13 @@ export default function AddStopScreen() {
               onPress={() => handleSelectSuggestion(item)}
               activeOpacity={0.7}
             >
-              <Feather name="map-pin" size={10} color={Colors.light.primary} style={{ marginRight: 4 }} />
+              <Feather name="map-pin" size={10} color={colors.primary} style={{ marginRight: 4 }} />
               <Text style={styles.quickChipText}>{item.name}</Text>
             </TouchableOpacity>
           ))}
           {nearbySuggestions.length === 0 && (
             <View style={styles.quickChip}>
-              <ActivityIndicator size="small" color={Colors.light.textMuted} />
+              <ActivityIndicator size="small" color={colors.textMuted} />
               <Text style={[styles.quickChipText, { marginLeft: 6, opacity: 0.6 }]}>
                 Loading nearby spots...
               </Text>
@@ -323,10 +328,10 @@ export default function AddStopScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: typeof Colors.light) => StyleSheet.create({
   root: {
     flex: 1,
-    backgroundColor: Colors.light.background,
+    backgroundColor: colors.background,
   },
   header: {
     flexDirection: "row",
@@ -334,25 +339,25 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingBottom: 16,
     gap: 10,
-    backgroundColor: Colors.light.background,
+    backgroundColor: colors.background,
     borderBottomWidth: 1,
-    borderBottomColor: Colors.light.border,
+    borderBottomColor: colors.border,
   },
   backBtn: {
     width: 32,
     height: 32,
     borderRadius: 8,
-    backgroundColor: Colors.light.surface,
+    backgroundColor: colors.surface,
     alignItems: "center",
     justifyContent: "center",
     borderWidth: 1,
-    borderColor: Colors.light.border,
+    borderColor: colors.border,
   },
   title: {
     flex: 1,
     fontSize: 14,
     fontWeight: "700",
-    color: Colors.light.text,
+    color: colors.text,
     textAlign: "center",
   },
   content: {
@@ -365,28 +370,28 @@ const styles = StyleSheet.create({
   inputLabel: {
     fontSize: 11,
     fontWeight: "600",
-    color: Colors.light.textSecondary,
+    color: colors.textSecondary,
     marginLeft: 4,
   },
   inputRow: {
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
-    backgroundColor: Colors.light.surface,
+    backgroundColor: colors.surface,
     borderRadius: 12,
     paddingHorizontal: 12,
     paddingVertical: 10,
     borderWidth: 1.5,
-    borderColor: Colors.light.border,
+    borderColor: colors.border,
   },
   inputRowActive: {
-    borderColor: Colors.light.primary,
+    borderColor: colors.primary,
   },
   input: {
     flex: 1,
     fontSize: 13,
     fontWeight: "500",
-    color: Colors.light.text,
+    color: colors.text,
   },
   autocompleteWrapper: {
     position: 'relative',
@@ -396,29 +401,29 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
-    backgroundColor: Colors.light.surface,
+    backgroundColor: colors.surface,
     borderRadius: 12,
     borderWidth: 1.5,
-    borderColor: Colors.light.border,
+    borderColor: colors.border,
     paddingHorizontal: 12,
     height: 40,
   },
   placesInputContainerActive: {
-    borderColor: Colors.light.primary,
+    borderColor: colors.primary,
     borderBottomLeftRadius: 0,
     borderBottomRightRadius: 0,
   },
   placesInput: {
     flex: 1,
-    color: Colors.light.text,
+    color: colors.text,
     fontSize: 13,
     fontWeight: '500',
   },
   dropdownContainer: {
-    backgroundColor: '#fff',
+    backgroundColor: colors.surface,
     borderWidth: 1.5,
     borderTopWidth: 0,
-    borderColor: Colors.light.primary,
+    borderColor: colors.primary,
     borderBottomLeftRadius: 16,
     borderBottomRightRadius: 16,
     overflow: 'hidden',
@@ -437,13 +442,13 @@ const styles = StyleSheet.create({
   },
   dropdownRowBorder: {
     borderBottomWidth: 1,
-    borderBottomColor: Colors.light.border,
+    borderBottomColor: colors.border,
   },
   dropdownIcon: {
     width: 24,
     height: 24,
     borderRadius: 12,
-    backgroundColor: `${Colors.light.primary}15`,
+    backgroundColor: `${colors.primary}15`,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -453,11 +458,11 @@ const styles = StyleSheet.create({
   dropdownMainText: {
     fontSize: 12,
     fontWeight: '600',
-    color: Colors.light.text,
+    color: colors.text,
   },
   dropdownSecondaryText: {
     fontSize: 10,
-    color: Colors.light.textMuted,
+    color: colors.textMuted,
     marginTop: 2,
   },
   dividerRow: {
@@ -469,12 +474,12 @@ const styles = StyleSheet.create({
   divider: {
     flex: 1,
     height: 1,
-    backgroundColor: Colors.light.border,
+    backgroundColor: colors.border,
   },
   dividerText: {
     fontSize: 10,
     fontWeight: "600",
-    color: Colors.light.textMuted,
+    color: colors.textMuted,
     textTransform: 'uppercase',
     letterSpacing: 1,
   },
@@ -488,22 +493,22 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    backgroundColor: `${Colors.light.primary}10`,
+    backgroundColor: `${colors.primary}10`,
     paddingHorizontal: 10,
     paddingVertical: 5,
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: `${Colors.light.primary}30`,
+    borderColor: `${colors.primary}30`,
   },
   itemBadgeText: {
     fontSize: 11,
     fontWeight: '600',
-    color: Colors.light.primary,
+    color: colors.primary,
   },
   quickLabel: {
     fontSize: 14,
     fontWeight: "700",
-    color: Colors.light.text,
+    color: colors.text,
     marginBottom: -4,
   },
   horizontalQuick: {
@@ -513,17 +518,17 @@ const styles = StyleSheet.create({
   quickChip: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: Colors.light.surface,
+    backgroundColor: colors.surface,
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 15,
     borderWidth: 1,
-    borderColor: Colors.light.border,
+    borderColor: colors.border,
   },
   quickChipText: {
     fontSize: 11,
     fontWeight: '600',
-    color: Colors.light.textSecondary,
+    color: colors.textSecondary,
   },
   footer: {
     position: 'absolute',
@@ -531,26 +536,26 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     padding: 20,
-    backgroundColor: Colors.light.background,
+    backgroundColor: colors.background,
     borderTopWidth: 1,
-    borderTopColor: Colors.light.border,
+    borderTopColor: colors.border,
   },
   addBtn: {
-    backgroundColor: Colors.light.primary,
+    backgroundColor: colors.primary,
     borderRadius: 12,
     paddingVertical: 12,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
     gap: 10,
-    shadowColor: Colors.light.primary,
+    shadowColor: colors.primary,
     shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.3,
     shadowRadius: 10,
     elevation: 6,
   },
   addBtnDisabled: {
-    backgroundColor: Colors.light.textMuted,
+    backgroundColor: colors.textMuted,
     shadowOpacity: 0,
   },
   addBtnText: {

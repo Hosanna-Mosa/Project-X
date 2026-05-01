@@ -18,12 +18,17 @@ import { router } from "expo-router";
 import * as ImagePicker from "expo-image-picker";
 import { LinearGradient } from "expo-linear-gradient";
 import Colors from "@/constants/colors";
+import { useThemeStore } from "@/contexts/themeStore";
 import { useAuthStore } from "@/contexts/authStore";
 import { customFetch } from "@/utils/api/custom-fetch";
 
 export default function ProfileScreen() {
   const insets = useSafeAreaInsets();
   const { user, logout, setUser } = useAuthStore();
+  const { theme } = useThemeStore();
+  const colors = Colors[theme];
+  const styles = React.useMemo(() => createStyles(colors), [theme]);
+
   const [loading, setLoading] = useState(false);
   const [editing, setEditing] = useState(false);
   
@@ -133,7 +138,7 @@ export default function ProfileScreen() {
     <View style={styles.root}>
       {/* Header with Linear Gradient for Premium Look */}
       <LinearGradient 
-        colors={["#1E293B", "#0F172A"]}
+        colors={theme === 'dark' ? [colors.surfaceSecondary, colors.surface] : ["#1E293B", "#0F172A"]}
         style={[styles.header, { paddingTop: insets.top + (Platform.OS === 'web' ? 20 : 10) }]}
       >
         <View style={styles.headerTop}>
@@ -174,9 +179,9 @@ export default function ProfileScreen() {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Account Information</Text>
           <View style={styles.infoCard}>
-            <InfoItem icon="user" label="Username" value={user?.username || "@username"} />
-            <InfoItem icon="mail" label="E-mail" value={user?.email || "Not set"} />
-            <InfoItem icon="phone" label="Phone" value={user?.phone || "Not set"} />
+            <InfoItem icon="user" label="Username" value={user?.username || "@username"} colors={colors} />
+            <InfoItem icon="mail" label="E-mail" value={user?.email || "Not set"} colors={colors} />
+            <InfoItem icon="phone" label="Phone" value={user?.phone || "Not set"} colors={colors} />
           </View>
         </View>
 
@@ -189,9 +194,10 @@ export default function ProfileScreen() {
                 count={user?.addresses?.length} 
                 onPress={() => router.push("/delivery/saved-addresses")} 
                 color="#8B5CF6" 
+                colors={colors}
             />
-            <MenuBtn icon="bell" label="Notifications" onPress={() => {}} color="#F59E0B" />
-            <MenuBtn icon="shield" label="Security" onPress={() => {}} color="#10B981" />
+            <MenuBtn icon="bell" label="Notifications" onPress={() => {}} color="#F59E0B" colors={colors} />
+            <MenuBtn icon="shield" label="Security" onPress={() => {}} color="#10B981" colors={colors} />
           </View>
         </View>
 
@@ -210,7 +216,7 @@ export default function ProfileScreen() {
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Personal Details</Text>
               <TouchableOpacity onPress={() => setEditing(false)}>
-                <Feather name="x" size={24} color={Colors.light.text} />
+                <Feather name="x" size={24} color={colors.text} />
               </TouchableOpacity>
             </View>
 
@@ -274,7 +280,8 @@ export default function ProfileScreen() {
   );
 }
 
-function InfoItem({ icon, label, value }: any) {
+function InfoItem({ icon, label, value, colors }: any) {
+  const styles = React.useMemo(() => createStyles(colors), [colors]);
   return (
     <View style={styles.infoItem}>
       <View style={styles.infoIcon}>
@@ -288,7 +295,8 @@ function InfoItem({ icon, label, value }: any) {
   );
 }
 
-function MenuBtn({ icon, label, count, onPress, color }: any) {
+function MenuBtn({ icon, label, count, onPress, color, colors }: any) {
+  const styles = React.useMemo(() => createStyles(colors), [colors]);
   return (
     <TouchableOpacity style={styles.menuBtn} onPress={onPress}>
       <View style={[styles.menuBtnIcon, { backgroundColor: `${color}15` }]}>
@@ -305,8 +313,8 @@ function MenuBtn({ icon, label, count, onPress, color }: any) {
   );
 }
 
-const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: "#F1F5F9" },
+const createStyles = (colors: typeof Colors.light) => StyleSheet.create({
+  root: { flex: 1, backgroundColor: colors.background },
   header: {
     backgroundColor: "#1E293B", // Dark sleek slate
     paddingHorizontal: 20,
@@ -377,41 +385,41 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 11,
     fontWeight: '800',
-    color: '#64748B',
+    color: colors.textSecondary,
     textTransform: 'uppercase',
     letterSpacing: 1,
     marginLeft: 4,
   },
   infoCard: {
-    backgroundColor: '#fff',
+    backgroundColor: colors.surface,
     borderRadius: 16,
     padding: 12,
     gap: 12,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.05,
+    shadowOpacity: colors.surface === "#FFFFFF" ? 0.05 : 0.2,
     shadowRadius: 15,
     elevation: 2,
   },
   infoItem: { flexDirection: 'row', gap: 16, alignItems: 'center' },
-  infoIcon: { width: 30, height: 30, borderRadius: 8, backgroundColor: '#F8FAFC', alignItems: 'center', justifyContent: 'center' },
+  infoIcon: { width: 30, height: 30, borderRadius: 8, backgroundColor: colors.surfaceSecondary, alignItems: 'center', justifyContent: 'center' },
   infoText: { flex: 1, gap: 2 },
-  infoLabel: { fontSize: 9, fontWeight: '700', color: '#94A3B8', textTransform: 'uppercase' },
-  infoValue: { fontSize: 13, fontWeight: '600', color: '#1E293B', flexShrink: 1 },
+  infoLabel: { fontSize: 9, fontWeight: '700', color: colors.textSecondary, textTransform: 'uppercase' },
+  infoValue: { fontSize: 13, fontWeight: '600', color: colors.text, flexShrink: 1 },
   
   menuList: { gap: 12 },
   menuBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 16,
-    backgroundColor: '#fff',
+    backgroundColor: colors.surface,
     padding: 16,
     borderRadius: 20,
   },
   menuBtnIcon: { width: 32, height: 32, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
-  menuBtnLabel: { flex: 1, fontSize: 14, fontWeight: '600', color: '#1E293B' },
-  menuBadge: { backgroundColor: '#F1F5F9', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 10 },
-  menuBadgeText: { fontSize: 12, fontWeight: '800', color: '#64748B' },
+  menuBtnLabel: { flex: 1, fontSize: 14, fontWeight: '600', color: colors.text },
+  menuBadge: { backgroundColor: colors.surfaceSecondary, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 10 },
+  menuBadgeText: { fontSize: 12, fontWeight: '800', color: colors.textSecondary },
   
   logoutBtn: {
     flexDirection: 'row',
@@ -419,17 +427,17 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 10,
     padding: 14,
-    backgroundColor: '#FEE2E2',
+    backgroundColor: colors.surfaceSecondary,
     borderRadius: 16,
     marginTop: 10,
   },
-  logoutText: { fontSize: 14, fontWeight: '800', color: '#EF4444' },
-  version: { textAlign: 'center', fontSize: 12, color: '#94A3B8', marginTop: 10 },
+  logoutText: { fontSize: 14, fontWeight: '800', color: colors.error },
+  version: { textAlign: 'center', fontSize: 12, color: colors.textMuted, marginTop: 10 },
 
   // Modal Styles
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end' },
   modalBody: { 
-    backgroundColor: '#fff', 
+    backgroundColor: colors.surface, 
     borderTopLeftRadius: 32, 
     borderTopRightRadius: 32, 
     padding: 24, 
@@ -442,32 +450,32 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 24,
   },
-  modalTitle: { fontSize: 22, fontWeight: '800', color: '#1E293B' },
+  modalTitle: { fontSize: 22, fontWeight: '800', color: colors.text },
   modalScroll: { marginBottom: 20 },
   inputGroup: { gap: 8, marginBottom: 20 },
-  inputLabel: { fontSize: 14, fontWeight: '700', color: '#64748B', marginLeft: 4 },
+  inputLabel: { fontSize: 14, fontWeight: '700', color: colors.textSecondary, marginLeft: 4 },
   textInput: {
-    backgroundColor: '#F8FAFC',
+    backgroundColor: colors.surfaceSecondary,
     borderWidth: 1,
-    borderColor: '#E2E8F0',
+    borderColor: colors.borderLight,
     borderRadius: 16,
     padding: 18,
     fontSize: 16,
-    color: '#1E293B',
+    color: colors.text,
     fontWeight: '600',
   },
   saveBtn: {
-    backgroundColor: '#0EA5E9',
+    backgroundColor: colors.primary,
     padding: 20,
     borderRadius: 20,
     alignItems: 'center',
-    shadowColor: '#0EA5E9',
+    shadowColor: colors.primary,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 10,
     elevation: 8,
   },
-  saveBtnDisabled: { backgroundColor: '#94A3B8' },
+  saveBtnDisabled: { backgroundColor: colors.textSecondary },
   saveBtnText: { color: '#fff', fontSize: 16, fontWeight: '800' },
 });
 
