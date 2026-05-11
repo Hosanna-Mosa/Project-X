@@ -12,6 +12,7 @@ import { Feather } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
 import Colors from "@/constants/colors";
 import { useAuthStore } from "@/contexts/authStore";
+import { useThemeStore } from "@/contexts/themeStore";
 import { Alert } from "react-native";
 import { ScreenWrapper } from "@/components/ScreenWrapper";
 
@@ -21,6 +22,9 @@ export default function OTPScreen() {
   const [otp, setOtp] = useState(["", "", "", "", "", ""]);
   const inputs = useRef<Array<TextInput | null>>([]);
   const { verifyOTP, loading } = useAuthStore();
+  const { theme } = useThemeStore();
+  const colors = Colors[theme];
+  const styles = React.useMemo(() => createStyles(colors), [theme]);
 
   const handleChange = (text: string, index: number) => {
     const newOtp = [...otp];
@@ -60,7 +64,7 @@ export default function OTPScreen() {
   return (
     <ScreenWrapper style={styles.container}>
       <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
-        <Feather name="arrow-left" size={22} color={Colors.light.text} />
+        <Feather name="arrow-left" size={22} color={colors.text} />
       </TouchableOpacity>
 
       <View style={styles.header}>
@@ -86,7 +90,7 @@ export default function OTPScreen() {
             keyboardType="number-pad"
             maxLength={1}
             textAlign="center"
-            selectionColor={Colors.light.primary}
+            selectionColor={colors.primary}
           />
         ))}
       </View>
@@ -111,7 +115,7 @@ export default function OTPScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: typeof Colors.light) => StyleSheet.create({
   container: {
     paddingHorizontal: 28,
     paddingTop: 20,
@@ -121,11 +125,11 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 10,
-    backgroundColor: Colors.light.surface,
+    backgroundColor: colors.surface,
     alignItems: "center",
     justifyContent: "center",
     borderWidth: 1,
-    borderColor: Colors.light.border,
+    borderColor: colors.border,
   },
   header: {
     gap: 8,
@@ -133,12 +137,12 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 22,
     fontWeight: "800",
-    color: Colors.light.text,
+    color: colors.text,
     letterSpacing: -0.5,
   },
   subtitle: {
     fontSize: 12,
-    color: Colors.light.textSecondary,
+    color: colors.textSecondary,
     lineHeight: 16,
   },
   otpRow: {
@@ -151,32 +155,32 @@ const styles = StyleSheet.create({
     height: 46,
     borderRadius: 10,
     borderWidth: 1.5,
-    borderColor: Colors.light.border,
+    borderColor: colors.border,
     fontSize: 18,
     fontWeight: "700",
-    color: Colors.light.text,
-    backgroundColor: Colors.light.surface,
+    color: colors.text,
+    backgroundColor: colors.surface,
   },
   otpInputFilled: {
-    borderColor: Colors.light.primary,
-    backgroundColor: `${Colors.light.primary}10`,
+    borderColor: colors.primary,
+    backgroundColor: `${colors.primary}10`,
   },
   verifyBtn: {
-    backgroundColor: Colors.light.primary,
+    backgroundColor: colors.primary,
     borderRadius: 12,
     paddingVertical: 14,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
     gap: 8,
-    shadowColor: Colors.light.primary,
+    shadowColor: colors.primary,
     shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.3,
     shadowRadius: 10,
     elevation: 6,
   },
   verifyBtnDisabled: {
-    backgroundColor: Colors.light.textMuted,
+    backgroundColor: colors.textMuted,
     shadowOpacity: 0,
   },
   verifyBtnText: {
@@ -189,10 +193,10 @@ const styles = StyleSheet.create({
   },
   resendText: {
     fontSize: 12,
-    color: Colors.light.textSecondary,
+    color: colors.textSecondary,
   },
   resendLink: {
-    color: Colors.light.primary,
+    color: colors.primary,
     fontWeight: "600",
   },
 });

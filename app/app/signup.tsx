@@ -15,12 +15,16 @@ import { Feather } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
 import Colors from "@/constants/colors";
 import { useAuthStore } from "@/contexts/authStore";
+import { useThemeStore } from "@/contexts/themeStore";
 
 export default function SignupScreen() {
   const insets = useSafeAreaInsets();
   const { phone } = useLocalSearchParams<{ phone: string }>();
   const [name, setName] = useState("");
   const { verifyOTP, loading } = useAuthStore();
+  const { theme } = useThemeStore();
+  const colors = Colors[theme];
+  const styles = React.useMemo(() => createStyles(colors), [theme]);
 
   const handleRegister = async () => {
     if (name.length < 3) {
@@ -28,20 +32,6 @@ export default function SignupScreen() {
       return;
     }
     try {
-      // Re-use verifyOTP with name to create the user
-      // Assuming they already verified OTP, but for simplicity we could also just have a "register" endpoint.
-      // In my current backend, verifyOTP handles creation if name is provided.
-      // However, we need the OTP code again or we need a separate "signup" endpoint.
-      // Let's assume the user was redirected here with their phone and we just need to provide the name.
-      // I'll add a 'register' method to authStore or just call verifyOTP with a dummy/stored code.
-      // Actually, a better way is to have a POST /api/auth/register that takes phone and name after OTP is verified.
-      
-      // For now, let's assume we use the verifyOTP logic which creates the user if name is present.
-      // BUT we need the OTP code. 
-      // Let's store the verified OTP status in the store.
-      
-      // Re-calling verifyOTP with name and the code used.
-      // Wait, let's just make it simpler: Add a 'register' endpoint in backend and store.
       const result = await verifyOTP(phone!, "123456", "USER", name);
       if (result.success) {
         router.replace("/(tabs)");
@@ -66,7 +56,7 @@ export default function SignupScreen() {
         ]}
       >
         <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
-          <Feather name="arrow-left" size={22} color={Colors.light.text} />
+          <Feather name="arrow-left" size={22} color={colors.text} />
         </TouchableOpacity>
 
         <View style={styles.header}>
@@ -81,6 +71,7 @@ export default function SignupScreen() {
           <TextInput
             style={styles.input}
             placeholder="e.g. John Doe"
+            placeholderTextColor={colors.textMuted}
             value={name}
             onChangeText={setName}
             autoFocus
@@ -101,39 +92,40 @@ export default function SignupScreen() {
   );
 }
 
-const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: "#fff" },
+const createStyles = (colors: typeof Colors.light) => StyleSheet.create({
+  root: { flex: 1, backgroundColor: colors.background },
   container: { paddingHorizontal: 28, gap: 32 },
   backBtn: {
     width: 36,
     height: 36,
     borderRadius: 10,
-    backgroundColor: Colors.light.surface,
+    backgroundColor: colors.surface,
     alignItems: "center",
     justifyContent: "center",
     borderWidth: 1,
-    borderColor: Colors.light.border,
+    borderColor: colors.border,
   },
   header: { gap: 8 },
-  title: { fontSize: 22, fontWeight: "800", color: Colors.light.text },
-  subtitle: { fontSize: 12, color: Colors.light.textSecondary, lineHeight: 16 },
+  title: { fontSize: 22, fontWeight: "800", color: colors.text },
+  subtitle: { fontSize: 12, color: colors.textSecondary, lineHeight: 16 },
   form: { gap: 16 },
-  label: { fontSize: 13, fontWeight: "600", color: Colors.light.text },
+  label: { fontSize: 13, fontWeight: "600", color: colors.text },
   input: {
-    backgroundColor: Colors.light.surface,
+    backgroundColor: colors.surface,
     borderRadius: 10,
     padding: 12,
     fontSize: 14,
     borderWidth: 1,
-    borderColor: Colors.light.border,
+    borderColor: colors.border,
+    color: colors.text,
   },
   btn: {
-    backgroundColor: Colors.light.primary,
+    backgroundColor: colors.primary,
     borderRadius: 12,
     padding: 14,
     alignItems: "center",
     marginTop: 10,
   },
-  btnDisabled: { backgroundColor: Colors.light.textMuted },
+  btnDisabled: { backgroundColor: colors.textMuted },
   btnText: { color: "#fff", fontSize: 15, fontWeight: "700" },
 });

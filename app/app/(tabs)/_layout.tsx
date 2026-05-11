@@ -3,7 +3,7 @@ import { isLiquidGlassAvailable } from "expo-glass-effect";
 import { Tabs } from "expo-router";
 import { Icon, Label, NativeTabs } from "expo-router/unstable-native-tabs";
 import { SymbolView } from "expo-symbols";
-import { Feather } from "@expo/vector-icons";
+import { Ionicons } from "@expo/vector-icons";
 import React from "react";
 import { Platform, StyleSheet, Text, TouchableOpacity, View, useColorScheme } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -18,7 +18,7 @@ function CustomTabBar({ state, descriptors, navigation }: any) {
   const styles = React.useMemo(() => createStyles(colors), [theme]);
 
   return (
-    <View style={[styles.tabBarContainer, { paddingBottom: insets.bottom + 8 }]}>
+    <View style={[styles.tabBarContainer, { paddingBottom: insets.bottom + 4 }]}>
       {state.routes.map((route: any, index: number) => {
         const { options } = descriptors[route.key];
         if (options.href === null) return null;
@@ -43,11 +43,11 @@ function CustomTabBar({ state, descriptors, navigation }: any) {
           const size = 24;
           switch (route.name) {
             case "index":
-              return <Feather name="home" size={size} color={color} />;
+              return <Ionicons name={isFocused ? "home" : "home-outline"} size={size} color={color} />;
             case "orders":
-              return <Feather name="box" size={size} color={color} />;
+              return <Ionicons name={isFocused ? "cube" : "cube-outline"} size={size} color={color} />;
             case "profile":
-              return <Feather name="user" size={size} color={color} />;
+              return <Ionicons name={isFocused ? "person" : "person-outline"} size={size} color={color} />;
             default:
               return null;
           }
@@ -93,7 +93,7 @@ const createStyles = (colors: typeof Colors.light) => StyleSheet.create({
     flexDirection: "row",
     backgroundColor: colors.surface,
 
-    paddingTop: 15,
+    paddingTop: 10,
     paddingHorizontal: 10,
     position: "absolute",
     bottom: 0,
@@ -115,16 +115,16 @@ const createStyles = (colors: typeof Colors.light) => StyleSheet.create({
   },
   iconContainer: {
     width: 60,
-    height: 38,
+    height: 32,
     borderRadius: 15,
     alignItems: "center",
     justifyContent: "center",
   },
   activeIconContainer: {
-    backgroundColor: colors.surface === "#FFFFFF" ? "#F0FDFA" : colors.surfaceSecondary,
+    backgroundColor: colors.surface === "#FFFFFF" ? "#F1F5F9" : colors.surfaceSecondary,
   },
   tabLabel: {
-    fontSize: 12,
+    fontSize: 10,
     fontWeight: "600",
     color: colors.textMuted,
   },

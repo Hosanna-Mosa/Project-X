@@ -100,6 +100,7 @@ interface DriverState {
   clearChat: () => void;
   setUnreadCount: (count: number) => void;
   incrementUnreadCount: () => void;
+  loginWithPassword: (phone: string, password: string) => Promise<void>;
 }
 
 export const useMockIncomingOrder = (): Order => ({
@@ -294,6 +295,27 @@ export const useDriverStore = create<DriverState>()(
       setUnreadCount: (unreadCount) => set({ unreadCount }),
 
       incrementUnreadCount: () => set((state) => ({ unreadCount: state.unreadCount + 1 })),
+
+      loginWithPassword: async (phone: string, password: string) => {
+        try {
+          const response = await fetch(`${apiUrl}/api/auth/login-password`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ phone, password, role: "DRIVER" }),
+          });
+          const data = await response.json();
+          if (!response.ok) throw new Error(data.message || "Login failed");
+
+          set({
+            isAuthenticated: true,
+            driverName: data.user.name,
+            driverPhone: data.user.phone,
+            token: data.token,
+          });
+        } catch (err: any) {
+          throw err;
+        }
+      },
     }),
     {
       name: "driver-store",

@@ -15,19 +15,40 @@ import { router } from "expo-router";
 import Colors from "@/constants/colors";
 import { ScreenWrapper } from "@/components/ScreenWrapper";
 import { useAuthStore } from "@/contexts/authStore";
+import { useThemeStore } from "@/contexts/themeStore";
 import { Alert } from "react-native";
 
 const { width } = Dimensions.get("window");
 
 export default function AuthScreen() {
   const [phone, setPhone] = useState("");
-  const { requestOTP, loading } = useAuthStore();
+  const [password, setPassword] = useState("");
+  const [isPasswordMode, setIsPasswordMode] = useState(false);
+  const { requestOTP, loginWithPassword, loading } = useAuthStore();
+  const { theme } = useThemeStore();
+  const colors = Colors[theme];
+  const styles = React.useMemo(() => createStyles(colors), [theme]);
 
   const handleContinue = async () => {
     if (phone.length < 10) {
       Alert.alert("Error", "Please enter a valid phone number");
       return;
     }
+
+    if (isPasswordMode) {
+      if (!password) {
+        Alert.alert("Error", "Please enter your password");
+        return;
+      }
+      try {
+        await loginWithPassword(phone, password, "USER");
+        router.replace("/(tabs)");
+      } catch (error: any) {
+        Alert.alert("Error", error.message || "Login failed");
+      }
+      return;
+    }
+
     try {
       await requestOTP(phone);
       router.push({
@@ -95,30 +116,56 @@ export default function AuthScreen() {
               <TextInput
                 style={styles.phoneInput}
                 placeholder="Enter mobile number"
-                placeholderTextColor={Colors.light.textMuted}
+                placeholderTextColor={colors.textMuted}
                 value={phone}
                 onChangeText={setPhone}
                 keyboardType="phone-pad"
                 returnKeyType="done"
-                onSubmitEditing={handleContinue}
               />
             </View>
+
+            {isPasswordMode && (
+              <>
+                <Text style={styles.fieldLabel}>Password</Text>
+                <View style={styles.phoneRow}>
+                  <TextInput
+                    style={styles.phoneInput}
+                    placeholder="Enter password"
+                    placeholderTextColor={colors.textMuted}
+                    value={password}
+                    onChangeText={setPassword}
+                    secureTextEntry
+                    returnKeyType="done"
+                    onSubmitEditing={handleContinue}
+                  />
+                </View>
+              </>
+            )}
 
             <TouchableOpacity
               style={[
                 styles.continueBtn,
-                (!phone.length || loading) && styles.continueBtnDisabled,
+                (!phone.length || loading || (isPasswordMode && !password.length)) && styles.continueBtnDisabled,
               ]}
               onPress={handleContinue}
               activeOpacity={0.85}
-              disabled={!phone.length || loading}
+              disabled={!phone.length || loading || (isPasswordMode && !password.length)}
             >
               <Text style={styles.continueBtnText}>
-                {loading ? "Please wait..." : "Continue"}
+                {loading ? "Please wait..." : isPasswordMode ? "Login" : "Continue"}
               </Text>
               {!loading && (
                 <Feather name="arrow-right" size={18} color="#fff" />
               )}
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.toggleModeBtn}
+              onPress={() => setIsPasswordMode(!isPasswordMode)}
+            >
+              <Text style={styles.toggleModeText}>
+                {isPasswordMode ? "Use OTP Login" : "Use Password Login"}
+              </Text>
             </TouchableOpacity>
           </View>
 
@@ -133,7 +180,7 @@ export default function AuthScreen() {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors: typeof Colors.light) => StyleSheet.create({
   flex: {
     flex: 1,
   },
@@ -150,10 +197,10 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 12,
-    backgroundColor: Colors.light.primary,
+    backgroundColor: colors.primary,
     alignItems: "center",
     justifyContent: "center",
-    shadowColor: Colors.light.primary,
+    shadowColor: colors.primary,
     shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.3,
     shadowRadius: 10,
@@ -169,19 +216,19 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 24,
     fontWeight: "800",
-    color: Colors.light.text,
+    color: colors.text,
     letterSpacing: -0.5,
   },
   titleAccent: {
-    color: Colors.light.primary,
+    color: colors.primary,
   },
   subtitle: {
     fontSize: 13,
-    color: Colors.light.textSecondary,
+    color: colors.textSecondary,
     lineHeight: 18,
   },
   connectCard: {
-    backgroundColor: "rgba(14,165,233,0.08)",
+    backgroundColor: `${colors.primary}15`,
     borderRadius: 16,
     paddingVertical: 24,
     alignItems: "center",
@@ -204,22 +251,21 @@ const styles = StyleSheet.create({
     width: 14,
     height: 14,
     borderRadius: 7,
-    backgroundColor: Colors.light.primary,
+    backgroundColor: colors.primary,
     position: "absolute",
   },
   spoke: {
     position: "absolute",
     width: 2,
     height: 24,
-    backgroundColor: Colors.light.primary,
+    backgroundColor: colors.primary,
     borderRadius: 1,
     top: 6,
-    transformOrigin: "center 24px",
   },
   connectLabel: {
     fontSize: 11,
     fontWeight: "700",
-    color: Colors.light.primary,
+    color: colors.primary,
     letterSpacing: 2,
   },
   formSection: {
@@ -228,39 +274,39 @@ const styles = StyleSheet.create({
   fieldLabel: {
     fontSize: 13,
     fontWeight: "600",
-    color: Colors.light.text,
+    color: colors.text,
   },
   phoneRow: {
     flexDirection: "row",
     gap: 10,
   },
   countryCode: {
-    backgroundColor: Colors.light.surface,
+    backgroundColor: colors.surface,
     borderRadius: 10,
     paddingHorizontal: 12,
     paddingVertical: 12,
     justifyContent: "center",
     borderWidth: 1,
-    borderColor: Colors.light.border,
+    borderColor: colors.border,
   },
   countryCodeText: {
     fontSize: 14,
     fontWeight: "600",
-    color: Colors.light.text,
+    color: colors.text,
   },
   phoneInput: {
     flex: 1,
-    backgroundColor: Colors.light.surface,
+    backgroundColor: colors.surface,
     borderRadius: 10,
     paddingHorizontal: 12,
     paddingVertical: 12,
     fontSize: 14,
-    color: Colors.light.text,
+    color: colors.text,
     borderWidth: 1,
-    borderColor: Colors.light.border,
+    borderColor: colors.border,
   },
   continueBtn: {
-    backgroundColor: Colors.light.primary,
+    backgroundColor: colors.primary,
     borderRadius: 12,
     paddingVertical: 14,
     flexDirection: "row",
@@ -268,14 +314,14 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     gap: 8,
     marginTop: 4,
-    shadowColor: Colors.light.primary,
+    shadowColor: colors.primary,
     shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.3,
     shadowRadius: 10,
     elevation: 6,
   },
   continueBtnDisabled: {
-    backgroundColor: Colors.light.textMuted,
+    backgroundColor: colors.textMuted,
     shadowOpacity: 0,
   },
   continueBtnText: {
@@ -285,12 +331,21 @@ const styles = StyleSheet.create({
   },
   terms: {
     fontSize: 12,
-    color: Colors.light.textMuted,
+    color: colors.textMuted,
     textAlign: "center",
     lineHeight: 18,
   },
   termsLink: {
-    color: Colors.light.primary,
+    color: colors.primary,
+    fontWeight: "600",
+  },
+  toggleModeBtn: {
+    marginTop: 12,
+    alignItems: "center",
+  },
+  toggleModeText: {
+    color: colors.primary,
+    fontSize: 14,
     fontWeight: "600",
   },
 });

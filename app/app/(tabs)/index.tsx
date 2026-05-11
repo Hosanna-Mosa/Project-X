@@ -11,25 +11,133 @@ import {
   ActivityIndicator,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Feather, FontAwesome5 } from "@expo/vector-icons";
+import { Ionicons, FontAwesome5 } from "@expo/vector-icons";
 import { router } from "expo-router";
-import { MapType } from "react-native-maps";
 import Colors from "@/constants/colors";
 import { useThemeStore } from "@/contexts/themeStore";
-import { MapBackground } from "@/components/MapBackground";
 import { ServiceCategory } from "@/components/ServiceCategory";
-import { FoodCard } from "@/components/FoodCard";
 import { LocationPickerSheet } from "@/components/LocationPickerSheet";
-import { BottomSheet } from "@/components/BottomSheet";
-import { customFetch } from "@/utils/api/custom-fetch";
-import * as Location from "expo-location";
+import { RestaurantListItem } from "@/components/RestaurantListItem";
+
+const FOOD_CATEGORIES = [
+  { id: 1, name: "Corner", image: "https://images.unsplash.com/photo-1578985545062-69928b1d9587?w=200" },
+  { id: 2, name: "South Indian", image: "https://images.unsplash.com/photo-1589302168068-964664d93dc0?w=200" },
+  { id: 3, name: "Dosa", image: "https://images.unsplash.com/photo-1541518763669-27fef04b14ea?w=200" },
+  { id: 4, name: "Vada", image: "https://images.unsplash.com/photo-1610192244261-3f33de3f55e4?w=200" },
+  { id: 5, name: "Poori", image: "https://images.unsplash.com/photo-1626074353765-517a681e40be?w=200" },
+  { id: 6, name: "Burgers", image: "https://images.unsplash.com/photo-1571091718767-18b5b1457add?w=200" },
+];
+
+const MOCK_RESTAURANTS = [
+  {
+    id: 1,
+    name: "McDonald's",
+    rating: 4.3,
+    reviews: "652",
+    time: "55-65 mins",
+    distance: "13.3 km",
+    categories: "Burgers, Beverages, Cafe, ...",
+    location: "Tilak Road, Baba...",
+    image: "https://images.unsplash.com/photo-1561758033-d89a9ad46330?w=500",
+    offer: "FLAT DEAL ₹166 OFF ABOVE ₹649",
+    bestIn: "Burger",
+  },
+  {
+    id: 2,
+    name: "Raju Tiffin Center",
+    rating: 4.8,
+    reviews: "646",
+    time: "50-60 mins",
+    distance: "8.4 km",
+    categories: "South Indian",
+    location: "Rajahmundry",
+    image: "https://images.unsplash.com/photo-1589302168068-964664d93dc0?w=500",
+    offer: "60% OFF UPTO ₹120",
+    isPureVeg: true,
+  },
+  {
+    id: 3,
+    name: "The Dessert Heaven",
+    rating: 4.5,
+    reviews: "1.7K+",
+    time: "40-50 mins",
+    distance: "12 km",
+    categories: "Bakery, Desserts, ...",
+    location: "Tilak Road",
+    image: "https://images.unsplash.com/photo-1578985545062-69928b1d9587?w=500",
+    offer: "70% OFF UPTO ₹130",
+    isPureVeg: true,
+  },
+  {
+    id: 4,
+    name: "KFC - Kentucky Fried Chicken",
+    rating: 4.1,
+    reviews: "2.1K+",
+    time: "30-40 mins",
+    distance: "10.5 km",
+    categories: "Fast Food, Fried Chicken",
+    location: "Main Street",
+    image: "https://images.unsplash.com/photo-1513639776629-7b61b0ac49cb?w=500",
+    offer: "GET ₹100 OFF ON ₹499",
+    bestIn: "Fried Chicken",
+  },
+  {
+    id: 5,
+    name: "Biryani House",
+    rating: 4.7,
+    reviews: "3.4K+",
+    time: "45-55 mins",
+    distance: "9.2 km",
+    categories: "North Indian, Biryani",
+    location: "Downtown",
+    image: "https://images.unsplash.com/photo-1563379091339-03b11adbc936?w=500",
+    offer: "BUY 1 GET 1 FREE",
+    bestIn: "Biryani",
+  },
+  {
+    id: 6,
+    name: "Pizza Hut",
+    rating: 4.2,
+    reviews: "1.2K+",
+    time: "35-45 mins",
+    distance: "11.1 km",
+    categories: "Pizza, Italian",
+    location: "Skyline Mall",
+    image: "https://images.unsplash.com/photo-1513104890138-7c749659a591?w=500",
+    offer: "FLAT 50% OFF",
+    bestIn: "Pizza",
+  },
+  {
+    id: 7,
+    name: "Starbucks Coffee",
+    rating: 4.6,
+    reviews: "890",
+    time: "15-25 mins",
+    distance: "5.4 km",
+    categories: "Beverages, Cafe",
+    location: "Airport Road",
+    image: "https://images.unsplash.com/photo-1544787210-22bbdcd0bfdc?w=500",
+    offer: "FREE COOKIE ON ₹300+",
+  },
+  {
+    id: 8,
+    name: "Subway",
+    rating: 4.0,
+    reviews: "560",
+    time: "20-30 mins",
+    distance: "7.8 km",
+    categories: "Healthy Food, Salads",
+    location: "Tech Park",
+    image: "https://images.unsplash.com/photo-1534353436294-0dbd4bdac845?w=500",
+    offer: "COMBO DEALS FROM ₹199",
+    isPureVeg: false,
+  },
+];
 
 export default function HomeScreen() {
   const insets = useSafeAreaInsets();
   const [searchText, setSearchText] = useState("");
-  const [restaurants, setRestaurants] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
-  const [mapType, setMapType] = useState<MapType>("standard");
   const { theme, toggleTheme } = useThemeStore();
   const colors = Colors[theme];
   const styles = React.useMemo(() => createStyles(colors), [theme]);
@@ -39,45 +147,60 @@ export default function HomeScreen() {
   const [isLocationSheetOpen, setIsLocationSheetOpen] = useState(false);
   const [selectedAddress, setSelectedAddress] = useState<any>(null);
 
-  useEffect(() => {
-    fetchNearbyRestaurants();
-  }, []);
-
-  const fetchNearbyRestaurants = async () => {
-    try {
-      setLoading(true);
-      let { status } = await Location.requestForegroundPermissionsAsync();
-      if (status !== 'granted') return;
-
-      const location = await Location.getCurrentPositionAsync({});
-      const data = await customFetch<any[]>(`/api/places/nearby?lat=${location.coords.latitude}&lng=${location.coords.longitude}&radius=5000&keyword=restaurant`);
-      if (data) setRestaurants(data);
-    } catch (err) {
-      console.error("Fetch restaurants error:", err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
   return (
     <View style={styles.root}>
-      <MapBackground style={StyleSheet.absoluteFill} mapType={mapType} />
-
-      <View style={[styles.mapActions, { top: topPadding + 130 }]}>
-        <TouchableOpacity 
-          style={styles.actionBtn} 
-          onPress={() => setMapType(m => m === 'standard' ? 'satellite' : 'standard')}
+      <ScrollView 
+        style={styles.mainScrollView}
+        contentContainerStyle={[styles.mainScrollContent, { paddingTop: topPadding + 160 }]}
+        showsVerticalScrollIndicator={false}
+      >
+        <ScrollView 
+          horizontal 
+          showsHorizontalScrollIndicator={false} 
+          contentContainerStyle={styles.foodCategoriesContainer}
         >
-          <Feather name={mapType === 'satellite' ? "map" : "layers"} size={18} color={colors.text} />
-        </TouchableOpacity>
-      </View>
+          {FOOD_CATEGORIES.map((cat) => (
+            <TouchableOpacity key={cat.id} style={styles.categoryCircleWrapper}>
+              <View style={styles.categoryCircle}>
+                <Image source={{ uri: cat.image }} style={styles.categoryImage} />
+              </View>
+              <Text style={styles.categoryLabel} numberOfLines={1}>{cat.name}</Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+
+        <View style={styles.filterRow}>
+          <TouchableOpacity style={styles.filterChip}>
+            <Text style={styles.filterChipText}>Filter</Text>
+            <Ionicons name="options-outline" size={14} color={colors.text} />
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.filterChip}>
+            <Text style={styles.filterChipText}>Sort by</Text>
+            <Ionicons name="chevron-down" size={14} color={colors.text} />
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.filterChip}>
+            <Text style={styles.filterChipText}>99 Store</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.filterChip}>
+            <Text style={styles.filterChipText}>Offers</Text>
+          </TouchableOpacity>
+        </View>
+
+        <View style={styles.restaurantList}>
+          {MOCK_RESTAURANTS.map((item) => (
+            <RestaurantListItem key={item.id} {...item} />
+          ))}
+        </View>
+
+        <View style={{ height: 120 }} />
+      </ScrollView>
 
       <View style={styles.overlay} pointerEvents="box-none">
         <View style={[styles.flushHeader, { paddingTop: topPadding + 8 }]}>
           <View style={styles.headerTopRow}>
             <View style={styles.locationInfoBox}>
               <View style={styles.deliveryTitleRow}>
-                <FontAwesome5 name="map-marker-alt" size={14} color="#06B6D4" style={{marginRight: 6}} />
+                <Ionicons name="location" size={14} color={colors.primary} style={{marginRight: 6}} />
                 <Text style={styles.deliveryTitle}>Delivery to</Text>
               </View>
               <TouchableOpacity 
@@ -97,25 +220,55 @@ export default function HomeScreen() {
                     </Text>
                   </View>
                 ) : (
-                  <Text style={[styles.addressText, { color: "#06B6D4", fontWeight: "800", fontSize: 14 }]} numberOfLines={1}>
+                  <Text style={[styles.addressText, { color: colors.primary, fontWeight: "800", fontSize: 14 }]} numberOfLines={1}>
                     Add address
                   </Text>
                 )}
-                <Feather name="chevron-down" size={18} color={colors.textSecondary} style={{marginLeft: 6}} />
+                <Ionicons name="chevron-down" size={18} color={colors.textSecondary} style={{marginLeft: 6}} />
               </TouchableOpacity>
             </View>
             <View style={{flexDirection: 'row', gap: 10, alignItems: 'center'}}>
               <TouchableOpacity style={styles.avatarBtnCircle} onPress={toggleTheme}>
-                  <Feather name={theme === 'dark' ? 'sun' : 'moon'} size={18} color={colors.text} />
+                  <Ionicons name={theme === 'dark' ? 'sunny' : 'moon'} size={18} color={colors.text} />
               </TouchableOpacity>
               <TouchableOpacity style={styles.avatarBtnCircle}>
-                  <Feather name="user" size={18} color={colors.text} />
+                  <Ionicons name="person-outline" size={18} color={colors.text} />
               </TouchableOpacity>
             </View>
           </View>
 
+          <View style={styles.categoriesRow}>
+            <ServiceCategory
+              icon="list"
+              label="Task"
+              color={colors.primary}
+              onPress={() => router.push({ pathname: "/service-selection", params: { label: "Task" } })}
+            />
+            <ServiceCategory
+              icon="car"
+              label="Rides"
+              color={colors.primary}
+              onPress={() => router.push({ pathname: "/all-services" })}
+            />
+            <ServiceCategory
+              icon="fitness"
+              label="Health"
+              color={colors.primary}
+              onPress={() => router.push({ pathname: "/service-selection", params: { label: "Health" } })}
+            />
+            <ServiceCategory
+              icon="restaurant"
+              label="Meat"
+              color={colors.primary}
+              onPress={() => router.push({ pathname: "/service-selection", params: { label: "Meat" } })}
+            />
+          </View>
+        </View>
+      </View>
+
+      <View style={[styles.bottomSearchOverlay, { bottom: insets.bottom + 75 }]}>
           <View style={styles.searchBar}>
-            <Feather name="search" size={18} color="#06B6D4" />
+            <Ionicons name="search" size={18} color={colors.primary} />
             <TextInput
               style={styles.searchInput}
               placeholder='Search "milk", "eggs", "bread"'
@@ -125,10 +278,9 @@ export default function HomeScreen() {
             />
             <View style={styles.micBtnDivider} />
             <TouchableOpacity hitSlop={{top:10, bottom:10, left:10, right:10}}>
-              <Feather name="mic" size={18} color="#06B6D4" />
+              <Ionicons name="mic" size={18} color={colors.primary} />
             </TouchableOpacity>
           </View>
-        </View>
       </View>
 
       <LocationPickerSheet 
@@ -136,80 +288,6 @@ export default function HomeScreen() {
         onClose={() => setIsLocationSheetOpen(false)} 
         onSelectAddress={(address) => setSelectedAddress(address)}
       />
-
-      <BottomSheet style={styles.bottomSheet}>
-        <View style={styles.sheetContent}>
-          <View style={styles.categoriesRow}>
-            <ServiceCategory
-              icon="car"
-              label="Ride"
-              color="#0EA5E9"
-              onPress={() => router.push({ pathname: "/service-selection", params: { label: "Ride" } })}
-            />
-            <ServiceCategory
-              icon="utensils"
-              label="Food"
-              color="#0EA5E9"
-              onPress={() => router.push({ pathname: "/service-selection", params: { label: "Food" } })}
-            />
-            <ServiceCategory
-              icon="shopping-basket"
-              label="Grocery"
-              color="#0EA5E9"
-              onPress={() => router.push({ pathname: "/service-selection", params: { label: "Grocery" } })}
-            />
-            <ServiceCategory
-              icon="medkit"
-              label="Meds"
-              color="#0EA5E9"
-              onPress={() => router.push({ pathname: "/service-selection", params: { label: "Meds" } })}
-            />
-          </View>
-
-          <TouchableOpacity
-            style={styles.promoBanner}
-            onPress={() => router.push("/delivery/entry")}
-            activeOpacity={0.9}
-          >
-            <View style={styles.promoIconContainer}>
-              <Feather name="box" size={18} color="#0EA5E9" />
-            </View>
-            <View style={styles.promoTextGroup}>
-              <Text style={styles.promoTitle}>Multi–Stop Delivery</Text>
-              <Text style={styles.promoSubtitle}>Ship multiple items in one route</Text>
-            </View>
-            <Feather name="chevron-right" size={16} color="#0EA5E9" />
-          </TouchableOpacity>
-
-          <View style={styles.sectionTitleRow}>
-            <Text style={styles.sectionTitleText}>Nearby Restaurants</Text>
-            <TouchableOpacity>
-              <Text style={styles.seeAllButton}>See all</Text>
-            </TouchableOpacity>
-          </View>
-
-          {loading ? (
-            <ActivityIndicator size="small" color="#0EA5E9" />
-          ) : (
-            <ScrollView 
-              horizontal 
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.horizontalScrollList}
-            >
-              {restaurants.map((item) => (
-                <FoodCard
-                  key={item.id}
-                  name={item.name}
-                  time="15-20 min"
-                  rating={item.rating || 4.5}
-                  category="Restaurant"
-                  image={{ uri: `https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?w=400&h=300&fit=crop` }}
-                />
-              ))}
-            </ScrollView>
-          )}
-        </View>
-      </BottomSheet>
     </View>
   );
 }
@@ -226,22 +304,18 @@ const createStyles = (colors: typeof Colors.light) => StyleSheet.create({
     right: 0,
     zIndex: 10,
   },
-  scrollView: {
-    position: "absolute",
-    bottom: 0,
-    left: 0,
-    right: 0,
-    maxHeight: "75%",
+  mainScrollView: {
+    flex: 1,
   },
-  scrollContent: {
-    paddingHorizontal: 0,
+  mainScrollContent: {
+    paddingBottom: 100,
   },
   flushHeader: {
     backgroundColor: colors.surface,
-    paddingBottom: 10,
+    paddingBottom: 15,
     paddingHorizontal: 16,
-    borderBottomLeftRadius: 20,
-    borderBottomRightRadius: 20,
+    borderBottomLeftRadius: 24,
+    borderBottomRightRadius: 24,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: colors.surface === "#FFFFFF" ? 0.05 : 0.3,
@@ -287,19 +361,91 @@ const createStyles = (colors: typeof Colors.light) => StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
+  categoriesRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginTop: 15,
+    paddingBottom: 5,
+  },
+  foodCategoriesContainer: {
+    paddingHorizontal: 16,
+    paddingVertical: 20,
+    gap: 16,
+  },
+  categoryCircleWrapper: {
+    alignItems: "center",
+    gap: 8,
+    width: 65,
+  },
+  categoryCircle: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    overflow: "hidden",
+    backgroundColor: colors.surfaceSecondary,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  categoryImage: {
+    width: "100%",
+    height: "100%",
+  },
+  categoryLabel: {
+    fontSize: 11,
+    fontWeight: "600",
+    color: colors.text,
+    textAlign: "center",
+  },
+  filterRow: {
+    flexDirection: "row",
+    paddingHorizontal: 16,
+    gap: 10,
+    marginBottom: 20,
+  },
+  filterChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: colors.surface,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: colors.border,
+    gap: 4,
+  },
+  filterChipText: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: colors.text,
+  },
+  restaurantList: {
+    paddingHorizontal: 16,
+  },
+  bottomSearchOverlay: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    paddingHorizontal: 16,
+    zIndex: 10,
+  },
   searchBar: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: colors.surfaceSecondary,
-    paddingHorizontal: 12,
+    backgroundColor: colors.surface,
+    paddingHorizontal: 16,
     paddingVertical: 8,
-    borderRadius: 10,
+    borderRadius: 30,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.1,
+    shadowRadius: 20,
+    elevation: 10,
     borderWidth: 1,
     borderColor: colors.border,
   },
   searchInput: {
     flex: 1,
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: "500",
     color: colors.text,
     marginLeft: 8,
@@ -309,88 +455,5 @@ const createStyles = (colors: typeof Colors.light) => StyleSheet.create({
     height: 16,
     backgroundColor: colors.border,
     marginHorizontal: 10,
-  },
-  bottomSheet: {
-    paddingHorizontal: 16,
-  },
-  sheetContent: {
-    gap: 16,
-    paddingBottom: 40,
-  },
-  categoriesRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-  },
-  promoBanner: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-    borderWidth: 1.5,
-    borderColor: "#0EA5E930",
-    borderRadius: 16,
-    padding: 12,
-    backgroundColor: "#0EA5E910",
-  },
-  promoIconContainer: {
-    width: 36,
-    height: 36,
-    borderRadius: 10,
-    backgroundColor: "#0EA5E915",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  promoTextGroup: {
-    flex: 1,
-    gap: 1,
-  },
-  promoTitle: {
-    fontSize: 13,
-    fontWeight: "700",
-    color: colors.text,
-  },
-  promoSubtitle: {
-    fontSize: 11,
-    color: colors.textSecondary,
-    fontWeight: "500",
-  },
-  sectionTitleRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-  },
-  sectionTitleText: {
-    fontSize: 13,
-    fontWeight: "800",
-    color: colors.text,
-    letterSpacing: -0.3,
-  },
-  seeAllButton: {
-    fontSize: 11,
-    fontWeight: "800",
-    color: "#0EA5E9",
-  },
-  horizontalScrollList: {
-    paddingBottom: 4,
-  },
-  mapActions: {
-    position: 'absolute',
-    right: 16,
-    zIndex: 10,
-    gap: 12,
-  },
-  actionBtn: {
-    width: 38,
-    height: 38,
-    borderRadius: 12,
-    backgroundColor: colors.surface,
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: colors.surface === "#FFFFFF" ? 0.1 : 0.3,
-    shadowRadius: 10,
-    elevation: 8,
-    borderWidth: 1,
-    borderColor: colors.border,
   },
 });
