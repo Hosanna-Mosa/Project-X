@@ -28,18 +28,39 @@ export default function AuthScreen() {
   const insets = useSafeAreaInsets();
   const [step, setStep] = useState<AuthStep>("phone");
   const [phone, setPhone] = useState("");
+  const [password, setPassword] = useState("");
+  const [isPasswordMode, setIsPasswordMode] = useState(false);
   const [otp, setOtp] = useState(["", "", "", "", "", ""]);
   const [name, setName] = useState("");
   const [loading, setLoading] = useState(false);
   const otpRefs = useRef<(TextInput | null)[]>([]);
   const slideAnim = useRef(new Animated.Value(0)).current;
-  const setAuthenticated = useDriverStore((s) => s.setAuthenticated);
+  const { setAuthenticated, loginWithPassword } = useDriverStore();
 
   const handleSendOTP = async () => {
     if (phone.length < 10) {
       Alert.alert("Invalid Phone", "Please enter a valid 10-digit phone number");
       return;
     }
+
+    if (isPasswordMode) {
+      if (!password) {
+        Alert.alert("Password Required", "Please enter your password");
+        return;
+      }
+      setLoading(true);
+      try {
+        await loginWithPassword(`+91${phone}`, password);
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        router.replace("/(tabs)");
+      } catch (err: any) {
+        Alert.alert("Login Failed", err.message);
+      } finally {
+        setLoading(false);
+      }
+      return;
+    }
+
     if (!name.trim()) {
       Alert.alert("Name Required", "Please enter your name");
       return;
@@ -145,23 +166,25 @@ export default function AuthScreen() {
           <View style={styles.formSection}>
             <Text style={styles.formTitle}>Welcome, Driver!</Text>
             <Text style={styles.formSubtitle}>
-              Enter your details to get started
+              {isPasswordMode ? "Enter your credentials to login" : "Enter your details to get started"}
             </Text>
 
-            <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>Your Name</Text>
-              <View style={styles.inputContainer}>
-                <Feather name="user" size={18} color={Colors.primary} />
-                <TextInput
-                  style={styles.input}
-                  placeholder="Enter your full name"
-                  value={name}
-                  onChangeText={setName}
-                  autoCapitalize="words"
-                  placeholderTextColor={Colors.textMuted}
-                />
+            {!isPasswordMode && (
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>Your Name</Text>
+                <View style={styles.inputContainer}>
+                  <Feather name="user" size={18} color={Colors.primary} />
+                  <TextInput
+                    style={styles.input}
+                    placeholder="Enter your full name"
+                    value={name}
+                    onChangeText={setName}
+                    autoCapitalize="words"
+                    placeholderTextColor={Colors.textMuted}
+                  />
+                </View>
               </View>
-            </View>
+            )}
 
             <View style={styles.inputGroup}>
               <Text style={styles.inputLabel}>Phone Number</Text>
@@ -179,19 +202,45 @@ export default function AuthScreen() {
               </View>
             </View>
 
+            {isPasswordMode && (
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>Password</Text>
+                <View style={styles.inputContainer}>
+                  <Feather name="lock" size={18} color={Colors.primary} />
+                  <TextInput
+                    style={styles.input}
+                    placeholder="Enter password"
+                    value={password}
+                    onChangeText={setPassword}
+                    secureTextEntry
+                    placeholderTextColor={Colors.textMuted}
+                  />
+                </View>
+              </View>
+            )}
+
             <TouchableOpacity
               style={[styles.primaryButton, loading && styles.primaryButtonDisabled]}
               onPress={handleSendOTP}
               disabled={loading}
             >
               {loading ? (
-                <Text style={styles.primaryButtonText}>Sending OTP...</Text>
+                <Text style={styles.primaryButtonText}>{isPasswordMode ? "Logging in..." : "Sending OTP..."}</Text>
               ) : (
                 <>
-                  <Text style={styles.primaryButtonText}>Get OTP</Text>
-                  <Feather name="arrow-right" size={20} color={Colors.white} />
+                  <Text style={styles.primaryButtonText}>{isPasswordMode ? "Login" : "Get OTP"}</Text>
+                  <Feather name={isPasswordMode ? "log-in" : "arrow-right"} size={20} color={Colors.white} />
                 </>
               )}
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.resendButton}
+              onPress={() => setIsPasswordMode(!isPasswordMode)}
+            >
+              <Text style={styles.resendText}>
+                {isPasswordMode ? "Use OTP Login" : "Use Password Login"}
+              </Text>
             </TouchableOpacity>
           </View>
         ) : (

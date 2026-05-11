@@ -40,6 +40,27 @@ export class AuthController {
     }
   }
 
+  async loginWithPassword(req: Request, res: Response) {
+    try {
+      const { phone, password, role } = req.body;
+
+      if (!phone || !password || !role) {
+        return res.status(400).json({ message: "Phone, password and role are required" });
+      }
+
+      if (!Object.values(UserRole).includes(role as UserRole)) {
+        return res.status(400).json({ message: "Invalid role" });
+      }
+
+      const result = await authService.loginWithPassword(phone, password, role as UserRole);
+
+      return res.json(result);
+    } catch (error: any) {
+      console.error(error);
+      return res.status(401).json({ message: error.message || "Login failed" });
+    }
+  }
+
   async logout(req: Request, res: Response) {
     // For JWT, logout is usually handled on the client by removing the token.
     // However, if we want server-side invalidation (blacklist), we'd do it here.

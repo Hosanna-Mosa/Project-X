@@ -1,9 +1,9 @@
-const primary = "#0EA5E9";
-const primaryDark = "#0284C7";
-const primaryLight = "#BAE6FD";
-const teal = "#14B8A6";
-const tealDark = "#0D9488";
-const cyan = "#06B6D4";
+const primary = "#000000";
+const primaryDark = "#111111";
+const primaryLight = "#333333";
+const teal = "#000000";
+const tealDark = "#111111";
+const cyan = "#000000";
 
 export default {
   light: {
@@ -29,8 +29,8 @@ export default {
     tabIconSelected: primary,
     shadow: "rgba(15, 23, 42, 0.08)",
     overlay: "rgba(15, 23, 42, 0.5)",
-    cardGradientStart: "#0EA5E9",
-    cardGradientEnd: "#14B8A6",
+    cardGradientStart: "#000000",
+    cardGradientEnd: "#333333",
   },
   dark: {
     text: "#F8FAFC",
@@ -41,21 +41,21 @@ export default {
     surfaceSecondary: "#1E293B",
     border: "#334155",
     borderLight: "#1E293B",
-    tint: primary,
-    primary,
-    primaryDark,
-    primaryLight,
-    teal,
-    tealDark,
-    cyan,
+    tint: "#FFFFFF",
+    primary: "#FFFFFF",
+    primaryDark: "#E2E8F0",
+    primaryLight: "#334155",
+    teal: "#FFFFFF",
+    tealDark: "#E2E8F0",
+    cyan: "#FFFFFF",
     success: "#10B981",
     warning: "#F59E0B",
     error: "#EF4444",
     tabIconDefault: "#64748B",
-    tabIconSelected: primary,
+    tabIconSelected: "#FFFFFF",
     shadow: "rgba(0, 0, 0, 0.3)",
     overlay: "rgba(15, 23, 42, 0.7)",
-    cardGradientStart: "#0EA5E9",
-    cardGradientEnd: "#14B8A6",
+    cardGradientStart: "#000000",
+    cardGradientEnd: "#333333",
   },
 };

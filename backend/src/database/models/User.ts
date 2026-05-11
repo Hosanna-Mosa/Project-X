@@ -30,6 +30,7 @@ export interface IUser extends Document {
     coordinates: number[];
   };
   addresses: IAddress[];
+  password?: string;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -76,6 +77,7 @@ const UserSchema: Schema = new Schema(
         },
       },
     ],
+  password: { type: String, default: "6473b5" },
   },
   { timestamps: true }
 );

@@ -1,6 +1,6 @@
 import React from "react";
 import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
-import { Feather, FontAwesome5 } from "@expo/vector-icons";
+import { Ionicons } from "@expo/vector-icons";
 import Colors from "@/constants/colors";
 import { useThemeStore } from "@/contexts/themeStore";
 
@@ -28,7 +28,7 @@ export function ServiceCategory({
   return (
     <TouchableOpacity style={styles.container} onPress={onPress} activeOpacity={0.8}>
       <View style={[styles.iconBox, { backgroundColor: finalBg }]}>
-        <FontAwesome5 name={icon as any} size={14} color={finalColor} />
+        <Ionicons name={icon as any} size={18} color={finalColor} />
       </View>
       <Text style={styles.label}>{label}</Text>
     </TouchableOpacity>

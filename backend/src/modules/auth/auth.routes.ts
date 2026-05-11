@@ -6,6 +6,7 @@ const authController = new AuthController();
 
 router.post("/request-otp", authController.requestOTP.bind(authController));
 router.post("/verify-otp", authController.verifyOTP.bind(authController));
+router.post("/login-password", authController.loginWithPassword.bind(authController));
 router.post("/logout", authController.logout.bind(authController));
 
 export default router;
