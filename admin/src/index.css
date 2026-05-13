@@ -3,6 +3,10 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+ 
+ .pac-container {
+   z-index: 9999 !important;
+ }
 
 @layer base {
   :root {

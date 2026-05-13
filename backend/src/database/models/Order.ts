@@ -28,6 +28,7 @@ export interface IStop {
 
 export interface IOrder extends Document {
   user: mongoose.Types.ObjectId;
+  vendor?: mongoose.Types.ObjectId;
   driver?: mongoose.Types.ObjectId;
   status: OrderStatus;
   totalDistance: number;
@@ -62,6 +63,7 @@ const StopSchema: Schema = new Schema({
 const OrderSchema: Schema = new Schema(
   {
     user: { type: Schema.Types.ObjectId, ref: "User", required: true },
+    vendor: { type: Schema.Types.ObjectId, ref: "Vendor" },
     driver: { type: Schema.Types.ObjectId, ref: "Driver" },
     status: {
       type: String,

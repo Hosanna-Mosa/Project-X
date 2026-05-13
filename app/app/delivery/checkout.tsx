@@ -23,7 +23,7 @@ const apiUrl = process.env.EXPO_PUBLIC_API_URL;
 export default function CheckoutScreen() {
   const insets = useSafeAreaInsets();
   const [isProcessing, setIsProcessing] = React.useState(false);
-  const { stops, price, paymentMethod, setStatus, route, resetDelivery, setOrderId } = useDeliveryStore();
+  const { stops, price, paymentMethod, setStatus, route, resetDelivery, setOrderId, vendorId } = useDeliveryStore();
   const { user } = useAuthStore();
 
   const { theme } = useThemeStore();
@@ -74,6 +74,7 @@ export default function CheckoutScreen() {
             stops: stops.map(s => ({ ...s, items: s.items || [] })),
             totalDistance: route?.totalDistance,
             totalPrice: price.total,
+            vendorId: vendorId,
           }
         }),
       });
