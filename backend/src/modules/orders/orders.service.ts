@@ -9,7 +9,7 @@ export class OrdersService {
   private routingService = new RoutingService();
   private pricingService = new PricingService();
 
-  async createOrder(userId: string, stopsData: any[]) {
+  async createOrder(userId: string, stopsData: any[], vendorId?: string) {
     if (!mongoose.Types.ObjectId.isValid(userId)) {
       throw new Error("Invalid User ID format");
     }
@@ -52,6 +52,7 @@ export class OrdersService {
 
     const order = new Order({
       user: userId,
+      vendor: vendorId,
       totalDistance: optimizationResult.totalDistance,
       totalPrice,
       status: OrderStatus.SEARCHING_DRIVER,
@@ -110,5 +111,11 @@ export class OrdersService {
 
   async getUserOrders(userId: string) {
     return Order.find({ user: userId }).sort({ createdAt: -1 });
+  }
+
+  async getVendorOrders(vendorId: string) {
+    return Order.find({ vendor: vendorId })
+      .populate("user")
+      .sort({ createdAt: -1 });
   }
 }

@@ -1,4 +1,4 @@
-import { Response } from "express";
+import { Request, Response } from "express";
 import { OrdersService } from "./orders.service";
 import { AuthRequest } from "../../middleware/auth.middleware";
 import { OrderStatus } from "../../database/models/Order";
@@ -63,6 +63,16 @@ export class OrdersController {
       if (!userId) return res.status(401).json({ message: "Unauthorized" });
 
       const orders = await ordersService.getUserOrders(userId);
+      return res.json(orders);
+    } catch (error) {
+      return res.status(500).json({ message: "Internal server error" });
+    }
+  }
+
+  async getVendorOrders(req: Request, res: Response) {
+    try {
+      const { vendorId } = req.params;
+      const orders = await ordersService.getVendorOrders(vendorId as string);
       return res.json(orders);
     } catch (error) {
       return res.status(500).json({ message: "Internal server error" });

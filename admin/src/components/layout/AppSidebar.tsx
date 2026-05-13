@@ -9,6 +9,7 @@ import {
   BarChart3,
   Headphones,
   Settings,
+  Store,
 } from "lucide-react";
 
 const navItems = [
@@ -16,6 +17,7 @@ const navItems = [
   { title: "Live Orders", url: "/live-orders", icon: ShoppingCart },
   { title: "Drivers", url: "/drivers", icon: Truck },
   { title: "Users", url: "/users", icon: Users },
+  { title: "Vendors", url: "/vendors", icon: Store },
   { title: "Multi-Stop Orders", url: "/multi-stop", icon: GitBranch },
   { title: "Payments", url: "/payments", icon: CreditCard },
   { title: "Analytics", url: "/analytics", icon: BarChart3 },

@@ -48,7 +48,8 @@ router.post("/verify", authenticateToken, async (req: AuthRequest, res: Response
     if (isValid) {
       if (orderData && req.user) {
         // Automatically create order if data provided
-        const order = await ordersService.createOrder(req.user.userId, orderData.stops);
+        const { stops, vendorId } = orderData;
+        const order = await ordersService.createOrder(req.user.userId, stops, vendorId);
         return res.json({ 
           message: "Payment verified and order created", 
           order 

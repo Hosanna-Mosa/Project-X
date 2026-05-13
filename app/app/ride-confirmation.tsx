@@ -28,8 +28,8 @@ const RIDE_GROUPS = [
     title: "Rides we think you'll like",
     options: [
       {
-        id: "uberx",
-        name: "UberX",
+        id: "rideX",
+        name: "RideX",
         capacity: 4,
         price: "₹181.50",
         time: "2:00pm",
@@ -60,8 +60,8 @@ const RIDE_GROUPS = [
         hasPriorityIcon: true,
       },
       {
-        id: "uberx-reserve",
-        name: "UberX Reserve",
+        id: "Ridex-reserve",
+        name: "Ridex Reserve",
         capacity: 4,
         price: "₹453.90",
         time: "2:27pm",
@@ -75,8 +75,8 @@ const RIDE_GROUPS = [
     title: "Economy",
     options: [
       {
-        id: "uberxl",
-        name: "UberXL",
+        id: "RideXl",
+        name: "RideXl",
         capacity: 6,
         price: "₹253.10",
         time: "1:53pm",
