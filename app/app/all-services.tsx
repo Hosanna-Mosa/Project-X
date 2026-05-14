@@ -20,13 +20,10 @@ const COLUMN_GAP = 15;
 const ITEM_WIDTH = (width - HORIZONTAL_PADDING * 2 - COLUMN_GAP * 2) / 3;
 
 const SERVICES = [
-  { id: "parcel", name: "Parcel", image: require("@/assets/images/services/parcel.png") },
+  { id: "bike", name: "Bike", image: require("@/assets/images/services/bike.png") },
   { id: "auto", name: "Auto", image: require("@/assets/images/services/auto.png") },
   { id: "cab-economy", name: "Cab Economy", image: require("@/assets/images/services/cab.png") },
-  { id: "bike", name: "Bike", image: require("@/assets/images/services/bike.png") },
-  { id: "bike-lite", name: "Bike Lite", image: require("@/assets/images/services/bike.png"), isLite: true },
-  { id: "cab-premium", name: "Cab Premium", image: require("@/assets/images/services/cab.png"), isPremium: true },
-  { id: "travel", name: "Travel", image: require("@/assets/images/services/travel.png") },
+  { id: "cab-prime", name: "Cab Prime", image: require("@/assets/images/services/cab.png"), isPremium: true },
 ];
 
 export default function AllServicesScreen() {
@@ -38,6 +35,9 @@ export default function AllServicesScreen() {
   return (
     <View style={styles.root}>
       <View style={[styles.header, { paddingTop: insets.top + 44 }]}>
+        <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
+          <Ionicons name="arrow-back" size={24} color={colors.text} />
+        </TouchableOpacity>
         <Text style={styles.headerTitle}>All Services</Text>
       </View>
 
@@ -78,8 +78,13 @@ const createStyles = (colors: typeof Colors.light) =>
       backgroundColor: colors.surface,
     },
     header: {
+      flexDirection: "row",
+      alignItems: "center",
       paddingHorizontal: HORIZONTAL_PADDING,
       paddingBottom: 20,
+    },
+    backButton: {
+      marginRight: 16,
     },
     headerTitle: {
       fontSize: 22,
