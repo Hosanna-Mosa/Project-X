@@ -23,70 +23,6 @@ import { useThemeStore } from "@/contexts/themeStore";
 const { width, height } = Dimensions.get("window");
 const GOOGLE_MAPS_APIKEY = process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY;
 
-const RIDE_GROUPS = [
-  {
-    title: "Rides we think you'll like",
-    options: [
-      {
-        id: "uberx",
-        name: "UberX",
-        capacity: 4,
-        price: "₹181.50",
-        time: "2:00pm",
-        eta: "9 min",
-        description: "Affordable rides all to yourself",
-        image: require("@/assets/images/services/cab.png"),
-      },
-      {
-        id: "wait-save",
-        name: "Wait & Save",
-        capacity: 4,
-        price: "₹162.20",
-        time: "2:08pm",
-        eta: "10-19 min",
-        description: "Get a cheaper ride by waiting a little longer",
-        image: require("@/assets/images/services/cab.png"),
-        hasWaitIcon: true,
-      },
-      {
-        id: "priority",
-        name: "Priority",
-        capacity: 4,
-        price: "₹212.40",
-        time: "1:59pm",
-        eta: "7 min",
-        description: "Shorter waiting time",
-        image: require("@/assets/images/services/cab.png"),
-        hasPriorityIcon: true,
-      },
-      {
-        id: "uberx-reserve",
-        name: "UberX Reserve",
-        capacity: 4,
-        price: "₹453.90",
-        time: "2:27pm",
-        description: "Leave as soon as 2:27 pm",
-        image: require("@/assets/images/services/cab.png"),
-        badge: "Most reliable",
-      },
-    ],
-  },
-  {
-    title: "Economy",
-    options: [
-      {
-        id: "uberxl",
-        name: "UberXL",
-        capacity: 6,
-        price: "₹253.10",
-        time: "1:53pm",
-        description: "Longer wait",
-        image: require("@/assets/images/services/cab.png"),
-      },
-    ],
-  },
-];
-
 // ─── Main screen ───────────────────────────────────────────────────────────
 export default function RideConfirmationScreen() {
   const insets = useSafeAreaInsets();
@@ -108,7 +44,121 @@ export default function RideConfirmationScreen() {
     [theme, insets]
   );
 
+  const RIDE_GROUPS = React.useMemo(() => {
+    if (params.serviceId === "bike" || params.serviceId === "bike-lite") {
+      return [
+        {
+          title: "Bikes for you",
+          options: [
+            {
+              id: "bike-ride",
+              name: "Bike Ride",
+              capacity: 1,
+              price: "₹45.00",
+              time: "2:00pm",
+              eta: "3 min",
+              description: "Quick bike ride",
+              image: require("@/assets/images/services/bike.png"),
+            },
+            {
+              id: "bike-reserve",
+              name: "Bike Reserve",
+              capacity: 1,
+              price: "₹60.00",
+              time: "2:15pm",
+              description: "Reserve a bike for later",
+              image: require("@/assets/images/services/bike.png"),
+              badge: "Planned",
+            },
+          ]
+        }
+      ];
+    } else if (params.serviceId === "auto") {
+      return [
+        {
+          title: "Autos for you",
+          options: [
+            {
+              id: "auto-ride",
+              name: "Auto Ride",
+              capacity: 3,
+              price: "₹80.50",
+              time: "2:00pm",
+              eta: "5 min",
+              description: "Standard auto ride",
+              image: require("@/assets/images/services/auto.png"),
+            },
+            {
+              id: "auto-reserve",
+              name: "Auto Reserve",
+              capacity: 3,
+              price: "₹100.00",
+              time: "2:20pm",
+              description: "Reserve an auto",
+              image: require("@/assets/images/services/auto.png"),
+              badge: "Planned",
+            },
+          ]
+        }
+      ];
+    } else {
+      return [
+        {
+          title: "Rides we think you'll like",
+          options: [
+            {
+              id: "cab-ride",
+              name: "Cab Ride",
+              capacity: 4,
+              price: "₹181.50",
+              time: "2:00pm",
+              eta: "9 min",
+              description: "Affordable rides all to yourself",
+              image: require("@/assets/images/services/cab.png"),
+            },
+            {
+              id: "cab-wait-save",
+              name: "Wait & Save",
+              capacity: 4,
+              price: "₹162.20",
+              time: "2:08pm",
+              eta: "10-19 min",
+              description: "Get a cheaper ride by waiting a little longer",
+              image: require("@/assets/images/services/cab.png"),
+              hasWaitIcon: true,
+            },
+            {
+              id: "cab-priority",
+              name: "Cab Priority",
+              capacity: 4,
+              price: "₹212.40",
+              time: "1:59pm",
+              eta: "7 min",
+              description: "Shorter waiting time",
+              image: require("@/assets/images/services/cab.png"),
+              hasPriorityIcon: true,
+            },
+            {
+              id: "cab-x",
+              name: "Cab X",
+              capacity: 4,
+              price: "₹253.10",
+              time: "1:53pm",
+              description: "Premium ride experience",
+              image: require("@/assets/images/services/cab.png"),
+              badge: "Premium",
+            },
+          ]
+        }
+      ];
+    }
+  }, [params.serviceId]);
+
   const [selectedRide, setSelectedRide] = useState(RIDE_GROUPS[0].options[0]);
+
+  React.useEffect(() => {
+    setSelectedRide(RIDE_GROUPS[0].options[0]);
+  }, [RIDE_GROUPS]);
   const [userLocation, setUserLocation] = useState<{
     latitude: number;
     longitude: number;
@@ -340,7 +390,7 @@ export default function RideConfirmationScreen() {
                 <Ionicons name="locate" size={18} color="#000" />
               </TouchableOpacity>
             </View>
-            <TouchableOpacity 
+            <TouchableOpacity
               style={styles.addStopBubble}
               onPress={handleAddStopFromMap}
             >
