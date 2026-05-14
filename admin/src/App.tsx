@@ -12,6 +12,10 @@ import Payments from "./pages/Payments";
 import Support from "./pages/Support";
 import OrderDetail from "./pages/OrderDetail";
 import Users from "./pages/Users";
+import Vendors from "./pages/Vendors";
+import VendorLogin from "./pages/VendorLogin";
+import VendorDashboard from "./pages/VendorDashboard";
+import VendorMenu from "./pages/VendorMenu";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -32,6 +36,10 @@ const App = () => (
           <Route path="/payments" element={<Payments />} />
           <Route path="/support" element={<Support />} />
           <Route path="/users" element={<Users />} />
+          <Route path="/vendors" element={<Vendors />} />
+          <Route path="/vendor-login" element={<VendorLogin />} />
+          <Route path="/vendor/dashboard" element={<VendorDashboard />} />
+          <Route path="/vendor/menu" element={<VendorMenu />} />
           <Route path="/settings" element={<NotFound />} />
           <Route path="*" element={<NotFound />} />
         </Routes>

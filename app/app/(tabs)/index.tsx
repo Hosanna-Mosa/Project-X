@@ -9,7 +9,9 @@ import {
   TouchableOpacity,
   View,
   ActivityIndicator,
+  useWindowDimensions,
 } from "react-native";
+import { useRef } from "react";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons, FontAwesome5 } from "@expo/vector-icons";
 import { router } from "expo-router";
@@ -28,172 +30,162 @@ const FOOD_CATEGORIES = [
   { id: 6, name: "Burgers", image: "https://images.unsplash.com/photo-1571091718767-18b5b1457add?w=200" },
 ];
 
-const MOCK_RESTAURANTS = [
-  {
-    id: 1,
-    name: "McDonald's",
-    rating: 4.3,
-    reviews: "652",
-    time: "55-65 mins",
-    distance: "13.3 km",
-    categories: "Burgers, Beverages, Cafe, ...",
-    location: "Tilak Road, Baba...",
-    image: "https://images.unsplash.com/photo-1561758033-d89a9ad46330?w=500",
-    offer: "FLAT DEAL ₹166 OFF ABOVE ₹649",
-    bestIn: "Burger",
-  },
-  {
-    id: 2,
-    name: "Raju Tiffin Center",
-    rating: 4.8,
-    reviews: "646",
-    time: "50-60 mins",
-    distance: "8.4 km",
-    categories: "South Indian",
-    location: "Rajahmundry",
-    image: "https://images.unsplash.com/photo-1589302168068-964664d93dc0?w=500",
-    offer: "60% OFF UPTO ₹120",
-    isPureVeg: true,
-  },
-  {
-    id: 3,
-    name: "The Dessert Heaven",
-    rating: 4.5,
-    reviews: "1.7K+",
-    time: "40-50 mins",
-    distance: "12 km",
-    categories: "Bakery, Desserts, ...",
-    location: "Tilak Road",
-    image: "https://images.unsplash.com/photo-1578985545062-69928b1d9587?w=500",
-    offer: "70% OFF UPTO ₹130",
-    isPureVeg: true,
-  },
-  {
-    id: 4,
-    name: "KFC - Kentucky Fried Chicken",
-    rating: 4.1,
-    reviews: "2.1K+",
-    time: "30-40 mins",
-    distance: "10.5 km",
-    categories: "Fast Food, Fried Chicken",
-    location: "Main Street",
-    image: "https://images.unsplash.com/photo-1513639776629-7b61b0ac49cb?w=500",
-    offer: "GET ₹100 OFF ON ₹499",
-    bestIn: "Fried Chicken",
-  },
-  {
-    id: 5,
-    name: "Biryani House",
-    rating: 4.7,
-    reviews: "3.4K+",
-    time: "45-55 mins",
-    distance: "9.2 km",
-    categories: "North Indian, Biryani",
-    location: "Downtown",
-    image: "https://images.unsplash.com/photo-1563379091339-03b11adbc936?w=500",
-    offer: "BUY 1 GET 1 FREE",
-    bestIn: "Biryani",
-  },
-  {
-    id: 6,
-    name: "Pizza Hut",
-    rating: 4.2,
-    reviews: "1.2K+",
-    time: "35-45 mins",
-    distance: "11.1 km",
-    categories: "Pizza, Italian",
-    location: "Skyline Mall",
-    image: "https://images.unsplash.com/photo-1513104890138-7c749659a591?w=500",
-    offer: "FLAT 50% OFF",
-    bestIn: "Pizza",
-  },
-  {
-    id: 7,
-    name: "Starbucks Coffee",
-    rating: 4.6,
-    reviews: "890",
-    time: "15-25 mins",
-    distance: "5.4 km",
-    categories: "Beverages, Cafe",
-    location: "Airport Road",
-    image: "https://images.unsplash.com/photo-1544787210-22bbdcd0bfdc?w=500",
-    offer: "FREE COOKIE ON ₹300+",
-  },
-  {
-    id: 8,
-    name: "Subway",
-    rating: 4.0,
-    reviews: "560",
-    time: "20-30 mins",
-    distance: "7.8 km",
-    categories: "Healthy Food, Salads",
-    location: "Tech Park",
-    image: "https://images.unsplash.com/photo-1534353436294-0dbd4bdac845?w=500",
-    offer: "COMBO DEALS FROM ₹199",
-    isPureVeg: false,
-  },
-];
+import * as Location from "expo-location";
+import { FlatList } from "react-native";
 
 export default function HomeScreen() {
   const insets = useSafeAreaInsets();
   const [searchText, setSearchText] = useState("");
   const [loading, setLoading] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
   const { theme, toggleTheme } = useThemeStore();
+  const [scrollOffset, setScrollOffset] = useState(0);
+  const categoriesScrollRef = useRef<ScrollView>(null);
   const colors = Colors[theme];
   const styles = React.useMemo(() => createStyles(colors), [theme]);
 
-  const topPadding = insets.top + (Platform.OS === "web" ? 67 : 0);
-
+  const [restaurants, setRestaurants] = useState<any[]>([]);
   const [isLocationSheetOpen, setIsLocationSheetOpen] = useState(false);
   const [selectedAddress, setSelectedAddress] = useState<any>(null);
 
+  const fetchVendors = async (lat: number, lng: number, pageNum: number = 1) => {
+    try {
+      if (pageNum === 1) setLoading(true);
+      else setLoadingMore(true);
+
+      const baseUrl = process.env.EXPO_PUBLIC_API_URL;
+      const url = `${baseUrl}/api/vendors/nearby?lat=${lat}&lng=${lng}&page=${pageNum}&limit=20`;
+      console.log(`[APP] Fetching vendors from: ${url}`);
+      
+      const response = await fetch(url);
+      const data = await response.json();
+      
+      console.log(`[APP] Received ${data?.length || 0} vendors`);
+      
+      if (Array.isArray(data)) {
+        if (data.length < 20) setHasMore(false);
+        else setHasMore(true);
+
+        if (pageNum === 1) {
+          setRestaurants(data);
+        } else {
+          setRestaurants(prev => [...prev, ...data]);
+        }
+      }
+    } catch (error) {
+      console.error("Error fetching vendors:", error);
+    } finally {
+      setLoading(false);
+      setLoadingMore(false);
+    }
+  };
+
+  useEffect(() => {
+    (async () => {
+      setPage(1);
+      setHasMore(true);
+      
+      let lat, lng;
+      if (selectedAddress?.location?.coordinates) {
+        [lng, lat] = selectedAddress.location.coordinates;
+      } else {
+        let { status } = await Location.requestForegroundPermissionsAsync();
+        if (status !== 'granted') {
+          lat = 17.4447;
+          lng = 78.3498;
+        } else {
+          let location = await Location.getCurrentPositionAsync({});
+          lat = location.coords.latitude;
+          lng = location.coords.longitude;
+        }
+      }
+      fetchVendors(lat, lng, 1);
+    })();
+  }, [selectedAddress]);
+
+  const loadMore = () => {
+    if (!loadingMore && hasMore) {
+      const nextPage = page + 1;
+      setPage(nextPage);
+      
+      let lat, lng;
+      if (selectedAddress?.location?.coordinates) {
+        [lng, lat] = selectedAddress.location.coordinates;
+      } else {
+        // Fallback to default or last known (simplified for this logic)
+        lat = 17.4447;
+        lng = 78.3498;
+      }
+      fetchVendors(lat, lng, nextPage);
+    }
+  };
+
+  const topPadding = insets.top + (Platform.OS === "web" ? 67 : 0);
+
+  const renderHeader = () => (
+    <>
+      <ScrollView 
+        horizontal 
+        showsHorizontalScrollIndicator={false} 
+        contentContainerStyle={styles.foodCategoriesContainer}
+      >
+        {FOOD_CATEGORIES.map((cat) => (
+          <TouchableOpacity key={cat.id} style={styles.categoryCircleWrapper}>
+            <View style={styles.categoryCircle}>
+              <Image source={{ uri: cat.image }} style={styles.categoryImage} />
+            </View>
+            <Text style={styles.categoryLabel} numberOfLines={1}>{cat.name}</Text>
+          </TouchableOpacity>
+        ))}
+      </ScrollView>
+
+      <View style={styles.filterRow}>
+        <TouchableOpacity style={styles.filterChip}>
+          <Text style={styles.filterChipText}>Filter</Text>
+          <Ionicons name="options-outline" size={14} color={colors.text} />
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.filterChip}>
+          <Text style={styles.filterChipText}>Sort by</Text>
+          <Ionicons name="chevron-down" size={14} color={colors.text} />
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.filterChip}>
+          <Text style={styles.filterChipText}>99 Store</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.filterChip}>
+          <Text style={styles.filterChipText}>Offers</Text>
+        </TouchableOpacity>
+      </View>
+    </>
+  );
+
   return (
     <View style={styles.root}>
-      <ScrollView 
-        style={styles.mainScrollView}
+      <FlatList
+        data={restaurants}
+        keyExtractor={(item) => item._id}
+        renderItem={({ item }) => <RestaurantListItem {...item} />}
+        ListHeaderComponent={renderHeader}
+        ListFooterComponent={() => (
+          loadingMore ? <ActivityIndicator size="small" color={colors.primary} style={{ marginVertical: 20 }} /> : <View style={{ height: 120 }} />
+        )}
+        onEndReached={loadMore}
+        onEndReachedThreshold={0.5}
         contentContainerStyle={[styles.mainScrollContent, { paddingTop: topPadding + 160 }]}
         showsVerticalScrollIndicator={false}
-      >
-        <ScrollView 
-          horizontal 
-          showsHorizontalScrollIndicator={false} 
-          contentContainerStyle={styles.foodCategoriesContainer}
-        >
-          {FOOD_CATEGORIES.map((cat) => (
-            <TouchableOpacity key={cat.id} style={styles.categoryCircleWrapper}>
-              <View style={styles.categoryCircle}>
-                <Image source={{ uri: cat.image }} style={styles.categoryImage} />
-              </View>
-              <Text style={styles.categoryLabel} numberOfLines={1}>{cat.name}</Text>
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
-
-        <View style={styles.filterRow}>
-          <TouchableOpacity style={styles.filterChip}>
-            <Text style={styles.filterChipText}>Filter</Text>
-            <Ionicons name="options-outline" size={14} color={colors.text} />
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.filterChip}>
-            <Text style={styles.filterChipText}>Sort by</Text>
-            <Ionicons name="chevron-down" size={14} color={colors.text} />
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.filterChip}>
-            <Text style={styles.filterChipText}>99 Store</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.filterChip}>
-            <Text style={styles.filterChipText}>Offers</Text>
-          </TouchableOpacity>
-        </View>
-
-        <View style={styles.restaurantList}>
-          {MOCK_RESTAURANTS.map((item) => (
-            <RestaurantListItem key={item.id} {...item} />
-          ))}
-        </View>
-
-        <View style={{ height: 120 }} />
-      </ScrollView>
+        refreshing={loading}
+        onRefresh={() => {
+          setPage(1);
+          setHasMore(true);
+          if (selectedAddress?.location?.coordinates) {
+             const [lng, lat] = selectedAddress.location.coordinates;
+             fetchVendors(lat, lng, 1);
+          } else {
+             fetchVendors(17.4447, 78.3498, 1);
+          }
+        }}
+      />
 
       <View style={styles.overlay} pointerEvents="box-none">
         <View style={[styles.flushHeader, { paddingTop: topPadding + 8 }]}>
@@ -237,31 +229,63 @@ export default function HomeScreen() {
             </View>
           </View>
 
-          <View style={styles.categoriesRow}>
-            <ServiceCategory
-              icon="list"
-              label="Task"
-              color={colors.primary}
-              onPress={() => router.push({ pathname: "/service-selection", params: { label: "Task" } })}
-            />
-            <ServiceCategory
-              icon="car"
-              label="Rides"
-              color={colors.primary}
-              onPress={() => router.push({ pathname: "/all-services" })}
-            />
-            <ServiceCategory
-              icon="fitness"
-              label="Health"
-              color={colors.primary}
-              onPress={() => router.push({ pathname: "/service-selection", params: { label: "Health" } })}
-            />
-            <ServiceCategory
-              icon="restaurant"
-              label="Meat"
-              color={colors.primary}
-              onPress={() => router.push({ pathname: "/service-selection", params: { label: "Meat" } })}
-            />
+          <View style={styles.categoriesContainer}>
+            {scrollOffset > 0 && (
+              <TouchableOpacity 
+                style={[styles.scrollButton, styles.scrollButtonLeft]} 
+                onPress={() => categoriesScrollRef.current?.scrollTo({ x: scrollOffset - 200, animated: true })}
+              >
+                <Ionicons name="chevron-back" size={16} color={colors.text} />
+              </TouchableOpacity>
+            )}
+            
+            <ScrollView
+              ref={categoriesScrollRef}
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.categoriesScrollContent}
+              onScroll={(e) => setScrollOffset(e.nativeEvent.contentOffset.x)}
+              scrollEventThrottle={16}
+            >
+              <ServiceCategory
+                icon="list"
+                label="Task"
+                onPress={() => router.push({ pathname: "/service-selection", params: { label: "Task" } })}
+              />
+              <ServiceCategory
+                icon="car"
+                label="Rides"
+                onPress={() => router.push({ pathname: "/all-services" })}
+              />
+              <ServiceCategory
+                icon="fast-food"
+                label="Food"
+                onPress={() => router.push({ pathname: "/all-services" })}
+              />
+              <ServiceCategory
+                icon="fitness"
+                label="Health"
+                onPress={() => router.push({ pathname: "/service-selection", params: { label: "Health" } })}
+              />
+              <ServiceCategory
+                icon="restaurant"
+                label="Meat"
+                onPress={() => router.push({ pathname: "/service-selection", params: { label: "Meat" } })}
+              />
+              <ServiceCategory
+                icon="paw"
+                label="pets"
+                onPress={() => router.push({ pathname: "/service-selection", params: { label: "pets" } })}
+              />
+            
+            </ScrollView>
+
+            <TouchableOpacity 
+              style={[styles.scrollButton, styles.scrollButtonRight]} 
+              onPress={() => categoriesScrollRef.current?.scrollTo({ x: scrollOffset + 200, animated: true })}
+            >
+              <Ionicons name="chevron-forward" size={16} color={colors.text} />
+            </TouchableOpacity>
           </View>
         </View>
       </View>
@@ -361,11 +385,41 @@ const createStyles = (colors: typeof Colors.light) => StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  categoriesRow: {
+  categoriesContainer: {
     flexDirection: "row",
-    justifyContent: "space-between",
+    alignItems: "center",
     marginTop: 15,
     paddingBottom: 5,
+  },
+  categoriesScrollContent: {
+    paddingRight: 40,
+    gap: 12,
+  },
+  scrollButton: {
+    position: "absolute",
+    backgroundColor: colors.surface,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    justifyContent: "center",
+    alignItems: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 5,
+    borderWidth: 1,
+    borderColor: colors.border,
+    zIndex: 20,
+    opacity: 0.9,
+  },
+  scrollButtonLeft: {
+    left: -14,
+    top: 6,
+  },
+  scrollButtonRight: {
+    right: -14,
+    top: 6,
   },
   foodCategoriesContainer: {
     paddingHorizontal: 16,

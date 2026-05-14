@@ -60,10 +60,12 @@ export interface DeliveryState {
   driver: any | null;
   activeChat: ChatMessage[];
   unreadCount: number;
+  vendorId: string | null;
   setCurrentLocation: (address: string) => void;
   setCurrentCoords: (coords: { lat: number; lng: number }) => void;
   setOrderId: (id: string | null) => void;
   setDriver: (driver: any) => void;
+  setVendorId: (id: string | null) => void;
   addStop: (address: string, storeName?: string, items?: DeliveryItem[], lat?: number, lng?: number) => void;
   removeStop: (id: string) => void;
   reorderStops: (from: number, to: number) => void;
@@ -101,6 +103,7 @@ const initialState = {
   driver: null,
   activeChat: [],
   unreadCount: 0,
+  vendorId: null,
 };
 
 export const useDeliveryStore = create<DeliveryState>((set, get) => ({
@@ -109,6 +112,7 @@ export const useDeliveryStore = create<DeliveryState>((set, get) => ({
   setCurrentCoords: (currentCoords) => set({ currentCoords }),
   setOrderId: (currentOrderId) => set({ currentOrderId }),
   setDriver: (driver) => set({ driver }),
+  setVendorId: (vendorId) => set({ vendorId }),
 
   addStop: (address: string, storeName?: string, items: DeliveryItem[] = [], lat?: number, lng?: number) => {
     set((state) => ({

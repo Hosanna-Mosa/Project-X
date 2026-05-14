@@ -23,6 +23,70 @@ import { useThemeStore } from "@/contexts/themeStore";
 const { width, height } = Dimensions.get("window");
 const GOOGLE_MAPS_APIKEY = process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY;
 
+const RIDE_GROUPS = [
+  {
+    title: "Rides we think you'll like",
+    options: [
+      {
+        id: "rideX",
+        name: "RideX",
+        capacity: 4,
+        price: "₹181.50",
+        time: "2:00pm",
+        eta: "9 min",
+        description: "Affordable rides all to yourself",
+        image: require("@/assets/images/services/cab.png"),
+      },
+      {
+        id: "wait-save",
+        name: "Wait & Save",
+        capacity: 4,
+        price: "₹162.20",
+        time: "2:08pm",
+        eta: "10-19 min",
+        description: "Get a cheaper ride by waiting a little longer",
+        image: require("@/assets/images/services/cab.png"),
+        hasWaitIcon: true,
+      },
+      {
+        id: "priority",
+        name: "Priority",
+        capacity: 4,
+        price: "₹212.40",
+        time: "1:59pm",
+        eta: "7 min",
+        description: "Shorter waiting time",
+        image: require("@/assets/images/services/cab.png"),
+        hasPriorityIcon: true,
+      },
+      {
+        id: "Ridex-reserve",
+        name: "Ridex Reserve",
+        capacity: 4,
+        price: "₹453.90",
+        time: "2:27pm",
+        description: "Leave as soon as 2:27 pm",
+        image: require("@/assets/images/services/cab.png"),
+        badge: "Most reliable",
+      },
+    ],
+  },
+  {
+    title: "Economy",
+    options: [
+      {
+        id: "RideXl",
+        name: "RideXl",
+        capacity: 6,
+        price: "₹253.10",
+        time: "1:53pm",
+        description: "Longer wait",
+        image: require("@/assets/images/services/cab.png"),
+      },
+    ],
+  },
+];
+
 // ─── Main screen ───────────────────────────────────────────────────────────
 export default function RideConfirmationScreen() {
   const insets = useSafeAreaInsets();

@@ -1,34 +1,38 @@
 import React from "react";
-import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { StyleSheet, Text, TouchableOpacity, View, Image, ImageSourcePropType } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import Colors from "@/constants/colors";
 import { useThemeStore } from "@/contexts/themeStore";
 
 interface Props {
-  icon: string;
+  icon?: string;
+  image?: ImageSourcePropType;
   label: string;
   onPress: () => void;
   color?: string;
-  backgroundColor?: string;
 }
 
 export function ServiceCategory({
   icon,
+  image,
   label,
   onPress,
   color,
-  backgroundColor,
 }: Props) {
   const { theme } = useThemeStore();
   const colors = Colors[theme];
   const styles = React.useMemo(() => createStyles(colors), [theme]);
 
-  const finalColor = color || colors.primary;
-  const finalBg = backgroundColor || colors.surfaceSecondary;
+  const finalColor = color || colors.text;
+  
   return (
-    <TouchableOpacity style={styles.container} onPress={onPress} activeOpacity={0.8}>
-      <View style={[styles.iconBox, { backgroundColor: finalBg }]}>
-        <Ionicons name={icon as any} size={18} color={finalColor} />
+    <TouchableOpacity style={styles.container} onPress={onPress} activeOpacity={0.7}>
+      <View style={styles.iconBox}>
+        {image ? (
+          <Image source={image} style={styles.iconImage} resizeMode="contain" />
+        ) : (
+          <Ionicons name={icon as any} size={24} color={finalColor} />
+        )}
       </View>
       <Text style={styles.label}>{label}</Text>
     </TouchableOpacity>
@@ -39,24 +43,23 @@ export function ServiceCategory({
 const createStyles = (colors: typeof Colors.light) => StyleSheet.create({
   container: {
     alignItems: "center",
-    gap: 8,
+    gap: 3,
+    width: 50,
   },
   iconBox: {
-    width: 36,
-    height: 36,
-    borderRadius: 10,
-    backgroundColor: colors.surfaceSecondary,
+    width: 40,
+    height: 40,
     alignItems: "center",
     justifyContent: "center",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: colors.surface === "#FFFFFF" ? 0.05 : 0.2,
-    shadowRadius: 10,
-    elevation: 2,
+    backgroundColor: 'transparent',
+  },
+  iconImage: {
+    width: 32,
+    height: 32,
   },
   label: {
-    fontSize: 11,
-    fontWeight: "600",
+    fontSize: 12,
+    fontWeight: "500",
     color: colors.text,
     textAlign: "center",
   },
