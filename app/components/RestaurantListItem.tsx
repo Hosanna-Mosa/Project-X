@@ -18,6 +18,7 @@ interface Props {
   offer?: string;
   isPureVeg?: boolean;
   bestIn?: string;
+  isMeat?: boolean;
 }
 
 export function RestaurantListItem({
@@ -30,6 +31,7 @@ export function RestaurantListItem({
   image,
   offer,
   isPureVeg,
+  isMeat,
 }: Props) {
   const { theme } = useThemeStore();
   const colors = Colors[theme];
@@ -38,7 +40,7 @@ export function RestaurantListItem({
   const handlePress = () => {
     router.push({
       pathname: "/restaurant-menu",
-      params: { id: _id, name, image, rating, reviews }
+      params: { id: _id, name, image, rating, reviews, isMeat: isMeat ? "true" : "false" }
     });
   };
 

@@ -33,7 +33,11 @@ export default function VendorDashboard() {
       <div className="space-y-8">
         <div>
           <h1 className="text-3xl font-bold text-foreground">Welcome, {vendorData.name}</h1>
-          <p className="text-muted-foreground">Here's what's happening with your restaurant today.</p>
+          <p className="text-muted-foreground">
+            {vendorData.role === "meat_vendor" 
+              ? "Here's what's happening with your meat center today."
+              : "Here's what's happening with your restaurant today."}
+          </p>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">

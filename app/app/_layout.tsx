@@ -34,6 +34,8 @@ setAuthTokenGetter(() => {
 });
 
 
+import { FloatingCart } from "@/components/FloatingCart";
+
 SplashScreen.preventAutoHideAsync();
 
 const queryClient = new QueryClient();
@@ -90,6 +92,7 @@ export default function RootLayout() {
           <GestureHandlerRootView style={{ flex: 1 }}>
             <KeyboardProvider>
               <RootLayoutNav />
+              <FloatingCart />
             </KeyboardProvider>
           </GestureHandlerRootView>
         </QueryClientProvider>

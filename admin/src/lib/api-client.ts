@@ -1,12 +1,13 @@
-const BASE_URL = "http://localhost:5000/api";
+export const BASE_URL = "http://localhost:5000/api";
 
 export async function adminFetch<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
-  const token = localStorage.getItem("admin_token");
+  const token = localStorage.getItem("admin_token") || localStorage.getItem("vendor_token");
   const headers = {
     "Content-Type": "application/json",
     ...(token ? { Authorization: `Bearer ${token}` } : {}),
     ...options.headers,
   };
+
 
   const response = await fetch(`${BASE_URL}${endpoint}`, {
     ...options,

@@ -76,7 +76,8 @@ export const loginVendor = async (req: Request, res: Response) => {
         name: vendor.name,
         email: vendor.email,
         phone: vendor.phone,
-        token: generateToken(vendor._id.toString()),
+        role: "restaurant_vendor",
+        token: generateToken(vendor._id.toString(), "restaurant_vendor"),
       });
     } else {
       res.status(401).json({ message: "Invalid email/phone or password" });
@@ -86,6 +87,7 @@ export const loginVendor = async (req: Request, res: Response) => {
     res.status(500).json({ message: "Internal server error" });
   }
 };
+
 
 export const createVendor = async (req: Request, res: Response) => {
   try {
@@ -123,32 +125,104 @@ import axios from "axios";
 
 export const searchGooglePlaces = async (req: Request, res: Response) => {
   try {
-    const { query } = req.query;
+    const { query, mode, types } = req.query;
     if (!query) {
       return res.status(400).json({ message: "Search query is required" });
     }
 
     const apiKey = process.env.GOOGLE_MAPS_API_KEY;
-    // Switching to Text Search for much better business-name accuracy
+
+    // ── TEXT SEARCH MODE ────────────────────────────────────────────────────────
+    // Best for category-matched results (e.g. "aa chicken mutton shop in City")
+    // No type restriction — query keywords do the category filtering
+    if (mode === "textsearch") {
+      const response = await axios.get(
+        `https://maps.googleapis.com/maps/api/place/textsearch/json`,
+        { params: { query, key: apiKey } }
+      );
+
+      const results = (response.data.results || []).map((item: any) => ({
+        place_id: item.place_id,
+        description: item.formatted_address,
+        structured_formatting: {
+          main_text: item.name,
+          secondary_text: item.formatted_address,
+        },
+      }));
+
+      return res.json(results);
+    }
+
+    // ── AUTOCOMPLETE + MEAT FILTER MODE ────────────────────────────────────────
+    // Runs Google Autocomplete with ONLY the raw typed prefix (e.g. "aa").
+    // DO NOT append location text to the input — Autocomplete does literal prefix
+    // matching, so "aa in Rajahmundry" will never match "Aadab Mutton & Chicken"
+    // Center. Location scope is handled via the `components` country filter.
+    // Results are then post-filtered by meat keywords to strip non-food places.
+    if (mode === "autocomplete-meat") {
+      const MEAT_KEYWORDS = [
+        "chicken", "mutton", "meat", "gosht", "fish", "poultry",
+        "butcher", "non-veg", "nalli", "nihari", "halal", "beef",
+        "lamb", "kheema", "keema", "maas", "murgi", "bakra",
+        "center", "centre", "shop", "store", "fresh",
+      ];
+
+      const response = await axios.get(
+        `https://maps.googleapis.com/maps/api/place/autocomplete/json`,
+        {
+          params: {
+            input: query,   // raw typed prefix ONLY (e.g. "aa", "mub")
+            key: apiKey,
+            types: "establishment",
+            language: "en",
+            components: "country:in",  // scope to India; avoids appending city text
+          },
+        }
+      );
+
+      const results = (response.data.predictions || [])
+        .filter((item: any) => {
+          // Keep only places whose name or address mentions a meat-related keyword
+          const text = (
+            (item.structured_formatting?.main_text || "") + " " +
+            (item.structured_formatting?.secondary_text || "") + " " +
+            (item.description || "")
+          ).toLowerCase();
+          return MEAT_KEYWORDS.some((kw) => text.includes(kw));
+        })
+        .map((item: any) => ({
+          place_id: item.place_id,
+          description: item.description,
+          structured_formatting: {
+            main_text: item.structured_formatting?.main_text || item.description,
+            secondary_text: item.structured_formatting?.secondary_text || "",
+          },
+        }));
+
+      return res.json(results);
+    }
+
+    // ── AUTOCOMPLETE MODE (default) ─────────────────────────────────────────────
+    // Used for vendor/restaurant searches (types=food scopes to food businesses)
     const response = await axios.get(
-      `https://maps.googleapis.com/maps/api/place/textsearch/json`,
+      `https://maps.googleapis.com/maps/api/place/autocomplete/json`,
       {
         params: {
-          query: query,
+          input: query,
           key: apiKey,
-          type: "restaurant",
+          types: types || "establishment",
+          language: "en",
         },
       }
     );
 
-    // Map Text Search results to a format the frontend expects
-    const results = response.data.results.map((item: any) => ({
+    const results = (response.data.predictions || []).map((item: any) => ({
       place_id: item.place_id,
-      description: item.formatted_address,
+      description: item.description,
       structured_formatting: {
-        main_text: item.name,
-        secondary_text: item.formatted_address
-      }
+        main_text: item.structured_formatting?.main_text || item.description,
+        secondary_text: item.structured_formatting?.secondary_text || "",
+      },
     }));
 
     res.json(results);

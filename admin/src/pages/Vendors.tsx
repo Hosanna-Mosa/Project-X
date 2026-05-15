@@ -86,7 +86,7 @@ export default function Vendors() {
 
       const fullQuery = locationContext ? `${val} in ${locationContext}` : val;
       
-      const data = await adminFetch<any[]>(`/vendors/search-google?query=${encodeURIComponent(fullQuery)}`);
+      const data = await adminFetch<any[]>(`/vendors/search-google?query=${encodeURIComponent(fullQuery)}&types=food`);
       setSuggestions(data || []);
     } catch (error) {
       console.error("Search error:", error);

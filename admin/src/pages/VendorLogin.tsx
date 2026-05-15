@@ -26,21 +26,54 @@ export default function VendorLogin() {
         ? { email: identifier, password } 
         : { phone: identifier, password };
 
-      const data = await adminFetch<any>("/vendors/login", {
-        method: "POST",
-        body: JSON.stringify(payload),
-      });
+      let data;
+      let loginType: "vendor" | "admin" = "vendor";
 
-      localStorage.setItem("vendor_token", data.token);
-      localStorage.setItem("vendor_data", JSON.stringify(data));
-      
-      toast.success(`Welcome back, ${data.name}`);
-      navigate("/vendor/dashboard");
+      // 1. Try Restaurant Vendor login
+      try {
+        data = await adminFetch<any>("/vendors/login", {
+          method: "POST",
+          body: JSON.stringify(payload),
+        });
+      } catch (err: any) {
+        // 2. If restaurant fails, try Meat Center login
+        try {
+          data = await adminFetch<any>("/meat/login", {
+            method: "POST",
+            body: JSON.stringify(payload),
+          });
+        } catch (meatErr: any) {
+          // 3. If meat center fails, try Admin login
+          try {
+            data = await adminFetch<any>("/auth/login-password", {
+              method: "POST",
+              body: JSON.stringify({ ...payload, role: "ADMIN" }),
+            });
+            loginType = "admin";
+          } catch (adminErr: any) {
+            throw new Error("Invalid credentials for Vendor or Admin");
+          }
+        }
+      }
+
+      if (loginType === "admin") {
+        localStorage.setItem("admin_token", data.token);
+        localStorage.setItem("admin_data", JSON.stringify(data.user));
+        toast.success(`Welcome back, Admin ${data.user.name}`);
+        navigate("/");
+      } else {
+        localStorage.setItem("vendor_token", data.token);
+        localStorage.setItem("vendor_data", JSON.stringify(data));
+        toast.success(`Welcome back, ${data.name}`);
+        navigate("/vendor/dashboard");
+      }
     } catch (error: any) {
       toast.error(error.message || "Invalid credentials");
     } finally {
       setIsLoading(false);
     }
+
+
   };
 
   return (
