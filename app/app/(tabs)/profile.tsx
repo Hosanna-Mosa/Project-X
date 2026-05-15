@@ -13,7 +13,7 @@ import {
   Image,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Feather, MaterialIcons } from "@expo/vector-icons";
+import { Feather, MaterialIcons, MaterialCommunityIcons, Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import * as ImagePicker from "expo-image-picker";
 import { LinearGradient } from "expo-linear-gradient";
@@ -27,7 +27,7 @@ export default function ProfileScreen() {
   const { user, logout, setUser } = useAuthStore();
   const { theme } = useThemeStore();
   const colors = Colors[theme];
-  const styles = React.useMemo(() => createStyles(colors), [theme]);
+  const styles = React.useMemo(() => createStyles(colors, theme), [theme]);
 
   const [loading, setLoading] = useState(false);
   const [editing, setEditing] = useState(false);
@@ -136,69 +136,185 @@ export default function ProfileScreen() {
 
   return (
     <View style={styles.root}>
-      {/* Header with Linear Gradient for Premium Look */}
+      {/* Header - Matching Image 1 */}
       <LinearGradient 
-        colors={theme === 'dark' ? [colors.surfaceSecondary, colors.surface] : ["#1E293B", "#0F172A"]}
-        style={[styles.header, { paddingTop: insets.top + (Platform.OS === 'web' ? 20 : 10) }]}
+        colors={theme === 'dark' ? ["#0F172A", "#1E293B"] : ["#1E293B", "#0F172A"]}
+        style={[styles.header, { paddingTop: insets.top + 20 }]}
       >
-        <View style={styles.headerTop}>
+        <View style={styles.headerTitleRow}>
           <Text style={styles.headerTitle}>My Profile</Text>
-          {loading && <ActivityIndicator size="small" color="#38BDF8" />}
+          {loading && <ActivityIndicator size="small" color="#fff" />}
         </View>
         
-        <View style={styles.profileSummary}>
-          <View style={styles.avatarWrapper}>
-            <TouchableOpacity onPress={handlePickImage} activeOpacity={0.8} style={styles.avatarMain}>
-              {user?.profilePic ? (
-                <Image source={{ uri: user.profilePic }} style={styles.avatarImg} />
-              ) : (
+        <View style={styles.profileInfoRow}>
+          <TouchableOpacity onPress={handlePickImage} activeOpacity={0.8} style={styles.avatarContainer}>
+            {user?.profilePic ? (
+              <Image source={{ uri: user.profilePic }} style={styles.avatar} />
+            ) : (
+              <View style={[styles.avatar, styles.avatarPlaceholder]}>
                 <Text style={styles.avatarInitial}>{user?.name?.charAt(0) || "U"}</Text>
-              )}
-              <View style={styles.cameraBadge}>
-                <Feather name="camera" size={12} color="#fff" />
               </View>
-            </TouchableOpacity>
+            )}
+            <View style={styles.cameraIconContainer}>
+              <Feather name="camera" size={10} color="#fff" />
+            </View>
+          </TouchableOpacity>
+          
+          <View style={styles.userNameContainer}>
+            <Text style={styles.userName} numberOfLines={1}>{user?.name || "User Name"}</Text>
+            <Text style={styles.userEmail} numberOfLines={1}>{user?.email || "No email added"}</Text>
           </View>
           
-          <View style={styles.summaryMeta}>
-            <Text style={styles.summaryName} numberOfLines={1}>{user?.name}</Text>
-            <Text style={styles.summarySub} numberOfLines={1} ellipsizeMode="tail">{user?.email || "No email added"}</Text>
-          </View>
-          
-          <TouchableOpacity style={styles.editPill} onPress={() => setEditing(true)}>
-            <Feather name="edit-2" size={14} color="#fff" />
-            <Text style={styles.editPillText}>Edit</Text>
+          <TouchableOpacity style={styles.editBtn} onPress={() => setEditing(true)}>
+            <Feather name="edit-2" size={16} color="#fff" />
+            <Text style={styles.editBtnText}>Edit</Text>
           </TouchableOpacity>
         </View>
       </LinearGradient>
 
       <ScrollView 
-        contentContainerStyle={[styles.container, { paddingBottom: insets.bottom + 100 }]}
+        contentContainerStyle={[styles.container, { paddingBottom: insets.bottom + 40 }]}
         showsVerticalScrollIndicator={false}
       >
+        {/* Grid Section - Matching Image 2 */}
+        <View style={styles.gridContainer}>
+          <GridItem 
+            icon={<Ionicons name="heart-outline" size={24} color={colors.text} />} 
+            label="Favourites" 
+            onPress={() => {}} 
+            colors={colors}
+          />
+          <GridItem 
+            icon={<MaterialCommunityIcons name="wallet-outline" size={24} color={colors.text} />} 
+            label="Wallet" 
+            onPress={() => router.push("/delivery/wallet")} 
+            colors={colors}
+          />
+          <GridItem 
+            icon={<MaterialCommunityIcons name="file-document-outline" size={24} color={colors.text} />} 
+            label="Orders" 
+            onPress={() => router.push("/orders")} 
+            colors={colors}
+          />
+        </View>
+
+        {/* ACCOUNT INFORMATION - Matching Image 1 */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Account Information</Text>
+          <Text style={styles.sectionHeader}>ACCOUNT INFORMATION</Text>
           <View style={styles.infoCard}>
-            <InfoItem icon="user" label="Username" value={user?.username || "@username"} colors={colors} />
-            <InfoItem icon="mail" label="E-mail" value={user?.email || "Not set"} colors={colors} />
-            <InfoItem icon="phone" label="Phone" value={user?.phone || "Not set"} colors={colors} />
+            <InfoItem 
+              icon={<Feather name="user" size={20} color={colors.textSecondary} />} 
+              label="USERNAME" 
+              value={user?.username || "sunand"} 
+              colors={colors}
+            />
+            <View style={styles.separator} />
+            <InfoItem 
+              icon={<Feather name="mail" size={20} color={colors.textSecondary} />} 
+              label="E-MAIL" 
+              value={user?.email || "vema...nd@gmail.com"} 
+              colors={colors}
+            />
+            <View style={styles.separator} />
+            <InfoItem 
+              icon={<Feather name="phone" size={20} color={colors.textSecondary} />} 
+              label="PHONE" 
+              value={user?.phone || "9704726252"} 
+              colors={colors}
+            />
           </View>
         </View>
 
+        {/* PREFERENCES - Matching Image 1 */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Preferences</Text>
-          <View style={styles.menuList}>
-            <MenuBtn 
-                icon="map-pin" 
-                label="Saved Addresses" 
-                count={user?.addresses?.length} 
-                onPress={() => router.push("/delivery/saved-addresses")} 
-                color="#8B5CF6" 
-                colors={colors}
-            />
-            <MenuBtn icon="bell" label="Notifications" onPress={() => {}} color="#F59E0B" colors={colors} />
-            <MenuBtn icon="shield" label="Security" onPress={() => {}} color="#10B981" colors={colors} />
-          </View>
+          <Text style={styles.sectionHeader}>PREFERENCES</Text>
+          <MenuButton 
+            icon={<Ionicons name="location-outline" size={22} color="#8B5CF6" />} 
+            label="Saved Addresses" 
+            count={user?.addresses?.length || 1}
+            onPress={() => router.push("/delivery/saved-addresses")}
+            colors={colors}
+            iconBg="#F5F3FF"
+          />
+          <MenuButton 
+            icon={<Ionicons name="notifications-outline" size={22} color="#F59E0B" />} 
+            label="Notifications" 
+            onPress={() => {}}
+            colors={colors}
+            iconBg="#FFFBEB"
+          />
+          <MenuButton 
+            icon={<Ionicons name="shield-checkmark-outline" size={22} color="#10B981" />} 
+            label="Security" 
+            onPress={() => {}}
+            colors={colors}
+            iconBg="#F0FDF4"
+          />
+        </View>
+
+        {/* MORE OPTIONS - Matching Image 2 */}
+        <View style={[styles.section, { marginTop: 10 }]}>
+          <ListItem 
+            icon={<Feather name="users" size={20} color={colors.text} />} 
+            title="Family and teenagers" 
+            subtitle="Teenager and adult accounts"
+            onPress={() => {}}
+            colors={colors}
+          />
+          <ListItem 
+            icon={<Feather name="list" size={20} color={colors.text} />} 
+            title="Lists" 
+            onPress={() => {}}
+            colors={colors}
+          />
+          <ListItem 
+            icon={<MaterialCommunityIcons name="car-outline" size={20} color={colors.text} />} 
+            title="Rides" 
+            onPress={() => {}}
+            colors={colors}
+          />
+          <ListItem 
+            icon={<Feather name="tag" size={20} color={colors.text} />} 
+            title="Promotions" 
+            onPress={() => {}}
+            colors={colors}
+          />
+          <ListItem 
+            icon={<Feather name="gift" size={20} color={colors.text} />} 
+            title="Send a gift" 
+            onPress={() => {}}
+            colors={colors}
+          />
+          <ListItem 
+            icon={<Feather name="help-circle" size={20} color={colors.text} />} 
+            title="Help" 
+            onPress={() => {}}
+            colors={colors}
+          />
+          <ListItem 
+            icon={<Feather name="mic" size={20} color={colors.text} />} 
+            title="Voice settings" 
+            onPress={() => {}}
+            colors={colors}
+          />
+          <ListItem 
+            icon={<Feather name="user-check" size={20} color={colors.text} />} 
+            title="Manager account" 
+            onPress={() => {}}
+            colors={colors}
+          />
+          <ListItem 
+            icon={<Feather name="info" size={20} color={colors.text} />} 
+            title="About" 
+            onPress={() => {}}
+            colors={colors}
+          />
+          <ListItem 
+            icon={<Feather name="share-2" size={20} color={colors.text} />} 
+            title="Invite friends" 
+            onPress={() => {}}
+            colors={colors}
+          />
         </View>
 
         <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout}>
@@ -228,6 +344,7 @@ export default function ProfileScreen() {
                   value={formData.name}
                   onChangeText={v => setFormData({...formData, name: v})}
                   placeholder="Your display name"
+                  placeholderTextColor={colors.textMuted}
                 />
               </View>
 
@@ -239,6 +356,7 @@ export default function ProfileScreen() {
                   onChangeText={v => setFormData({...formData, username: v})}
                   placeholder="@handle"
                   autoCapitalize="none"
+                  placeholderTextColor={colors.textMuted}
                 />
               </View>
 
@@ -251,6 +369,7 @@ export default function ProfileScreen() {
                   placeholder="your@email.com"
                   keyboardType="email-address"
                   autoCapitalize="none"
+                  placeholderTextColor={colors.textMuted}
                 />
               </View>
 
@@ -262,6 +381,7 @@ export default function ProfileScreen() {
                   onChangeText={v => setFormData({...formData, phone: v})}
                   placeholder="+1..."
                   keyboardType="phone-pad"
+                  placeholderTextColor={colors.textMuted}
                 />
               </View>
             </ScrollView>
@@ -280,159 +400,240 @@ export default function ProfileScreen() {
   );
 }
 
-function InfoItem({ icon, label, value, colors }: any) {
-  const styles = React.useMemo(() => createStyles(colors), [colors]);
+function GridItem({ icon, label, onPress, colors }: any) {
   return (
-    <View style={styles.infoItem}>
-      <View style={styles.infoIcon}>
-        <Feather name={icon} size={18} color={Colors.light.textSecondary} />
+    <TouchableOpacity style={[stylesGrid.gridItem, { backgroundColor: colors.surfaceSecondary }]} onPress={onPress}>
+      <View style={stylesGrid.gridIcon}>{icon}</View>
+      <Text style={[stylesGrid.gridLabel, { color: colors.text }]} numberOfLines={1}>{label}</Text>
+    </TouchableOpacity>
+  );
+}
+
+function InfoItem({ icon, label, value, colors }: any) {
+  return (
+    <View style={stylesInfo.infoItem}>
+      <View style={[stylesInfo.infoIconContainer, { backgroundColor: colors.surfaceSecondary }]}>
+        {icon}
       </View>
-      <View style={styles.infoText}>
-        <Text style={styles.infoLabel}>{label}</Text>
-        <Text style={styles.infoValue} numberOfLines={1} ellipsizeMode="tail">{value}</Text>
+      <View style={stylesInfo.infoContent}>
+        <Text style={[stylesInfo.infoLabel, { color: colors.textSecondary }]}>{label}</Text>
+        <Text style={[stylesInfo.infoValue, { color: colors.text }]}>{value}</Text>
       </View>
     </View>
   );
 }
 
-function MenuBtn({ icon, label, count, onPress, color, colors }: any) {
-  const styles = React.useMemo(() => createStyles(colors), [colors]);
+function MenuButton({ icon, label, count, onPress, colors, iconBg }: any) {
   return (
-    <TouchableOpacity style={styles.menuBtn} onPress={onPress}>
-      <View style={[styles.menuBtnIcon, { backgroundColor: `${color}15` }]}>
-        <Feather name={icon} size={20} color={color} />
+    <TouchableOpacity style={[stylesMenu.menuButton, { backgroundColor: colors.surface }]} onPress={onPress}>
+      <View style={[stylesMenu.iconContainer, { backgroundColor: iconBg }]}>
+        {icon}
       </View>
-      <Text style={styles.menuBtnLabel}>{label}</Text>
-      {count !== undefined && (
-        <View style={styles.menuBadge}>
-          <Text style={styles.menuBadgeText}>{count}</Text>
-        </View>
-      )}
-      <Feather name="chevron-right" size={18} color="#94A3B8" />
+      <Text style={[stylesMenu.label, { color: colors.text }]}>{label}</Text>
+      <View style={stylesMenu.rightContainer}>
+        {count !== undefined && (
+          <View style={[stylesMenu.badge, { backgroundColor: colors.surfaceSecondary }]}>
+            <Text style={[stylesMenu.badgeText, { color: colors.text }]}>{count}</Text>
+          </View>
+        )}
+        <Feather name="chevron-right" size={20} color={colors.textMuted} />
+      </View>
     </TouchableOpacity>
   );
 }
 
-const createStyles = (colors: typeof Colors.light) => StyleSheet.create({
+function ListItem({ icon, title, subtitle, onPress, colors }: any) {
+  return (
+    <TouchableOpacity style={stylesList.listItem} onPress={onPress}>
+      <View style={stylesList.listIcon}>{icon}</View>
+      <View style={stylesList.listContent}>
+        <Text style={[stylesList.listTitle, { color: colors.text }]}>{title}</Text>
+        {subtitle && <Text style={[stylesList.listSubtitle, { color: colors.textSecondary }]}>{subtitle}</Text>}
+      </View>
+    </TouchableOpacity>
+  );
+}
+
+const stylesGrid = StyleSheet.create({
+  gridItem: {
+    flex: 1,
+    aspectRatio: 1,
+    borderRadius: 20,
+    padding: 15,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginHorizontal: 8,
+  },
+  gridIcon: { marginBottom: 10 },
+  gridLabel: { fontSize: 13, fontWeight: '600' },
+});
+
+const stylesInfo = StyleSheet.create({
+  infoItem: { flexDirection: 'row', alignItems: 'center', paddingVertical: 12 },
+  infoIconContainer: { width: 44, height: 44, borderRadius: 12, justifyContent: 'center', alignItems: 'center', marginRight: 15 },
+  infoContent: { flex: 1 },
+  infoLabel: { fontSize: 10, fontWeight: '700', letterSpacing: 0.5, marginBottom: 2 },
+  infoValue: { fontSize: 15, fontWeight: '600' },
+});
+
+const stylesMenu = StyleSheet.create({
+  menuButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+    borderRadius: 20,
+    marginBottom: 12,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 10,
+    elevation: 2,
+  },
+  iconContainer: { width: 44, height: 44, borderRadius: 12, justifyContent: 'center', alignItems: 'center', marginRight: 15 },
+  label: { flex: 1, fontSize: 15, fontWeight: '600' },
+  rightContainer: { flexDirection: 'row', alignItems: 'center' },
+  badge: { paddingHorizontal: 12, paddingVertical: 4, borderRadius: 12, marginRight: 10 },
+  badgeText: { fontSize: 13, fontWeight: '700' },
+});
+
+const stylesList = StyleSheet.create({
+  listItem: { flexDirection: 'row', alignItems: 'center', paddingVertical: 18, borderBottomWidth: 0 },
+  listIcon: { width: 40, justifyContent: 'center', alignItems: 'center', marginRight: 10 },
+  listContent: { flex: 1 },
+  listTitle: { fontSize: 17, fontWeight: '500' },
+  listSubtitle: { fontSize: 14, marginTop: 4 },
+});
+
+const createStyles = (colors: typeof Colors.light, theme: string) => StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.background },
   header: {
-    backgroundColor: "#1E293B", // Dark sleek slate
-    paddingHorizontal: 20,
-    paddingBottom: 24,
-    borderBottomLeftRadius: 24,
-    borderBottomRightRadius: 24,
+    paddingHorizontal: 25,
+    paddingBottom: 20,
   },
-  headerTop: {
+  headerTitleRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: 25,
   },
   headerTitle: {
-    fontSize: 18,
-    fontWeight: "900",
+    fontSize: 24,
+    fontWeight: "800",
     color: "#fff",
-    letterSpacing: -0.5,
   },
-  profileSummary: {
+  profileInfoRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 16,
   },
-  avatarWrapper: {
-    padding: 2,
-    borderRadius: 40,
-    backgroundColor: "rgba(255,255,255,0.2)",
-  },
-  avatarMain: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    backgroundColor: "#38BDF8",
-    alignItems: 'center',
-    justifyContent: 'center',
-    overflow: 'hidden',
+  avatarContainer: {
     position: 'relative',
+    marginRight: 15,
   },
-  avatarImg: { width: "100%", height: "100%" },
-  avatarInitial: { fontSize: 24, fontWeight: '800', color: '#fff' },
-  cameraBadge: {
+  avatar: {
+    width: 65,
+    height: 65,
+    borderRadius: 32.5,
+    borderWidth: 2,
+    borderColor: 'rgba(255,255,255,0.2)',
+  },
+  avatarPlaceholder: {
+    backgroundColor: '#38BDF8',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  avatarInitial: {
+    fontSize: 28,
+    fontWeight: '800',
+    color: '#fff',
+  },
+  cameraIconContainer: {
     position: 'absolute',
     bottom: 0,
     right: 0,
-    backgroundColor: Colors.light.primary,
-    padding: 6,
-    borderTopLeftRadius: 10,
+    backgroundColor: '#000',
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#fff',
   },
-  summaryMeta: { flex: 1, gap: 1, marginRight: 12 },
-  summaryName: { fontSize: 16, fontWeight: '700', color: '#fff' },
-  summarySub: { fontSize: 11, color: '#94A3B8' },
-  editPill: {
+  userNameContainer: {
+    flex: 1,
+  },
+  userName: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#fff',
+    marginBottom: 2,
+  },
+  userEmail: {
+    fontSize: 13,
+    color: 'rgba(255,255,255,0.6)',
+  },
+  editBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    backgroundColor: 'rgba(255,255,255,0.1)',
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 15,
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    paddingHorizontal: 15,
+    paddingVertical: 8,
+    borderRadius: 20,
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.2)',
   },
-  editPillText: { fontSize: 10, fontWeight: '700', color: '#fff' },
+  editBtnText: {
+    color: '#fff',
+    fontWeight: '700',
+    fontSize: 14,
+    marginLeft: 6,
+  },
   
-  container: { padding: 20, gap: 24 },
-  section: { gap: 12 },
-  sectionTitle: {
-    fontSize: 11,
-    fontWeight: '800',
+  container: { padding: 20 },
+  gridContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 30,
+    marginHorizontal: -8,
+  },
+  section: { marginBottom: 25 },
+  sectionHeader: {
+    fontSize: 13,
+    fontWeight: '700',
     color: colors.textSecondary,
-    textTransform: 'uppercase',
-    letterSpacing: 1,
-    marginLeft: 4,
+    marginBottom: 15,
+    marginLeft: 5,
   },
   infoCard: {
     backgroundColor: colors.surface,
-    borderRadius: 16,
-    padding: 12,
-    gap: 12,
+    borderRadius: 24,
+    padding: 15,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: colors.surface === "#FFFFFF" ? 0.05 : 0.2,
+    shadowOpacity: 0.06,
     shadowRadius: 15,
-    elevation: 2,
+    elevation: 3,
   },
-  infoItem: { flexDirection: 'row', gap: 16, alignItems: 'center' },
-  infoIcon: { width: 30, height: 30, borderRadius: 8, backgroundColor: colors.surfaceSecondary, alignItems: 'center', justifyContent: 'center' },
-  infoText: { flex: 1, gap: 2 },
-  infoLabel: { fontSize: 9, fontWeight: '700', color: colors.textSecondary, textTransform: 'uppercase' },
-  infoValue: { fontSize: 13, fontWeight: '600', color: colors.text, flexShrink: 1 },
-  
-  menuList: { gap: 12 },
-  menuBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 16,
-    backgroundColor: colors.surface,
-    padding: 16,
-    borderRadius: 20,
+  separator: {
+    height: 1,
+    backgroundColor: colors.borderLight,
+    marginHorizontal: 10,
   },
-  menuBtnIcon: { width: 32, height: 32, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
-  menuBtnLabel: { flex: 1, fontSize: 14, fontWeight: '600', color: colors.text },
-  menuBadge: { backgroundColor: colors.surfaceSecondary, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 10 },
-  menuBadgeText: { fontSize: 12, fontWeight: '800', color: colors.textSecondary },
   
   logoutBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 10,
-    padding: 14,
-    backgroundColor: colors.surfaceSecondary,
-    borderRadius: 16,
+    padding: 18,
+    backgroundColor: colors.surface,
+    borderRadius: 20,
     marginTop: 10,
+    borderWidth: 1,
+    borderColor: colors.borderLight,
   },
-  logoutText: { fontSize: 14, fontWeight: '800', color: colors.error },
-  version: { textAlign: 'center', fontSize: 12, color: colors.textMuted, marginTop: 10 },
+  logoutText: { fontSize: 16, fontWeight: '700', color: colors.error },
+  version: { textAlign: 'center', fontSize: 12, color: colors.textMuted, marginTop: 20 },
 
   // Modal Styles
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end' },
@@ -476,6 +677,6 @@ const createStyles = (colors: typeof Colors.light) => StyleSheet.create({
     elevation: 8,
   },
   saveBtnDisabled: { backgroundColor: colors.textSecondary },
-  saveBtnText: { color: '#fff', fontSize: 16, fontWeight: '800' },
+  saveBtnText: { color: colors.background, fontSize: 16, fontWeight: '800' },
 });
 
