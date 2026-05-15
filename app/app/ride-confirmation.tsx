@@ -535,18 +535,7 @@ export default function RideConfirmationScreen() {
         </ScrollView>
 
         <View style={styles.footer}>
-          <TouchableOpacity style={styles.paymentMethodCard}>
-            <View style={styles.paymentMethodLeft}>
-              <View style={styles.mastercardIcon}>
-                <View style={[styles.mcCircle, { backgroundColor: "#EB001B" }]} />
-                <View style={[styles.mcCircle, { backgroundColor: "#F79E1B", marginLeft: -8 }]} />
-              </View>
-              <Text style={styles.paymentMethodText}>
-                Mastercard •••• 8654 (Babblu New ...
-              </Text>
-            </View>
-            <Ionicons name="chevron-forward" size={18} color={colors.textSecondary} />
-          </TouchableOpacity>
+         
 
           <View style={styles.actionRow}>
             <TouchableOpacity

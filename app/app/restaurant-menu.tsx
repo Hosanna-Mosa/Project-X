@@ -16,6 +16,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Colors from "@/constants/colors";
 import { useThemeStore } from "@/contexts/themeStore";
 import { useDeliveryStore } from "@/contexts/deliveryStore";
+import { useCartStore } from "@/contexts/cartStore";
 
 interface FoodItem {
   _id: string;
@@ -28,15 +29,20 @@ interface FoodItem {
 }
 
 export default function RestaurantMenu() {
-  const { id, name, image, rating, reviews } = useLocalSearchParams();
+  const { id, name, image, rating, reviews, isMeat } = useLocalSearchParams();
+
   const insets = useSafeAreaInsets();
   const { theme } = useThemeStore();
   const { setVendorId } = useDeliveryStore();
+  const { items, addItem, updateQuantity, getTotalPrice, getItemCount } = useCartStore();
   const colors = Colors[theme];
   const [loading, setLoading] = useState(true);
   const [menu, setMenu] = useState<FoodItem[]>([]);
   const [activeCategory, setActiveCategory] = useState("");
   const scrollY = React.useRef(new Animated.Value(0)).current;
+
+  const itemCount = getItemCount();
+  const totalPrice = getTotalPrice();
 
   useEffect(() => {
     if (id) setVendorId(id as string);
@@ -46,11 +52,24 @@ export default function RestaurantMenu() {
     const fetchMenu = async () => {
       try {
         const baseUrl = process.env.EXPO_PUBLIC_API_URL;
-        const response = await fetch(`${baseUrl}/api/food/vendor/${id}`);
+        const endpoint = isMeat === "true" 
+          ? `${baseUrl}/api/meat/menu/${id}`
+          : `${baseUrl}/api/food/vendor/${id}`;
+          
+        const response = await fetch(endpoint);
         const data = await response.json();
-        setMenu(data);
-        if (data.length > 0) {
-          setActiveCategory(data[0].category);
+        
+        // Meat items have slightly different structure
+        const normalizedData = data.map((item: any) => ({
+          ...item,
+          isVeg: false,
+          images: item.images || [item.image || 'https://images.unsplash.com/photo-1587593810167-a84920ea0781?w=400'],
+          description: item.description || `Fresh ${item.name} - ${item.weight}`
+        }));
+
+        setMenu(normalizedData);
+        if (normalizedData.length > 0) {
+          setActiveCategory(normalizedData[0].category);
         }
       } catch (error) {
         console.error("Error fetching menu:", error);
@@ -59,7 +78,7 @@ export default function RestaurantMenu() {
       }
     };
     fetchMenu();
-  }, [id]);
+  }, [id, isMeat]);
 
   const groupedMenu = menu.reduce((acc, item) => {
     if (!acc[item.category]) acc[item.category] = [];
@@ -160,9 +179,32 @@ export default function RestaurantMenu() {
                       {item.description}
                     </Text>
                   </View>
-                  <TouchableOpacity style={[styles.addButton, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-                    <Text style={[styles.addButtonText, { color: colors.primary }]}>ADD</Text>
-                  </TouchableOpacity>
+                  {items.find(i => i._id === item._id) ? (
+                    <View style={styles.quantityContainer}>
+                      <TouchableOpacity 
+                        onPress={() => updateQuantity(item._id, (items.find(i => i._id === item._id)?.quantity || 0) - 1)}
+                        style={[styles.qtyBtn, { borderColor: colors.border }]}
+                      >
+                        <Feather name="minus" size={16} color={colors.primary} />
+                      </TouchableOpacity>
+                      <Text style={[styles.qtyText, { color: colors.text }]}>
+                        {items.find(i => i._id === item._id)?.quantity}
+                      </Text>
+                      <TouchableOpacity 
+                        onPress={() => addItem(item, id as string)}
+                        style={[styles.qtyBtn, { borderColor: colors.border }]}
+                      >
+                        <Feather name="plus" size={16} color={colors.primary} />
+                      </TouchableOpacity>
+                    </View>
+                  ) : (
+                    <TouchableOpacity 
+                      onPress={() => addItem(item, id as string)}
+                      style={[styles.addButton, { backgroundColor: colors.surface, borderColor: colors.border }]}
+                    >
+                      <Text style={[styles.addButtonText, { color: colors.primary }]}>ADD</Text>
+                    </TouchableOpacity>
+                  )}
                 </View>
               ))}
             </View>
@@ -171,16 +213,21 @@ export default function RestaurantMenu() {
       </ScrollView>
 
       {/* Sleek Black Cart Bar */}
-      <View style={[styles.cartSummary, { bottom: insets.bottom + 20 }]}>
-        <View>
-          <Text style={styles.cartItems}>1 ITEM IN CART</Text>
-          <Text style={styles.cartPrice}>₹{menu[0]?.price || 0} plus taxes</Text>
+      {itemCount > 0 && (
+        <View style={[styles.cartSummary, { bottom: insets.bottom + 20 }]}>
+          <View>
+            <Text style={styles.cartItems}>{itemCount} {itemCount === 1 ? 'ITEM' : 'ITEMS'} IN CART</Text>
+            <Text style={styles.cartPrice}>₹{totalPrice} plus taxes</Text>
+          </View>
+          <TouchableOpacity 
+            style={styles.viewCartButton}
+            onPress={() => router.push("/delivery/checkout")}
+          >
+            <Text style={styles.viewCartText}>View Cart</Text>
+            <Ionicons name="arrow-forward" size={18} color="white" />
+          </TouchableOpacity>
         </View>
-        <TouchableOpacity style={styles.viewCartButton}>
-          <Text style={styles.viewCartText}>View Cart</Text>
-          <Ionicons name="arrow-forward" size={18} color="white" />
-        </TouchableOpacity>
-      </View>
+      )}
     </View>
   );
 }
@@ -410,5 +457,24 @@ const styles = StyleSheet.create({
     color: 'white',
     fontSize: 14,
     fontWeight: '700',
+  },
+  quantityContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  qtyBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  qtyText: {
+    fontSize: 16,
+    fontWeight: '700',
+    minWidth: 20,
+    textAlign: 'center',
   },
 });

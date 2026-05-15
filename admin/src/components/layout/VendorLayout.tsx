@@ -6,7 +6,8 @@ import {
   Settings, 
   LogOut,
   Bell,
-  Search
+  Search,
+  Drumstick
 } from "lucide-react";
 import { TopBar } from "./TopBar";
 
@@ -39,29 +40,44 @@ export function VendorLayout({ children, searchPlaceholder }: VendorLayoutProps)
         <div>
           <div className="px-6 py-8">
             <h1 className="text-xl font-bold text-primary flex items-center gap-2">
-              <UtensilsCrossed className="h-6 w-6" />
-              VendorHub
+              {vendorData.role === "meat_vendor" ? (
+                <Drumstick className="h-6 w-6" />
+              ) : (
+                <UtensilsCrossed className="h-6 w-6" />
+              )}
+              {vendorData.role === "meat_vendor" ? "Meat Center" : "VendorHub"}
             </h1>
             <p className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground font-medium mt-1">
-              Precision Logistics
+              {vendorData.role === "meat_vendor" ? "Fresh Supplies" : "Precision Logistics"}
             </p>
           </div>
 
+
           <nav className="mt-4 flex flex-col gap-1 px-3">
             {navItems.map((item) => {
-              const isActive = location.pathname === item.url;
+              let title = item.title;
+              let url = item.url;
+              let Icon = item.icon;
+
+              if (vendorData.role === "meat_vendor" && item.title === "Menu Items") {
+                title = "Meat Inventory";
+                url = "/vendor/meat-menu";
+                Icon = Drumstick;
+              }
+
+              const isActive = location.pathname === url;
               return (
                 <Link
-                  key={item.title}
-                  to={item.url}
+                  key={title}
+                  to={url}
                   className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all ${
                     isActive
                       ? "bg-primary text-primary-foreground shadow-lg shadow-primary/20"
                       : "text-muted-foreground hover:bg-muted/80 hover:text-foreground"
                   }`}
                 >
-                  <item.icon className="h-5 w-5" />
-                  <span>{item.title}</span>
+                  <Icon className="h-5 w-5" />
+                  <span>{title}</span>
                 </Link>
               );
             })}

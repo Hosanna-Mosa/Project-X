@@ -1,10 +1,20 @@
-import { Search, Bell, Building2, User } from "lucide-react";
+import { Search, Bell, Building2, User, LogOut } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 
 interface TopBarProps {
   searchPlaceholder?: string;
 }
 
 export function TopBar({ searchPlaceholder = "Search orders, drivers..." }: TopBarProps) {
+  const navigate = useNavigate();
+
+  const handleLogout = () => {
+    localStorage.removeItem("admin_token");
+    localStorage.removeItem("vendor_token");
+    localStorage.removeItem("vendor_data");
+    navigate("/vendor-login");
+  };
+
   return (
     <header className="h-14 bg-card border-b border-border flex items-center justify-between px-6 shrink-0">
       <div className="relative w-[360px]">
@@ -25,8 +35,17 @@ export function TopBar({ searchPlaceholder = "Search orders, drivers..." }: TopB
           <Building2 className="h-[18px] w-[18px] text-muted-foreground" />
           <span className="text-sm text-muted-foreground">City Selector</span>
         </button>
-        <div className="flex items-center gap-2 pl-3 border-l border-border">
-          <span className="text-sm font-medium text-foreground">Admin Profile</span>
+        <div className="flex items-center gap-3 pl-3 border-l border-border">
+          <div className="flex flex-col items-end mr-1">
+            <span className="text-sm font-medium text-foreground">Admin Profile</span>
+            <button 
+              onClick={handleLogout}
+              className="text-[10px] text-destructive hover:underline flex items-center gap-1"
+            >
+              <LogOut className="h-2.5 w-2.5" />
+              Sign Out
+            </button>
+          </div>
           <div className="h-8 w-8 rounded-full bg-primary flex items-center justify-center">
             <User className="h-4 w-4 text-primary-foreground" />
           </div>
@@ -35,3 +54,4 @@ export function TopBar({ searchPlaceholder = "Search orders, drivers..." }: TopB
     </header>
   );
 }
+

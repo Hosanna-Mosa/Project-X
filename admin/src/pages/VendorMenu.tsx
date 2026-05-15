@@ -2,7 +2,7 @@ import { useState, useCallback } from "react";
 import { VendorLayout } from "@/components/layout/VendorLayout";
 import { Plus, Utensils, IndianRupee, Trash2, Edit2, Search, Filter, Upload, X, Loader2 } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { adminFetch } from "@/lib/api-client";
+import { adminFetch, BASE_URL } from "@/lib/api-client";
 import { toast } from "sonner";
 import { useDropzone } from "react-dropzone";
 import {
@@ -46,7 +46,7 @@ export default function VendorMenu() {
     acceptedFiles.forEach(file => formData.append("images", file));
 
     try {
-      const response = await fetch(`http://localhost:5000/api/food/upload`, {
+      const response = await fetch(`${BASE_URL}/food/upload`, {
         method: "POST",
         body: formData,
       });

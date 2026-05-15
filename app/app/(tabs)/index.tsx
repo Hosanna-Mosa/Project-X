@@ -10,6 +10,7 @@ import {
   View,
   ActivityIndicator,
   useWindowDimensions,
+  Animated,
 } from "react-native";
 import { useRef } from "react";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -47,35 +48,56 @@ export default function HomeScreen() {
   const styles = React.useMemo(() => createStyles(colors), [theme]);
 
   const [restaurants, setRestaurants] = useState<any[]>([]);
+  const [meatCenters, setMeatCenters] = useState<any[]>([]);
+  const [activeService, setActiveService] = useState<'Food' | 'Meat'>('Food');
   const [isLocationSheetOpen, setIsLocationSheetOpen] = useState(false);
   const [selectedAddress, setSelectedAddress] = useState<any>(null);
+
+  const getCoords = async () => {
+    if (selectedAddress?.location?.coordinates) {
+      const [lng, lat] = selectedAddress.location.coordinates;
+      return { lat, lng };
+    }
+    let { status } = await Location.requestForegroundPermissionsAsync();
+    if (status !== 'granted') return { lat: 17.4447, lng: 78.3498 };
+    const loc = await Location.getCurrentPositionAsync({});
+    return { lat: loc.coords.latitude, lng: loc.coords.longitude };
+  };
 
   const fetchVendors = async (lat: number, lng: number, pageNum: number = 1) => {
     try {
       if (pageNum === 1) setLoading(true);
       else setLoadingMore(true);
-
       const baseUrl = process.env.EXPO_PUBLIC_API_URL;
-      const url = `${baseUrl}/api/vendors/nearby?lat=${lat}&lng=${lng}&page=${pageNum}&limit=20`;
-      console.log(`[APP] Fetching vendors from: ${url}`);
-      
-      const response = await fetch(url);
+      const response = await fetch(`${baseUrl}/api/vendors/nearby?lat=${lat}&lng=${lng}&page=${pageNum}&limit=20`);
       const data = await response.json();
-      
-      console.log(`[APP] Received ${data?.length || 0} vendors`);
-      
       if (Array.isArray(data)) {
-        if (data.length < 20) setHasMore(false);
-        else setHasMore(true);
-
-        if (pageNum === 1) {
-          setRestaurants(data);
-        } else {
-          setRestaurants(prev => [...prev, ...data]);
-        }
+        if (data.length < 20) setHasMore(false); else setHasMore(true);
+        if (pageNum === 1) setRestaurants(data);
+        else setRestaurants(prev => [...prev, ...data]);
       }
     } catch (error) {
       console.error("Error fetching vendors:", error);
+    } finally {
+      setLoading(false);
+      setLoadingMore(false);
+    }
+  };
+
+  const fetchMeatCenters = async (lat: number, lng: number, pageNum: number = 1) => {
+    try {
+      if (pageNum === 1) setLoading(true);
+      else setLoadingMore(true);
+      const baseUrl = process.env.EXPO_PUBLIC_API_URL;
+      const response = await fetch(`${baseUrl}/api/meat/nearby?lat=${lat}&lng=${lng}&page=${pageNum}&limit=20`);
+      const data = await response.json();
+      if (Array.isArray(data)) {
+        if (data.length < 20) setHasMore(false); else setHasMore(true);
+        if (pageNum === 1) setMeatCenters(data);
+        else setMeatCenters(prev => [...prev, ...data]);
+      }
+    } catch (error) {
+      console.error("Error fetching meat centers:", error);
     } finally {
       setLoading(false);
       setLoadingMore(false);
@@ -86,60 +108,56 @@ export default function HomeScreen() {
     (async () => {
       setPage(1);
       setHasMore(true);
-      
-      let lat, lng;
-      if (selectedAddress?.location?.coordinates) {
-        [lng, lat] = selectedAddress.location.coordinates;
-      } else {
-        let { status } = await Location.requestForegroundPermissionsAsync();
-        if (status !== 'granted') {
-          lat = 17.4447;
-          lng = 78.3498;
-        } else {
-          let location = await Location.getCurrentPositionAsync({});
-          lat = location.coords.latitude;
-          lng = location.coords.longitude;
-        }
-      }
-      fetchVendors(lat, lng, 1);
+      const { lat, lng } = await getCoords();
+      if (activeService === 'Meat') fetchMeatCenters(lat, lng, 1);
+      else fetchVendors(lat, lng, 1);
     })();
-  }, [selectedAddress]);
+  }, [selectedAddress, activeService]);
 
   const loadMore = () => {
     if (!loadingMore && hasMore) {
       const nextPage = page + 1;
       setPage(nextPage);
-      
-      let lat, lng;
-      if (selectedAddress?.location?.coordinates) {
-        [lng, lat] = selectedAddress.location.coordinates;
-      } else {
-        // Fallback to default or last known (simplified for this logic)
-        lat = 17.4447;
-        lng = 78.3498;
-      }
-      fetchVendors(lat, lng, nextPage);
+      const lat = 17.4447, lng = 78.3498;
+      if (activeService === 'Meat') fetchMeatCenters(lat, lng, nextPage);
+      else fetchVendors(lat, lng, nextPage);
     }
+  };
+
+  const handleServiceSwitch = (service: 'Food' | 'Meat') => {
+    if (activeService === service) return;
+    setPage(1);
+    setHasMore(true);
+    setActiveService(service);
   };
 
   const topPadding = insets.top + (Platform.OS === "web" ? 67 : 0);
 
   const renderHeader = () => (
     <>
-      <ScrollView 
-        horizontal 
-        showsHorizontalScrollIndicator={false} 
-        contentContainerStyle={styles.foodCategoriesContainer}
-      >
-        {FOOD_CATEGORIES.map((cat) => (
-          <TouchableOpacity key={cat.id} style={styles.categoryCircleWrapper}>
-            <View style={styles.categoryCircle}>
-              <Image source={{ uri: cat.image }} style={styles.categoryImage} />
-            </View>
-            <Text style={styles.categoryLabel} numberOfLines={1}>{cat.name}</Text>
-          </TouchableOpacity>
-        ))}
-      </ScrollView>
+      {activeService === 'Food' && (
+        <ScrollView 
+          horizontal 
+          showsHorizontalScrollIndicator={false} 
+          contentContainerStyle={styles.foodCategoriesContainer}
+        >
+          {FOOD_CATEGORIES.map((cat) => (
+            <TouchableOpacity key={cat.id} style={styles.categoryCircleWrapper}>
+              <View style={styles.categoryCircle}>
+                <Image source={{ uri: cat.image }} style={styles.categoryImage} />
+              </View>
+              <Text style={styles.categoryLabel} numberOfLines={1}>{cat.name}</Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+      )}
+
+      {activeService === 'Meat' && (
+        <View style={styles.meatBannerRow}>
+          <Text style={styles.meatBannerTitle}>🥩 Nearby Meat Centers</Text>
+          <Text style={styles.meatBannerSubtitle}>Fresh meat delivered to your door</Text>
+        </View>
+      )}
 
       <View style={styles.filterRow}>
         <TouchableOpacity style={styles.filterChip}>
@@ -150,9 +168,11 @@ export default function HomeScreen() {
           <Text style={styles.filterChipText}>Sort by</Text>
           <Ionicons name="chevron-down" size={14} color={colors.text} />
         </TouchableOpacity>
-        <TouchableOpacity style={styles.filterChip}>
-          <Text style={styles.filterChipText}>99 Store</Text>
-        </TouchableOpacity>
+        {activeService === 'Food' && (
+          <TouchableOpacity style={styles.filterChip}>
+            <Text style={styles.filterChipText}>99 Store</Text>
+          </TouchableOpacity>
+        )}
         <TouchableOpacity style={styles.filterChip}>
           <Text style={styles.filterChipText}>Offers</Text>
         </TouchableOpacity>
@@ -160,12 +180,32 @@ export default function HomeScreen() {
     </>
   );
 
+  const scrollY = useRef(new Animated.Value(0)).current;
+
+  const headerTranslateY = scrollY.interpolate({
+    inputRange: [0, 100],
+    outputRange: [0, -60],
+    extrapolate: 'clamp',
+  });
+
+  const topRowOpacity = scrollY.interpolate({
+    inputRange: [0, 50],
+    outputRange: [1, 0],
+    extrapolate: 'clamp',
+  });
+
+  const categoriesTranslateY = scrollY.interpolate({
+    inputRange: [0, 100],
+    outputRange: [0, -40],
+    extrapolate: 'clamp',
+  });
+
   return (
     <View style={styles.root}>
-      <FlatList
-        data={restaurants}
+      <Animated.FlatList
+        data={activeService === 'Meat' ? meatCenters : restaurants}
         keyExtractor={(item) => item._id}
-        renderItem={({ item }) => <RestaurantListItem {...item} />}
+        renderItem={({ item }) => <RestaurantListItem {...item} isMeat={activeService === 'Meat'} />}
         ListHeaderComponent={renderHeader}
         ListFooterComponent={() => (
           loadingMore ? <ActivityIndicator size="small" color={colors.primary} style={{ marginVertical: 20 }} /> : <View style={{ height: 120 }} />
@@ -175,21 +215,28 @@ export default function HomeScreen() {
         contentContainerStyle={[styles.mainScrollContent, { paddingTop: topPadding + 160 }]}
         showsVerticalScrollIndicator={false}
         refreshing={loading}
-        onRefresh={() => {
+        onRefresh={async () => {
           setPage(1);
           setHasMore(true);
-          if (selectedAddress?.location?.coordinates) {
-             const [lng, lat] = selectedAddress.location.coordinates;
-             fetchVendors(lat, lng, 1);
-          } else {
-             fetchVendors(17.4447, 78.3498, 1);
-          }
+          const { lat, lng } = await getCoords();
+          if (activeService === 'Meat') fetchMeatCenters(lat, lng, 1);
+          else fetchVendors(lat, lng, 1);
         }}
+        onScroll={Animated.event(
+          [{ nativeEvent: { contentOffset: { y: scrollY } } }],
+          { useNativeDriver: true }
+        )}
       />
 
       <View style={styles.overlay} pointerEvents="box-none">
-        <View style={[styles.flushHeader, { paddingTop: topPadding + 8 }]}>
-          <View style={styles.headerTopRow}>
+        <Animated.View style={[
+          styles.flushHeader, 
+          { 
+            paddingTop: topPadding + 8,
+            transform: [{ translateY: headerTranslateY }] 
+          }
+        ]}>
+          <Animated.View style={[styles.headerTopRow, { opacity: topRowOpacity }]}>
             <View style={styles.locationInfoBox}>
               <View style={styles.deliveryTitleRow}>
                 <Ionicons name="location" size={14} color={colors.primary} style={{marginRight: 6}} />
@@ -227,9 +274,12 @@ export default function HomeScreen() {
                   <Ionicons name="person-outline" size={18} color={colors.text} />
               </TouchableOpacity>
             </View>
-          </View>
+          </Animated.View>
 
-          <View style={styles.categoriesContainer}>
+          <Animated.View style={[
+            styles.categoriesContainer,
+            { transform: [{ translateY: categoriesTranslateY }] }
+          ]}>
             {scrollOffset > 0 && (
               <TouchableOpacity 
                 style={[styles.scrollButton, styles.scrollButtonLeft]} 
@@ -260,7 +310,8 @@ export default function HomeScreen() {
               <ServiceCategory
                 icon="fast-food"
                 label="Food"
-                onPress={() => router.push({ pathname: "/all-services" })}
+                active={activeService === 'Food'}
+                onPress={() => handleServiceSwitch('Food')}
               />
               <ServiceCategory
                 icon="fitness"
@@ -270,7 +321,8 @@ export default function HomeScreen() {
               <ServiceCategory
                 icon="restaurant"
                 label="Meat"
-                onPress={() => router.push({ pathname: "/service-selection", params: { label: "Meat" } })}
+                active={activeService === 'Meat'}
+                onPress={() => handleServiceSwitch('Meat')}
               />
               <ServiceCategory
                 icon="paw"
@@ -286,8 +338,8 @@ export default function HomeScreen() {
             >
               <Ionicons name="chevron-forward" size={16} color={colors.text} />
             </TouchableOpacity>
-          </View>
-        </View>
+          </Animated.View>
+        </Animated.View>
       </View>
 
       <View style={[styles.bottomSearchOverlay, { bottom: insets.bottom + 75 }]}>
@@ -487,7 +539,7 @@ const createStyles = (colors: typeof Colors.light) => StyleSheet.create({
     alignItems: "center",
     backgroundColor: colors.surface,
     paddingHorizontal: 16,
-    paddingVertical: 8,
+    paddingVertical: Platform.OS === 'ios' ? 15 : 8,
     borderRadius: 30,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 10 },
@@ -499,7 +551,7 @@ const createStyles = (colors: typeof Colors.light) => StyleSheet.create({
   },
   searchInput: {
     flex: 1,
-    fontSize: 11,
+    fontSize: Platform.OS === 'ios' ? 13 : 11,
     fontWeight: "500",
     color: colors.text,
     marginLeft: 8,
@@ -509,5 +561,22 @@ const createStyles = (colors: typeof Colors.light) => StyleSheet.create({
     height: 16,
     backgroundColor: colors.border,
     marginHorizontal: 10,
+  },
+  meatBannerRow: {
+    paddingHorizontal: 16,
+    paddingTop: 20,
+    paddingBottom: 12,
+  },
+  meatBannerTitle: {
+    fontSize: 20,
+    fontWeight: '900',
+    color: colors.text,
+    letterSpacing: -0.3,
+  },
+  meatBannerSubtitle: {
+    fontSize: 13,
+    color: colors.textSecondary,
+    fontWeight: '500',
+    marginTop: 3,
   },
 });
