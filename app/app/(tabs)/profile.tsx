@@ -47,7 +47,7 @@ export default function ProfileScreen() {
   const fetchProfile = async () => {
     try {
       setLoading(true);
-      const data = await customFetch<any>("/api/users/profile");
+      const data = await customFetch<any>("/api/v1/users/profile");
       if (data) {
         setUser(data);
         setFormData({
@@ -87,7 +87,7 @@ export default function ProfileScreen() {
 
       formData.append('image', { uri, name: filename, type } as any);
 
-      const data = await customFetch<any>("/api/users/profile-pic", {
+      const data = await customFetch<any>("/api/v1/users/profile-pic", {
         method: "POST",
         body: formData,
         isFormData: true,
@@ -108,7 +108,7 @@ export default function ProfileScreen() {
   const handleUpdateProfile = async () => {
     try {
       setLoading(true);
-      const data = await customFetch<any>("/api/users/profile", {
+      const data = await customFetch<any>("/api/v1/users/profile", {
         method: "PATCH",
         body: JSON.stringify(formData),
       });

@@ -69,7 +69,7 @@ export default function HomeScreen() {
       if (pageNum === 1) setLoading(true);
       else setLoadingMore(true);
       const baseUrl = process.env.EXPO_PUBLIC_API_URL;
-      const response = await fetch(`${baseUrl}/api/vendors/nearby?lat=${lat}&lng=${lng}&page=${pageNum}&limit=20`);
+      const response = await fetch(`${baseUrl}/api/v1/vendors/nearby?lat=${lat}&lng=${lng}&page=${pageNum}&limit=20`);
       const data = await response.json();
       if (Array.isArray(data)) {
         if (data.length < 20) setHasMore(false); else setHasMore(true);
@@ -89,7 +89,7 @@ export default function HomeScreen() {
       if (pageNum === 1) setLoading(true);
       else setLoadingMore(true);
       const baseUrl = process.env.EXPO_PUBLIC_API_URL;
-      const response = await fetch(`${baseUrl}/api/meat/nearby?lat=${lat}&lng=${lng}&page=${pageNum}&limit=20`);
+      const response = await fetch(`${baseUrl}/api/v1/meat/nearby?lat=${lat}&lng=${lng}&page=${pageNum}&limit=20`);
       const data = await response.json();
       if (Array.isArray(data)) {
         if (data.length < 20) setHasMore(false); else setHasMore(true);

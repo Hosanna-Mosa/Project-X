@@ -122,7 +122,7 @@ export default function LocationSelectionScreen() {
     }
     setIsSearching(true);
     try {
-      const data = await customFetch<any[]>(`/api/places/autocomplete?input=${encodeURIComponent(text)}`);
+      const data = await customFetch<any[]>(`/api/v1/places/autocomplete?input=${encodeURIComponent(text)}`);
       setSearchResults(data);
     } catch (e) {
       console.error("Search error:", e);
@@ -131,7 +131,7 @@ export default function LocationSelectionScreen() {
 
   const selectResult = async (result: any) => {
     try {
-      const details = await customFetch<{ lat: number, lng: number }>(`/api/places/details/${result.id}`);
+      const details = await customFetch<{ lat: number, lng: number }>(`/api/v1/places/details/${result.id}`);
       const completeData = {
         description: result.address,
         lat: details.lat,

@@ -10,6 +10,7 @@ export class SocketManager {
   private constructor(server: http.Server) {
     this.io = new Server(server, {
       cors: { origin: "*" },
+      path: "/ws/v1/socket.io",
     });
 
     this.setupRedis();

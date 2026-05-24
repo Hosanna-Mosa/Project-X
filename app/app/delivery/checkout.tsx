@@ -40,7 +40,7 @@ export default function CheckoutScreen() {
     setIsProcessing(true);
     try {
       // 1. Create Razorpay Order on Backend
-      const orderResponse = await fetch(`${apiUrl}/api/payments/create-order`, {
+      const orderResponse = await fetch(`${apiUrl}/api/v1/payments/create-order`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ amount: price.total }),
@@ -62,7 +62,7 @@ export default function CheckoutScreen() {
       });
 
       // 3. Verify Payment AND Create Order
-      const verifyResponse = await fetch(`${apiUrl}/api/payments/verify`, {
+      const verifyResponse = await fetch(`${apiUrl}/api/v1/payments/verify`, {
         method: "POST",
         headers: { 
           "Content-Type": "application/json",

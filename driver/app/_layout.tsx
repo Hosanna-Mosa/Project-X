@@ -16,7 +16,6 @@ import { SafeAreaProvider } from "react-native-safe-area-context";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { useDriverStore } from "@/store/driverStore";
 import { LocationHandler } from "@/components/LocationHandler";
-import { socketService } from "@/utils/socketService";
 
 SplashScreen.preventAutoHideAsync();
 
@@ -24,6 +23,7 @@ const queryClient = new QueryClient();
 
 function RootLayoutNav() {
   const isAuthenticated = useDriverStore((s) => s.isAuthenticated);
+  const hasCompletedOnboarding = useDriverStore((s) => s.hasCompletedOnboarding);
 
   useEffect(() => {
     if (!isAuthenticated) {
@@ -31,18 +31,20 @@ function RootLayoutNav() {
     }
   }, [isAuthenticated]);
 
+  useEffect(() => {
+    if (isAuthenticated && hasCompletedOnboarding) {
+      router.replace("/(tabs)");
+    } else if (isAuthenticated && !hasCompletedOnboarding) {
+      router.replace("/onboarding");
+    }
+  }, [isAuthenticated, hasCompletedOnboarding]);
+
   return (
     <Stack screenOptions={{ headerShown: false }}>
       <Stack.Screen name="auth" options={{ headerShown: false }} />
+      <Stack.Screen name="onboarding" options={{ headerShown: false }} />
       <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-      <Stack.Screen
-        name="order-navigation"
-        options={{ headerShown: false, presentation: "fullScreenModal" }}
-      />
-      <Stack.Screen
-        name="profile"
-        options={{ headerShown: false, presentation: "modal" }}
-      />
+      <Stack.Screen name="+not-found" />
       <LocationHandler />
     </Stack>
   );

@@ -1,33 +1,54 @@
 export const Colors = {
-  primary: "#06B6D4",
-  primaryDark: "#0891B2",
-  primaryLight: "#CFFAFE",
-  accent: "#0E7490",
-  background: "#FFFFFF",
-  surface: "#F8FAFC",
-  surfaceAlt: "#F1F5F9",
-  border: "#E2E8F0",
-  text: "#0F172A",
-  textSecondary: "#64748B",
-  textMuted: "#94A3B8",
-  success: "#10B981",
-  successLight: "#D1FAE5",
-  warning: "#F59E0B",
-  warningLight: "#FEF3C7",
-  error: "#EF4444",
-  errorLight: "#FEE2E2",
-  white: "#FFFFFF",
+  // Primary (Brand Cyan)
+  primary: "#00B7EB",
+  primaryDark: "#0095C4",
+  primaryLight: "#CCF2FF",
+  primaryContainer: "#33C9FF",
+  
+  // Secondary (Professional Navy)
+  secondary: "#565e74",
+  secondaryLight: "#dae2fd",
+  secondaryContainer: "#dae2fd",
+  
+  // Tertiary / Success (Operational Green)
+  success: "#006b2d",
+  successLight: "#6bff8f",
+  tertiary: "#006b2d",
+  tertiaryLight: "#f7fff3",
+  
+  // Surface & Background
+  background: "#f8f9ff",
+  surface: "#ffffff",
+  surfaceContainer: "#e5eeff",
+  surfaceContainerLow: "#eff4ff",
+  surfaceContainerHigh: "#dce9ff",
+  border: "#e2e8f0",
+  outline: "#907065",
+  
+  // Text
+  text: "#0b1c30",
+  textSecondary: "#5c4037",
+  textMuted: "#907065",
+  
+  // Functional
+  white: "#ffffff",
   black: "#000000",
-  overlay: "rgba(0,0,0,0.5)",
-  cardShadow: "rgba(6,182,212,0.12)",
-  online: "#10B981",
-  offline: "#94A3B8",
-  stop1: "#06B6D4",
-  stop2: "#8B5CF6",
-  stop3: "#F59E0B",
-  tabBar: "#FFFFFF",
-  tabActive: "#06B6D4",
-  tabInactive: "#94A3B8",
+  error: "#ba1a1a",
+  errorLight: "#ffdad6",
+  overlay: "rgba(11,28,48,0.5)",
+  cardShadow: "rgba(86,94,116,0.08)",
+  
+  // Status
+  online: "#006b2d",
+  offline: "#907065",
+  
+  // Tab Bar
+  tabBar: "#ffffff",
+  tabActive: "#00B7EB",
+  tabInactive: "#907065",
+  
+  // Surge Zone
+  surge: "#00E5FF",
 };
 
 export default Colors;

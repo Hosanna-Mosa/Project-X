@@ -1,11 +1,23 @@
 import mongoose, { Schema, Document } from "mongoose";
 
+export enum ServiceType {
+  BIKE = "bike",
+  AUTO = "auto",
+  CAB = "cab",
+  CAB_PRIME = "cab_prime",
+  DELIVERY = "delivery",
+}
+
 export enum OrderStatus {
   CREATED = "CREATED",
   SEARCHING_DRIVER = "SEARCHING_DRIVER",
   DRIVER_ASSIGNED = "DRIVER_ASSIGNED",
   PICKING_ITEMS = "PICKING_ITEMS",
   ON_THE_WAY = "ON_THE_WAY",
+  // Ride-specific statuses
+  ARRIVED_PICKUP = "ARRIVED_PICKUP",
+  IN_TRANSIT = "IN_TRANSIT",
+  COMPLETED = "COMPLETED",
   DELIVERED = "DELIVERED",
   CANCELLED = "CANCELLED",
 }
@@ -31,8 +43,16 @@ export interface IOrder extends Document {
   vendor?: mongoose.Types.ObjectId;
   driver?: mongoose.Types.ObjectId;
   status: OrderStatus;
+  serviceType: ServiceType;
   totalDistance: number;
   totalPrice: number;
+  priceBreakdown: {
+    baseFare: number;
+    distanceFare: number;
+    timeFare: number;
+    surgeMultiplier: number;
+    total: number;
+  };
   stops: IStop[];
   createdAt: Date;
   updatedAt: Date;
@@ -70,8 +90,20 @@ const OrderSchema: Schema = new Schema(
       enum: Object.values(OrderStatus),
       default: OrderStatus.CREATED,
     },
+    serviceType: {
+      type: String,
+      enum: Object.values(ServiceType),
+      default: ServiceType.CAB,
+    },
     totalDistance: { type: Number, default: 0 },
     totalPrice: { type: Number, default: 0 },
+    priceBreakdown: {
+      baseFare: { type: Number, default: 0 },
+      distanceFare: { type: Number, default: 0 },
+      timeFare: { type: Number, default: 0 },
+      surgeMultiplier: { type: Number, default: 1 },
+      total: { type: Number, default: 0 },
+    },
     stops: [StopSchema],
   },
   { timestamps: true }

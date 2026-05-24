@@ -43,7 +43,7 @@ export function FloatingCart() {
   const isTabArea = segments.includes('(tabs)');
   const isMenuArea = pathname.includes('restaurant-menu');
   const isCheckoutArea = pathname.includes('checkout');
-  const shouldShow = !!token && (isTabArea || isMenuArea || isCheckoutArea);
+  const shouldShow = !!token && (isTabArea || isMenuArea || isCheckoutArea) && itemCount > 0;
 
   // Dynamic Calculation for Search Bar Height & Position
   // On iOS, search bar has paddingVertical: 15. On Android: 8.

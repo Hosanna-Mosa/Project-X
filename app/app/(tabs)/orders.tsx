@@ -53,7 +53,7 @@ export default function OrdersScreen() {
   const fetchOrders = async () => {
     try {
       setLoading(true);
-      const data = await customFetch<any[]>("/api/orders");
+      const data = await customFetch<any[]>("/api/v1/orders");
       if (data) setOrders(data);
     } catch (err) {
       console.error("Fetch orders error:", err);

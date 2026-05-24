@@ -52,7 +52,7 @@ export default function AuthScreen() {
       try {
         await loginWithPassword(`+91${phone}`, password);
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-        router.replace("/(tabs)");
+        router.replace("/onboarding");
       } catch (err: any) {
         Alert.alert("Login Failed", err.message);
       } finally {
@@ -68,7 +68,7 @@ export default function AuthScreen() {
     setLoading(true);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     try {
-      const response = await fetch(`${apiUrl}/api/auth/request-otp`, {
+      const response = await fetch(`${apiUrl}/api/v1/auth/request-otp`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ phone: `+91${phone}` }),
@@ -114,7 +114,7 @@ export default function AuthScreen() {
     if (fullOtp.length < 6) return;
     setLoading(true);
     try {
-      const response = await fetch(`${apiUrl}/api/auth/verify-otp`, {
+      const response = await fetch(`${apiUrl}/api/v1/auth/verify-otp`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ 
@@ -129,7 +129,7 @@ export default function AuthScreen() {
 
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       setAuthenticated(data.user.name, data.user.phone, data.token);
-      router.replace("/(tabs)");
+      router.replace("/onboarding");
     } catch (err: any) {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       Alert.alert("Invalid OTP", err.message);
