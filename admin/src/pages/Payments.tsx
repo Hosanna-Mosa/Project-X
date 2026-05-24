@@ -4,10 +4,10 @@ import { StatusBadge } from "@/components/shared/StatusBadge";
 import { DollarSign, Truck, CreditCard, SlidersHorizontal, Download, Eye, ChevronLeft, ChevronRight, Sparkles } from "lucide-react";
 
 const transactions = [
-  { id: "#TXN-90214", date: "Oct 24, 2023", time: "02:45 PM", route: "Zone A → Downtown Hub", fee: "$24.50", status: "SETTLED", statusVariant: "settled" as const },
-  { id: "#TXN-90215", date: "Oct 24, 2023", time: "03:12 PM", route: "North Wharf → Storage 04", fee: "$18.20", status: "SETTLED", statusVariant: "settled" as const },
-  { id: "#TXN-90216", date: "Oct 24, 2023", time: "03:55 PM", route: "Central → Airport Cargo", fee: "$42.00", status: "PENDING", statusVariant: "pending" as const },
-  { id: "#TXN-90217", date: "Oct 24, 2023", time: "04:10 PM", route: "Zone B → Residential P", fee: "$12.75", status: "SETTLED", statusVariant: "settled" as const },
+  { id: "#TXN-90214", date: "Oct 24, 2023", time: "02:45 PM", route: "Zone A → Downtown Hub", fee: "₹24.50", status: "SETTLED", statusVariant: "settled" as const },
+  { id: "#TXN-90215", date: "Oct 24, 2023", time: "03:12 PM", route: "North Wharf → Storage 04", fee: "₹18.20", status: "SETTLED", statusVariant: "settled" as const },
+  { id: "#TXN-90216", date: "Oct 24, 2023", time: "03:55 PM", route: "Central → Airport Cargo", fee: "₹42.00", status: "PENDING", statusVariant: "pending" as const },
+  { id: "#TXN-90217", date: "Oct 24, 2023", time: "04:10 PM", route: "Zone B → Residential P", fee: "₹12.75", status: "SETTLED", statusVariant: "settled" as const },
 ];
 
 const revenueBreakdown = [
@@ -27,9 +27,9 @@ export default function Payments() {
 
         {/* Stats */}
         <div className="grid grid-cols-3 gap-4">
-          <StatCard icon={<DollarSign className="h-5 w-5" />} label="Total Earnings" value="$142,580.00" badge="MONTHLY" badgeColor="primary" subtitle="+12.4% from last month" />
-          <StatCard icon={<Truck className="h-5 w-5" />} label="Delivery Charges" value="$48,210.50" subtitle="Updated 5 mins ago" badgeColor="primary" />
-          <StatCard icon={<CreditCard className="h-5 w-5" />} label="Driver Payouts" value="$94,369.50" subtitle="98.2% Payout Success Rate" badgeColor="success" />
+          <StatCard icon={<DollarSign className="h-5 w-5" />} label="Total Earnings" value="₹142,580.00" badge="MONTHLY" badgeColor="primary" subtitle="+12.4% from last month" />
+          <StatCard icon={<Truck className="h-5 w-5" />} label="Delivery Charges" value="₹48,210.50" subtitle="Updated 5 mins ago" badgeColor="primary" />
+          <StatCard icon={<CreditCard className="h-5 w-5" />} label="Driver Payouts" value="₹94,369.50" subtitle="98.2% Payout Success Rate" badgeColor="success" />
         </div>
 
         {/* Table */}

@@ -52,7 +52,7 @@ export default function AddStopScreen() {
 
   const fetchNearbySuggestions = async (lat: number, lng: number) => {
     try {
-      const response = await fetch(`${BACKEND_URL}/api/places/nearby?lat=${lat}&lng=${lng}&radius=3000`);
+      const response = await fetch(`${BACKEND_URL}/api/v1/places/nearby?lat=${lat}&lng=${lng}&radius=3000`);
       const data = await response.json();
       if (Array.isArray(data)) {
         setNearbySuggestions(data.slice(0, 8));
@@ -75,7 +75,7 @@ export default function AddStopScreen() {
       try {
         const latParam = currentCoords ? `&lat=${currentCoords.lat}&lng=${currentCoords.lng}` : "";
         const response = await fetch(
-          `${BACKEND_URL}/api/places/autocomplete?input=${encodeURIComponent(input)}${latParam}&radius=10000`
+          `${BACKEND_URL}/api/v1/places/autocomplete?input=${encodeURIComponent(input)}${latParam}&radius=10000`
         );
         const data = await response.json();
         if (Array.isArray(data)) {
@@ -109,7 +109,7 @@ export default function AddStopScreen() {
       setCoords({ lat: item.lat, lng: item.lng });
     } else if (item.id) {
       try {
-        const response = await fetch(`${BACKEND_URL}/api/places/details/${item.id}`);
+        const response = await fetch(`${BACKEND_URL}/api/v1/places/details/${item.id}`);
         const data = await response.json();
         if (data.lat && data.lng) {
           setCoords({ lat: data.lat, lng: data.lng });

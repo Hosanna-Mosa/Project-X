@@ -20,9 +20,9 @@ const heatmapData = Array.from({ length: 30 }, (_, i) => ({
 }));
 
 const anomalies = [
-  { id: "#PN-9284-A", status: "Optimal", statusVariant: "optimal" as const, driver: "Marcus Chen", value: "$4,281.00", activity: "Arrived at Hub B" },
-  { id: "#PN-9285-C", status: "Minor Delay", statusVariant: "delay" as const, driver: "Sarah Jenkins", value: "$12,940.50", activity: "Heavy Traffic (Exit 4)" },
-  { id: "#PN-9286-K", status: "In-Transit", statusVariant: "transit" as const, driver: "David Miller", value: "$842.12", activity: "Loading Dock 4" },
+  { id: "#PN-9284-A", status: "Optimal", statusVariant: "optimal" as const, driver: "Marcus Chen", value: "₹4,281.00", activity: "Arrived at Hub B" },
+  { id: "#PN-9285-C", status: "Minor Delay", statusVariant: "delay" as const, driver: "Sarah Jenkins", value: "₹12,940.50", activity: "Heavy Traffic (Exit 4)" },
+  { id: "#PN-9286-K", status: "In-Transit", statusVariant: "transit" as const, driver: "David Miller", value: "₹842.12", activity: "Loading Dock 4" },
 ];
 
 export default function Analytics() {
@@ -48,7 +48,7 @@ export default function Analytics() {
         {/* Stats */}
         <div className="grid grid-cols-4 gap-4">
           <StatCard label="Total Orders" value="12,842" badge="+14.2%" badgeColor="success" />
-          <StatCard label="Net Revenue" value="$482.5k" badge="+8.4%" badgeColor="success" />
+          <StatCard label="Net Revenue" value="₹482.5k" badge="+8.4%" badgeColor="success" />
           <StatCard label="Avg. Delivery" value="34.2m" badge="-2.1%" badgeColor="destructive" />
           <StatCard label="Active Drivers" value="842" badge="98% cap." badgeColor="success" />
         </div>

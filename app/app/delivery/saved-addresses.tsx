@@ -29,7 +29,7 @@ export default function SavedAddressesScreen() {
   const fetchAddresses = async () => {
     try {
       setLoading(true);
-      const data = await customFetch<any[]>("/api/users/addresses");
+      const data = await customFetch<any[]>("/api/v1/users/addresses");
       setAddresses(data || []);
       if (user) setUser({ ...user, addresses: data || [] });
     } catch (err) {
@@ -51,7 +51,7 @@ export default function SavedAddressesScreen() {
           onPress: async () => {
             try {
               setLoading(true);
-              const updatedAddresses = await customFetch<any[]>(`/api/users/addresses/${id}`, { method: "DELETE" });
+              const updatedAddresses = await customFetch<any[]>(`/api/v1/users/addresses/${id}`, { method: "DELETE" });
               setAddresses(updatedAddresses || []);
               if (user) setUser({ ...user, addresses: updatedAddresses || [] });
             } catch (err: any) {

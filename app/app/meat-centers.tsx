@@ -49,7 +49,7 @@ export default function MeatCentersScreen() {
       else setLoadingMore(true);
 
       const baseUrl = process.env.EXPO_PUBLIC_API_URL;
-      let url = `${baseUrl}/api/meat/nearby?lat=${lat}&lng=${lng}&page=${pageNum}&limit=20`;
+      let url = `${baseUrl}/api/v1/meat/nearby?lat=${lat}&lng=${lng}&page=${pageNum}&limit=20`;
       if (category) {
         url += `&category=${category}`;
       }

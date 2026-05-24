@@ -62,7 +62,7 @@ export default function ServiceSelectionScreen() {
 
   const fetchNearby = async (lat: number, lng: number, keyword: string) => {
     try {
-      const data = await customFetch<any[]>(`/api/places/nearby?lat=${lat}&lng=${lng}&radius=5000&keyword=${encodeURIComponent(keyword)}`);
+      const data = await customFetch<any[]>(`/api/v1/places/nearby?lat=${lat}&lng=${lng}&radius=5000&keyword=${encodeURIComponent(keyword)}`);
       setNearbyPlaces(data);
       if (data.length > 0) {
         setTimeout(() => mapRef.current?.fitToMarkers(data), 1000);

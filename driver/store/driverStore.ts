@@ -73,6 +73,8 @@ export interface EarningsData {
 
 interface DriverState {
   isOnline: boolean;
+  homeMode: boolean;
+  activeServices: ("food" | "ride")[];
   currentOrder: Order | null;
   incomingOrder: Order | null;
   currentStep: number;
@@ -83,11 +85,13 @@ interface DriverState {
   driverPhone: string;
   token: string | null;
   isAuthenticated: boolean;
+  hasCompletedOnboarding: boolean;
   activeChat: ChatMessage[];
   unreadCount: number;
 
-  goOnline: () => void;
+  goOnline: (services: ("food" | "ride")[]) => void;
   goOffline: () => void;
+  toggleHomeMode: () => void;
   acceptOrder: () => void;
   rejectOrder: () => void;
   updateStep: (step: number) => void;
@@ -95,6 +99,8 @@ interface DriverState {
   setIncomingOrder: (order: Order | null) => void;
   updateDriverLocation: (lat: number, lng: number) => void;
   setAuthenticated: (name: string, phone: string, token: string) => void;
+  setOnboardingCompleted: () => void;
+  resetOnboarding: () => void;
   logout: () => void;
   addChatMessage: (msg: ChatMessage) => void;
   clearChat: () => void;
@@ -154,6 +160,8 @@ export const useDriverStore = create<DriverState>()(
   persist(
     (set, get) => ({
       isOnline: false,
+      homeMode: false,
+      activeServices: [],
       currentOrder: null,
       incomingOrder: null,
       currentStep: 0,
@@ -162,6 +170,7 @@ export const useDriverStore = create<DriverState>()(
       driverPhone: "",
       token: null,
       isAuthenticated: false,
+      hasCompletedOnboarding: false,
       activeChat: [],
       unreadCount: 0,
       earnings: {
@@ -213,8 +222,9 @@ export const useDriverStore = create<DriverState>()(
         },
       ],
 
-      goOnline: () => set({ isOnline: true }),
-      goOffline: () => set({ isOnline: false }),
+      goOnline: (services) => set({ isOnline: true, activeServices: services }),
+      goOffline: () => set({ isOnline: false, homeMode: false }),
+      toggleHomeMode: () => set((state) => ({ homeMode: !state.homeMode })),
 
       acceptOrder: () => {
         const { incomingOrder } = get();
@@ -273,6 +283,9 @@ export const useDriverStore = create<DriverState>()(
       setAuthenticated: (name: string, phone: string, token: string) =>
         set({ isAuthenticated: true, driverName: name, driverPhone: phone, token }),
   
+      setOnboardingCompleted: () => set({ hasCompletedOnboarding: true }),
+      resetOnboarding: () => set({ hasCompletedOnboarding: false }),
+  
       logout: () => {
         AsyncStorage.removeItem("driver-store"); // Clear persistence on logout
         set({
@@ -298,7 +311,7 @@ export const useDriverStore = create<DriverState>()(
 
       loginWithPassword: async (phone: string, password: string) => {
         try {
-          const response = await fetch(`${apiUrl}/api/auth/login-password`, {
+          const response = await fetch(`${apiUrl}/api/v1/auth/login-password`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ phone, password, role: "DRIVER" }),
@@ -322,6 +335,7 @@ export const useDriverStore = create<DriverState>()(
       storage: createJSONStorage(() => AsyncStorage),
       partialize: (state) => ({
         isAuthenticated: state.isAuthenticated,
+        hasCompletedOnboarding: state.hasCompletedOnboarding,
         driverName: state.driverName,
         driverPhone: state.driverPhone,
         token: state.token,

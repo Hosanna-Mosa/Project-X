@@ -1,5 +1,5 @@
 import mongoose from "mongoose";
-import Order, { OrderStatus, StopType } from "../../database/models/Order";
+import Order, { OrderStatus, ServiceType, StopType } from "../../database/models/Order";
 import User from "../../database/models/User";
 import { RoutingService } from "../routing/routing.service";
 import { PricingService } from "../pricing/pricing.service";
@@ -9,7 +9,7 @@ export class OrdersService {
   private routingService = new RoutingService();
   private pricingService = new PricingService();
 
-  async createOrder(userId: string, stopsData: any[], vendorId?: string) {
+  async createOrder(userId: string, stopsData: any[], serviceType?: ServiceType, vendorId?: string) {
     if (!mongoose.Types.ObjectId.isValid(userId)) {
       throw new Error("Invalid User ID format");
     }
@@ -34,10 +34,33 @@ export class OrdersService {
 
     if (!optimizationResult) throw new Error("Could not optimize route");
 
-    const totalPrice = this.pricingService.calculatePrice(
-      optimizationResult.totalDistance, 
-      optimizationResult.optimizedStops.length
-    );
+    // Use new fare breakdown for rides, fallback to old pricing for delivery
+    const effectiveType = serviceType || ServiceType.DELIVERY;
+    const isRide = effectiveType !== ServiceType.DELIVERY;
+
+    let totalPrice: number;
+    let priceBreakdown: any;
+
+    if (isRide) {
+      priceBreakdown = this.pricingService.calculateFareBreakdown(
+        effectiveType,
+        optimizationResult.totalDistance,
+        optimizationResult.estimatedTime,
+      );
+      totalPrice = priceBreakdown.total;
+    } else {
+      totalPrice = this.pricingService.calculatePrice(
+        optimizationResult.totalDistance, 
+        optimizationResult.optimizedStops.length
+      );
+      priceBreakdown = {
+        baseFare: this.pricingService.getRateConfig(effectiveType).baseFare,
+        distanceFare: totalPrice - this.pricingService.getRateConfig(effectiveType).baseFare,
+        timeFare: 0,
+        surgeMultiplier: 1,
+        total: totalPrice,
+      };
+    }
 
     const orderStops = optimizationResult.optimizedStops.map((stop: any, index: number) => ({
       sequence: index + 1,
@@ -53,9 +76,11 @@ export class OrdersService {
     const order = new Order({
       user: userId,
       vendor: vendorId,
+      serviceType: effectiveType,
       totalDistance: optimizationResult.totalDistance,
       totalPrice,
-      status: OrderStatus.SEARCHING_DRIVER,
+      priceBreakdown,
+      status: isRide ? OrderStatus.SEARCHING_DRIVER : OrderStatus.SEARCHING_DRIVER,
       stops: orderStops,
     });
 
@@ -65,6 +90,7 @@ export class OrdersService {
       ...savedOrder.toObject(),
       estimatedTime: optimizationResult.estimatedTime,
       polyline: optimizationResult.polyline,
+      isRide,
     };
 
     // BROADCAST to drivers
@@ -72,9 +98,10 @@ export class OrdersService {
     if (socketManager) {
       socketManager.broadcastToDrivers("new_order", {
         id: savedOrder._id,
+        serviceType: effectiveType,
         distance: `${optimizationResult.totalDistance} km`,
         duration: `${optimizationResult.estimatedTime} min`,
-        earnings: Math.round(savedOrder.totalPrice * 0.8), // 80% to driver
+        earnings: Math.round(savedOrder.totalPrice * 0.8),
         customerName: user.name || "Customer",
         customerPhone: user.phone || "N/A",
         status: "pending",
@@ -92,6 +119,46 @@ export class OrdersService {
     }
 
     return result;
+  }
+
+  async estimateFare(
+    pickupLat: number,
+    pickupLng: number,
+    dropLat: number,
+    dropLng: number,
+    serviceType: ServiceType,
+  ) {
+    // Calculate approximate distance using Haversine
+    const distanceInKm = this.haversineDistance(pickupLat, pickupLng, dropLat, dropLng);
+    const estimatedMinutes = Math.round(distanceInKm * 4); // assume avg speed 15 km/h
+
+    const breakdown = this.pricingService.calculateFareBreakdown(
+      serviceType,
+      distanceInKm,
+      estimatedMinutes,
+    );
+
+    return {
+      distanceInKm: Math.round(distanceInKm * 10) / 10,
+      estimatedMinutes,
+      fareBreakdown: breakdown,
+    };
+  }
+
+  private haversineDistance(lat1: number, lng1: number, lat2: number, lng2: number): number {
+    const R = 6371; // Earth's radius in km
+    const dLat = this.toRad(lat2 - lat1);
+    const dLng = this.toRad(lng2 - lng1);
+    const a = 
+      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos(this.toRad(lat1)) * Math.cos(this.toRad(lat2)) *
+      Math.sin(dLng / 2) * Math.sin(dLng / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return R * c;
+  }
+
+  private toRad(deg: number): number {
+    return deg * (Math.PI / 180);
   }
 
   async getOrderById(orderId: string) {

@@ -21,6 +21,7 @@ class SocketService {
     this.socket = io(SOCKET_URL, {
       transports: ["websocket"],
       autoConnect: true,
+      path: "/ws/v1/socket.io",
     });
 
     this.socket.on("connect", () => {

@@ -57,7 +57,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   requestOTP: async (phone: string) => {
     set({ loading: true, error: null });
     try {
-      const response = await fetch(`${apiUrl}/api/auth/request-otp`, {
+      const response = await fetch(`${apiUrl}/api/v1/auth/request-otp`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ phone }),
@@ -75,7 +75,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   verifyOTP: async (phone: string, code: string, role: string, name?: string) => {
     set({ loading: true, error: null });
     try {
-      const response = await fetch(`${apiUrl}/api/auth/verify-otp`, {
+      const response = await fetch(`${apiUrl}/api/v1/auth/verify-otp`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ phone, code, role, name }),
@@ -104,7 +104,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   loginWithPassword: async (phone: string, password: string, role: string) => {
     set({ loading: true, error: null });
     try {
-      const response = await fetch(`${apiUrl}/api/auth/login-password`, {
+      const response = await fetch(`${apiUrl}/api/v1/auth/login-password`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ phone, password, role }),

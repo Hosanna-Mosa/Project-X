@@ -151,7 +151,7 @@ export default function AddAddressScreen() {
       setSearching(true);
       try {
         const locQuery = userCoords ? `&lat=${userCoords.lat}&lng=${userCoords.lng}&radius=50000` : "";
-        const results = await customFetch<any[]>(`/api/places/autocomplete?input=${encodeURIComponent(text)}${locQuery}`);
+        const results = await customFetch<any[]>(`/api/v1/places/autocomplete?input=${encodeURIComponent(text)}${locQuery}`);
         setSearchResults(results);
       } catch (error) {
         console.error("Search error:", error);
@@ -165,7 +165,7 @@ export default function AddAddressScreen() {
 
   const handleSelectSearchResult = async (item: any) => {
     try {
-      const details = await customFetch<any>(`/api/places/details/${item.id}`);
+      const details = await customFetch<any>(`/api/v1/places/details/${item.id}`);
       const newRegion = {
         ...region,
         latitude: details.lat,
@@ -199,7 +199,7 @@ export default function AddAddressScreen() {
       const finalAddress = `${completeAddress}, ${addressLine}`;
       const finalLabel = contactType === "myself" ? "Home" : (label.trim() || receiverName || "Other");
 
-      const updatedAddresses = await customFetch<any[]>("/api/users/addresses", {
+      const updatedAddresses = await customFetch<any[]>("/api/v1/users/addresses", {
         method: "POST",
         body: JSON.stringify({
           label: finalLabel,

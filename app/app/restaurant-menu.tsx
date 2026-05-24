@@ -53,8 +53,8 @@ export default function RestaurantMenu() {
       try {
         const baseUrl = process.env.EXPO_PUBLIC_API_URL;
         const endpoint = isMeat === "true" 
-          ? `${baseUrl}/api/meat/menu/${id}`
-          : `${baseUrl}/api/food/vendor/${id}`;
+          ? `${baseUrl}/api/v1/meat/menu/${id}`
+          : `${baseUrl}/api/v1/food/vendor/${id}`;
           
         const response = await fetch(endpoint);
         const data = await response.json();

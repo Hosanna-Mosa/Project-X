@@ -89,8 +89,8 @@ export default function Drivers() {
                       </div>
                     </td>
                     <td className="px-6 py-4">
-                      <p className="text-sm font-semibold text-foreground">$0.00</p>
-                      <p className="text-xs text-primary">Target: $0</p>
+                      <p className="text-sm font-semibold text-foreground">₹0.00</p>
+                      <p className="text-xs text-primary">Target: ₹0</p>
                     </td>
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-1">

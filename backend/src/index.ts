@@ -44,17 +44,18 @@ connectDB().then(async () => {
   });
 
   // API Routes
-  app.use("/api/auth", authRoutes);
-  app.use("/api/users", userRoutes);
-  app.use("/api/drivers", driverRoutes);
-  app.use("/api/orders", orderRoutes);
-  app.use("/api/admin", adminRoutes);
-  app.use("/api/places", placesRoutes);
-  app.use("/api/routing", routingRoutes);
-  app.use("/api/payments", paymentRoutes);
-  app.use("/api/vendors", vendorRoutes);
-  app.use("/api/food", foodRoutes);
-  app.use("/api/meat", meatRoutes);
+  // API Routes v1
+  app.use("/api/v1/auth", authRoutes);
+  app.use("/api/v1/users", userRoutes);
+  app.use("/api/v1/drivers", driverRoutes);
+  app.use("/api/v1/orders", orderRoutes);
+  app.use("/api/v1/admin", adminRoutes);
+  app.use("/api/v1/places", placesRoutes);
+  app.use("/api/v1/routing", routingRoutes);
+  app.use("/api/v1/payments", paymentRoutes);
+  app.use("/api/v1/vendors", vendorRoutes);
+  app.use("/api/v1/food", foodRoutes);
+  app.use("/api/v1/meat", meatRoutes);
 
   server.listen(PORT, () => {
     console.log(`Server is running on port ${PORT}`);
