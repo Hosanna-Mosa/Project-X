@@ -19,9 +19,29 @@ import MapViewDirections from "react-native-maps-directions";
 import * as Location from "expo-location";
 import Colors from "@/constants/colors";
 import { useThemeStore } from "@/contexts/themeStore";
+import { customFetch } from "@/utils/api/custom-fetch";
 
 const { width, height } = Dimensions.get("window");
 const GOOGLE_MAPS_APIKEY = process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY;
+
+type FareEstimate = {
+  distanceInKm: number;
+  estimatedMinutes: number;
+  fareBreakdown: {
+    total: number;
+  };
+};
+
+const normalizeServiceType = (serviceId?: string) => {
+  if (serviceId === "bike-lite") return "bike";
+  if (serviceId === "cab-prime") return "cab_prime";
+  if (serviceId === "bike" || serviceId === "auto" || serviceId === "cab") {
+    return serviceId;
+  }
+  return "cab";
+};
+
+const formatFare = (value: number) => `₹${value.toFixed(2)}`;
 
 const RIDE_GROUPS = [
   {
@@ -107,6 +127,65 @@ export default function RideConfirmationScreen() {
     () => createStyles(colors, insets),
     [theme, insets]
   );
+  const [fareEstimate, setFareEstimate] = useState<FareEstimate | null>(null);
+  const [fareLoading, setFareLoading] = useState(false);
+  const serviceType = normalizeServiceType(params.serviceId);
+
+  const pickupCoords = {
+    latitude: parseFloat(params.pickupLat || "0"),
+    longitude: parseFloat(params.pickupLng || "0"),
+  };
+  const dropCoords = {
+    latitude: parseFloat(params.dropLat || "0"),
+    longitude: parseFloat(params.dropLng || "0"),
+  };
+
+  React.useEffect(() => {
+    const canEstimate =
+      Number.isFinite(pickupCoords.latitude) &&
+      Number.isFinite(pickupCoords.longitude) &&
+      Number.isFinite(dropCoords.latitude) &&
+      Number.isFinite(dropCoords.longitude);
+
+    if (!canEstimate) return;
+
+    const loadFareEstimate = async () => {
+      setFareLoading(true);
+      try {
+        const query = new URLSearchParams({
+          pickupLat: String(pickupCoords.latitude),
+          pickupLng: String(pickupCoords.longitude),
+          dropLat: String(dropCoords.latitude),
+          dropLng: String(dropCoords.longitude),
+          serviceType,
+        });
+        const estimate = await customFetch<FareEstimate>(
+          `/api/v1/orders/estimate-fare?${query.toString()}`,
+          { responseType: "json" },
+        );
+        setFareEstimate(estimate);
+      } catch (error) {
+        console.error("Fare estimate error:", error);
+      } finally {
+        setFareLoading(false);
+      }
+    };
+
+    loadFareEstimate();
+  }, [
+    pickupCoords.latitude,
+    pickupCoords.longitude,
+    dropCoords.latitude,
+    dropCoords.longitude,
+    serviceType,
+  ]);
+
+  const backendFare = fareEstimate?.fareBreakdown?.total;
+  const backendEta = fareEstimate?.estimatedMinutes
+    ? `${fareEstimate.estimatedMinutes} min`
+    : undefined;
+  const getBackendPrice = (fallback: string, multiplier = 1) =>
+    backendFare ? formatFare(backendFare * multiplier) : fallback;
 
   const RIDE_GROUPS = React.useMemo(() => {
     if (params.serviceId === "bike" || params.serviceId === "bike-lite") {
@@ -218,26 +297,39 @@ export default function RideConfirmationScreen() {
     }
   }, [params.serviceId]);
 
-  const [selectedRide, setSelectedRide] = useState(RIDE_GROUPS[0].options[0]);
+  const displayRideGroups = React.useMemo(() => {
+    const priceFor = (id: string, fallback: string) => {
+      const multipliers: Record<string, number> = {
+        "bike-reserve": 1.2,
+        "auto-reserve": 1.2,
+        "cab-wait-save": 0.9,
+        "cab-priority": 1.15,
+        "cab-x": 1.3,
+      };
+      return getBackendPrice(fallback, multipliers[id] || 1);
+    };
+
+    return RIDE_GROUPS.map((group) => ({
+      ...group,
+      options: group.options.map((option) => ({
+        ...option,
+        price: priceFor(option.id, option.price),
+        eta: backendEta || option.eta,
+      })),
+    }));
+  }, [RIDE_GROUPS, backendEta, backendFare]);
+
+  const [selectedRide, setSelectedRide] = useState(displayRideGroups[0].options[0]);
 
   React.useEffect(() => {
-    setSelectedRide(RIDE_GROUPS[0].options[0]);
-  }, [RIDE_GROUPS]);
+    setSelectedRide(displayRideGroups[0].options[0]);
+  }, [displayRideGroups]);
   const [userLocation, setUserLocation] = useState<{
     latitude: number;
     longitude: number;
   } | null>(null);
   const [mapReady, setMapReady] = useState(false);
   const mapRef = useRef<MapView>(null);
-
-  const pickupCoords = {
-    latitude: parseFloat(params.pickupLat || "0"),
-    longitude: parseFloat(params.pickupLng || "0"),
-  };
-  const dropCoords = {
-    latitude: parseFloat(params.dropLat || "0"),
-    longitude: parseFloat(params.dropLng || "0"),
-  };
 
   const stops = React.useMemo(() => {
     if (!params.stops) return [];
@@ -475,7 +567,7 @@ export default function RideConfirmationScreen() {
           showsVerticalScrollIndicator={false}
           contentContainerStyle={{ paddingBottom: 20 }}
         >
-          {RIDE_GROUPS.map((group, groupIdx) => (
+          {displayRideGroups.map((group, groupIdx) => (
             <View key={groupIdx} style={styles.rideGroup}>
               <Text style={styles.groupTitle}>{group.title}</Text>
               {group.options.map((option) => (
@@ -542,12 +634,29 @@ export default function RideConfirmationScreen() {
               style={styles.bookBtn}
               onPress={() =>
                 router.push({
-                  pathname: "/tracking",
-                  params: { serviceId: selectedRide.id },
+                  pathname: "/pickup-confirmation",
+                  params: {
+                    serviceId: params.serviceId,
+                    rideId: selectedRide.id,
+                    rideName: selectedRide.name,
+                    ridePrice: selectedRide.price,
+                    pickupName: params.pickupName,
+                    dropName: params.dropName,
+                    pickupLat: params.pickupLat,
+                    pickupLng: params.pickupLng,
+                    dropLat: params.dropLat,
+                    dropLng: params.dropLng,
+                    stops: params.stops,
+                    estimatedMinutes: fareEstimate?.estimatedMinutes?.toString() || "",
+                    distanceInKm: fareEstimate?.distanceInKm?.toString() || "",
+                    fareTotal: backendFare?.toString() || "",
+                  },
                 })
               }
             >
-              <Text style={styles.bookBtnText}>Choose {selectedRide.name}</Text>
+              <Text style={styles.bookBtnText}>
+                {fareLoading ? "Loading fare..." : `Choose ${selectedRide.name}`}
+              </Text>
             </TouchableOpacity>
 
             <TouchableOpacity style={styles.calendarBtn}>
