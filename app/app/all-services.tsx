@@ -19,7 +19,15 @@ const HORIZONTAL_PADDING = 16;
 const COLUMN_GAP = 15;
 const ITEM_WIDTH = (width - HORIZONTAL_PADDING * 2 - COLUMN_GAP * 2) / 3;
 
-const SERVICES = [
+type ServiceItem = {
+  id: string;
+  name: string;
+  image: any;
+  isLite?: boolean;
+  isPremium?: boolean;
+};
+
+const SERVICES: ServiceItem[] = [
   { id: "bike", name: "Bike", image: require("@/assets/images/services/bike.png") },
   { id: "auto", name: "Auto", image: require("@/assets/images/services/auto.png") },
   { id: "cab-economy", name: "Cab Economy", image: require("@/assets/images/services/cab.png") },

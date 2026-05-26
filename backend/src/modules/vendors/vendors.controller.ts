@@ -60,6 +60,17 @@ export const getNearbyVendors = async (req: Request, res: Response) => {
   }
 };
 
+export const getVendorById = async (req: Request, res: Response) => {
+  try {
+    const vendor = await Vendor.findById(req.params.id);
+    if (!vendor) return res.status(404).json({ message: "Vendor not found" });
+    res.json(vendor);
+  } catch (error) {
+    console.error("Error fetching vendor:", error);
+    res.status(500).json({ message: "Internal server error" });
+  }
+};
+
 import generateToken from "../../utils/generateToken";
 
 export const loginVendor = async (req: Request, res: Response) => {

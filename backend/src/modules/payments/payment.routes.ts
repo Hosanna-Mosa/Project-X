@@ -2,6 +2,7 @@ import { Request, Response, Router } from "express";
 import { PaymentService } from "./payment.service";
 import { authenticateToken, AuthRequest } from "../../middleware/auth.middleware";
 import { OrdersService } from "../orders/orders.service";
+import { ServiceType } from "../../database/models/Order";
 
 const router = Router();
 const paymentService = new PaymentService();
@@ -48,8 +49,17 @@ router.post("/verify", authenticateToken, async (req: AuthRequest, res: Response
     if (isValid) {
       if (orderData && req.user) {
         // Automatically create order if data provided
-        const { stops, vendorId } = orderData;
-        const order = await ordersService.createOrder(req.user.userId, stops, vendorId);
+        const { stops, vendorId, serviceType, totals } = orderData;
+        const effectiveServiceType = Object.values(ServiceType).includes(serviceType)
+          ? serviceType
+          : ServiceType.DELIVERY;
+        const order = await ordersService.createOrder(
+          req.user.userId,
+          stops,
+          effectiveServiceType,
+          vendorId,
+          totals,
+        );
         return res.json({ 
           message: "Payment verified and order created", 
           order 

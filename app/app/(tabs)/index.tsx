@@ -531,7 +531,7 @@ const createStyles = (colors: typeof Colors.light) => StyleSheet.create({
     position: "absolute",
     left: 0,
     right: 0,
-    paddingHorizontal: 16,
+    alignItems: "center",
     zIndex: 10,
   },
   searchBar: {
@@ -548,6 +548,8 @@ const createStyles = (colors: typeof Colors.light) => StyleSheet.create({
     elevation: 10,
     borderWidth: 1,
     borderColor: colors.border,
+    width: "80%",
+    maxWidth: 400,
   },
   searchInput: {
     flex: 1,

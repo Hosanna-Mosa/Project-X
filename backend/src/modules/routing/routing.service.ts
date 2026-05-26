@@ -12,6 +12,8 @@ export interface StopInput extends Coordinate {
   address: string;
   type?: string;
   items?: any;
+  instructions?: any;
+  deliveryAddress?: any;
 }
 
 export class RoutingService {

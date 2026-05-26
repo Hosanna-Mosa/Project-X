@@ -107,7 +107,7 @@ export default function Home() {
               </div>
 
               {/* Search / Input Area */}
-              <div className="bg-white rounded-2xl p-2 shadow-2xl shadow-black/20 flex flex-col sm:flex-row items-stretch sm:items-center gap-2 max-w-xl mx-auto mb-8">
+              <div className="bg-white rounded-2xl p-2 shadow-2xl shadow-black/20 flex flex-col sm:flex-row items-stretch sm:items-center gap-2 max-w-md mx-auto mb-8">
                 <div className="flex items-center gap-3 flex-1 px-4 py-2">
                   <span className="text-brand-kinetic">
                     <Icon name={activeService === "food" ? "search" : "my_location"} className="text-xl" />

@@ -46,7 +46,7 @@ export class OrdersController {
   async create(req: AuthRequest, res: Response) {
     console.log("Creating Order - Payload:", req.body);
     try {
-      const { stops, serviceType, vendorId } = req.body;
+      const { stops, serviceType, vendorId, totals } = req.body;
       const userId = req.user?.userId;
 
       if (!userId || !stops || stops.length === 0) {
@@ -54,7 +54,7 @@ export class OrdersController {
         return res.status(400).json({ message: "Incomplete order data. User and stops are required." });
       }
 
-      const order = await ordersService.createOrder(userId, stops, serviceType, vendorId);
+      const order = await ordersService.createOrder(userId, stops, serviceType, vendorId, totals);
 
       // Trigger Matching Driver logic (in background or service)
       // For now, return order
