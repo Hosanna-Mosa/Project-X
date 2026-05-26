@@ -1,5 +1,7 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Link } from "react-router-dom";
+import { useGoogleMaps } from "../hooks/useGoogleMaps";
+import { apiFetch } from "../lib/api-client";
 
 function Icon({ name, className = "" }: { name: string; className?: string }) {
   return <span className={`material-symbols-outlined ${className}`}>{name}</span>;
@@ -21,6 +23,15 @@ const CUISINE_OPTIONS = [
 ];
 
 const DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
+const MENU_UPLOAD_COLUMNS = ["category", "itemName", "price", "description", "type", "isBestseller"];
+
+type DayTimeSlots = Record<string, { open: string; close: string }[]>;
+
+const createDefaultDayTimeSlots = (): DayTimeSlots =>
+  DAYS.reduce((acc, day) => {
+    acc[day] = [{ open: "09:00", close: "22:00" }];
+    return acc;
+  }, {} as DayTimeSlots);
 
 // ─── Time Picker helper ────────────────────────────────────────────────────────
 
@@ -60,6 +71,18 @@ function FileUploader({
   accept?: string;
 }) {
   const [dragOver, setDragOver] = useState(false);
+  const fileInputId = `file-${label.replace(/[^a-zA-Z0-9]/g, "")}`;
+
+  const handleUseDummy = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const ext = accept.includes(".csv") ? "csv" : "png";
+    const dummyName = `${label.toLowerCase().replace(/[^a-z0-9]/g, "_")}_dummy.${ext}`;
+    const fileContent = ext === "csv" 
+      ? ["category", "itemName", "price", "description", "type", "isBestseller"].join(",") 
+      : "dummy data";
+    onChange(new File([fileContent], dummyName, { type: ext === "csv" ? "text/csv" : "image/png" }));
+  };
 
   return (
     <div
@@ -71,7 +94,7 @@ function FileUploader({
         const f = e.dataTransfer.files?.[0];
         if (f) onChange(f);
       }}
-      className={`border-2 border-dashed rounded-xl p-6 text-center transition-all cursor-pointer ${
+      className={`border-2 border-dashed rounded-xl p-6 text-center transition-all ${
         dragOver
           ? "border-brand-kinetic bg-brand-kinetic/5"
           : file
@@ -83,39 +106,50 @@ function FileUploader({
         type="file"
         accept={accept}
         className="hidden"
-        id={`file-${label.replace(/\s/g, "")}`}
+        id={fileInputId}
         onChange={(e) => onChange(e.target.files?.[0] || null)}
       />
-      <label htmlFor={`file-${label.replace(/\s/g, "")}`} className="cursor-pointer block">
-        {file ? (
-          <div className="flex items-center justify-center gap-3">
-            <Icon name="description" className="text-2xl text-green-600" />
-            <div className="text-left">
-              <p className="text-sm font-semibold text-green-700 truncate max-w-[200px]">{file.name}</p>
-              <p className="text-xs text-green-500">{(file.size / 1024).toFixed(0)} KB</p>
-            </div>
+      {file ? (
+        <div className="flex items-center justify-center gap-3">
+          <Icon name="description" className="text-2xl text-green-600" />
+          <div className="text-left">
+            <p className="text-sm font-semibold text-green-700 truncate max-w-[200px]">{file.name}</p>
+            <p className="text-xs text-green-500">{(file.size / 1024).toFixed(0)} KB</p>
+          </div>
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); onChange(null); }}
+            className="ml-auto text-gray-400 hover:text-red-500 transition-colors"
+          >
+            <Icon name="close" className="text-lg" />
+          </button>
+        </div>
+      ) : (
+        <div>
+          <div className="w-12 h-12 rounded-xl bg-gray-100 flex items-center justify-center mx-auto mb-3">
+            <Icon name="cloud_upload" className="text-2xl text-gray-400" />
+          </div>
+          <p className="text-sm font-semibold text-on-surface mb-1">{label}</p>
+          {desc && <p className="text-xs text-secondary-app mb-2">{desc}</p>}
+          
+          <div className="flex flex-col items-center justify-center gap-2 mt-2">
+            <label htmlFor={fileInputId} className="text-xs text-secondary-app/60 cursor-pointer">
+              <span className="text-brand-kinetic font-medium hover:underline">Click to upload</span> or drag & drop
+            </label>
             <button
               type="button"
-              onClick={(e) => { e.stopPropagation(); onChange(null); }}
-              className="ml-auto text-gray-400 hover:text-red-500 transition-colors"
+              onClick={handleUseDummy}
+              className="text-xs font-semibold text-brand-kinetic bg-brand-kinetic/10 hover:bg-brand-kinetic/20 px-3 py-1 rounded-full transition-all border border-brand-kinetic/20"
             >
-              <Icon name="close" className="text-lg" />
+              Use Dummy File
             </button>
           </div>
-        ) : (
-          <div>
-            <div className="w-12 h-12 rounded-xl bg-gray-100 flex items-center justify-center mx-auto mb-3">
-              <Icon name="cloud_upload" className="text-2xl text-gray-400" />
-            </div>
-            <p className="text-sm font-semibold text-on-surface mb-1">{label}</p>
-            {desc && <p className="text-xs text-secondary-app mb-2">{desc}</p>}
-            <p className="text-xs text-secondary-app/60">
-              <span className="text-brand-kinetic font-medium">Click to upload</span> or drag & drop
-            </p>
-            <p className="text-[10px] text-secondary-app/40 mt-1">PDF, JPG, PNG (max 10MB)</p>
-          </div>
-        )}
-      </label>
+
+          <p className="text-[10px] text-secondary-app/40 mt-2">
+            {accept.includes(".xlsx") ? "CSV, XLS, XLSX (max 10MB)" : "PDF, JPG, PNG (max 10MB)"}
+          </p>
+        </div>
+      )}
     </div>
   );
 }
@@ -246,16 +280,25 @@ function ItemForm({ initialItem, onSave, onCancel }: { initialItem?: MenuItem; o
               </button>
             </div>
           ) : (
-            <label className="flex items-center gap-2 px-4 py-2 rounded-lg border border-dashed border-gray-300 text-xs font-medium text-secondary-app cursor-pointer hover:border-brand-kinetic/30 hover:text-brand-kinetic transition-all">
-              <Icon name="add_photo_alternate" className="text-lg" />
-              Upload Photo
-              <input
-                type="file"
-                accept="image/*"
-                className="hidden"
-                onChange={(e) => setPhoto(e.target.files?.[0] || null)}
-              />
-            </label>
+            <div className="flex gap-2">
+              <label className="flex items-center gap-2 px-4 py-2 rounded-lg border border-dashed border-gray-300 text-xs font-medium text-secondary-app cursor-pointer hover:border-brand-kinetic/30 hover:text-brand-kinetic transition-all">
+                <Icon name="add_photo_alternate" className="text-lg" />
+                Upload Photo
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={(e) => setPhoto(e.target.files?.[0] || null)}
+                />
+              </label>
+              <button
+                type="button"
+                onClick={() => setPhoto(new File(["dummy photo data"], "item_photo_dummy.png", { type: "image/png" }))}
+                className="flex items-center gap-2 px-3 py-2 rounded-lg border border-gray-200 text-xs font-medium text-secondary-app hover:text-brand-kinetic hover:border-brand-kinetic/30 transition-all"
+              >
+                Use Dummy Photo
+              </button>
+            </div>
           )}
         </div>
       </div>
@@ -314,6 +357,201 @@ export default function PartnerOnboarding() {
     window.scrollTo({ top: 0, behavior: "smooth" });
   }, [step]);
 
+  const mapsApiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY || "";
+  const isMapsLoaded = useGoogleMaps(mapsApiKey);
+
+  const mapRef = useRef<HTMLDivElement>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
+  const mapInstanceRef = useRef<any>(null);
+  const markerInstanceRef = useRef<any>(null);
+  const tileLayerRef = useRef<any>(null);
+  const [mapView, setMapView] = useState<"map" | "satellite">("map");
+  const [isSaving, setIsSaving] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const reverseGeocode = async (lat: number, lng: number) => {
+    try {
+      const response = await fetch(
+        `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1`
+      );
+      const data = await response.json();
+      if (data && data.address) {
+        const addr = data.address;
+        const sublocality = addr.suburb || addr.neighbourhood || addr.village || "";
+        const cityVal = addr.city || addr.town || addr.county || "";
+        const landmarkVal = addr.amenity || addr.shop || addr.road || "";
+        const shopNoVal = addr.house_number || "";
+
+        const areaName = [sublocality, addr.subdistrict].filter(Boolean).join(", ");
+        if (areaName) setArea(areaName);
+        if (cityVal) setCity(cityVal);
+        if (landmarkVal) setLandmark(landmarkVal);
+        if (shopNoVal) setShopNo(shopNoVal);
+        
+        if (data.display_name) {
+          setLocationSearch(data.display_name);
+        }
+      }
+    } catch (err) {
+      console.error("Reverse geocoding failed:", err);
+    }
+  };
+
+  const parseAddressComponents = (place: any) => {
+    let streetNo = "";
+    let route = "";
+    let locality = "";
+    let sublocality = "";
+    let currentCity = "";
+    let state = "";
+    let country = "";
+    let postalCode = "";
+
+    if (place.address_components) {
+      for (const component of place.address_components) {
+        const types = component.types;
+        if (types.includes("street_number")) streetNo = component.long_name;
+        if (types.includes("route")) route = component.long_name;
+        if (types.includes("sublocality") || types.includes("sublocality_level_1")) {
+          sublocality = component.long_name;
+        }
+        if (types.includes("locality")) locality = component.long_name;
+        if (types.includes("administrative_area_level_2")) currentCity = component.long_name;
+        if (types.includes("administrative_area_level_1")) state = component.long_name;
+        if (types.includes("country")) country = component.long_name;
+        if (types.includes("postal_code")) postalCode = component.long_name;
+      }
+    }
+
+    const areaName = [sublocality, locality].filter(Boolean).join(", ");
+    if (areaName) setArea(areaName);
+
+    const resolvedCity = locality || currentCity;
+    if (resolvedCity) setCity(resolvedCity);
+
+    if (streetNo || route) {
+      setShopNo([streetNo, route].filter(Boolean).join(" "));
+    }
+
+    if (place.formatted_address) {
+      setLocationSearch(place.formatted_address);
+    }
+  };
+
+  useEffect(() => {
+    if (!isMapsLoaded || !mapRef.current) return;
+
+    if (mapInstanceRef.current) return;
+
+    const L = (window as any).L;
+    if (!L) return;
+
+    const defaultLat = parseFloat(gpsLat) || 16.932539;
+    const defaultLng = parseFloat(gpsLng) || 81.752708;
+    const tileUrl = mapView === "satellite"
+      ? "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
+      : "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png";
+
+    const map = L.map(mapRef.current, {
+      zoomControl: false,
+      attributionControl: false,
+    }).setView([defaultLat, defaultLng], 15);
+
+    tileLayerRef.current = L.tileLayer(tileUrl, {
+      maxZoom: 19,
+    }).addTo(map);
+
+    const customIcon = L.divIcon({
+      html: `
+        <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; width: 30px; height: 30px; transform: translate(-3px, -15px);">
+          <div style="width: 14px; height: 14px; background-color: #f97316; border: 3px solid white; border-radius: 50%; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);"></div>
+          <div style="width: 0; height: 0; border-left: 6px solid transparent; border-right: 6px solid transparent; border-top: 8px solid #f97316; margin-top: -1px;"></div>
+        </div>
+      `,
+      className: "custom-leaflet-marker",
+      iconSize: [30, 30],
+      iconAnchor: [15, 30],
+    });
+
+    const marker = L.marker([defaultLat, defaultLng], {
+      draggable: true,
+      icon: customIcon,
+    }).addTo(map);
+
+    mapInstanceRef.current = map;
+    markerInstanceRef.current = marker;
+
+    marker.on("dragend", () => {
+      const pos = marker.getLatLng();
+      const newLat = pos.lat.toFixed(6);
+      const newLng = pos.lng.toFixed(6);
+      setGpsLat(newLat);
+      setGpsLng(newLng);
+      reverseGeocode(pos.lat, pos.lng);
+    });
+
+    map.on("click", (e: any) => {
+      if (e.latlng) {
+        marker.setLatLng(e.latlng);
+        const newLat = e.latlng.lat.toFixed(6);
+        const newLng = e.latlng.lng.toFixed(6);
+        setGpsLat(newLat);
+        setGpsLng(newLng);
+        reverseGeocode(e.latlng.lat, e.latlng.lng);
+      }
+    });
+
+    const google = (window as any).google;
+    if (google && searchInputRef.current) {
+      const autocomplete = new google.maps.places.Autocomplete(searchInputRef.current, {
+        types: ["geocode", "establishment"],
+      });
+
+      autocomplete.addListener("place_changed", () => {
+        const place = autocomplete.getPlace();
+        if (!place.geometry || !place.geometry.location) return;
+
+        const loc = place.geometry.location;
+        const lat = loc.lat();
+        const lng = loc.lng();
+
+        setGpsLat(lat.toFixed(6));
+        setGpsLng(lng.toFixed(6));
+
+        map.setView([lat, lng], 17);
+        marker.setLatLng([lat, lng]);
+
+        parseAddressComponents(place);
+      });
+    }
+
+    return () => {
+      if (mapInstanceRef.current) {
+        mapInstanceRef.current.remove();
+        mapInstanceRef.current = null;
+        markerInstanceRef.current = null;
+        tileLayerRef.current = null;
+      }
+    };
+  }, [isMapsLoaded]);
+
+  useEffect(() => {
+    const L = (window as any).L;
+    if (!L || !mapInstanceRef.current) return;
+
+    if (tileLayerRef.current) {
+      mapInstanceRef.current.removeLayer(tileLayerRef.current);
+    }
+
+    const tileUrl = mapView === "satellite"
+      ? "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
+      : "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png";
+
+    tileLayerRef.current = L.tileLayer(tileUrl, {
+      maxZoom: 19,
+    }).addTo(mapInstanceRef.current);
+  }, [mapView]);
+
   // ── Step 1: Restaurant Information ──────────────────────────────────────
 
   const [restaurantName, setRestaurantName] = useState("");
@@ -349,8 +587,10 @@ export default function PartnerOnboarding() {
   };
 
   const verifyOtp = () => {
-    if (otp.length >= 4) {
+    if (otp === "1234") {
       setOtpVerified(true);
+    } else {
+      alert("Invalid OTP! Please enter code '1234' for verification.");
     }
   };
 
@@ -358,39 +598,129 @@ export default function PartnerOnboarding() {
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
         (pos) => {
-          setGpsLat(pos.coords.latitude.toFixed(6));
-          setGpsLng(pos.coords.longitude.toFixed(6));
+          const lat = pos.coords.latitude;
+          const lng = pos.coords.longitude;
+          const latStr = lat.toFixed(6);
+          const lngStr = lng.toFixed(6);
+          setGpsLat(latStr);
+          setGpsLng(lngStr);
+
+          if (mapInstanceRef.current && markerInstanceRef.current) {
+            mapInstanceRef.current.setView([lat, lng], 17);
+            markerInstanceRef.current.setLatLng([lat, lng]);
+          }
+          
+          reverseGeocode(lat, lng);
         },
         () => alert("Unable to retrieve your location. Please search manually.")
       );
     }
   };
 
+  const handleMapZoom = (direction: "in" | "out") => {
+    if (!mapInstanceRef.current) return;
+    if (direction === "in") {
+      mapInstanceRef.current.zoomIn();
+    } else {
+      mapInstanceRef.current.zoomOut();
+    }
+  };
+
   // ── Step 2: Menu & Operational Details ──────────────────────────────────
 
   const [selectedDays, setSelectedDays] = useState<string[]>(["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"]);
-  const [timeSlots, setTimeSlots] = useState<{ open: string; close: string }[]>([
-    { open: "09:00", close: "22:00" },
-  ]);
+  const [activeTimingDay, setActiveTimingDay] = useState("Monday");
+  const [dayTimeSlots, setDayTimeSlots] = useState<DayTimeSlots>(() => createDefaultDayTimeSlots());
   
   // Menu Builder State
   const [menuSetupMode, setMenuSetupMode] = useState<"upload" | "manual">("manual");
   const [menuReferenceFile, setMenuReferenceFile] = useState<File | null>(null);
+  const [menuUploadValid, setMenuUploadValid] = useState(false);
+  const [menuUploadError, setMenuUploadError] = useState("");
   const [menuCategories, setMenuCategories] = useState<MenuCategory[]>([]);
   const [editingItem, setEditingItem] = useState<{ categoryId: string; item?: MenuItem } | null>(null);
+  const [showCategoryDialog, setShowCategoryDialog] = useState(false);
+  const [newCategoryName, setNewCategoryName] = useState("");
 
   const toggleDay = (day: string) => {
-    setSelectedDays((prev) =>
-      prev.includes(day) ? prev.filter((d) => d !== day) : [...prev, day]
-    );
+    setSelectedDays((prev) => {
+      const next = prev.includes(day) ? prev.filter((d) => d !== day) : [...prev, day];
+      if (!next.includes(activeTimingDay)) {
+        setActiveTimingDay(next[0] || day);
+      }
+      return next;
+    });
   };
 
-  const addTimeSlot = () => setTimeSlots([...timeSlots, { open: "09:00", close: "22:00" }]);
-  const removeTimeSlot = (i: number) => setTimeSlots(timeSlots.filter((_, idx) => idx !== i));
-  const updateTimeSlot = (i: number, key: "open" | "close", val: string) => {
-    const updated = [...timeSlots];
-    updated[i] = { ...updated[i], [key]: val };
-    setTimeSlots(updated);
+  const addTimeSlot = (day = activeTimingDay) => {
+    setDayTimeSlots((prev) => ({
+      ...prev,
+      [day]: [...(prev[day] || []), { open: "09:00", close: "22:00" }],
+    }));
+  };
+
+  const removeTimeSlot = (day: string, i: number) => {
+    setDayTimeSlots((prev) => ({
+      ...prev,
+      [day]: (prev[day] || []).filter((_, idx) => idx !== i),
+    }));
+  };
+
+  const updateTimeSlot = (day: string, i: number, key: "open" | "close", val: string) => {
+    setDayTimeSlots((prev) => {
+      const updated = [...(prev[day] || [])];
+      updated[i] = { ...updated[i], [key]: val };
+      return { ...prev, [day]: updated };
+    });
+  };
+
+  const addCategory = () => {
+    const name = newCategoryName.trim();
+    if (!name) return;
+    setMenuCategories((prev) => [
+      ...prev,
+      { id: crypto.randomUUID(), name, items: [] },
+    ]);
+    setNewCategoryName("");
+    setShowCategoryDialog(false);
+  };
+
+  const validateMenuReferenceFile = (file: File | null) => {
+    setMenuReferenceFile(file);
+    setMenuUploadValid(false);
+    setMenuUploadError("");
+
+    if (!file) return;
+
+    const extension = file.name.split(".").pop()?.toLowerCase();
+    if (!["csv", "xls", "xlsx"].includes(extension || "")) {
+      setMenuUploadError("Upload a CSV, XLS, or XLSX menu sheet.");
+      return;
+    }
+
+    if (extension !== "csv") {
+      setMenuUploadValid(true);
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      const firstLine = String(reader.result || "").split(/\r?\n/)[0] || "";
+      const uploadedColumns = firstLine.split(",").map((column) => column.trim());
+      const missingColumns = MENU_UPLOAD_COLUMNS.filter((column) => !uploadedColumns.includes(column));
+
+      if (missingColumns.length > 0) {
+        setMenuUploadError(`Missing columns: ${missingColumns.join(", ")}`);
+        setMenuUploadValid(false);
+        return;
+      }
+
+      setMenuUploadValid(true);
+    };
+    reader.onerror = () => {
+      setMenuUploadError("Unable to read the uploaded menu sheet.");
+    };
+    reader.readAsText(file);
   };
 
   // ── Step 3: Documents & Legal ───────────────────────────────────────────
@@ -440,8 +770,13 @@ export default function PartnerOnboarding() {
   };
 
   const canProceedStep2 = () => {
-    if (menuSetupMode === "upload") return selectedDays.length > 0 && menuReferenceFile !== null;
-    return selectedDays.length > 0 && menuCategories.length > 0 && menuCategories.some((c) => c.items.length > 0);
+    const timingsComplete = selectedDays.length > 0 && selectedDays.every((day) =>
+      (dayTimeSlots[day] || []).some((slot) => slot.open && slot.close)
+    );
+
+    if (!timingsComplete) return false;
+    if (menuSetupMode === "upload") return menuReferenceFile !== null && menuUploadValid;
+    return menuCategories.length > 0 && menuCategories.some((c) => c.items.length > 0);
   };
 
   const canProceedStep3 = () => {
@@ -468,17 +803,102 @@ export default function PartnerOnboarding() {
     if (step > 1) setStep(step - 1);
   };
 
-  const handleSaveDraft = () => {
-    if (!saveEmail.includes("@")) return;
-    setDraftSaved(true);
-    setTimeout(() => {
-      setShowSaveModal(false);
-      setDraftSaved(false);
-    }, 2000);
+  const getPayload = (status: "draft" | "submitted") => {
+    const selectedDayTimeSlots: Record<string, { open: string; close: string }[]> = {};
+    selectedDays.forEach((day) => {
+      selectedDayTimeSlots[day] = dayTimeSlots[day] || [];
+    });
+
+    return {
+      status,
+      restaurantName,
+      cuisines,
+      ownerName,
+      ownerEmail,
+      ownerPhone,
+      otp: otp || "1234",
+      otpVerified,
+      primaryContact: sameAsOwner ? ownerPhone : primaryContact,
+      sameAsOwner,
+      location: {
+        lat: gpsLat ? parseFloat(gpsLat) : undefined,
+        lng: gpsLng ? parseFloat(gpsLng) : undefined,
+      },
+      address: {
+        shopNo,
+        floor,
+        area,
+        city,
+        landmark,
+      },
+      selectedDays,
+      dayTimeSlots: selectedDayTimeSlots,
+      menuSetupMode,
+      menuReferenceFile: menuReferenceFile ? { name: menuReferenceFile.name } : null,
+      menuUploadValid,
+      menuCategories: menuCategories.map((category) => ({
+        name: category.name,
+        items: category.items.map((item) => ({
+          name: item.name,
+          price: item.price,
+          description: item.description,
+          isVeg: item.isVeg,
+          isBestseller: item.isBestseller,
+          photo: item.photo ? { name: item.photo.name } : null,
+        })),
+      })),
+      panNumber,
+      panFile: panFile ? { name: panFile.name } : null,
+      gstin,
+      gstFile: gstFile ? { name: gstFile.name } : null,
+      gstExempt,
+      fssaiNumber,
+      fssaiExpiry,
+      fssaiFile: fssaiFile ? { name: fssaiFile.name } : null,
+      bankAccount,
+      bankConfirm,
+      accountType,
+      ifsc,
+      ifscFetched,
+      chequeFile: chequeFile ? { name: chequeFile.name } : null,
+      acceptedTos,
+      signature,
+    };
   };
 
-  const handleFinalSubmit = () => {
-    setSubmitted(true);
+  const handleSaveDraft = async () => {
+    if (!saveEmail.includes("@")) return;
+    setIsSaving(true);
+    try {
+      await apiFetch("/vendors/onboarding", {
+        method: "POST",
+        body: JSON.stringify(getPayload("draft")),
+      });
+      setDraftSaved(true);
+      setTimeout(() => {
+        setShowSaveModal(false);
+        setDraftSaved(false);
+      }, 2500);
+    } catch (err: any) {
+      alert("Error saving draft: " + err.message);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleFinalSubmit = async () => {
+    setIsSubmitting(true);
+    try {
+      await apiFetch("/vendors/onboarding", {
+        method: "POST",
+        body: JSON.stringify(getPayload("submitted")),
+      });
+      setSubmitted(true);
+    } catch (err: any) {
+      alert("Error submitting application: " + err.message);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   // ── Submitted State ─────────────────────────────────────────────────────
@@ -832,71 +1252,89 @@ export default function PartnerOnboarding() {
                 </div>
 
                 <div className="space-y-5 bg-white rounded-2xl border border-gray-200 p-6">
-                  {/* Google Maps-Style Map Widget */}
-                  <div className="h-64 rounded-xl bg-gray-100 border border-gray-200 flex items-center justify-center relative overflow-hidden">
-                    {/* Map tile background */}
-                    <div className="absolute inset-0" style={{
-                      backgroundImage: `
-                        linear-gradient(rgba(200,200,205,0.3) 1px, transparent 1px),
-                        linear-gradient(90deg, rgba(200,200,205,0.3) 1px, transparent 1px)
-                      `,
-                      backgroundSize: '60px 60px',
-                      backgroundColor: '#e8e8ec',
-                    }} />
+                  {/* Google Maps Container */}
+                  <div className="h-72 rounded-xl bg-gray-100 border border-gray-200 relative overflow-hidden">
+                    <div ref={mapRef} className="absolute inset-0 z-0 h-full w-full" />
 
-                    {/* Search bar overlay */}
-                    <div className="absolute top-3 left-3 right-3 z-20">
+                    <div className="pointer-events-none absolute inset-0 z-[1000]">
+                      {/* Search bar overlay */}
+                      <div className="pointer-events-auto absolute left-3 right-16 top-3">
                       <div className="bg-white rounded-lg shadow-lg border border-gray-200 flex items-center gap-2 px-3 py-2.5">
                         <Icon name="search" className="text-lg text-gray-400" />
                         <input
+                          ref={searchInputRef}
                           type="text"
                           value={locationSearch}
                           onChange={(e) => setLocationSearch(e.target.value)}
-                          placeholder="Search for area, street name..."
+                          placeholder={isMapsLoaded ? "Search for area, street name..." : "Loading Google Maps..."}
                           className="flex-1 bg-transparent text-sm text-on-surface placeholder:text-gray-400 outline-none"
                         />
-                        <button
-                          type="button"
-                          onClick={() => {
-                            if (locationSearch) setArea(locationSearch);
-                          }}
-                          className="text-xs font-semibold text-brand-kinetic hover:text-brand-kinetic/80 transition-colors"
-                        >
-                          Search
-                        </button>
                       </div>
                     </div>
 
                     {/* Zoom controls */}
-                    <div className="absolute top-3 right-3 z-20 flex flex-col gap-0.5 shadow-lg rounded-lg overflow-hidden">
-                      <button className="w-8 h-8 bg-white hover:bg-gray-50 flex items-center justify-center border-b border-gray-200 text-gray-600 text-sm font-bold">+</button>
-                      <button className="w-8 h-8 bg-white hover:bg-gray-50 flex items-center justify-center text-gray-600 text-sm font-bold">−</button>
+                    <div className="pointer-events-auto absolute right-3 top-3 flex flex-col overflow-hidden rounded-lg border border-gray-200 bg-white shadow-lg">
+                      <button
+                        type="button"
+                        onClick={() => handleMapZoom("in")}
+                        className="flex h-9 w-9 items-center justify-center border-b border-gray-200 text-lg font-bold text-on-surface hover:bg-gray-50"
+                        title="Zoom in"
+                      >
+                        +
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleMapZoom("out")}
+                        className="flex h-9 w-9 items-center justify-center text-lg font-bold text-on-surface hover:bg-gray-50"
+                        title="Zoom out"
+                      >
+                        -
+                      </button>
                     </div>
 
-                    {/* Draggable pin */}
-                    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-10 flex flex-col items-center drop-shadow-lg animate-bounce-slow">
-                      <div className="w-6 h-6 bg-brand-kinetic rounded-full border-4 border-white shadow-lg" />
-                      <div className="w-0 h-0 border-l-[10px] border-r-[10px] border-t-[14px] border-l-transparent border-r-transparent border-t-brand-kinetic -mt-1" />
+                    {/* Center crosshair hint */}
+                    <div className="absolute left-1/2 top-1/2 flex h-9 w-9 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border-2 border-white bg-brand-kinetic/90 shadow-lg">
+                      <Icon name="my_location" className="text-xl text-white" />
                     </div>
 
-                    {/* Map type toggle */}
-                    <div className="absolute bottom-3 right-3 z-20">
-                      <div className="bg-white rounded-lg shadow-lg border border-gray-200 flex text-xs font-semibold overflow-hidden">
-                        <button className="px-3 py-1.5 bg-brand-kinetic text-white">Map</button>
-                        <button className="px-3 py-1.5 text-gray-500 hover:bg-gray-50">Satellite</button>
-                      </div>
-                    </div>
-
-                    {/* Location dot on current location */}
-                    <div className="absolute bottom-3 left-3 z-20">
+                    {/* Crosshair current location button */}
+                    <div className="pointer-events-auto absolute bottom-3 left-3">
                       <button
                         type="button"
                         onClick={handleUseCurrentLocation}
-                        className="w-9 h-9 bg-white rounded-lg shadow-lg border border-gray-200 flex items-center justify-center hover:bg-gray-50 transition-colors"
-                        title="Use current location"
+                        className="flex h-10 items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 text-xs font-semibold text-on-surface shadow-lg transition-colors hover:bg-gray-50"
+                        title="Use current location coordinates"
                       >
-                        <Icon name="my_location" className="text-lg text-brand-kinetic" />
+                        <Icon name="filter_center_focus" className="text-xl text-brand-kinetic" />
+                        Locate
                       </button>
+                    </div>
+
+                    {/* Map type toggle */}
+                    <div className="pointer-events-auto absolute bottom-3 right-3 overflow-hidden rounded-lg border border-gray-200 bg-white text-xs font-semibold shadow-lg">
+                      <button
+                        type="button"
+                        onClick={() => setMapView("map")}
+                        className={`px-4 py-2 transition-colors ${
+                          mapView === "map"
+                            ? "bg-brand-kinetic text-white"
+                            : "text-secondary-app hover:bg-gray-50"
+                        }`}
+                      >
+                        Map
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setMapView("satellite")}
+                        className={`px-4 py-2 transition-colors ${
+                          mapView === "satellite"
+                            ? "bg-brand-kinetic text-white"
+                            : "text-secondary-app hover:bg-gray-50"
+                        }`}
+                      >
+                        Satellite
+                      </button>
+                    </div>
                     </div>
                   </div>
 
@@ -1031,7 +1469,11 @@ export default function PartnerOnboarding() {
                       </label>
                       <button
                         type="button"
-                        onClick={() => setSelectedDays(selectedDays.length === 7 ? [] : [...DAYS])}
+                        onClick={() => {
+                          const nextDays = selectedDays.length === 7 ? [] : [...DAYS];
+                          setSelectedDays(nextDays);
+                          setActiveTimingDay(nextDays[0] || "Monday");
+                        }}
                         className="text-xs font-semibold text-brand-kinetic hover:text-brand-kinetic/80 transition-colors"
                       >
                         {selectedDays.length === 7 ? "Deselect All" : "Select All"}
@@ -1042,7 +1484,10 @@ export default function PartnerOnboarding() {
                         <button
                           key={day}
                           type="button"
-                          onClick={() => toggleDay(day)}
+                          onClick={() => {
+                            toggleDay(day);
+                            setActiveTimingDay(day);
+                          }}
                           className={`py-2.5 rounded-lg text-xs font-semibold border transition-all ${
                             selectedDays.includes(day)
                               ? "bg-brand-kinetic text-white border-brand-kinetic"
@@ -1061,7 +1506,7 @@ export default function PartnerOnboarding() {
                       <label className="text-sm font-semibold">Opening &amp; Closing Hours</label>
                       <button
                         type="button"
-                        onClick={addTimeSlot}
+                        onClick={() => addTimeSlot(activeTimingDay)}
                         className="flex items-center gap-1 text-xs font-semibold text-brand-kinetic hover:text-brand-kinetic/80 transition-colors"
                       >
                         <Icon name="add" className="text-base" />
@@ -1069,25 +1514,41 @@ export default function PartnerOnboarding() {
                       </button>
                     </div>
                     <p className="text-xs text-secondary-app mb-3">Add multiple time slots if your restaurant has break times.</p>
+                    <div className="flex flex-wrap gap-2 mb-4">
+                      {selectedDays.map((day) => (
+                        <button
+                          key={day}
+                          type="button"
+                          onClick={() => setActiveTimingDay(day)}
+                          className={`px-4 py-2 rounded-lg text-xs font-semibold border transition-all ${
+                            activeTimingDay === day
+                              ? "bg-brand-kinetic text-white border-brand-kinetic"
+                              : "bg-white text-secondary-app border-gray-200 hover:border-brand-kinetic/30"
+                          }`}
+                        >
+                          {day}
+                        </button>
+                      ))}
+                    </div>
 
                     <div className="space-y-3">
-                      {timeSlots.map((slot, i) => (
+                      {(dayTimeSlots[activeTimingDay] || []).map((slot, i) => (
                         <div key={i} className="flex items-end gap-3">
                           <TimePicker
                             label="Opening Time"
                             value={slot.open}
-                            onChange={(v) => updateTimeSlot(i, "open", v)}
+                            onChange={(v) => updateTimeSlot(activeTimingDay, i, "open", v)}
                           />
                           <span className="text-sm text-secondary-app pb-2.5">—</span>
                           <TimePicker
                             label="Closing Time"
                             value={slot.close}
-                            onChange={(v) => updateTimeSlot(i, "close", v)}
+                            onChange={(v) => updateTimeSlot(activeTimingDay, i, "close", v)}
                           />
-                          {timeSlots.length > 1 && (
+                          {(dayTimeSlots[activeTimingDay] || []).length > 1 && (
                             <button
                               type="button"
-                              onClick={() => removeTimeSlot(i)}
+                              onClick={() => removeTimeSlot(activeTimingDay, i)}
                               className="pb-2.5 text-gray-400 hover:text-red-500 transition-colors"
                             >
                               <Icon name="remove_circle" className="text-lg" />
@@ -1153,8 +1614,24 @@ export default function PartnerOnboarding() {
                         label="Upload Your Menu"
                         desc="Upload a clear photo or PDF of your menu — our team will digitize it for you"
                         file={menuReferenceFile}
-                        onChange={setMenuReferenceFile}
+                        onChange={validateMenuReferenceFile}
+                        accept=".csv,.xls,.xlsx"
                       />
+                      <p className="mt-3 text-xs text-secondary-app">
+                        Required columns: {MENU_UPLOAD_COLUMNS.join(", ")}
+                      </p>
+                      {menuUploadError && (
+                        <div className="mt-3 flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs font-medium text-red-700">
+                          <Icon name="error" className="text-base" />
+                          {menuUploadError}
+                        </div>
+                      )}
+                      {menuUploadValid && menuReferenceFile && (
+                        <div className="mt-3 flex items-center gap-2 rounded-lg border border-green-200 bg-green-50 px-3 py-2 text-xs font-medium text-green-700">
+                          <Icon name="check_circle" className="text-base" />
+                          Menu sheet accepted.
+                        </div>
+                      )}
                       <div className="mt-4 p-4 rounded-xl bg-blue-50 border border-blue-200">
                         <div className="flex items-start gap-3">
                           <Icon name="info" className="text-lg text-blue-500 mt-0.5" />
@@ -1282,15 +1759,7 @@ export default function PartnerOnboarding() {
                         {/* Add Category Button */}
                         <button
                           type="button"
-                          onClick={() => {
-                            const name = prompt("Enter category name (e.g. Appetizers, Main Course):");
-                            if (name && name.trim()) {
-                              setMenuCategories([
-                                ...menuCategories,
-                                { id: crypto.randomUUID(), name: name.trim(), items: [] },
-                              ]);
-                            }
-                          }}
+                          onClick={() => setShowCategoryDialog(true)}
                           className="w-full flex items-center justify-center gap-2 px-4 py-3 rounded-xl border-2 border-dashed border-gray-200 text-sm font-semibold text-secondary-app hover:border-brand-kinetic/30 hover:text-brand-kinetic transition-all"
                         >
                           <Icon name="add" className="text-lg" />
@@ -1298,9 +1767,64 @@ export default function PartnerOnboarding() {
                         </button>
                       </div>
 
+                      {showCategoryDialog && (
+                        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm px-4">
+                          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
+                            <div className="mb-5 flex items-center justify-between">
+                              <h3 className="font-display text-lg font-bold">Add Category</h3>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setShowCategoryDialog(false);
+                                  setNewCategoryName("");
+                                }}
+                                className="text-gray-400 hover:text-on-surface transition-colors"
+                              >
+                                <Icon name="close" className="text-xl" />
+                              </button>
+                            </div>
+                            <label className="block text-sm font-semibold mb-2">
+                              Category Name <span className="text-brand-kinetic">*</span>
+                            </label>
+                            <input
+                              type="text"
+                              value={newCategoryName}
+                              onChange={(e) => setNewCategoryName(e.target.value)}
+                              onKeyDown={(event) => {
+                                if (event.key === "Enter") addCategory();
+                              }}
+                              placeholder="e.g. Starters"
+                              className="w-full px-4 py-3 rounded-xl border border-gray-200 bg-white outline-none focus:border-brand-kinetic focus:ring-2 focus:ring-brand-kinetic/10 transition-all text-sm"
+                              autoFocus
+                            />
+                            <div className="mt-6 flex justify-end gap-3">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setShowCategoryDialog(false);
+                                  setNewCategoryName("");
+                                }}
+                                className="px-5 py-3 rounded-xl border border-gray-200 text-sm font-semibold text-secondary-app hover:text-on-surface transition-all"
+                              >
+                                Cancel
+                              </button>
+                              <button
+                                type="button"
+                                onClick={addCategory}
+                                disabled={!newCategoryName.trim()}
+                                className="px-5 py-3 rounded-xl bg-brand-kinetic text-white text-sm font-semibold hover:bg-brand-kinetic/90 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                              >
+                                Add Category
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
                       {/* Add/Edit Item Panel */}
                       {editingItem && (
-                        <div className="bg-white rounded-2xl border border-gray-200 p-6">
+                        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm px-4">
+                        <div className="max-h-[90vh] w-full max-w-4xl overflow-y-auto bg-white rounded-2xl border border-gray-200 p-6 shadow-2xl">
                           <div className="flex items-center justify-between mb-5">
                             <h3 className="font-display text-base font-bold">
                               {editingItem.item ? "Edit Item" : "Add New Item"}
@@ -1336,6 +1860,7 @@ export default function PartnerOnboarding() {
                             onCancel={() => setEditingItem(null)}
                           />
                         </div>
+                        </div>
                       )}
                     </div>
                   )}
@@ -1347,9 +1872,34 @@ export default function PartnerOnboarding() {
           {/* ═══════════════ STEP 3: Documents & Legal Verification ═══════════════ */}
           {step === 3 && (
             <div>
-              <div className="mb-8">
-                <h1 className="font-display text-2xl lg:text-3xl font-bold mb-2">Documents &amp; Legal Verification</h1>
-                <p className="text-secondary-app text-sm">Upload the required documents to verify your business.</p>
+              <div className="mb-8 flex flex-wrap items-center justify-between gap-4 border-b border-gray-100 pb-4">
+                <div>
+                  <h1 className="font-display text-2xl lg:text-3xl font-bold mb-1">Documents &amp; Legal Verification</h1>
+                  <p className="text-secondary-app text-sm">Upload the required documents to verify your business.</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setPanNumber("ABCDE1234F");
+                    setPanFile(new File(["dummy pan"], "pan_card_copy_dummy.png", { type: "image/png" }));
+                    setGstExempt(false);
+                    setGstin("22AAAAA0000A1Z5");
+                    setGstFile(new File(["dummy gst"], "gst_certificate_dummy.png", { type: "image/png" }));
+                    setFssaiNumber("12345678901234");
+                    setFssaiExpiry("2030-12-31");
+                    setFssaiFile(new File(["dummy fssai"], "fssai_license_dummy.png", { type: "image/png" }));
+                    setBankAccount("9876543210");
+                    setBankConfirm("9876543210");
+                    setAccountType("savings");
+                    setIfsc("HDFC0001234");
+                    setIfscFetched(true);
+                    setChequeFile(new File(["dummy cheque"], "cheque_statement_dummy.png", { type: "image/png" }));
+                  }}
+                  className="flex items-center gap-1.5 px-4 py-2.5 bg-brand-kinetic/10 text-brand-kinetic hover:bg-brand-kinetic/20 rounded-xl text-sm font-semibold transition-all border border-brand-kinetic/20 shadow-sm"
+                >
+                  <Icon name="auto_fix_high" className="text-lg" />
+                  Fill Step 3 Dummy Data
+                </button>
               </div>
 
               {/* ── Section 3.1: Tax & Identity ── */}
@@ -1740,7 +2290,7 @@ export default function PartnerOnboarding() {
                   {[
                     { label: "Restaurant", value: restaurantName, detail: `${cuisines.join(", ")} · ${area}, ${city}` },
                     { label: "Owner", value: ownerName, detail: `${ownerEmail} · ${ownerPhone}` },
-                    { label: "Hours", value: `${selectedDays.length} days/week`, detail: timeSlots.map(s => `${s.open} - ${s.close}`).join(", ") },
+                    { label: "Hours", value: `${selectedDays.length} days/week`, detail: selectedDays.map(day => `${day}: ${(dayTimeSlots[day] || []).map(s => `${s.open} - ${s.close}`).join(", ")}`).join(" | ") },
                     { label: "Documents", value: "All uploaded ✓", detail: `PAN · ${gstExempt ? "GST Exempt" : "GST"} · FSSAI · Bank` },
                   ].map((item) => (
                     <div key={item.label} className="bg-white rounded-xl border border-gray-200 p-4 flex items-center justify-between">
@@ -1805,11 +2355,11 @@ export default function PartnerOnboarding() {
                 ) : (
                   <button
                     onClick={handleFinalSubmit}
-                    disabled={!acceptedTos || signature.length < 2}
+                    disabled={!acceptedTos || signature.length < 2 || isSubmitting}
                     className="flex items-center gap-2 px-8 py-3 rounded-xl bg-green-600 text-white text-sm font-semibold hover:bg-green-700 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
                   >
-                    <Icon name="how_to_reg" className="text-lg" />
-                    Submit &amp; Sign
+                    <Icon name={isSubmitting ? "pending" : "how_to_reg"} className="text-lg" />
+                    {isSubmitting ? "Submitting..." : "Submit & Sign"}
                   </button>
                 )}
               </div>
@@ -1860,10 +2410,10 @@ export default function PartnerOnboarding() {
                   </button>
                   <button
                     onClick={handleSaveDraft}
-                    disabled={!saveEmail.includes("@")}
+                    disabled={!saveEmail.includes("@") || isSaving}
                     className="flex-1 px-4 py-3 rounded-xl bg-brand-kinetic text-white text-sm font-semibold hover:bg-brand-kinetic/90 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    Send Link
+                    {isSaving ? "Saving..." : "Send Link"}
                   </button>
                 </div>
               </>
