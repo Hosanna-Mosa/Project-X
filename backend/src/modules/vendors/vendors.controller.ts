@@ -121,6 +121,181 @@ export const createVendor = async (req: Request, res: Response) => {
   }
 };
 
+const fileName = (file?: { name?: string } | null) => file?.name || undefined;
+
+const requireFields = (payload: any) => {
+  const missing: string[] = [];
+  const requireText = (value: unknown, label: string) => {
+    if (typeof value !== "string" || value.trim().length === 0) missing.push(label);
+  };
+
+  requireText(payload.restaurantName, "Restaurant name");
+  if (!Array.isArray(payload.cuisines) || payload.cuisines.length === 0) missing.push("Cuisine / Food Category");
+  requireText(payload.ownerName, "Owner full name");
+  if (!payload.ownerEmail || !String(payload.ownerEmail).includes("@")) missing.push("Owner email address");
+  if (!/^\d{10}$/.test(String(payload.ownerPhone || ""))) missing.push("Owner phone number");
+  if (payload.otp !== "1234" || !payload.otpVerified) missing.push("OTP verification");
+  if (!payload.location?.lat || !payload.location?.lng) missing.push("GPS location");
+  requireText(payload.address?.area, "Area / Sector / Locality");
+  requireText(payload.address?.city, "City");
+  requireText(payload.address?.landmark, "Nearby landmark");
+  if (!Array.isArray(payload.selectedDays) || payload.selectedDays.length === 0) missing.push("Days of operation");
+  const dayTimeSlots = payload.dayTimeSlots || {};
+  if (Array.isArray(payload.selectedDays)) {
+    payload.selectedDays.forEach((day: string) => {
+      if (!Array.isArray(dayTimeSlots[day]) || !dayTimeSlots[day].some((slot: any) => slot.open && slot.close)) {
+        missing.push(`${day} timings`);
+      }
+    });
+  }
+  if (payload.menuSetupMode === "upload") {
+    if (!fileName(payload.menuReferenceFile) || !payload.menuUploadValid) missing.push("Valid uploaded menu sheet");
+  } else if (!Array.isArray(payload.menuCategories) || !payload.menuCategories.some((category: any) => Array.isArray(category.items) && category.items.length > 0)) {
+    missing.push("Manual menu category and item");
+  }
+
+  requireText(payload.panNumber, "PAN number");
+  if (!fileName(payload.panFile)) missing.push("PAN file");
+  if (!payload.gstExempt) {
+    requireText(payload.gstin, "GSTIN");
+    if (!fileName(payload.gstFile)) missing.push("GST file");
+  }
+  if (!/^\d{14}$/.test(String(payload.fssaiNumber || ""))) missing.push("FSSAI number");
+  requireText(payload.fssaiExpiry, "FSSAI expiry");
+  if (!fileName(payload.fssaiFile)) missing.push("FSSAI file");
+  if (String(payload.bankAccount || "").length < 9) missing.push("Bank account number");
+  if (payload.bankAccount !== payload.bankConfirm) missing.push("Matching bank account confirmation");
+  if (!/^[A-Z]{4}0[A-Z0-9]{6}$/.test(String(payload.ifsc || ""))) missing.push("IFSC code");
+  if (!payload.ifscFetched) missing.push("IFSC verification");
+  if (!fileName(payload.chequeFile)) missing.push("Cancelled cheque / bank statement");
+  if (!payload.acceptedTos) missing.push("Accepted contract terms");
+  requireText(payload.signature, "Digital signature");
+
+  return missing;
+};
+
+export const saveVendorOnboarding = async (req: Request, res: Response) => {
+  try {
+    const payload = req.body;
+    const status = payload.status === "submitted" ? "submitted" : "draft";
+
+    if (status === "submitted") {
+      const missing = requireFields(payload);
+      if (missing.length > 0) {
+        return res.status(400).json({
+          message: `Please complete required fields: ${missing.join(", ")}`,
+          missing,
+        });
+      }
+    }
+
+    const ownerPhoneInput = String(payload.ownerPhone || payload.phone || "").replace(/\D/g, "");
+    const ownerEmail = String(payload.ownerEmail || payload.email || "").trim().toLowerCase();
+    const ownerPhone = ownerPhoneInput || (status === "draft" && ownerEmail ? `draft-${ownerEmail}` : "");
+    const lat = Number(payload.location?.lat);
+    const lng = Number(payload.location?.lng);
+    const hasLocation = Number.isFinite(lat) && Number.isFinite(lng);
+    const addressParts = [
+      payload.address?.shopNo,
+      payload.address?.floor,
+      payload.address?.area,
+      payload.address?.city,
+      payload.address?.landmark,
+    ].filter(Boolean);
+    const formattedAddress = payload.address?.formattedAddress || addressParts.join(", ");
+
+    if (!ownerPhone) {
+      return res.status(400).json({ message: "Owner phone number is required to save onboarding" });
+    }
+
+    const vendorData = {
+      name: payload.restaurantName || "Draft restaurant",
+      email: ownerEmail || undefined,
+      phone: ownerPhone,
+      googlePlaceId: payload.googlePlaceId,
+      onboardingStatus: status,
+      owner: {
+        name: payload.ownerName,
+        email: ownerEmail,
+        phone: ownerPhoneInput || "",
+        primaryContact: payload.primaryContact || ownerPhoneInput,
+        otpVerified: payload.otpVerified && payload.otp === "1234",
+      },
+      location: {
+        type: "Point",
+        coordinates: hasLocation ? [lng, lat] : [0, 0],
+      },
+      address: formattedAddress || "Draft address",
+      detailedAddress: {
+        shopNo: payload.address?.shopNo,
+        floor: payload.address?.floor,
+        area: payload.address?.area,
+        city: payload.address?.city,
+        landmark: payload.address?.landmark,
+        formattedAddress,
+      },
+      image: payload.image || "https://images.unsplash.com/photo-1561758033-d89a9ad46330?w=500",
+      categories: payload.cuisines || [],
+      operations: {
+        selectedDays: payload.selectedDays || [],
+        timeSlots: payload.timeSlots || [],
+        dayTimeSlots: payload.dayTimeSlots || {},
+        menuSetupMode: payload.menuSetupMode || "manual",
+        menuReferenceFileName: fileName(payload.menuReferenceFile),
+        menuUploadValid: Boolean(payload.menuUploadValid),
+        menuCategories: (payload.menuCategories || []).map((category: any) => ({
+          name: category.name,
+          items: (category.items || []).map((item: any) => ({
+            name: item.name,
+            price: item.price,
+            description: item.description,
+            isVeg: item.isVeg,
+            isBestseller: item.isBestseller,
+            photoFileName: fileName(item.photo),
+          })),
+        })),
+      },
+      legal: {
+        panNumber: payload.panNumber,
+        panFileName: fileName(payload.panFile),
+        gstin: payload.gstin,
+        gstFileName: fileName(payload.gstFile),
+        gstExempt: Boolean(payload.gstExempt),
+        fssaiNumber: payload.fssaiNumber,
+        fssaiExpiry: payload.fssaiExpiry,
+        fssaiFileName: fileName(payload.fssaiFile),
+        bankAccount: payload.bankAccount,
+        accountType: payload.accountType || "savings",
+        ifsc: payload.ifsc,
+        ifscVerified: Boolean(payload.ifscFetched),
+        chequeFileName: fileName(payload.chequeFile),
+      },
+      contract: {
+        acceptedTos: Boolean(payload.acceptedTos),
+        signature: payload.signature,
+        signedAt: status === "submitted" ? new Date() : undefined,
+      },
+    };
+
+    const vendor = await Vendor.findOneAndUpdate(
+      ownerEmail ? { $or: [{ phone: ownerPhone }, { email: ownerEmail }] } : { phone: ownerPhone },
+      { $set: vendorData },
+      { new: true, upsert: true, runValidators: true, setDefaultsOnInsert: true }
+    );
+
+    res.status(status === "submitted" ? 201 : 200).json({
+      message: status === "submitted" ? "Onboarding submitted successfully" : "Draft saved successfully",
+      vendor,
+    });
+  } catch (error: any) {
+    console.error("Error saving vendor onboarding:", error);
+    if (error?.code === 11000) {
+      return res.status(400).json({ message: "Vendor with this email or phone already exists" });
+    }
+    res.status(500).json({ message: "Internal server error" });
+  }
+};
+
 import axios from "axios";
 
 export const searchGooglePlaces = async (req: Request, res: Response) => {

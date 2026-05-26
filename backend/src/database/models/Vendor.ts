@@ -7,15 +7,70 @@ export interface IVendor extends Document {
   phone: string;
   password?: string;
   googlePlaceId?: string;
+  onboardingStatus?: "draft" | "submitted";
+  owner?: {
+    name?: string;
+    email?: string;
+    phone?: string;
+    primaryContact?: string;
+    otpVerified?: boolean;
+  };
   location: {
     type: string;
     coordinates: number[]; // [longitude, latitude]
   };
   address: string;
+  detailedAddress?: {
+    shopNo?: string;
+    floor?: string;
+    area?: string;
+    city?: string;
+    landmark?: string;
+    formattedAddress?: string;
+  };
   image: string;
   rating: number;
   reviews: string;
   categories: string[];
+  operations?: {
+    selectedDays?: string[];
+    timeSlots?: { open: string; close: string }[];
+    dayTimeSlots?: Record<string, { open: string; close: string }[]>;
+    menuSetupMode?: "upload" | "manual";
+    menuReferenceFileName?: string;
+    menuUploadValid?: boolean;
+    menuCategories?: {
+      name: string;
+      items: {
+        name: string;
+        price: string;
+        description?: string;
+        isVeg: boolean;
+        isBestseller: boolean;
+        photoFileName?: string;
+      }[];
+    }[];
+  };
+  legal?: {
+    panNumber?: string;
+    panFileName?: string;
+    gstin?: string;
+    gstFileName?: string;
+    gstExempt?: boolean;
+    fssaiNumber?: string;
+    fssaiExpiry?: string;
+    fssaiFileName?: string;
+    bankAccount?: string;
+    accountType?: "savings" | "current";
+    ifsc?: string;
+    ifscVerified?: boolean;
+    chequeFileName?: string;
+  };
+  contract?: {
+    acceptedTos?: boolean;
+    signature?: string;
+    signedAt?: Date;
+  };
   isPureVeg: boolean;
   isOpen: boolean;
   deliveryFee: number;
@@ -32,6 +87,18 @@ const VendorSchema: Schema = new Schema(
     phone: { type: String, required: true, unique: true },
     password: { type: String },
     googlePlaceId: { type: String },
+    onboardingStatus: {
+      type: String,
+      enum: ["draft", "submitted"],
+      default: "draft",
+    },
+    owner: {
+      name: { type: String },
+      email: { type: String },
+      phone: { type: String },
+      primaryContact: { type: String },
+      otpVerified: { type: Boolean, default: false },
+    },
     location: {
       type: {
         type: String,
@@ -44,10 +111,72 @@ const VendorSchema: Schema = new Schema(
       },
     },
     address: { type: String, required: true },
+    detailedAddress: {
+      shopNo: { type: String },
+      floor: { type: String },
+      area: { type: String },
+      city: { type: String },
+      landmark: { type: String },
+      formattedAddress: { type: String },
+    },
     image: { type: String },
     rating: { type: Number, default: 0 },
     reviews: { type: String, default: "0" },
     categories: { type: [String], default: [] },
+    operations: {
+      selectedDays: { type: [String], default: [] },
+      timeSlots: {
+        type: [
+          {
+            open: { type: String },
+            close: { type: String },
+          },
+        ],
+        default: [],
+      },
+      dayTimeSlots: { type: Schema.Types.Mixed },
+      menuSetupMode: { type: String, enum: ["upload", "manual"], default: "manual" },
+      menuReferenceFileName: { type: String },
+      menuUploadValid: { type: Boolean, default: false },
+      menuCategories: {
+        type: [
+          {
+            name: { type: String },
+            items: [
+              {
+                name: { type: String },
+                price: { type: String },
+                description: { type: String },
+                isVeg: { type: Boolean },
+                isBestseller: { type: Boolean },
+                photoFileName: { type: String },
+              },
+            ],
+          },
+        ],
+        default: [],
+      },
+    },
+    legal: {
+      panNumber: { type: String },
+      panFileName: { type: String },
+      gstin: { type: String },
+      gstFileName: { type: String },
+      gstExempt: { type: Boolean, default: false },
+      fssaiNumber: { type: String },
+      fssaiExpiry: { type: String },
+      fssaiFileName: { type: String },
+      bankAccount: { type: String },
+      accountType: { type: String, enum: ["savings", "current"], default: "savings" },
+      ifsc: { type: String },
+      ifscVerified: { type: Boolean, default: false },
+      chequeFileName: { type: String },
+    },
+    contract: {
+      acceptedTos: { type: Boolean, default: false },
+      signature: { type: String },
+      signedAt: { type: Date },
+    },
     isPureVeg: { type: Boolean, default: false },
     isOpen: { type: Boolean, default: true },
     deliveryFee: { type: Number, default: 0 },
