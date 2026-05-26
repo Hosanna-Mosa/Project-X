@@ -72,8 +72,7 @@ export default function RideSearchingScreen() {
     estimatedMinutes?: string;
     distanceInKm?: string;
   }>();
-  const [detailsVisible, setDetailsVisible] = React.useState(false);
-  const [bookAgainVisible, setBookAgainVisible] = React.useState(false);
+  const [tripDetailsVisible, setTripDetailsVisible] = React.useState(false);
   const [cancelReasonVisible, setCancelReasonVisible] = React.useState(false);
   const [cancelConfirmVisible, setCancelConfirmVisible] = React.useState(false);
   const [selectedCancelReason, setSelectedCancelReason] = React.useState("");
@@ -94,8 +93,6 @@ export default function RideSearchingScreen() {
   );
 
   const fare = parseFare(params.fareTotal, params.ridePrice);
-  const rideFare = Math.max(0, Math.round(fare * 0.85 * 100) / 100);
-  const surcharge = Math.max(0, Math.round((fare - rideFare) * 100) / 100);
   const pickupTitle = String(params.pickupName || "Pickup").split(",")[0];
   const dropTitle = String(params.dropName || "Drop").split(",")[0];
   const cancelUsesDrop = selectedCancelReason.toLowerCase().includes("drop");
@@ -170,7 +167,11 @@ export default function RideSearchingScreen() {
     setCurrentOrderId,
   ]);
 
-  const showTripDetails = () => setDetailsVisible(true);
+  const showTripDetails = () => {
+    setCancelConfirmVisible(false);
+    setCancelReasonVisible(false);
+    setTripDetailsVisible(true);
+  };
   const showCancelReasons = () => {
     setCancelConfirmVisible(false);
     setCancelReasonVisible(true);
@@ -187,7 +188,9 @@ export default function RideSearchingScreen() {
   const cancelRide = () => {
     setCancelConfirmVisible(false);
     setCancelReasonVisible(false);
-    setBookAgainVisible(false);
+    setTripDetailsVisible(false);
+    setCurrentOrderId(null);
+    router.replace("/(tabs)");
   };
   /* void [
       `${params.pickupName}\n\nTo\n\n${params.dropName}\n\nRide: ${params.rideName || "Bike Ride"}\nFare: ₹${fare}`,
@@ -238,6 +241,13 @@ export default function RideSearchingScreen() {
             </View>
           </Marker>
         </MapView>
+        <TouchableOpacity
+          style={styles.screenBackButton}
+          activeOpacity={0.85}
+          onPress={() => router.back()}
+        >
+          <Ionicons name="arrow-back" size={24} color={colors.text} />
+        </TouchableOpacity>
       </View>
 
       <View style={styles.panel}>
@@ -263,7 +273,7 @@ export default function RideSearchingScreen() {
 
         <View style={styles.fareCard}>
           <View style={styles.bikeBadge}>
-            <MaterialCommunityIcons name="motorbike" size={28} color="#0f172a" />
+            <MaterialCommunityIcons name="motorbike" size={28} color={colors.text} />
           </View>
           <View style={styles.fareTextGroup}>
             <Text style={styles.fareLabel}>Total Fare</Text>
@@ -279,7 +289,7 @@ export default function RideSearchingScreen() {
         <View style={styles.suggestionCard}>
           <View style={styles.suggestionHeader}>
             <View style={styles.avatar}>
-              <Ionicons name="person" size={25} color="#0f172a" />
+              <Ionicons name="person" size={25} color={colors.text} />
             </View>
             <Text style={styles.suggestionTitle}>
               Captains aren't accepting at ₹{fare}.{"\n"}Try adding more
@@ -293,28 +303,21 @@ export default function RideSearchingScreen() {
               </TouchableOpacity>
             ))}
           </View>
-
-          <TouchableOpacity
-            style={styles.bookAgainButton}
-            onPress={() => setBookAgainVisible(true)}
-          >
-            <Text style={styles.bookAgainText}>Book again</Text>
-          </TouchableOpacity>
         </View>
       </View>
 
-      {bookAgainVisible && (
+      {tripDetailsVisible && (
         <View style={styles.bookAgainOverlay}>
           <TouchableOpacity
             style={styles.bookAgainBackdrop}
             activeOpacity={1}
-            onPress={() => setBookAgainVisible(false)}
+            onPress={() => setTripDetailsVisible(false)}
           />
           <TouchableOpacity
             style={styles.bookAgainBackFloating}
-            onPress={() => setBookAgainVisible(false)}
+            onPress={() => setTripDetailsVisible(false)}
           >
-            <Ionicons name="arrow-back" size={24} color="#000" />
+            <Ionicons name="arrow-back" size={24} color={colors.text} />
           </TouchableOpacity>
 
           <View style={styles.bookAgainSheet}>
@@ -323,7 +326,7 @@ export default function RideSearchingScreen() {
             <View style={styles.serviceSummaryCard}>
               <View style={styles.serviceLeft}>
                 <View style={styles.serviceBikeBadge}>
-                  <MaterialCommunityIcons name="motorbike" size={30} color="#0f172a" />
+                  <MaterialCommunityIcons name="motorbike" size={30} color={colors.text} />
                 </View>
                 <Text style={styles.serviceName}>Bike</Text>
               </View>
@@ -365,13 +368,13 @@ export default function RideSearchingScreen() {
             </View>
 
             <View style={styles.paymentRow}>
-              <Ionicons name="cash-outline" size={20} color="#334155" />
+              <Ionicons name="cash-outline" size={20} color={colors.textSecondary} />
               <Text style={styles.paymentText}>Paying via cash</Text>
             </View>
 
             <TouchableOpacity
               style={styles.backYellowButton}
-              onPress={() => setBookAgainVisible(false)}
+              onPress={() => setTripDetailsVisible(false)}
             >
               <Text style={styles.backYellowText}>Back</Text>
             </TouchableOpacity>
@@ -395,7 +398,7 @@ export default function RideSearchingScreen() {
                 style={styles.cancelFlowBackButton}
                 onPress={() => setCancelReasonVisible(false)}
               >
-                <Ionicons name="arrow-back" size={24} color="#000" />
+                <Ionicons name="arrow-back" size={24} color={colors.text} />
               </TouchableOpacity>
 
               <View style={styles.cancelReasonSheet}>
@@ -413,7 +416,7 @@ export default function RideSearchingScreen() {
                     onPress={() => selectCancelReason(reason)}
                   >
                     <Text style={styles.cancelReasonText}>{reason}</Text>
-                    <Ionicons name="chevron-forward" size={22} color="#0f172a" />
+                    <Ionicons name="chevron-forward" size={22} color={colors.text} />
                   </TouchableOpacity>
                 ))}
               </View>
@@ -429,7 +432,7 @@ export default function RideSearchingScreen() {
               />
 
               <TouchableOpacity style={styles.cancelConfirmClose} onPress={keepSearching}>
-                <Ionicons name="close" size={28} color="#000" />
+                <Ionicons name="close" size={28} color={colors.text} />
               </TouchableOpacity>
 
               <View style={styles.cancelConfirmSheet}>
@@ -477,64 +480,6 @@ export default function RideSearchingScreen() {
           )}
         </View>
       )}
-
-      {detailsVisible && (
-        <View style={styles.detailsOverlay}>
-          <TouchableOpacity
-            style={styles.detailsBackdrop}
-            activeOpacity={1}
-            onPress={() => setDetailsVisible(false)}
-          />
-          <TouchableOpacity
-            style={styles.detailsClose}
-            onPress={() => setDetailsVisible(false)}
-          >
-            <Ionicons name="close" size={28} color="#000" />
-          </TouchableOpacity>
-
-          <View style={styles.detailsSheet}>
-            <View style={styles.detailsHandle} />
-            <View style={styles.detailsHeader}>
-              <MaterialCommunityIcons name="motorbike" size={24} color="#0f172a" />
-              <Text style={styles.detailsTitle}>Bike Fare Details</Text>
-            </View>
-
-            <View style={styles.estimateRow}>
-              <Text style={styles.estimateLabel}>
-                Total Estimated fare price including{"\n"}taxes.
-              </Text>
-              <Text style={styles.estimateValue}>₹{fare}*</Text>
-            </View>
-
-            <View style={styles.detailDivider} />
-            <View style={styles.breakdownRow}>
-              <Text style={styles.breakdownLabel}>Ride Fare</Text>
-              <Text style={styles.breakdownValue}>₹{rideFare.toFixed(2)}</Text>
-            </View>
-            <View style={styles.breakdownRow}>
-              <Text style={styles.breakdownLabel}>Surcharge</Text>
-              <Text style={styles.breakdownValue}>₹{surcharge.toFixed(2)}</Text>
-            </View>
-
-            <Text style={styles.detailsNote}>
-              *Price may vary based on final pickup or drop location, time taken, final route and toll area.
-            </Text>
-            <Text style={styles.detailsPolicy}>
-              22 Base Fare upto 2 kms, 6 Rs/km upto 6 kms post 6 kms 8Rs/km
-            </Text>
-            <Text style={styles.detailsPolicy}>
-              Waiting charges after 3 mins of captain arrival is ₹1/min
-            </Text>
-
-            <TouchableOpacity
-              style={styles.gotItButton}
-              onPress={() => setDetailsVisible(false)}
-            >
-              <Text style={styles.gotItText}>Got it</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      )}
     </View>
   );
 }
@@ -549,6 +494,23 @@ const createStyles = (colors: typeof Colors.light, insets: any) =>
       height: height * 0.43,
       backgroundColor: "#eef1f4",
     },
+    screenBackButton: {
+      position: "absolute",
+      top: insets.top + 12,
+      left: 16,
+      width: 44,
+      height: 44,
+      borderRadius: 22,
+      backgroundColor: colors.surface,
+      alignItems: "center",
+      justifyContent: "center",
+      shadowColor: "#000",
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.18,
+      shadowRadius: 8,
+      elevation: 8,
+      zIndex: 8,
+    },
     pickupMarkerWrap: {
       alignItems: "center",
     },
@@ -556,9 +518,9 @@ const createStyles = (colors: typeof Colors.light, insets: any) =>
       width: 26,
       height: 26,
       borderRadius: 13,
-      backgroundColor: "#1f8f49",
+      backgroundColor: colors.success,
       borderWidth: 3,
-      borderColor: "#fff",
+      borderColor: colors.surface,
       alignItems: "center",
       justifyContent: "center",
       shadowColor: "#000",
@@ -571,23 +533,23 @@ const createStyles = (colors: typeof Colors.light, insets: any) =>
       width: 9,
       height: 9,
       borderRadius: 4.5,
-      backgroundColor: "#fff",
+      backgroundColor: colors.surface,
     },
     pickupStem: {
       width: 3,
       height: 24,
-      backgroundColor: "#64748b",
+      backgroundColor: colors.textSecondary,
       marginTop: -1,
     },
     dropMarker: {
       width: 28,
       height: 28,
       borderRadius: 14,
-      backgroundColor: "#d73c32",
+      backgroundColor: colors.error,
       alignItems: "center",
       justifyContent: "center",
       borderWidth: 2,
-      borderColor: "#fff",
+      borderColor: colors.surface,
       shadowColor: "#000",
       shadowOffset: { width: 0, height: 2 },
       shadowOpacity: 0.2,
@@ -598,7 +560,7 @@ const createStyles = (colors: typeof Colors.light, insets: any) =>
       width: 9,
       height: 9,
       borderRadius: 4.5,
-      backgroundColor: "#fff",
+      backgroundColor: colors.surface,
     },
     panel: {
       flex: 1,
@@ -619,7 +581,7 @@ const createStyles = (colors: typeof Colors.light, insets: any) =>
       width: 42,
       height: 4,
       borderRadius: 2,
-      backgroundColor: "#e1e8ef",
+      backgroundColor: colors.border,
       alignSelf: "center",
       marginBottom: 11,
     },
@@ -631,13 +593,13 @@ const createStyles = (colors: typeof Colors.light, insets: any) =>
       marginBottom: 8,
     },
     titleCount: {
-      color: "#0a4f9d",
+      color: colors.primary,
       fontWeight: "900",
     },
     progressTrack: {
       height: 18,
       borderRadius: 9,
-      backgroundColor: "#d9e8f8",
+      backgroundColor: colors.surfaceSecondary,
       overflow: "hidden",
       flexDirection: "row",
       alignItems: "stretch",
@@ -647,7 +609,7 @@ const createStyles = (colors: typeof Colors.light, insets: any) =>
     },
     progressBlock: {
       width: 13,
-      backgroundColor: "#0c5aa7",
+      backgroundColor: colors.primary,
     },
     progressBlockFirst: {
       borderTopLeftRadius: 9,
@@ -664,7 +626,7 @@ const createStyles = (colors: typeof Colors.light, insets: any) =>
       height: 64,
       borderRadius: 16,
       borderWidth: 1,
-      borderColor: "#dce4ee",
+      borderColor: colors.border,
       backgroundColor: colors.surface,
       flexDirection: "row",
       alignItems: "center",
@@ -675,12 +637,12 @@ const createStyles = (colors: typeof Colors.light, insets: any) =>
       width: 44,
       height: 44,
       borderRadius: 22,
-      backgroundColor: "#f8fafc",
+      backgroundColor: colors.surfaceSecondary,
       alignItems: "center",
       justifyContent: "center",
       marginRight: 10,
       borderWidth: 1,
-      borderColor: "#edf2f7",
+      borderColor: colors.borderLight,
     },
     fareTextGroup: {
       flex: 1,
@@ -700,7 +662,7 @@ const createStyles = (colors: typeof Colors.light, insets: any) =>
       paddingHorizontal: 18,
       borderRadius: 17,
       borderWidth: 1,
-      borderColor: "#cfd9e6",
+      borderColor: colors.border,
       alignItems: "center",
       justifyContent: "center",
     },
@@ -712,19 +674,18 @@ const createStyles = (colors: typeof Colors.light, insets: any) =>
     dashedLine: {
       borderTopWidth: 1,
       borderStyle: "dashed",
-      borderColor: "#d7e0ea",
+      borderColor: colors.border,
       marginHorizontal: -16,
       marginBottom: 12,
     },
     suggestionCard: {
       borderWidth: 1,
-      borderColor: "#dce4ee",
-      backgroundColor: "#f8fbff",
+      borderColor: colors.border,
+      backgroundColor: colors.surfaceSecondary,
       borderRadius: 14,
       paddingHorizontal: 18,
       paddingTop: 13,
       paddingBottom: 14,
-      minHeight: 158,
     },
     suggestionHeader: {
       flexDirection: "row",
@@ -735,7 +696,7 @@ const createStyles = (colors: typeof Colors.light, insets: any) =>
       width: 44,
       height: 44,
       borderRadius: 22,
-      backgroundColor: "#f8d4c8",
+      backgroundColor: colors.surface,
       alignItems: "center",
       justifyContent: "center",
       marginRight: 12,
@@ -752,30 +713,21 @@ const createStyles = (colors: typeof Colors.light, insets: any) =>
       flexDirection: "row",
       alignItems: "center",
       gap: 14,
-      marginBottom: 20,
     },
     addFarePill: {
       minWidth: 62,
       height: 30,
       borderRadius: 15,
-      backgroundColor: "#fff",
+      backgroundColor: colors.surface,
       alignItems: "center",
       justifyContent: "center",
+      borderWidth: 1,
+      borderColor: colors.borderLight,
     },
     addFareText: {
       fontSize: 13,
       fontWeight: "700",
       color: colors.text,
-    },
-    bookAgainButton: {
-      alignSelf: "center",
-      paddingHorizontal: 24,
-      paddingVertical: 6,
-    },
-    bookAgainText: {
-      fontSize: 14,
-      color: colors.text,
-      fontWeight: "500",
     },
     bookAgainOverlay: {
       ...StyleSheet.absoluteFillObject,
@@ -784,7 +736,7 @@ const createStyles = (colors: typeof Colors.light, insets: any) =>
     },
     bookAgainBackdrop: {
       ...StyleSheet.absoluteFillObject,
-      backgroundColor: "rgba(15, 23, 42, 0.68)",
+      backgroundColor: colors.overlay,
     },
     bookAgainBackFloating: {
       position: "absolute",
@@ -793,7 +745,7 @@ const createStyles = (colors: typeof Colors.light, insets: any) =>
       width: 44,
       height: 44,
       borderRadius: 22,
-      backgroundColor: "#fff",
+      backgroundColor: colors.surface,
       alignItems: "center",
       justifyContent: "center",
       shadowColor: "#000",
@@ -803,7 +755,7 @@ const createStyles = (colors: typeof Colors.light, insets: any) =>
       elevation: 8,
     },
     bookAgainSheet: {
-      backgroundColor: "#fff",
+      backgroundColor: colors.surface,
       borderTopLeftRadius: 24,
       borderTopRightRadius: 24,
       paddingHorizontal: 18,
@@ -814,13 +766,13 @@ const createStyles = (colors: typeof Colors.light, insets: any) =>
       fontSize: 16,
       lineHeight: 22,
       fontWeight: "900",
-      color: "#0f172a",
+      color: colors.text,
       marginBottom: 10,
     },
     serviceSummaryCard: {
       height: 52,
       borderRadius: 10,
-      backgroundColor: "#f8fafc",
+      backgroundColor: colors.surfaceSecondary,
       flexDirection: "row",
       alignItems: "center",
       justifyContent: "space-between",
@@ -836,30 +788,30 @@ const createStyles = (colors: typeof Colors.light, insets: any) =>
       width: 42,
       height: 38,
       borderRadius: 19,
-      backgroundColor: "#fff",
+      backgroundColor: colors.surface,
       alignItems: "center",
       justifyContent: "center",
     },
     serviceName: {
       fontSize: 14,
       fontWeight: "900",
-      color: "#0f172a",
+      color: colors.text,
     },
     serviceFare: {
       fontSize: 14,
       fontWeight: "900",
-      color: "#0f172a",
+      color: colors.text,
     },
     bookDashedLine: {
       borderTopWidth: 1,
       borderStyle: "dashed",
-      borderColor: "#cfd8e3",
+      borderColor: colors.border,
       marginBottom: 10,
     },
     locationTitle: {
       fontSize: 16,
       fontWeight: "900",
-      color: "#0f172a",
+      color: colors.text,
       marginBottom: 9,
     },
     locationRows: {
@@ -876,25 +828,25 @@ const createStyles = (colors: typeof Colors.light, insets: any) =>
       width: 14,
       height: 14,
       borderRadius: 7,
-      backgroundColor: "#14a05d",
+      backgroundColor: colors.success,
       borderWidth: 4,
-      borderColor: "#eafff3",
+      borderColor: colors.surface,
     },
     locationDashes: {
       width: 1,
       height: 35,
       borderLeftWidth: 1,
       borderStyle: "dashed",
-      borderColor: "#cbd5e1",
+      borderColor: colors.border,
       marginVertical: 2,
     },
     dropSmallDot: {
       width: 14,
       height: 14,
       borderRadius: 7,
-      backgroundColor: "#d84b3f",
+      backgroundColor: colors.error,
       borderWidth: 4,
-      borderColor: "#fff0ee",
+      borderColor: colors.surface,
     },
     locationTextColumn: {
       flex: 1,
@@ -905,19 +857,19 @@ const createStyles = (colors: typeof Colors.light, insets: any) =>
     locationName: {
       fontSize: 14,
       fontWeight: "900",
-      color: "#0f172a",
+      color: colors.text,
       marginBottom: 2,
     },
     locationAddress: {
       fontSize: 12,
       lineHeight: 16,
-      color: "#64748b",
+      color: colors.textSecondary,
     },
     totalFareRow: {
       height: 44,
       borderTopWidth: 1,
       borderBottomWidth: 1,
-      borderColor: "#e2e8f0",
+      borderColor: colors.border,
       flexDirection: "row",
       alignItems: "center",
       justifyContent: "space-between",
@@ -928,12 +880,12 @@ const createStyles = (colors: typeof Colors.light, insets: any) =>
     totalFareLabel: {
       fontSize: 16,
       fontWeight: "900",
-      color: "#0f172a",
+      color: colors.text,
     },
     totalFareValue: {
       fontSize: 16,
       fontWeight: "900",
-      color: "#0f172a",
+      color: colors.text,
     },
     paymentRow: {
       height: 46,
@@ -943,17 +895,17 @@ const createStyles = (colors: typeof Colors.light, insets: any) =>
       marginHorizontal: -18,
       paddingHorizontal: 18,
       borderBottomWidth: 1,
-      borderColor: "#e2e8f0",
+      borderColor: colors.border,
       marginBottom: 22,
     },
     paymentText: {
       fontSize: 14,
-      color: "#334155",
+      color: colors.textSecondary,
     },
     backYellowButton: {
       height: 48,
       borderRadius: 24,
-      backgroundColor: "#ffc928",
+      backgroundColor: colors.primary,
       alignItems: "center",
       justifyContent: "center",
       marginBottom: 12,
@@ -961,13 +913,13 @@ const createStyles = (colors: typeof Colors.light, insets: any) =>
     backYellowText: {
       fontSize: 15,
       fontWeight: "800",
-      color: "#000",
+      color: colors.surface,
     },
     cancelRideButton: {
       height: 46,
       borderRadius: 23,
       borderWidth: 1,
-      borderColor: "#9b241b",
+      borderColor: colors.error,
       alignItems: "center",
       justifyContent: "center",
       marginBottom: 8,
@@ -975,7 +927,7 @@ const createStyles = (colors: typeof Colors.light, insets: any) =>
     cancelRideText: {
       fontSize: 14,
       fontWeight: "700",
-      color: "#8f1f17",
+      color: colors.error,
     },
     cancelFlowOverlay: {
       ...StyleSheet.absoluteFillObject,
@@ -984,7 +936,7 @@ const createStyles = (colors: typeof Colors.light, insets: any) =>
     },
     cancelFlowBackdrop: {
       ...StyleSheet.absoluteFillObject,
-      backgroundColor: "rgba(15, 23, 42, 0.42)",
+      backgroundColor: colors.overlay,
     },
     cancelFlowBackButton: {
       position: "absolute",
@@ -993,7 +945,7 @@ const createStyles = (colors: typeof Colors.light, insets: any) =>
       width: 36,
       height: 36,
       borderRadius: 18,
-      backgroundColor: "#fff",
+      backgroundColor: colors.surface,
       alignItems: "center",
       justifyContent: "center",
       shadowColor: "#000",
@@ -1003,7 +955,7 @@ const createStyles = (colors: typeof Colors.light, insets: any) =>
       elevation: 8,
     },
     cancelReasonSheet: {
-      backgroundColor: "#fff",
+      backgroundColor: colors.surface,
       borderTopLeftRadius: 24,
       borderTopRightRadius: 24,
       paddingHorizontal: 14,
@@ -1015,7 +967,7 @@ const createStyles = (colors: typeof Colors.light, insets: any) =>
       width: 48,
       height: 4,
       borderRadius: 2,
-      backgroundColor: "#e2e8f0",
+      backgroundColor: colors.border,
       alignSelf: "center",
       marginBottom: 22,
     },
@@ -1023,25 +975,25 @@ const createStyles = (colors: typeof Colors.light, insets: any) =>
       fontSize: 18,
       lineHeight: 22,
       fontWeight: "900",
-      color: "#0f172a",
+      color: colors.text,
       marginBottom: 6,
     },
     cancelReasonSubtitle: {
       fontSize: 14,
       lineHeight: 20,
-      color: "#0f172a",
+      color: colors.textSecondary,
       marginBottom: 10,
     },
     cancelReasonDivider: {
       borderTopWidth: 1,
       borderStyle: "dashed",
-      borderColor: "#cfd8e3",
+      borderColor: colors.border,
       marginBottom: 14,
     },
     cancelReasonRow: {
       height: 54,
       borderBottomWidth: 1,
-      borderBottomColor: "#e2e8f0",
+      borderBottomColor: colors.borderLight,
       flexDirection: "row",
       alignItems: "center",
       justifyContent: "space-between",
@@ -1052,7 +1004,7 @@ const createStyles = (colors: typeof Colors.light, insets: any) =>
       fontSize: 14,
       lineHeight: 19,
       fontWeight: "800",
-      color: "#0f172a",
+      color: colors.text,
       paddingRight: 10,
     },
     cancelConfirmClose: {
@@ -1062,7 +1014,7 @@ const createStyles = (colors: typeof Colors.light, insets: any) =>
       width: 42,
       height: 42,
       borderRadius: 21,
-      backgroundColor: "#fff",
+      backgroundColor: colors.surface,
       alignItems: "center",
       justifyContent: "center",
       shadowColor: "#000",
@@ -1073,7 +1025,7 @@ const createStyles = (colors: typeof Colors.light, insets: any) =>
       zIndex: 75,
     },
     cancelConfirmSheet: {
-      backgroundColor: "#fff",
+      backgroundColor: colors.surface,
       borderTopLeftRadius: 24,
       borderTopRightRadius: 24,
       paddingHorizontal: 14,
@@ -1085,17 +1037,17 @@ const createStyles = (colors: typeof Colors.light, insets: any) =>
       fontSize: 20,
       lineHeight: 24,
       fontWeight: "900",
-      color: "#0f172a",
+      color: colors.text,
       marginBottom: 12,
     },
     cancelConfirmCopy: {
       fontSize: 15,
       lineHeight: 20,
-      color: "#0f172a",
+      color: colors.textSecondary,
       marginBottom: 18,
     },
     selectedReasonBox: {
-      backgroundColor: "#f8fafc",
+      backgroundColor: colors.surfaceSecondary,
       borderRadius: 10,
       paddingHorizontal: 12,
       paddingVertical: 9,
@@ -1104,19 +1056,19 @@ const createStyles = (colors: typeof Colors.light, insets: any) =>
     selectedReasonLabel: {
       fontSize: 12,
       lineHeight: 16,
-      color: "#64748b",
+      color: colors.textSecondary,
       marginBottom: 2,
     },
     selectedReasonText: {
       fontSize: 14,
       lineHeight: 18,
       fontWeight: "800",
-      color: "#0f172a",
+      color: colors.text,
     },
     currentAddressLabel: {
       fontSize: 15,
       lineHeight: 20,
-      color: "#0f172a",
+      color: colors.text,
       marginBottom: 10,
     },
     cancelAddressRow: {
@@ -1128,9 +1080,9 @@ const createStyles = (colors: typeof Colors.light, insets: any) =>
       width: 14,
       height: 14,
       borderRadius: 7,
-      backgroundColor: "#16a34a",
+      backgroundColor: colors.success,
       borderWidth: 4,
-      borderColor: "#dcfce7",
+      borderColor: colors.surface,
       marginHorizontal: 6,
       marginRight: 18,
     },
@@ -1141,18 +1093,18 @@ const createStyles = (colors: typeof Colors.light, insets: any) =>
       fontSize: 14,
       lineHeight: 18,
       fontWeight: "900",
-      color: "#0f172a",
+      color: colors.text,
       marginBottom: 1,
     },
     cancelAddressDetail: {
       fontSize: 12,
       lineHeight: 16,
-      color: "#334155",
+      color: colors.textSecondary,
     },
     cancelMyRideButton: {
       height: 46,
       borderRadius: 23,
-      backgroundColor: "#ffc928",
+      backgroundColor: colors.error,
       alignItems: "center",
       justifyContent: "center",
       marginBottom: 16,
@@ -1160,138 +1112,19 @@ const createStyles = (colors: typeof Colors.light, insets: any) =>
     cancelMyRideText: {
       fontSize: 14,
       fontWeight: "700",
-      color: "#000",
+      color: "#FFFFFF",
     },
     keepSearchingButton: {
       height: 46,
       borderRadius: 23,
       borderWidth: 1,
-      borderColor: "#0f172a",
+      borderColor: colors.primary,
       alignItems: "center",
       justifyContent: "center",
     },
     keepSearchingText: {
       fontSize: 14,
       fontWeight: "700",
-      color: "#0f172a",
-    },
-    detailsOverlay: {
-      ...StyleSheet.absoluteFillObject,
-      zIndex: 50,
-      justifyContent: "flex-end",
-    },
-    detailsBackdrop: {
-      ...StyleSheet.absoluteFillObject,
-      backgroundColor: "rgba(15, 23, 42, 0.68)",
-    },
-    detailsClose: {
-      position: "absolute",
-      right: 16,
-      bottom: 455,
-      width: 46,
-      height: 46,
-      borderRadius: 23,
-      backgroundColor: "#fff",
-      alignItems: "center",
-      justifyContent: "center",
-      shadowColor: "#000",
-      shadowOffset: { width: 0, height: 4 },
-      shadowOpacity: 0.2,
-      shadowRadius: 8,
-      elevation: 8,
-    },
-    detailsSheet: {
-      backgroundColor: "#fff",
-      borderTopLeftRadius: 24,
-      borderTopRightRadius: 24,
-      paddingHorizontal: 16,
-      paddingTop: 9,
-      paddingBottom: Platform.OS === "ios" ? insets.bottom + 26 : 48,
-      minHeight: 430,
-    },
-    detailsHandle: {
-      width: 42,
-      height: 4,
-      borderRadius: 2,
-      backgroundColor: "#e1e8ef",
-      alignSelf: "center",
-      marginBottom: 36,
-    },
-    detailsHeader: {
-      flexDirection: "row",
-      alignItems: "center",
-      gap: 14,
-      marginBottom: 28,
-    },
-    detailsTitle: {
-      fontSize: 18,
-      fontWeight: "900",
-      color: "#0f172a",
-    },
-    estimateRow: {
-      flexDirection: "row",
-      alignItems: "center",
-      justifyContent: "space-between",
-      marginBottom: 10,
-    },
-    estimateLabel: {
-      flex: 1,
-      fontSize: 14,
-      lineHeight: 18,
-      fontWeight: "800",
-      color: "#0f172a",
-    },
-    estimateValue: {
-      fontSize: 26,
-      fontWeight: "900",
-      color: "#0f172a",
-    },
-    detailDivider: {
-      height: 1,
-      backgroundColor: "#d1d5db",
-      marginBottom: 10,
-    },
-    breakdownRow: {
-      flexDirection: "row",
-      alignItems: "center",
-      justifyContent: "space-between",
-      marginBottom: 16,
-    },
-    breakdownLabel: {
-      fontSize: 14,
-      color: "#24324a",
-    },
-    breakdownValue: {
-      fontSize: 14,
-      fontWeight: "800",
-      color: "#24324a",
-    },
-    detailsNote: {
-      fontSize: 12,
-      lineHeight: 16,
-      color: "#334155",
-      marginTop: 2,
-      marginBottom: 12,
-    },
-    detailsPolicy: {
-      fontSize: 12,
-      lineHeight: 16,
-      color: "#334155",
-      marginBottom: 12,
-    },
-    gotItButton: {
-      height: 46,
-      borderRadius: 23,
-      borderWidth: 1,
-      borderColor: "#0f172a",
-      alignItems: "center",
-      justifyContent: "center",
-      marginTop: 8,
-      marginBottom: Platform.OS === "ios" ? 0 : 8,
-    },
-    gotItText: {
-      fontSize: 14,
-      fontWeight: "700",
-      color: "#0f172a",
+      color: colors.primary,
     },
   });

@@ -43,70 +43,6 @@ const normalizeServiceType = (serviceId?: string) => {
 
 const formatFare = (value: number) => `₹${value.toFixed(2)}`;
 
-const RIDE_GROUPS = [
-  {
-    title: "Rides we think you'll like",
-    options: [
-      {
-        id: "rideX",
-        name: "RideX",
-        capacity: 4,
-        price: "₹181.50",
-        time: "2:00pm",
-        eta: "9 min",
-        description: "Affordable rides all to yourself",
-        image: require("@/assets/images/services/cab.png"),
-      },
-      {
-        id: "wait-save",
-        name: "Wait & Save",
-        capacity: 4,
-        price: "₹162.20",
-        time: "2:08pm",
-        eta: "10-19 min",
-        description: "Get a cheaper ride by waiting a little longer",
-        image: require("@/assets/images/services/cab.png"),
-        hasWaitIcon: true,
-      },
-      {
-        id: "priority",
-        name: "Priority",
-        capacity: 4,
-        price: "₹212.40",
-        time: "1:59pm",
-        eta: "7 min",
-        description: "Shorter waiting time",
-        image: require("@/assets/images/services/cab.png"),
-        hasPriorityIcon: true,
-      },
-      {
-        id: "Ridex-reserve",
-        name: "Ridex Reserve",
-        capacity: 4,
-        price: "₹453.90",
-        time: "2:27pm",
-        description: "Leave as soon as 2:27 pm",
-        image: require("@/assets/images/services/cab.png"),
-        badge: "Most reliable",
-      },
-    ],
-  },
-  {
-    title: "Economy",
-    options: [
-      {
-        id: "RideXl",
-        name: "RideXl",
-        capacity: 6,
-        price: "₹253.10",
-        time: "1:53pm",
-        description: "Longer wait",
-        image: require("@/assets/images/services/cab.png"),
-      },
-    ],
-  },
-];
-
 // ─── Main screen ───────────────────────────────────────────────────────────
 export default function RideConfirmationScreen() {
   const insets = useSafeAreaInsets();
@@ -245,51 +181,59 @@ export default function RideConfirmationScreen() {
         }
       ];
     } else {
+      const isCabPrime = params.serviceId === "cab-prime";
+      const cabName = isCabPrime ? "Cab Prime" : "Cab";
+      const title = isCabPrime ? "Prime cabs for you" : "Cabs for you";
+      const description = isCabPrime ? "Premium cab ride" : "Affordable cab ride";
+      const reserveDescription = isCabPrime
+        ? "Reserve a premium cab for later"
+        : "Reserve a cab for later";
+
       return [
         {
-          title: "Rides we think you'll like",
+          title,
           options: [
             {
-              id: "cab-ride",
-              name: "Cab Ride",
+              id: isCabPrime ? "cab-prime-ride-4" : "cab-economy-ride-4",
+              name: `${cabName} Ride`,
               capacity: 4,
-              price: "₹181.50",
+              price: isCabPrime ? "₹245.00" : "₹181.50",
               time: "2:00pm",
               eta: "9 min",
-              description: "Affordable rides all to yourself",
+              description,
               image: require("@/assets/images/services/cab.png"),
             },
             {
-              id: "cab-wait-save",
-              name: "Wait & Save",
+              id: isCabPrime ? "cab-prime-reserve-4" : "cab-economy-reserve-4",
+              name: `${cabName} Reserve`,
               capacity: 4,
-              price: "₹162.20",
+              price: isCabPrime ? "₹290.00" : "₹215.00",
               time: "2:08pm",
-              eta: "10-19 min",
-              description: "Get a cheaper ride by waiting a little longer",
+              eta: "12 min",
+              description: reserveDescription,
               image: require("@/assets/images/services/cab.png"),
-              hasWaitIcon: true,
+              badge: "Planned",
             },
             {
-              id: "cab-priority",
-              name: "Cab Priority",
-              capacity: 4,
-              price: "₹212.40",
+              id: isCabPrime ? "cab-prime-ride-7" : "cab-economy-ride-7",
+              name: `${cabName} Ride`,
+              capacity: 7,
+              price: isCabPrime ? "₹365.00" : "₹260.00",
               time: "1:59pm",
-              eta: "7 min",
-              description: "Shorter waiting time",
+              eta: "11 min",
+              description: `${description} for larger groups`,
               image: require("@/assets/images/services/cab.png"),
-              hasPriorityIcon: true,
             },
             {
-              id: "cab-x",
-              name: "Cab X",
-              capacity: 4,
-              price: "₹253.10",
+              id: isCabPrime ? "cab-prime-reserve-7" : "cab-economy-reserve-7",
+              name: `${cabName} Reserve`,
+              capacity: 7,
+              price: isCabPrime ? "₹420.00" : "₹305.00",
               time: "1:53pm",
-              description: "Premium ride experience",
+              eta: "15 min",
+              description: `${reserveDescription} for larger groups`,
               image: require("@/assets/images/services/cab.png"),
-              badge: "Premium",
+              badge: "Planned",
             },
           ]
         }
@@ -302,9 +246,13 @@ export default function RideConfirmationScreen() {
       const multipliers: Record<string, number> = {
         "bike-reserve": 1.2,
         "auto-reserve": 1.2,
-        "cab-wait-save": 0.9,
-        "cab-priority": 1.15,
-        "cab-x": 1.3,
+        "cab-economy-reserve-4": 1.18,
+        "cab-economy-ride-7": 1.35,
+        "cab-economy-reserve-7": 1.55,
+        "cab-prime-ride-4": 1.25,
+        "cab-prime-reserve-4": 1.45,
+        "cab-prime-ride-7": 1.65,
+        "cab-prime-reserve-7": 1.9,
       };
       return getBackendPrice(fallback, multipliers[id] || 1);
     };
@@ -585,16 +533,6 @@ export default function RideConfirmationScreen() {
                       style={styles.rideImage}
                       resizeMode="contain"
                     />
-                    {option.hasWaitIcon && (
-                      <View style={styles.waitBadge}>
-                        <Ionicons name="time" size={10} color="#fff" />
-                      </View>
-                    )}
-                    {option.hasPriorityIcon && (
-                      <View style={styles.priorityBadge}>
-                        <Ionicons name="flash" size={10} color="#000" />
-                      </View>
-                    )}
                   </View>
 
                   <View style={styles.rideInfo}>
@@ -781,30 +719,6 @@ const createStyles = (colors: typeof Colors.light, insets: any) =>
       justifyContent: "center",
     },
     rideImage: { width: "100%", height: "100%" },
-    waitBadge: {
-      position: "absolute",
-      top: -2,
-      right: -2,
-      width: 14,
-      height: 14,
-      borderRadius: 7,
-      backgroundColor: "#000",
-      alignItems: "center",
-      justifyContent: "center",
-    },
-    priorityBadge: {
-      position: "absolute",
-      top: -2,
-      right: -2,
-      width: 14,
-      height: 14,
-      borderRadius: 7,
-      backgroundColor: "#fff",
-      alignItems: "center",
-      justifyContent: "center",
-      borderWidth: 1,
-      borderColor: "#000",
-    },
     rideInfo: { flex: 1, gap: 1 },
     rideTitleRow: { flexDirection: "row", alignItems: "center", gap: 6 },
     rideName: { fontSize: 15, fontWeight: "700", color: colors.text },

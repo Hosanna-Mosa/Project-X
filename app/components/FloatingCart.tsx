@@ -40,10 +40,10 @@ export function FloatingCart() {
 
   // Check if we are in the main app area
   // (tabs) group or specific menu/checkout screens
-  const isTabArea = segments.includes('(tabs)');
+  const isTabArea = (segments as string[]).includes('(tabs)');
   const isMenuArea = pathname.includes('restaurant-menu');
-  const isCheckoutArea = pathname.includes('checkout');
-  const shouldShow = !!token && (isTabArea || isMenuArea || isCheckoutArea) && itemCount > 0;
+  const isFoodOrderArea = pathname.includes('cart') || pathname.includes('checkout') || pathname.includes('payment');
+  const shouldShow = !!token && (isTabArea || isMenuArea) && !isFoodOrderArea && itemCount > 0;
 
   // Dynamic Calculation for Search Bar Height & Position
   // On iOS, search bar has paddingVertical: 15. On Android: 8.
@@ -112,7 +112,7 @@ export function FloatingCart() {
   });
 
   const handlePress = () => {
-    router.push('/delivery/checkout');
+    router.push('/cart');
   };
 
   return (

@@ -242,7 +242,7 @@ export default function PickupConfirmationScreen() {
               <Text style={styles.pickupBubbleText}>Pickup Point</Text>
             </View>
             <View style={styles.pin}>
-              <Ionicons name="navigate" size={18} color="#fff" />
+              <Ionicons name="navigate" size={18} color={colors.surface} />
             </View>
           </View>
         </View>
@@ -251,11 +251,11 @@ export default function PickupConfirmationScreen() {
           style={[styles.backButton, { top: insets.top + 16 }]}
           onPress={() => router.back()}
         >
-          <Ionicons name="arrow-back" size={22} color="#000" />
+          <Ionicons name="arrow-back" size={22} color={colors.text} />
         </TouchableOpacity>
 
         <TouchableOpacity style={styles.locateButton} onPress={useCurrentLocation}>
-          <Ionicons name="locate" size={22} color="#0f6fff" />
+          <Ionicons name="locate" size={22} color={colors.primary} />
         </TouchableOpacity>
       </View>
 
@@ -309,7 +309,7 @@ const createStyles = (colors: typeof Colors.light, insets: any) =>
       width: 42,
       height: 42,
       borderRadius: 21,
-      backgroundColor: "#fff",
+      backgroundColor: colors.surface,
       alignItems: "center",
       justifyContent: "center",
       shadowColor: "#000",
@@ -325,7 +325,7 @@ const createStyles = (colors: typeof Colors.light, insets: any) =>
       width: 42,
       height: 42,
       borderRadius: 21,
-      backgroundColor: "#fff",
+      backgroundColor: colors.surface,
       alignItems: "center",
       justifyContent: "center",
       shadowColor: "#000",
@@ -353,7 +353,7 @@ const createStyles = (colors: typeof Colors.light, insets: any) =>
       height: 92,
     },
     pickupBubble: {
-      backgroundColor: "#119447",
+      backgroundColor: colors.primary,
       paddingHorizontal: 16,
       paddingVertical: 9,
       borderRadius: 18,
@@ -367,7 +367,7 @@ const createStyles = (colors: typeof Colors.light, insets: any) =>
       alignItems: "center",
     },
     pickupBubbleText: {
-      color: "#fff",
+      color: colors.surface,
       fontSize: 13,
       fontWeight: "800",
     },
@@ -375,21 +375,26 @@ const createStyles = (colors: typeof Colors.light, insets: any) =>
       width: 26,
       height: 26,
       borderRadius: 13,
-      backgroundColor: "#2f7df6",
+      backgroundColor: colors.primary,
       alignItems: "center",
       justifyContent: "center",
       borderWidth: 2,
-      borderColor: "#fff",
+      borderColor: colors.surface,
     },
     panel: {
       flex: 1,
       marginTop: -18,
       backgroundColor: colors.surface,
-      borderTopLeftRadius: 18,
-      borderTopRightRadius: 18,
+      borderTopLeftRadius: 24,
+      borderTopRightRadius: 24,
       paddingHorizontal: 14,
       paddingTop: 10,
       paddingBottom: Platform.OS === "ios" ? insets.bottom + 22 : 34,
+      shadowColor: "#000",
+      shadowOffset: { width: 0, height: -6 },
+      shadowOpacity: 0.08,
+      shadowRadius: 14,
+      elevation: 16,
     },
     handle: {
       width: 38,
@@ -407,8 +412,9 @@ const createStyles = (colors: typeof Colors.light, insets: any) =>
     },
     addressCard: {
       borderWidth: 2,
-      borderColor: "#07924a",
+      borderColor: colors.primary,
       borderRadius: 10,
+      backgroundColor: colors.surfaceSecondary,
       paddingHorizontal: 10,
       paddingVertical: 8,
       marginBottom: 12,
@@ -421,7 +427,7 @@ const createStyles = (colors: typeof Colors.light, insets: any) =>
     },
     addressSubtitle: {
       fontSize: 13,
-      color: colors.text,
+      color: colors.textSecondary,
     },
     metaRow: {
       minHeight: 28,
@@ -442,12 +448,12 @@ const createStyles = (colors: typeof Colors.light, insets: any) =>
     updateButton: {
       height: 46,
       borderRadius: 23,
-      backgroundColor: "#ffc928",
+      backgroundColor: colors.primary,
       alignItems: "center",
       justifyContent: "center",
     },
     updateButtonText: {
-      color: "#000",
+      color: colors.surface,
       fontSize: 15,
       fontWeight: "800",
     },

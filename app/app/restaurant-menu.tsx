@@ -221,7 +221,7 @@ export default function RestaurantMenu() {
           </View>
           <TouchableOpacity 
             style={styles.viewCartButton}
-            onPress={() => router.push("/delivery/checkout")}
+            onPress={() => router.push({ pathname: "/cart", params: { vendorName: name as string } })}
           >
             <Text style={styles.viewCartText}>View Cart</Text>
             <Ionicons name="arrow-forward" size={18} color="white" />

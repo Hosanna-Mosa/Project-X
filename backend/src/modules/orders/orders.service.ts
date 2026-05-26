@@ -9,7 +9,7 @@ export class OrdersService {
   private routingService = new RoutingService();
   private pricingService = new PricingService();
 
-  async createOrder(userId: string, stopsData: any[], serviceType?: ServiceType, vendorId?: string) {
+  async createOrder(userId: string, stopsData: any[], serviceType?: ServiceType, vendorId?: string, totals?: any) {
     if (!mongoose.Types.ObjectId.isValid(userId)) {
       throw new Error("Invalid User ID format");
     }
@@ -29,6 +29,9 @@ export class OrdersService {
         latitude: s.latitude || s.lat,
         longitude: s.longitude || s.lng,
         type: s.type,
+        items: s.items || [],
+        instructions: s.instructions,
+        deliveryAddress: s.deliveryAddress,
       }))
     );
 
@@ -49,13 +52,13 @@ export class OrdersService {
       );
       totalPrice = priceBreakdown.total;
     } else {
-      totalPrice = this.pricingService.calculatePrice(
+      totalPrice = totals?.total ?? this.pricingService.calculatePrice(
         optimizationResult.totalDistance, 
         optimizationResult.optimizedStops.length
       );
       priceBreakdown = {
-        baseFare: this.pricingService.getRateConfig(effectiveType).baseFare,
-        distanceFare: totalPrice - this.pricingService.getRateConfig(effectiveType).baseFare,
+        baseFare: totals?.subtotal ?? this.pricingService.getRateConfig(effectiveType).baseFare,
+        distanceFare: totals?.deliveryFee ?? totalPrice - this.pricingService.getRateConfig(effectiveType).baseFare,
         timeFare: 0,
         surgeMultiplier: 1,
         total: totalPrice,
@@ -70,7 +73,12 @@ export class OrdersService {
       },
       address: stop.address,
       type: stop.type || StopType.PICKUP,
-      items: stop.items || [],
+      items: {
+        lines: stop.items || [],
+        instructions: stop.instructions,
+        deliveryAddress: stop.deliveryAddress,
+        totals: stop.type === StopType.DROP ? totals : undefined,
+      },
     }));
 
     const order = new Order({
