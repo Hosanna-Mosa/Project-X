@@ -185,7 +185,7 @@ export default function PickupConfirmationScreen() {
         Alert.alert("Permission Denied", "Location permission is required.");
         return;
       }
-      const location = await Location.getCurrentPositionAsync({});
+      const location = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
       const coords = {
         latitude: location.coords.latitude,
         longitude: location.coords.longitude,

@@ -12,23 +12,29 @@ import { useThemeStore } from "@/contexts/themeStore";
 
 const { height: SCREEN_HEIGHT } = Dimensions.get("window");
 // Clamping points
-const COLLAPSED_HEIGHT = 220;
 const MAX_TRANSLATE_Y = -SCREEN_HEIGHT + 100; // Almost full page
-const MIN_TRANSLATE_Y = -COLLAPSED_HEIGHT; // Default view
 
 interface Props {
   children: React.ReactNode;
   style?: any;
+  defaultHeight?: number;
 }
 
-export function BottomSheet({ children, style }: Props) {
+export function BottomSheet({ children, style, defaultHeight = 220 }: Props) {
   const insets = useSafeAreaInsets();
   const { theme } = useThemeStore();
   const colors = Colors[theme];
   const styles = React.useMemo(() => createStyles(colors), [theme]);
 
+  const MIN_TRANSLATE_Y = -defaultHeight;
+
   const translateY = useSharedValue(MIN_TRANSLATE_Y);
   const context = useSharedValue({ y: 0 });
+
+  // Spring animate transition to new defaultHeight dynamically when state changes
+  React.useEffect(() => {
+    translateY.value = withSpring(MIN_TRANSLATE_Y, { damping: 50 });
+  }, [defaultHeight]);
 
   const gesture = Gesture.Pan()
     .activeOffsetY([-10, 10])

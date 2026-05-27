@@ -89,7 +89,7 @@ export default function MeatCentersScreen() {
           lat = 17.4447;
           lng = 78.3498;
         } else {
-          let location = await Location.getCurrentPositionAsync({});
+          let location = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
           lat = location.coords.latitude;
           lng = location.coords.longitude;
         }

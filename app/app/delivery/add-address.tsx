@@ -74,8 +74,8 @@ export default function AddAddressScreen() {
       try {
         let { status } = await Location.requestForegroundPermissionsAsync();
         if (status === "granted") {
-          const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
-          setUserCoords({ lat: loc.coords.latitude, lng: loc.coords.longitude });
+           const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
+           setUserCoords({ lat: loc.coords.latitude, lng: loc.coords.longitude });
         }
       } catch(e) {}
     })();
@@ -88,7 +88,7 @@ export default function AddAddressScreen() {
       if (status !== "granted") {
         return;
       }
-      let location = await Location.getCurrentPositionAsync({});
+      let location = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
       const { latitude, longitude } = location.coords;
 
       const newRegion = {
