@@ -20,6 +20,7 @@ import paymentRoutes from "./modules/payments/payment.routes";
 import vendorRoutes from "./modules/vendors/vendors.routes";
 import foodRoutes from "./modules/food/food.routes";
 import meatRoutes from "./modules/meat/meat.routes";
+import onboardingRoutes from "./modules/onboarding/onboarding.routes";
 
 dotenv.config();
 
@@ -56,6 +57,7 @@ connectDB().then(async () => {
   app.use("/api/v1/vendors", vendorRoutes);
   app.use("/api/v1/food", foodRoutes);
   app.use("/api/v1/meat", meatRoutes);
+  app.use("/api/v1/onboarding", onboardingRoutes);
 
   server.listen(PORT, () => {
     console.log(`Server is running on port ${PORT}`);
