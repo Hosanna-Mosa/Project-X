@@ -45,7 +45,7 @@ export default function MeatCenters() {
 
   const { data: centers, isLoading } = useQuery({
     queryKey: ["meat-centers"],
-    queryFn: () => adminFetch<MeatCenter[]>("/meat/nearby?lat=0&lng=0"),
+    queryFn: () => adminFetch<MeatCenter[]>("/meat/nearby?lat=0&lng=0&all=true"),
   });
 
   const createCenterMutation = useMutation({

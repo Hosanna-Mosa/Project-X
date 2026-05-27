@@ -6,7 +6,9 @@ import {
   updateGlobalMeatPrices,
   getGlobalMeatPrices,
   getMeatCenterMenu,
-  updateMeatItemAvailability
+  updateMeatItemAvailability,
+  addMeatItem,
+  deleteMeatItem
 } from "./meat.controller";
 
 const router = Router();
@@ -22,6 +24,8 @@ router.put("/global-prices", updateGlobalMeatPrices);
 
 // Menu & Availability (Vendor/App)
 router.get("/menu/:centerId", getMeatCenterMenu);
+router.post("/items", addMeatItem);
 router.put("/items/:itemId/availability", updateMeatItemAvailability);
+router.delete("/items/:itemId", deleteMeatItem);
 
 export default router;

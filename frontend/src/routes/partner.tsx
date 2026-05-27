@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 
 function Icon({ name, className = "" }: { name: string; className?: string }) {
   return <span className={`material-symbols-outlined ${className}`}>{name}</span>;
@@ -75,13 +75,13 @@ const faqs = [
 ];
 
 export default function PartnerPage() {
-  const [form, setForm] = useState({ name: "", email: "", phone: "", business: "", city: "", service: "food" });
-  const [submitted, setSubmitted] = useState(false);
   const [openFaq, setOpenFaq] = useState<number | null>(null);
+  const [showPartnerTypeDialog, setShowPartnerTypeDialog] = useState(false);
+  const navigate = useNavigate();
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    setSubmitted(true);
+  const startOnboarding = (type: "food" | "meat") => {
+    setShowPartnerTypeDialog(false);
+    navigate(`/partner/onboarding?type=${type}`);
   };
 
   return (
@@ -123,12 +123,13 @@ export default function PartnerPage() {
                 Join India's fastest-growing urban platform. Whether you run a restaurant, a fleet, or a service — we help you reach more customers and earn more.
               </p>
               <div className="flex flex-wrap justify-center gap-4">
-                <Link
-                  to="/partner/onboarding"
+                <button
+                  type="button"
+                  onClick={() => setShowPartnerTypeDialog(true)}
                   className="bg-brand-kinetic text-white px-8 py-3.5 rounded-full font-semibold shadow-lg shadow-brand-kinetic/20 hover:scale-105 active:scale-95 transition-all"
                 >
                   Get Started Today
-                </Link>
+                </button>
                 <a
                   href="#how-it-works"
                   className="bg-white/10 backdrop-blur-md text-white px-8 py-3.5 rounded-full font-semibold border border-white/20 hover:bg-white/20 transition-all"
@@ -261,15 +262,63 @@ export default function PartnerPage() {
             <p className="text-white/80 mb-8 max-w-md mx-auto">
               Join 500K+ partners and start reaching more customers today.
             </p>
-            <Link
-              to="/partner/onboarding"
+            <button
+              type="button"
+              onClick={() => setShowPartnerTypeDialog(true)}
               className="inline-block bg-white text-brand-kinetic px-8 py-3.5 rounded-full font-bold shadow-xl hover:scale-105 active:scale-95 transition-all"
             >
               Get Started Now
-            </Link>
+            </button>
           </div>
         </section>
       </main>
+
+      {showPartnerTypeDialog && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-on-surface/60 px-4 backdrop-blur-sm">
+          <div className="w-full max-w-xl rounded-2xl bg-white p-6 shadow-2xl">
+            <div className="mb-5 flex items-start justify-between gap-4">
+              <div>
+                <p className="text-xs font-bold uppercase tracking-wider text-brand-kinetic">Start onboarding</p>
+                <h2 className="mt-1 font-display text-2xl font-bold text-on-surface">Choose your partner type</h2>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowPartnerTypeDialog(false)}
+                className="flex h-9 w-9 items-center justify-center rounded-lg border border-gray-200 text-secondary-app transition-colors hover:text-on-surface"
+                aria-label="Close"
+              >
+                <Icon name="close" className="text-lg" />
+              </button>
+            </div>
+
+            <div className="grid gap-3 sm:grid-cols-2">
+              <button
+                type="button"
+                onClick={() => startOnboarding("food")}
+                className="group rounded-xl border border-gray-200 p-5 text-left transition-all hover:border-brand-kinetic hover:bg-brand-kinetic/5"
+              >
+                <div className="mb-4 flex h-11 w-11 items-center justify-center rounded-lg bg-brand-kinetic/10 text-brand-kinetic transition-colors group-hover:bg-brand-kinetic group-hover:text-white">
+                  <Icon name="restaurant" className="text-2xl" />
+                </div>
+                <p className="font-display text-lg font-bold text-on-surface">Food Restaurant</p>
+                <p className="mt-2 text-sm text-secondary-app">Restaurant details, menu, food license, and payout setup.</p>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => startOnboarding("meat")}
+                className="group rounded-xl border border-gray-200 p-5 text-left transition-all hover:border-brand-kinetic hover:bg-brand-kinetic/5"
+              >
+                <div className="mb-4 flex h-11 w-11 items-center justify-center rounded-lg bg-brand-kinetic/10 text-brand-kinetic transition-colors group-hover:bg-brand-kinetic group-hover:text-white">
+                  <Icon name="set_meal" className="text-2xl" />
+                </div>
+                <p className="font-display text-lg font-bold text-on-surface">Meat Center</p>
+                <p className="mt-2 text-sm text-secondary-app">Meat center details, product list, FSSAI, and payout setup.</p>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Footer */}
       <footer className="bg-on-surface text-white pt-16 pb-10">
