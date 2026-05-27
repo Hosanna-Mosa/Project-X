@@ -1045,46 +1045,61 @@ export default function OnboardingScreen() {
 
       case "bank":
         return (
-          <View style={{ gap: 16 }}>
-            <FormInput
-              label="Account Number"
-              value={bankAccount}
-              onChangeText={(t) => setBankAccount(t.replace(/[^0-9]/g, "").slice(0, 18))}
-              placeholder="Enter account number"
-              keyboardType="number-pad"
-              icon="hash"
-            />
-            <FormInput
-              label="Confirm Account Number"
-              value={bankConfirm}
-              onChangeText={(t) => setBankConfirm(t.replace(/[^0-9]/g, "").slice(0, 18))}
-              placeholder="Re-enter account number"
-              keyboardType="number-pad"
-              icon="hash"
-            />
-            {bankConfirm && bankAccount !== bankConfirm && (
-              <Text style={{ color: Colors.error, fontSize: 13, fontWeight: "500" }}>
-                Account numbers don't match
-              </Text>
-            )}
-            <FormInput
-              label="IFSC Code"
-              value={ifsc}
-              onChangeText={(t) => setIfsc(t.toUpperCase().slice(0, 11))}
-              placeholder="SBIN0001234"
-              autoCapitalize="characters"
-              icon="map-pin"
-            />
-            {!bankVerified ? (
-              <PrimaryButton
-                title="Verify Bank Account"
-                onPress={handleVerifyBank}
-                disabled={bankAccount.length < 9 || bankAccount !== bankConfirm || ifsc.length < 8}
-                icon="shield"
+          <View style={bankStyles.wrap}>
+            <View style={bankStyles.notice}>
+              <View style={bankStyles.noticeIcon}>
+                <Feather name="shield" size={17} color={Colors.success} />
+              </View>
+              <View style={bankStyles.noticeCopy}>
+                <Text style={bankStyles.noticeTitle}>Secure payout setup</Text>
+                <Text style={bankStyles.noticeText}>
+                  Add the account where your delivery earnings should be settled.
+                </Text>
+              </View>
+            </View>
+
+            <View style={bankStyles.card}>
+              <FormInput
+                label="Account Number"
+                value={bankAccount}
+                onChangeText={(t) => setBankAccount(t.replace(/[^0-9]/g, "").slice(0, 18))}
+                placeholder="Enter account number"
+                keyboardType="number-pad"
+                icon="credit-card"
               />
-            ) : (
-              <InfoBanner icon="check-circle" text="Bank account verified! Payouts will be sent here." />
-            )}
+              <FormInput
+                label="Confirm Account Number"
+                value={bankConfirm}
+                onChangeText={(t) => setBankConfirm(t.replace(/[^0-9]/g, "").slice(0, 18))}
+                placeholder="Re-enter account number"
+                keyboardType="number-pad"
+                icon="check-square"
+              />
+              {bankConfirm && bankAccount !== bankConfirm && (
+                <View style={bankStyles.errorRow}>
+                  <Feather name="alert-circle" size={15} color={Colors.error} />
+                  <Text style={bankStyles.errorText}>Account numbers don't match</Text>
+                </View>
+              )}
+              <FormInput
+                label="IFSC Code"
+                value={ifsc}
+                onChangeText={(t) => setIfsc(t.toUpperCase().slice(0, 11))}
+                placeholder="SBIN0001234"
+                autoCapitalize="characters"
+                icon="map-pin"
+              />
+              {!bankVerified ? (
+                <PrimaryButton
+                  title="Verify Bank Account"
+                  onPress={handleVerifyBank}
+                  disabled={bankAccount.length < 9 || bankAccount !== bankConfirm || ifsc.length < 8}
+                  icon="shield"
+                />
+              ) : (
+                <InfoBanner icon="check-circle" text="Bank account verified! Payouts will be sent here." />
+              )}
+            </View>
           </View>
         );
 
@@ -1135,7 +1150,7 @@ export default function OnboardingScreen() {
       style={styles.container}
       behavior={Platform.OS === "ios" ? "padding" : "height"}
     >
-      <View style={[styles.inner, { paddingTop: insets.top + 16, paddingBottom: insets.bottom + 20 }]}>
+      <View style={[styles.inner, { paddingTop: insets.top + 16 }]}>
         {/* Header Back + Close */}
         <View style={styles.topBar}>
           {sectionIdx > 0 || step > 1 ? (
@@ -1192,7 +1207,7 @@ export default function OnboardingScreen() {
         <ScrollView
           ref={scrollRef}
           style={styles.scroll}
-          contentContainerStyle={styles.scrollContent}
+          contentContainerStyle={[styles.scrollContent, { paddingBottom: insets.bottom + 32 }]}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
         >
@@ -1214,7 +1229,13 @@ export default function OnboardingScreen() {
           </Animated.View>
         </ScrollView>
 
-        <View style={styles.bottomBar}>
+        <View
+          style={[
+            styles.bottomBar,
+            { paddingBottom: Math.max(insets.bottom, 12) },
+            currentSections[sectionIdx]?.key === "bank" && !bankVerified && styles.bottomBarHidden,
+          ]}
+        >
           {(() => {
             const sec = currentSections[sectionIdx]?.key;
             const nextSection = currentSections[sectionIdx + 1];
@@ -1285,6 +1306,10 @@ export default function OnboardingScreen() {
                   loading={saving}
                 />
               );
+            }
+
+            if (sec === "bank") {
+              return <View />;
             }
 
             if (sec === "gender" && gender) {
@@ -1363,6 +1388,9 @@ const styles = StyleSheet.create({
     borderTopColor: Colors.border,
     backgroundColor: Colors.background,
   },
+  bottomBarHidden: {
+    display: "none",
+  },
 });
 
 const dlStyles = StyleSheet.create({
@@ -1387,6 +1415,69 @@ const dlStyles = StyleSheet.create({
     borderColor: "#fecaca",
   },
   errorText: { color: Colors.error, fontSize: 13, lineHeight: 18 },
+});
+
+const bankStyles = StyleSheet.create({
+  wrap: {
+    gap: 16,
+  },
+  notice: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 12,
+    backgroundColor: "#f1fbf5",
+    borderWidth: 1,
+    borderColor: "#b8e6ca",
+    borderRadius: 14,
+    padding: 14,
+  },
+  noticeIcon: {
+    width: 34,
+    height: 34,
+    borderRadius: 10,
+    backgroundColor: Colors.white,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  noticeCopy: {
+    flex: 1,
+    gap: 3,
+  },
+  noticeTitle: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: Colors.text,
+  },
+  noticeText: {
+    fontSize: 13,
+    lineHeight: 18,
+    color: Colors.textSecondary,
+  },
+  card: {
+    gap: 16,
+    backgroundColor: Colors.surface,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    borderRadius: 16,
+    padding: 16,
+  },
+  errorRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 7,
+    backgroundColor: "#fef2f2",
+    borderWidth: 1,
+    borderColor: "#fecaca",
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+  errorText: {
+    flex: 1,
+    color: Colors.error,
+    fontSize: 13,
+    fontWeight: "600",
+  },
 });
 
 const selfieSectionStyles = StyleSheet.create({

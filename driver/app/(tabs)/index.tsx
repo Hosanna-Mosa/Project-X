@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
 
 import Colors from "@/constants/colors";
@@ -20,6 +20,7 @@ const mockHotspots = [
 ];
 
 export default function HomeScreen() {
+  const insets = useSafeAreaInsets();
   const [mode, setMode] = useState<"ride" | "delivery">("ride");
   const [showOnlineModal, setShowOnlineModal] = useState(false);
   const isOnline = useDriverStore((s) => s.isOnline);
@@ -45,12 +46,15 @@ export default function HomeScreen() {
 
   return (
     <SafeAreaView style={styles.safe} edges={["top"]}>
-      <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+      <ScrollView
+        style={styles.container}
+        contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 104 }]}
+      >
         {/* Header with Online/Offline Toggle */}
         <View style={styles.header}>
-          <View>
+          <View style={styles.headerCopy}>
             <Text style={styles.greeting}>Good Afternoon</Text>
-            <Text style={styles.subGreeting}>
+            <Text style={styles.subGreeting} numberOfLines={1}>
               {isOnline ? "You're online and receiving orders" : "Ready to start earning"}
             </Text>
           </View>
@@ -231,13 +235,17 @@ const styles = StyleSheet.create({
   },
   content: {
     padding: 16,
-    paddingBottom: 32,
     gap: 16,
   },
   header: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
+    gap: 12,
+  },
+  headerCopy: {
+    flex: 1,
+    minWidth: 0,
   },
   greeting: {
     fontFamily: "Inter_700Bold",
@@ -253,9 +261,10 @@ const styles = StyleSheet.create({
   onlineToggle: {
     flexDirection: "row",
     alignItems: "center",
+    justifyContent: "center",
     gap: 8,
     backgroundColor: Colors.surfaceContainerLow,
-    paddingHorizontal: 16,
+    width: 116,
     paddingVertical: 10,
     borderRadius: 100,
     borderWidth: 1,

@@ -17,6 +17,7 @@ import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { useDriverStore } from "@/store/driverStore";
 import { LocationHandler } from "@/components/LocationHandler";
 import { GlobalSocketHandler } from "@/components/GlobalSocketHandler";
+import "@/utils/networkLogger";
 
 SplashScreen.preventAutoHideAsync();
 

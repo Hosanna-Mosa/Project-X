@@ -1,6 +1,6 @@
 import React from "react";
 import { ScrollView, StyleSheet, Text, View } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 
 import Colors from "@/constants/colors";
 import { EarningsChart } from "@/components/EarningsChart";
@@ -24,9 +24,14 @@ const transactions = [
 ];
 
 export default function EarningsScreen() {
+  const insets = useSafeAreaInsets();
+
   return (
     <SafeAreaView style={styles.safe} edges={["top"]}>
-      <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+      <ScrollView
+        style={styles.container}
+        contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 104 }]}
+      >
         {/* Header */}
         <Text style={styles.headerTitle}>Earnings</Text>
 
@@ -88,7 +93,6 @@ const styles = StyleSheet.create({
   },
   content: {
     padding: 16,
-    paddingBottom: 32,
     gap: 16,
   },
   headerTitle: {

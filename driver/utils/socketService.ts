@@ -18,6 +18,8 @@ class SocketService {
   public connect() {
     if (this.socket) return;
 
+    console.log(`[Driver Socket] Connecting to ${SOCKET_URL || "not configured"}/ws/v1/socket.io`);
+
     this.socket = io(SOCKET_URL, {
       transports: ["websocket"],
       autoConnect: true,
