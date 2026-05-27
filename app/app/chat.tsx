@@ -25,7 +25,7 @@ const QUICK_REPLIES = [
 
 export default function ChatScreen() {
   const insets = useSafeAreaInsets();
-  const { currentOrderId, driver, activeChat, addChatMessage, setUnreadCount } = useDeliveryStore();
+  const { currentOrderId, driver, activeChat, addChatMessage, setUnreadCount, setIsChatActive } = useDeliveryStore();
   const [inputText, setInputText] = useState("");
   const flatListRef = useRef<FlatList>(null);
 
@@ -34,6 +34,7 @@ export default function ChatScreen() {
 
     // Clear unread count when entering chat
     setUnreadCount(0);
+    setIsChatActive(true);
 
     // Ensure we are in the order room
     socketService.trackOrder(currentOrderId);
@@ -59,6 +60,7 @@ export default function ChatScreen() {
 
     return () => {
       socketService.off("receive_message", onMessage);
+      setIsChatActive(false);
     };
   }, [currentOrderId]);
 

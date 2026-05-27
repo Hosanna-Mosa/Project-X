@@ -1,4 +1,5 @@
 import { Request, Response } from "express";
+import bcrypt from "bcryptjs";
 import Vendor from "../../database/models/Vendor";
 import OTP from "../../database/models/OTP";
 import { sendEmail, generateOTP, getOTPEmailHtml } from "../../services/email.service";
@@ -108,7 +109,8 @@ export const getNearbyVendors = async (req: Request, res: Response) => {
           },
           distanceField: "distance",
           spherical: true,
-          key: "location"
+          key: "location",
+          query: { partnerType: { $ne: "meat" } },
         },
       },
       { $skip: skip },
@@ -158,20 +160,34 @@ import generateToken from "../../utils/generateToken";
 
 export const loginVendor = async (req: Request, res: Response) => {
   try {
-    const { email, phone, password } = req.body;
+    const email = String(req.body.email || "").trim().toLowerCase();
+    const phone = String(req.body.phone || "").replace(/\D/g, "");
+    const password = String(req.body.password || "");
+
+    if (!password || (!email && !phone)) {
+      return res.status(400).json({ message: "Email/phone and password are required" });
+    }
 
     const vendor = await Vendor.findOne({
-      $or: [{ email }, { phone }],
+      $or: [...(email ? [{ email }] : []), ...(phone ? [{ phone }] : [])],
     });
 
-    if (vendor && (await vendor.matchPassword(password))) {
+    if (!vendor?.password) {
+      return res.status(401).json({ message: "Invalid email/phone or password" });
+    }
+
+    if (await vendor.matchPassword(password)) {
       res.json({
         _id: vendor._id,
         name: vendor.name,
         email: vendor.email,
         phone: vendor.phone,
-        role: "restaurant_vendor",
-        token: generateToken(vendor._id.toString(), "restaurant_vendor"),
+        role: vendor.partnerType === "meat" ? "meat_vendor" : "restaurant_vendor",
+        partnerType: vendor.partnerType || "food",
+        token: generateToken(
+          vendor._id.toString(),
+          vendor.partnerType === "meat" ? "meat_vendor" : "restaurant_vendor"
+        ),
       });
     } else {
       res.status(401).json({ message: "Invalid email/phone or password" });
@@ -223,10 +239,14 @@ const requireFields = (payload: any) => {
     if (typeof value !== "string" || value.trim().length === 0) missing.push(label);
   };
 
-  requireText(payload.restaurantName, "Restaurant name");
-  if (!Array.isArray(payload.cuisines) || payload.cuisines.length === 0) missing.push("Cuisine / Food Category");
+  const partnerType = payload.partnerType === "meat" ? "meat" : "food";
+  requireText(payload.restaurantName, partnerType === "meat" ? "Meat center name" : "Restaurant name");
+  if (!Array.isArray(payload.cuisines) || payload.cuisines.length === 0) {
+    missing.push(partnerType === "meat" ? "Meat categories" : "Cuisine / Food Category");
+  }
   requireText(payload.ownerName, "Owner full name");
   if (!payload.ownerEmail || !String(payload.ownerEmail).includes("@")) missing.push("Owner email address");
+  if (String(payload.portalPassword || "").length < 6) missing.push("Vendor portal password");
   if (!/^\d{10}$/.test(String(payload.ownerPhone || ""))) missing.push("Owner phone number");
   if (payload.otp !== "1234" || !payload.otpVerified) missing.push("OTP verification");
   if (!payload.location?.lat || !payload.location?.lng) missing.push("GPS location");
@@ -242,10 +262,17 @@ const requireFields = (payload: any) => {
       }
     });
   }
-  if (payload.menuSetupMode === "upload") {
-    if (!fileName(payload.menuReferenceFile) || !payload.menuUploadValid) missing.push("Valid uploaded menu sheet");
-  } else if (!Array.isArray(payload.menuCategories) || !payload.menuCategories.some((category: any) => Array.isArray(category.items) && category.items.length > 0)) {
-    missing.push("Manual menu category and item");
+  if (partnerType === "food") {
+    if (payload.menuSetupMode === "upload") {
+      if (!fileName(payload.menuReferenceFile) || !payload.menuUploadValid) missing.push("Valid uploaded menu sheet");
+      if (!Array.isArray(payload.menuUploadRows) || payload.menuUploadRows.length === 0) {
+        missing.push("Uploaded sheet item rows");
+      } else if (payload.menuUploadRows.some((row: any) => !fileName(row.image))) {
+        missing.push("Image for every uploaded sheet item");
+      }
+    } else if (!Array.isArray(payload.menuCategories) || !payload.menuCategories.some((category: any) => Array.isArray(category.items) && category.items.length > 0)) {
+      missing.push("Manual menu category and item");
+    }
   }
 
   requireText(payload.panNumber, "PAN number");
@@ -302,12 +329,18 @@ export const saveVendorOnboarding = async (req: Request, res: Response) => {
       return res.status(400).json({ message: "Owner phone number is required to save onboarding" });
     }
 
+    const hashedPortalPassword = payload.portalPassword
+      ? await bcrypt.hash(String(payload.portalPassword), 10)
+      : undefined;
+
     const vendorData = {
       name: payload.restaurantName || "Draft restaurant",
       email: ownerEmail || undefined,
       phone: ownerPhone,
+      ...(hashedPortalPassword ? { password: hashedPortalPassword } : {}),
       googlePlaceId: payload.googlePlaceId,
       onboardingStatus: status,
+      partnerType: payload.partnerType === "meat" ? "meat" : "food",
       owner: {
         name: payload.ownerName,
         email: ownerEmail,
@@ -337,6 +370,15 @@ export const saveVendorOnboarding = async (req: Request, res: Response) => {
         menuSetupMode: payload.menuSetupMode || "manual",
         menuReferenceFileName: fileName(payload.menuReferenceFile),
         menuUploadValid: Boolean(payload.menuUploadValid),
+        menuUploadRows: (payload.menuUploadRows || []).map((row: any) => ({
+          category: row.category,
+          itemName: row.itemName,
+          price: row.price,
+          description: row.description,
+          type: row.type,
+          isBestseller: row.isBestseller,
+          imageFileName: fileName(row.image),
+        })),
         menuCategories: (payload.menuCategories || []).map((category: any) => ({
           name: category.name,
           items: (category.items || []).map((item: any) => ({

@@ -396,6 +396,11 @@ export default function OnboardingScreen() {
         const res = await fetch(`${API_URL}/api/v1/onboarding`, {
           headers: { Authorization: `Bearer ${token}` },
         });
+        if (res.status === 401 || res.status === 403) {
+          useDriverStore.getState().logout();
+          router.replace("/auth");
+          return;
+        }
         if (!res.ok) return;
         const result = await res.json();
         const d = result.data;
@@ -668,7 +673,7 @@ export default function OnboardingScreen() {
 
     setSaving(true);
     try {
-      await fetch(`${API_URL}/api/v1/onboarding`, {
+      const res = await fetch(`${API_URL}/api/v1/onboarding`, {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
@@ -676,6 +681,11 @@ export default function OnboardingScreen() {
         },
         body: JSON.stringify(data),
       });
+      if (res.status === 401 || res.status === 403) {
+        useDriverStore.getState().logout();
+        router.replace("/auth");
+        return;
+      }
     } catch (err) {
       console.error("Failed to save onboarding section:", sec, err);
     } finally {
@@ -691,7 +701,7 @@ export default function OnboardingScreen() {
     // Save selfie section first
     setSaving(true);
     try {
-      await fetch(`${API_URL}/api/v1/onboarding`, {
+      const patchRes = await fetch(`${API_URL}/api/v1/onboarding`, {
         method: "PATCH",
         headers: {
           "Content-Type": "application/json",
@@ -699,6 +709,12 @@ export default function OnboardingScreen() {
         },
         body: JSON.stringify({ selfieImage: "captured" }),
       });
+      
+      if (patchRes.status === 401 || patchRes.status === 403) {
+        useDriverStore.getState().logout();
+        router.replace("/auth");
+        return;
+      }
 
       // Call complete endpoint
       const res = await fetch(`${API_URL}/api/v1/onboarding/complete`, {
@@ -709,7 +725,17 @@ export default function OnboardingScreen() {
         },
       });
 
-      if (!res.ok) throw new Error("Failed to complete onboarding");
+      if (res.status === 401 || res.status === 403) {
+        useDriverStore.getState().logout();
+        router.replace("/auth");
+        return;
+      }
+
+      if (!res.ok) {
+        const errText = await res.text();
+        console.error("Backend error response:", res.status, errText);
+        throw new Error(`Failed to complete onboarding: ${res.status} ${errText}`);
+      }
 
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       setOnboardingCompleted();

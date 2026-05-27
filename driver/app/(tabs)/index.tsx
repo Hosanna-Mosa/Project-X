@@ -9,7 +9,9 @@ import { PerformanceCard } from "@/components/PerformanceCard";
 import { ActiveTaskCard } from "@/components/ActiveTaskCard";
 import { HighDemandAreas } from "@/components/HighDemandAreas";
 import { GoOnlineModal } from "@/components/GoOnlineModal";
+import IncomingOrderModal from "@/components/IncomingOrderModal";
 import { useDriverStore } from "@/store/driverStore";
+import { router } from "expo-router";
 
 const mockHotspots = [
   { name: "Downtown Market", surge: "1.5x Surge" },
@@ -26,6 +28,7 @@ export default function HomeScreen() {
   const goOnline = useDriverStore((s) => s.goOnline);
   const goOffline = useDriverStore((s) => s.goOffline);
   const toggleHomeMode = useDriverStore((s) => s.toggleHomeMode);
+  const currentOrder = useDriverStore((s) => s.currentOrder);
 
   const handleToggleOnline = () => {
     if (isOnline) {
@@ -37,7 +40,7 @@ export default function HomeScreen() {
 
   const handleGoOnline = (services: ("food" | "ride")[]) => {
     goOnline(services);
-    setMode(services[0] || "ride");
+    setMode(services[0] === "food" ? "delivery" : "ride");
   };
 
   return (
@@ -157,16 +160,33 @@ export default function HomeScreen() {
         />
 
         {/* Active Tasks */}
-        <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>Active Tasks</Text>
-        </View>
-        <ActiveTaskCard
-          mode={mode}
-          time="5:00 PM"
-          pickup="Airport Terminal 2"
-          dropoff="Grand Hyatt Hotel"
-          onGo={() => {}}
-        />
+        {currentOrder ? (
+          <>
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionTitle}>Active Tasks</Text>
+            </View>
+            <ActiveTaskCard
+              mode={currentOrder.serviceType?.toLowerCase() === "helper" ? "delivery" : "ride"}
+              time={currentOrder.timestamp ? new Date(currentOrder.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : "Just Now"}
+              pickup={currentOrder.stops?.[0]?.address || currentOrder.stops?.[0]?.locationName || "Pickup Location"}
+              dropoff={currentOrder.stops?.[currentOrder.stops.length - 1]?.address || currentOrder.stops?.[currentOrder.stops.length - 1]?.locationName || "Drop-off Location"}
+              onGo={() => router.push("/active-order")}
+            />
+          </>
+        ) : (
+          <>
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionTitle}>Active Tasks</Text>
+            </View>
+            <View style={{ backgroundColor: Colors.surface, borderRadius: 12, padding: 20, borderWidth: 1, borderColor: Colors.border, alignItems: "center", justifyContent: "center" }}>
+              <Feather name="briefcase" size={24} color={Colors.textMuted} style={{ marginBottom: 8 }} />
+              <Text style={{ fontFamily: "Inter_600SemiBold", fontSize: 14, color: Colors.text, marginBottom: 4 }}>No Active Tasks</Text>
+              <Text style={{ fontFamily: "Inter_400Regular", fontSize: 12, color: Colors.textMuted, textAlign: "center" }}>
+                {isOnline ? "You are online and ready to receive bookings. Keep the app open." : "Go online to receive and accept bookings."}
+              </Text>
+            </View>
+          </>
+        )}
 
         {/* High Demand Areas */}
         <View style={styles.sectionSpacing}>
@@ -195,6 +215,8 @@ export default function HomeScreen() {
         onClose={() => setShowOnlineModal(false)}
         onGoOnline={handleGoOnline}
       />
+      
+      <IncomingOrderModal />
     </SafeAreaView>
   );
 }

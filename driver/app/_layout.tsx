@@ -16,6 +16,7 @@ import { SafeAreaProvider } from "react-native-safe-area-context";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { useDriverStore } from "@/store/driverStore";
 import { LocationHandler } from "@/components/LocationHandler";
+import { GlobalSocketHandler } from "@/components/GlobalSocketHandler";
 
 SplashScreen.preventAutoHideAsync();
 
@@ -45,7 +46,6 @@ function RootLayoutNav() {
       <Stack.Screen name="onboarding" options={{ headerShown: false }} />
       <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
       <Stack.Screen name="+not-found" />
-      <LocationHandler />
     </Stack>
   );
 }
@@ -73,6 +73,8 @@ export default function RootLayout() {
           <GestureHandlerRootView style={{ flex: 1 }}>
             <KeyboardProvider>
               <RootLayoutNav />
+              <LocationHandler />
+              <GlobalSocketHandler />
             </KeyboardProvider>
           </GestureHandlerRootView>
         </QueryClientProvider>

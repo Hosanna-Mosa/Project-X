@@ -1,6 +1,6 @@
 import React, { useEffect, useState, forwardRef, useImperativeHandle, useRef } from 'react';
 import { StyleSheet, View, Platform, ViewStyle, Text } from 'react-native';
-import MapView, { PROVIDER_GOOGLE, Region, MapType, MapStyleElement, Marker, Polyline } from 'react-native-maps';
+import MapView, { PROVIDER_GOOGLE, Region, MapType, MapStyleElement, Marker, Polyline, Circle } from 'react-native-maps';
 import * as Location from 'expo-location';
 import { Feather } from '@expo/vector-icons';
 import { DeliveryStop } from '@/contexts/deliveryStore';
@@ -18,6 +18,8 @@ interface Props {
   markers?: any[];
   initialRegion?: Region;
   onMarkerPress?: (marker: any) => void;
+  radiusCenter?: { lat: number; lng: number } | null;
+  radiusMeters?: number;
 }
 
 export interface MapBackgroundRef {
@@ -108,7 +110,9 @@ export const MapBackground = forwardRef<MapBackgroundRef, Props>(({
   driverLocation,
   userLocation,
   onLocationUpdate,
-  onMarkerPress 
+  onMarkerPress,
+  radiusCenter,
+  radiusMeters
 }, ref) => {
   const [region, setRegion] = useState<Region | undefined>(initialRegion);
   const internalMapRef = useRef<MapView>(null);
@@ -247,6 +251,16 @@ export const MapBackground = forwardRef<MapBackgroundRef, Props>(({
             }
           }}
         >
+          {radiusCenter && radiusMeters && (
+            <Circle
+              center={{ latitude: radiusCenter.lat, longitude: radiusCenter.lng }}
+              radius={radiusMeters}
+              fillColor="rgba(16, 185, 129, 0.1)"
+              strokeColor="rgba(16, 185, 129, 0.5)"
+              strokeWidth={2}
+            />
+          )}
+
           {markers.map((item) => (
             <Marker
               key={item.id}

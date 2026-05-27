@@ -35,6 +35,7 @@ setAuthTokenGetter(() => {
 
 
 import { FloatingCart } from "@/components/FloatingCart";
+import { GlobalSocketHandler } from "@/components/GlobalSocketHandler";
 
 SplashScreen.preventAutoHideAsync();
 
@@ -98,6 +99,7 @@ export default function RootLayout() {
             <KeyboardProvider>
               <RootLayoutNav />
               <FloatingCart />
+              <GlobalSocketHandler />
             </KeyboardProvider>
           </GestureHandlerRootView>
         </QueryClientProvider>

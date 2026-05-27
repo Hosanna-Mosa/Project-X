@@ -1,11 +1,12 @@
 import { VendorLayout } from "@/components/layout/VendorLayout";
-import { Utensils, Star, Clock, IndianRupee, ChevronRight, TrendingUp, Package } from "lucide-react";
+import { Utensils, Star, Clock, IndianRupee, ChevronRight, TrendingUp, Package, Drumstick } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { adminFetch } from "@/lib/api-client";
 import { format } from "date-fns";
 
 export default function VendorDashboard() {
   const vendorData = JSON.parse(localStorage.getItem("vendor_data") || "{}");
+  const isMeatVendor = vendorData.role === "meat_vendor";
 
   const { data: orders, isLoading: ordersLoading } = useQuery({
     queryKey: ["vendor-orders", vendorData._id],
@@ -14,8 +15,8 @@ export default function VendorDashboard() {
   });
 
   const { data: menu, isLoading: menuLoading } = useQuery({
-    queryKey: ["vendor-menu", vendorData._id],
-    queryFn: () => adminFetch<any[]>(`/food/vendor/${vendorData._id}`),
+    queryKey: [isMeatVendor ? "meat-menu" : "vendor-menu", vendorData._id],
+    queryFn: () => adminFetch<any[]>(isMeatVendor ? `/meat/menu/${vendorData._id}` : `/food/vendor/${vendorData._id}`),
     enabled: !!vendorData._id
   });
 
@@ -23,7 +24,7 @@ export default function VendorDashboard() {
 
   const stats = [
     { title: "Today's Orders", value: orders?.length.toString() || "0", icon: Clock, color: "bg-blue-500/10 text-blue-500" },
-    { title: "Active Menu Items", value: menu?.length.toString() || "0", icon: Utensils, color: "bg-green-500/10 text-green-500" },
+    { title: isMeatVendor ? "Active Meat Items" : "Active Menu Items", value: menu?.length.toString() || "0", icon: isMeatVendor ? Drumstick : Utensils, color: "bg-green-500/10 text-green-500" },
     { title: "Average Rating", value: "4.8", icon: Star, color: "bg-yellow-500/10 text-yellow-500" },
     { title: "Total Revenue", value: `₹${totalRevenue}`, icon: IndianRupee, color: "bg-purple-500/10 text-purple-500" },
   ];
@@ -115,8 +116,10 @@ export default function VendorDashboard() {
               <div className="h-16 w-16 bg-muted rounded-full flex items-center justify-center mb-4">
                 <Utensils className="h-8 w-8 text-muted-foreground" />
               </div>
-              <h3 className="font-semibold text-foreground">Your menu is empty</h3>
-              <p className="text-sm text-muted-foreground max-w-[250px] mt-2">Add your first food items to start receiving orders.</p>
+                <h3 className="font-semibold text-foreground">{isMeatVendor ? "Your meat inventory is empty" : "Your menu is empty"}</h3>
+                <p className="text-sm text-muted-foreground max-w-[250px] mt-2">
+                  {isMeatVendor ? "Add your first meat items to start receiving orders." : "Add your first food items to start receiving orders."}
+                </p>
             </div>
           </div>
         </div>

@@ -19,6 +19,7 @@ import { MapBackground, MapBackgroundRef } from "@/components/MapBackground";
 import { BottomSheet } from "@/components/BottomSheet";
 import { OrderStatusTimeline } from "@/components/OrderStatusTimeline";
 import { OrderStatus } from "@/contexts/deliveryStore";
+import { customFetch } from "@/utils/api/custom-fetch";
 
 const STATUS_SEQUENCE: OrderStatus[] = [
   "confirmed",
@@ -33,14 +34,78 @@ const STATUS_SEQUENCE: OrderStatus[] = [
 
 export default function TrackingScreen() {
   const insets = useSafeAreaInsets();
-  const { status, setStatus, currentOrderId, route, stops, driver, setDriver, unreadCount, incrementUnreadCount } = useDeliveryStore();
+  const { status, setStatus, currentOrderId, route, stops, setStops, driver, setDriver, unreadCount, incrementUnreadCount } = useDeliveryStore();
   const [eta, setEta] = useState(15);
   const [driverLocation, setDriverLocation] = useState<{ lat: number, lng: number } | null>(null);
+  const [radius, setRadius] = useState<number | null>(null);
   const mapRef = React.useRef<MapBackgroundRef>(null);
 
   const { theme } = useThemeStore();
   const colors = Colors[theme];
   const styles = React.useMemo(() => createStyles(colors), [theme]);
+
+  const normalizeStatus = (backendStatus: string): OrderStatus => {
+    const s = backendStatus.toLowerCase();
+    switch (s) {
+      case "created":
+      case "searching_driver":
+        return "confirmed";
+      case "driver_assigned":
+        return "driver_assigned";
+      case "en_route_pickup":
+      case "on_the_way":
+        return "en_route_pickup";
+      case "arrived_pickup":
+        return "arrived_pickup";
+      case "picking_items":
+        return "picking_items";
+      case "en_route_delivery":
+      case "in_transit":
+        return "en_route_delivery";
+      case "arrived_delivery":
+        return "arrived_delivery";
+      case "delivered":
+      case "completed":
+        return "delivered";
+      default:
+        return "confirmed";
+    }
+  };
+
+  useEffect(() => {
+    if (currentOrderId) {
+      customFetch<any>(`/api/v1/orders/${currentOrderId}`)
+        .then((order) => {
+          if (order) {
+            if (order.status) {
+              setStatus(normalizeStatus(order.status));
+            }
+            if (order.driver) {
+              setDriver({
+                id: order.driver._id,
+                name: order.driver.name || "Driver",
+                phone: order.driver.phone || "",
+                vehicle: order.driver.vehicleType || "unknown",
+              });
+            }
+            if (order.stops && order.stops.length > 0) {
+              const mappedStops = order.stops.map((s: any) => ({
+                id: s._id,
+                address: s.address,
+                lat: s.location.coordinates[1],
+                lng: s.location.coordinates[0],
+                items: s.items?.lines || [],
+              }));
+              setStops(mappedStops);
+            }
+            if (order.radius) {
+              setRadius(order.radius);
+            }
+          }
+        })
+        .catch((err) => console.error("Error fetching order in tracking:", err));
+    }
+  }, [currentOrderId]);
 
   useEffect(() => {
     if (currentOrderId) {
@@ -60,20 +125,13 @@ export default function TrackingScreen() {
 
       const onStatusUpdate = (data: any) => {
         if (data.status) {
-          setStatus(data.status as OrderStatus);
-        }
-      };
-
-      const onMessage = (msg: any) => {
-        if (msg.from === "driver") {
-          incrementUnreadCount();
+          setStatus(normalizeStatus(data.status));
         }
       };
 
       socketService.on("order_accepted", onOrderAccepted);
       socketService.on("driver_location_update", onLocationUpdate);
       socketService.on("order_status_update", onStatusUpdate);
-      socketService.on("receive_message", onMessage);
 
       const timer = setInterval(() => {
         setEta((prev) => Math.max(1, prev - 1));
@@ -84,7 +142,6 @@ export default function TrackingScreen() {
         socketService.off("order_accepted", onOrderAccepted);
         socketService.off("driver_location_update", onLocationUpdate);
         socketService.off("order_status_update", onStatusUpdate);
-        socketService.off("receive_message", onMessage);
       };
     }
   }, [currentOrderId]);
@@ -100,6 +157,12 @@ export default function TrackingScreen() {
         stops={stops}
         polyline={route?.polyline}
         driverLocation={driverLocation}
+        radiusCenter={
+          stops?.[0]?.lat !== undefined && stops?.[0]?.lng !== undefined
+            ? { lat: stops[0].lat, lng: stops[0].lng }
+            : null
+        }
+        radiusMeters={radius ? radius * 1000 : undefined}
         style={StyleSheet.absoluteFill} 
       />
 
@@ -168,19 +231,7 @@ export default function TrackingScreen() {
 
               <OrderStatusTimeline currentStatus={status} />
 
-              <TouchableOpacity
-                style={styles.nextStatusBtn}
-                onPress={() => {
-                  const currentIndex = STATUS_SEQUENCE.indexOf(status);
-                  if (currentIndex < STATUS_SEQUENCE.length - 1) {
-                    setStatus(STATUS_SEQUENCE[currentIndex + 1]);
-                  }
-                }}
-              >
-                <Text style={styles.nextStatusText}>
-                  {status === "delivered" ? "Order Delivered!" : "Simulate Next Step"}
-                </Text>
-              </TouchableOpacity>
+              {/* Simulation button removed for real-time tracking */}
 
               {status === "delivered" && (
                 <TouchableOpacity style={styles.doneBtn} onPress={handleBack}>

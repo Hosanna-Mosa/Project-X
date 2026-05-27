@@ -43,6 +43,21 @@ export default function MeatCentersScreen() {
 
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
 
+  const getCoords = async () => {
+    if (selectedAddress?.location?.coordinates) {
+      const [lng, lat] = selectedAddress.location.coordinates;
+      return { lat, lng };
+    }
+
+    const { status } = await Location.requestForegroundPermissionsAsync();
+    if (status !== "granted") {
+      return { lat: 17.4447, lng: 78.3498 };
+    }
+
+    const location = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
+    return { lat: location.coords.latitude, lng: location.coords.longitude };
+  };
+
   const fetchMeatCenters = async (lat: number, lng: number, pageNum: number = 1, category: string | null = null) => {
     try {
       if (pageNum === 1) setLoading(true);
@@ -51,10 +66,11 @@ export default function MeatCentersScreen() {
       const baseUrl = process.env.EXPO_PUBLIC_API_URL;
       let url = `${baseUrl}/api/v1/meat/nearby?lat=${lat}&lng=${lng}&page=${pageNum}&limit=20`;
       if (category) {
-        url += `&category=${category}`;
+        url += `&category=${encodeURIComponent(category)}`;
       }
       
       const response = await fetch(url);
+      if (!response.ok) throw new Error(`Failed to fetch meat centers: ${response.status}`);
       const data = await response.json();
       
       if (Array.isArray(data)) {
@@ -79,36 +95,16 @@ export default function MeatCentersScreen() {
     (async () => {
       setPage(1);
       setHasMore(true);
-      
-      let lat, lng;
-      if (selectedAddress?.location?.coordinates) {
-        [lng, lat] = selectedAddress.location.coordinates;
-      } else {
-        let { status } = await Location.requestForegroundPermissionsAsync();
-        if (status !== 'granted') {
-          lat = 17.4447;
-          lng = 78.3498;
-        } else {
-          let location = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
-          lat = location.coords.latitude;
-          lng = location.coords.longitude;
-        }
-      }
+      const { lat, lng } = await getCoords();
       fetchMeatCenters(lat, lng, 1, selectedCategory);
     })();
   }, [selectedAddress, selectedCategory]);
 
-  const loadMore = () => {
-    if (!loadingMore && hasMore) {
+  const loadMore = async () => {
+    if (!loading && !loadingMore && hasMore) {
       const nextPage = page + 1;
       setPage(nextPage);
-      let lat, lng;
-      if (selectedAddress?.location?.coordinates) {
-        [lng, lat] = selectedAddress.location.coordinates;
-      } else {
-        lat = 17.4447;
-        lng = 78.3498;
-      }
+      const { lat, lng } = await getCoords();
       fetchMeatCenters(lat, lng, nextPage, selectedCategory);
     }
   };
@@ -166,15 +162,11 @@ export default function MeatCentersScreen() {
         contentContainerStyle={[styles.mainScrollContent, { paddingTop: topPadding + 160 }]}
         showsVerticalScrollIndicator={false}
         refreshing={loading}
-        onRefresh={() => {
+        onRefresh={async () => {
           setPage(1);
           setHasMore(true);
-          if (selectedAddress?.location?.coordinates) {
-             const [lng, lat] = selectedAddress.location.coordinates;
-             fetchMeatCenters(lat, lng, 1);
-          } else {
-             fetchMeatCenters(17.4447, 78.3498, 1);
-          }
+          const { lat, lng } = await getCoords();
+          fetchMeatCenters(lat, lng, 1, selectedCategory);
         }}
       />
 

@@ -6,6 +6,7 @@ export enum ServiceType {
   CAB = "cab",
   CAB_PRIME = "cab_prime",
   DELIVERY = "delivery",
+  HELPER = "helper",
 }
 
 export enum OrderStatus {
@@ -20,11 +21,22 @@ export enum OrderStatus {
   COMPLETED = "COMPLETED",
   DELIVERED = "DELIVERED",
   CANCELLED = "CANCELLED",
+
+  // Lowercase compatibility statuses for client tracking sequence
+  CONFIRMED = "confirmed",
+  DRIVER_ASSIGNED_LC = "driver_assigned",
+  EN_ROUTE_PICKUP = "en_route_pickup",
+  ARRIVED_PICKUP_LC = "arrived_pickup",
+  PICKING_ITEMS_LC = "picking_items",
+  EN_ROUTE_DELIVERY = "en_route_delivery",
+  ARRIVED_DELIVERY_LC = "arrived_delivery",
+  DELIVERED_LC = "delivered",
 }
 
 export enum StopType {
-  PICKUP = "PICKUP",
-  DROP = "DROP",
+  PICKUP = "pickup",
+  DROP = "drop",
+  STOP = "stop",
 }
 
 export interface IStop {
@@ -54,6 +66,8 @@ export interface IOrder extends Document {
     total: number;
   };
   stops: IStop[];
+  radius?: number;
+  duration?: number;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -105,6 +119,8 @@ const OrderSchema: Schema = new Schema(
       total: { type: Number, default: 0 },
     },
     stops: [StopSchema],
+    radius: { type: Number },
+    duration: { type: Number },
   },
   { timestamps: true }
 );

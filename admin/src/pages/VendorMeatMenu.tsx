@@ -6,7 +6,10 @@ import { Switch } from "@/components/ui/switch";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
-import { Drumstick, AlertCircle, Check, X, IndianRupee, Pencil } from "lucide-react";
+import { Drumstick, AlertCircle, Plus, Trash2, Check, X, IndianRupee, Pencil } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 
 interface MeatItem {
   _id: string;
@@ -14,14 +17,26 @@ interface MeatItem {
   weight: string;
   price: number;
   category: string;
+  image?: string;
   isAvailable: boolean;
+  isGlobalItem?: boolean;
 }
+
+const blankItem = {
+  name: "",
+  weight: "",
+  price: "",
+  category: "Chicken",
+  image: "",
+};
 
 export default function VendorMeatMenu() {
   const queryClient = useQueryClient();
   const vendorData = JSON.parse(localStorage.getItem("vendor_data") || "{}");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editPrice, setEditPrice] = useState<string>("");
+  const [isAddOpen, setIsAddOpen] = useState(false);
+  const [newItem, setNewItem] = useState(blankItem);
 
   // Fetch ALL items (available + unavailable)
   const { data: menu, isLoading } = useQuery({
@@ -84,7 +99,7 @@ export default function VendorMeatMenu() {
           <p className="text-muted-foreground">Manage stock availability and update your daily prices.</p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
           {isLoading ? (
             <p className="text-muted-foreground col-span-full text-center py-12">Loading your items...</p>
           ) : !menu || menu.length === 0 ? (

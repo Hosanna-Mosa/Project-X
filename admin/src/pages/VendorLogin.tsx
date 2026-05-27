@@ -75,7 +75,7 @@ export default function VendorLogin() {
         localStorage.setItem("vendor_token", data.token);
         localStorage.setItem("vendor_data", JSON.stringify(data));
         toast.success(`Welcome back, ${data.name}`);
-        navigate("/vendor/dashboard");
+        navigate(data.role === "meat_vendor" ? "/vendor/meat-menu" : "/vendor/dashboard");
       }
     } catch (error: any) {
       toast.error(error.message || "Invalid credentials");

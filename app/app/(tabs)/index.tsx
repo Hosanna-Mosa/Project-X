@@ -71,6 +71,7 @@ export default function HomeScreen() {
       else setLoadingMore(true);
       const baseUrl = process.env.EXPO_PUBLIC_API_URL;
       const response = await fetch(`${baseUrl}/api/v1/vendors/nearby?lat=${lat}&lng=${lng}&page=${pageNum}&limit=20`);
+      if (!response.ok) throw new Error(`Failed to fetch vendors: ${response.status}`);
       const data = await response.json();
       if (Array.isArray(data)) {
         if (data.length < 20) setHasMore(false); else setHasMore(true);
@@ -91,6 +92,7 @@ export default function HomeScreen() {
       else setLoadingMore(true);
       const baseUrl = process.env.EXPO_PUBLIC_API_URL;
       const response = await fetch(`${baseUrl}/api/v1/meat/nearby?lat=${lat}&lng=${lng}&page=${pageNum}&limit=20`);
+      if (!response.ok) throw new Error(`Failed to fetch meat centers: ${response.status}`);
       const data = await response.json();
       if (Array.isArray(data)) {
         if (data.length < 20) setHasMore(false); else setHasMore(true);
@@ -115,11 +117,11 @@ export default function HomeScreen() {
     })();
   }, [selectedAddress, activeService]);
 
-  const loadMore = () => {
-    if (!loadingMore && hasMore) {
+  const loadMore = async () => {
+    if (!loading && !loadingMore && hasMore) {
       const nextPage = page + 1;
       setPage(nextPage);
-      const lat = 17.4447, lng = 78.3498;
+      const { lat, lng } = await getCoords();
       if (activeService === 'Meat') fetchMeatCenters(lat, lng, nextPage);
       else fetchVendors(lat, lng, nextPage);
     }

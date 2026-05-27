@@ -17,6 +17,7 @@ import Colors from "@/constants/colors";
 import { useDeliveryStore } from "@/contexts/deliveryStore";
 import { useThemeStore } from "@/contexts/themeStore";
 import { customFetch } from "@/utils/api/custom-fetch";
+import { socketService } from "@/utils/socketService";
 
 const { height } = Dimensions.get("window");
 
@@ -54,7 +55,7 @@ export default function RideSearchingScreen() {
   const { theme } = useThemeStore();
   const colors = Colors[theme];
   const styles = React.useMemo(() => createStyles(colors, insets), [colors, insets]);
-  const setCurrentOrderId = useDeliveryStore((s) => s.setOrderId);
+  const { currentOrderId, setOrderId: setCurrentOrderId, setDriver: setGlobalDriver, setStatus: setGlobalStatus } = useDeliveryStore();
   const mapRef = React.useRef<MapView>(null);
 
   const params = useLocalSearchParams<{
@@ -133,13 +134,13 @@ export default function RideSearchingScreen() {
                 address: params.pickupName,
                 latitude: pickupCoords.latitude,
                 longitude: pickupCoords.longitude,
-                type: "PICKUP",
+                type: "pickup",
               },
               {
                 address: params.dropName,
                 latitude: dropCoords.latitude,
                 longitude: dropCoords.longitude,
-                type: "DROP",
+                type: "drop",
               },
             ],
           }),
@@ -167,6 +168,34 @@ export default function RideSearchingScreen() {
     setCurrentOrderId,
   ]);
 
+  React.useEffect(() => {
+    if (currentOrderId) {
+      socketService.connect();
+      socketService.trackOrder(currentOrderId);
+
+      const handleOrderAccepted = (data: any) => {
+        if (data.orderId === currentOrderId) {
+          setGlobalDriver(data.driver);
+          setGlobalStatus("driver_assigned");
+          
+          Alert.alert("Driver Assigned", `${data.driver.name} is on the way!`, [
+            {
+              text: "OK",
+              onPress: () => {
+                router.push("/tracking");
+              }
+            }
+          ]);
+        }
+      };
+
+      socketService.on("order_accepted", handleOrderAccepted);
+      return () => {
+        socketService.off("order_accepted", handleOrderAccepted);
+      };
+    }
+  }, [currentOrderId]);
+
   const showTripDetails = () => {
     setCancelConfirmVisible(false);
     setCancelReasonVisible(false);
@@ -190,7 +219,7 @@ export default function RideSearchingScreen() {
     setCancelReasonVisible(false);
     setTripDetailsVisible(false);
     setCurrentOrderId(null);
-    router.replace("/(tabs)");
+    router.push("/(tabs)");
   };
   /* void [
       `${params.pickupName}\n\nTo\n\n${params.dropName}\n\nRide: ${params.rideName || "Bike Ride"}\nFare: ₹${fare}`,
