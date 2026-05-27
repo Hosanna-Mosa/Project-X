@@ -8,6 +8,7 @@ import {
 } from "react-native";
 import { Feather } from "@expo/vector-icons";
 import Colors from "@/constants/colors";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 interface GoOnlineModalProps {
   visible: boolean;
@@ -16,6 +17,7 @@ interface GoOnlineModalProps {
 }
 
 export function GoOnlineModal({ visible, onClose, onGoOnline }: GoOnlineModalProps) {
+  const insets = useSafeAreaInsets();
   const [selectedServices, setSelectedServices] = React.useState<("food" | "ride")[]>(["ride", "food"]);
   const [showSuccess, setShowSuccess] = React.useState(false);
 
@@ -51,7 +53,7 @@ export function GoOnlineModal({ visible, onClose, onGoOnline }: GoOnlineModalPro
       onRequestClose={handleClose}
     >
       <View style={styles.overlay}>
-        <View style={styles.sheet}>
+        <View style={[styles.sheet, { paddingBottom: Math.max(insets.bottom, 16) + 16 }]}>
           {/* Handle */}
           <View style={styles.handleRow}>
             <View style={styles.handle} />
@@ -202,7 +204,6 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     paddingHorizontal: 24,
-    paddingBottom: 40,
     paddingTop: 12,
   },
   handleRow: {

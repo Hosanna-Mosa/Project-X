@@ -4,10 +4,14 @@ import { Feather } from "@expo/vector-icons";
 import React from "react";
 import { Platform, StyleSheet, View } from "react-native";
 import Colors from "@/constants/colors";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 export default function TabLayout() {
   const isIOS = Platform.OS === "ios";
   const isWeb = Platform.OS === "web";
+  const insets = useSafeAreaInsets();
+  const bottomInset = isWeb ? 0 : insets.bottom;
+  const tabBarHeight = isWeb ? 84 : 64 + bottomInset;
 
   return (
     <Tabs
@@ -20,8 +24,8 @@ export default function TabLayout() {
           backgroundColor: isIOS ? "transparent" : Colors.tabBar,
           borderTopWidth: 0,
           elevation: 0,
-          height: isWeb ? 84 : 64,
-          paddingBottom: isWeb ? 20 : 8,
+          height: tabBarHeight,
+          paddingBottom: isWeb ? 20 : Math.max(bottomInset, 8),
           paddingTop: 8,
         },
         tabBarBackground: () =>

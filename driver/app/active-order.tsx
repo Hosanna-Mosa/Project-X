@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
-import { StyleSheet, View, Text, TouchableOpacity, Dimensions, Platform } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { ScrollView, StyleSheet, View, Text, TouchableOpacity, Dimensions, Platform } from "react-native";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import MapView, { Marker, Polyline, Circle, PROVIDER_GOOGLE } from "react-native-maps";
 import { Feather, Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
@@ -80,6 +80,7 @@ const mapStyle = [
 ];
 
 export default function ActiveOrderScreen() {
+  const insets = useSafeAreaInsets();
   const { currentOrder, completeOrder, updateOrderStatus, unreadCount } = useDriverStore();
   const [driverLocation, setDriverLocation] = useState<{ lat: number; lng: number } | null>(null);
 
@@ -248,7 +249,12 @@ export default function ActiveOrderScreen() {
         </MapView>
       </View>
 
-      <View style={styles.bottomCard}>
+      <View style={[styles.bottomCard, { paddingBottom: Math.max(insets.bottom, 16) + 8 }]}>
+        <ScrollView
+          bounces={false}
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={styles.bottomCardContent}
+        >
         <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
           <Text style={styles.taskTitle}>{isHelper ? "Helper Task" : "Delivery / Ride"}</Text>
           <View style={[styles.statusPill, { backgroundColor: getStatusColor(currentOrder.status) }]}>
@@ -309,6 +315,7 @@ export default function ActiveOrderScreen() {
         <TouchableOpacity style={styles.completeBtn} onPress={handleStatusTransition}>
           <Text style={styles.completeBtnText}>{getButtonText()}</Text>
         </TouchableOpacity>
+        </ScrollView>
       </View>
     </SafeAreaView>
   );
@@ -346,7 +353,8 @@ const styles = StyleSheet.create({
   },
   bottomCard: {
     backgroundColor: Colors.surface,
-    padding: 24,
+    paddingHorizontal: 20,
+    paddingTop: 20,
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     shadowColor: "#000",
@@ -355,6 +363,10 @@ const styles = StyleSheet.create({
     shadowRadius: 12,
     elevation: 20,
     marginTop: -20, // Overlap map slightly
+    maxHeight: height * 0.58,
+  },
+  bottomCardContent: {
+    paddingBottom: 4,
   },
   taskTitle: { fontSize: 20, fontWeight: "800", color: Colors.text, marginBottom: 16 },
   infoRow: { flexDirection: "row", alignItems: "center", marginBottom: 20, gap: 12 },

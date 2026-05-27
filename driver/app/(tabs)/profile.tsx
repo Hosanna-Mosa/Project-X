@@ -1,6 +1,6 @@
 import React from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { router } from "expo-router";
 
 import Colors from "@/constants/colors";
@@ -17,9 +17,14 @@ const menuItems = [
 ];
 
 export default function ProfileScreen() {
+  const insets = useSafeAreaInsets();
+
   return (
     <SafeAreaView style={styles.safe} edges={["top"]}>
-      <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+      <ScrollView
+        style={styles.container}
+        contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 104 }]}
+      >
         {/* Profile Header */}
         <ProfileHeader
           name="Alex Driver"
@@ -91,7 +96,6 @@ const styles = StyleSheet.create({
   },
   content: {
     padding: 16,
-    paddingBottom: 32,
     gap: 16,
   },
   statusRow: {
