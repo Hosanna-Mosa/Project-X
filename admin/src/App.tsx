@@ -20,6 +20,7 @@ import VendorLogin from "./pages/VendorLogin";
 import VendorDashboard from "./pages/VendorDashboard";
 import VendorMenu from "./pages/VendorMenu";
 import VendorMeatMenu from "./pages/VendorMeatMenu";
+import VendorSettings from "./pages/VendorSettings";
 import NotFound from "./pages/NotFound";
 
 const RootRedirect = () => {
@@ -58,6 +59,7 @@ const App = () => (
           <Route path="/vendor/dashboard" element={<VendorDashboard />} />
           <Route path="/vendor/menu" element={<VendorMenu />} />
           <Route path="/vendor/meat-menu" element={<VendorMeatMenu />} />
+          <Route path="/vendor/settings" element={<VendorSettings />} />
           <Route path="/settings" element={<NotFound />} />
 
           <Route path="*" element={<NotFound />} />

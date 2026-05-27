@@ -15,8 +15,14 @@ export const authenticateToken = (req: AuthRequest, res: Response, next: NextFun
 
   if (!token) return res.sendStatus(401);
 
-  jwt.verify(token, process.env.JWT_SECRET || "default_secret", (err: any, user: any) => {
+  jwt.verify(token, process.env.JWT_SECRET || "supersecret123", (err: any, user: any) => {
     if (err) return res.sendStatus(403);
+    
+    // Support tokens using 'id' instead of 'userId'
+    if (user && user.id && !user.userId) {
+      user.userId = user.id;
+    }
+    
     req.user = user;
     next();
   });
