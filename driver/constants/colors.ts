@@ -24,6 +24,8 @@ export const Colors = {
   surfaceContainerHigh: "#dce9ff",
   border: "#e2e8f0",
   outline: "#907065",
+  surfaceAlt: "#f1f5f9",
+  warning: "#F59E0B",
   
   // Text
   text: "#0b1c30",

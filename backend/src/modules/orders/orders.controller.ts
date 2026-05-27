@@ -46,7 +46,7 @@ export class OrdersController {
   async create(req: AuthRequest, res: Response) {
     console.log("Creating Order - Payload:", req.body);
     try {
-      const { stops, serviceType, vendorId, totals } = req.body;
+      const { stops, serviceType, vendorId, totals, radius, duration } = req.body;
       const userId = req.user?.userId;
 
       if (!userId || !stops || stops.length === 0) {
@@ -54,7 +54,7 @@ export class OrdersController {
         return res.status(400).json({ message: "Incomplete order data. User and stops are required." });
       }
 
-      const order = await ordersService.createOrder(userId, stops, serviceType, vendorId, totals);
+      const order = await ordersService.createOrder(userId, stops, serviceType, vendorId, totals, radius, duration);
 
       // Trigger Matching Driver logic (in background or service)
       // For now, return order
@@ -91,6 +91,23 @@ export class OrdersController {
       return res.json(order);
     } catch (error) {
       return res.status(500).json({ message: "Internal server error" });
+    }
+  }
+
+  async accept(req: AuthRequest, res: Response) {
+    try {
+      const { id } = req.params;
+      const userId = req.user?.userId;
+
+      if (!userId) return res.status(401).json({ message: "Unauthorized" });
+
+      const order = await ordersService.acceptOrder(id as string, userId);
+      return res.json(order);
+    } catch (error: any) {
+      if (error.message === "Order is no longer available") {
+        return res.status(409).json({ message: error.message });
+      }
+      return res.status(500).json({ message: error.message || "Internal server error" });
     }
   }
 

@@ -187,7 +187,7 @@ export default function ProfileScreen() {
           <GridItem 
             icon={<MaterialCommunityIcons name="wallet-outline" size={24} color={colors.text} />} 
             label="Wallet" 
-            onPress={() => router.push("/delivery/wallet")} 
+            onPress={() => router.push("/delivery/wallet" as any)} 
             colors={colors}
           />
           <GridItem 

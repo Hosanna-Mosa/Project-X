@@ -46,6 +46,8 @@ export interface Order {
   customerPhone: string;
   status: OrderStatus;
   timestamp: Date;
+  serviceType?: string;
+  radius?: number;
 }
 
 export interface CompletedOrder {
@@ -59,9 +61,9 @@ export interface CompletedOrder {
 
 export interface ChatMessage {
   id: string;
-  sender: "customer" | "driver";
+  from: "driver" | "user";
   text: string;
-  timestamp: string;
+  time: string;
 }
 
 export interface EarningsData {
@@ -83,18 +85,21 @@ interface DriverState {
   driverLocation: { lat: number; lng: number } | null;
   driverName: string;
   driverPhone: string;
+  driverUserId: string | null;
   token: string | null;
   isAuthenticated: boolean;
   hasCompletedOnboarding: boolean;
   activeChat: ChatMessage[];
   unreadCount: number;
+  isChatActive: boolean;
 
-  goOnline: (services: ("food" | "ride")[]) => void;
-  goOffline: () => void;
+  goOnline: (services: ("food" | "ride")[]) => Promise<void>;
+  goOffline: () => Promise<void>;
   toggleHomeMode: () => void;
   acceptOrder: () => void;
   rejectOrder: () => void;
   updateStep: (step: number) => void;
+  updateOrderStatus: (status: OrderStatus) => Promise<void>;
   completeOrder: () => void;
   setIncomingOrder: (order: Order | null) => void;
   updateDriverLocation: (lat: number, lng: number) => void;
@@ -106,6 +111,7 @@ interface DriverState {
   clearChat: () => void;
   setUnreadCount: (count: number) => void;
   incrementUnreadCount: () => void;
+  setIsChatActive: (active: boolean) => void;
   loginWithPassword: (phone: string, password: string) => Promise<void>;
 }
 
@@ -168,11 +174,13 @@ export const useDriverStore = create<DriverState>()(
       driverLocation: null,
       driverName: "",
       driverPhone: "",
+      driverUserId: null,
       token: null,
       isAuthenticated: false,
       hasCompletedOnboarding: false,
       activeChat: [],
       unreadCount: 0,
+      isChatActive: false,
       earnings: {
         today: 342,
         week: 2180,
@@ -222,13 +230,94 @@ export const useDriverStore = create<DriverState>()(
         },
       ],
 
-      goOnline: (services) => set({ isOnline: true, activeServices: services }),
-      goOffline: () => set({ isOnline: false, homeMode: false }),
+      goOnline: async (services) => {
+        const { token, driverUserId } = get();
+        if (token) {
+          try {
+            await fetch(`${apiUrl}/api/v1/drivers/status`, {
+              method: "PATCH",
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${token}`
+              },
+              body: JSON.stringify({ status: "ONLINE" })
+            });
+          } catch (e) {
+            console.error("Failed to set online status:", e);
+          }
+        }
+        
+        // Connect to real-time order broadcasts regardless of token
+        import("../utils/socketService").then(({ socketService }) => {
+          socketService.connect();
+          socketService.join(driverUserId || "mock_driver_123", "DRIVER");
+          socketService.on("new_order", (data: any) => {
+            console.log("New order received:", data);
+            get().setIncomingOrder(data as Order);
+          });
+        });
+
+        set({ isOnline: true, activeServices: services });
+      },
+      goOffline: async () => {
+        const { token } = get();
+        if (token) {
+          try {
+            await fetch(`${apiUrl}/api/v1/drivers/status`, {
+              method: "PATCH",
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${token}`
+              },
+              body: JSON.stringify({ status: "OFFLINE" })
+            });
+          } catch (e) {
+            console.error("Failed to set offline status:", e);
+          }
+        }
+        
+        import("../utils/socketService").then(({ socketService }) => {
+          socketService.off("new_order", () => {}); // Remove listener
+        });
+
+        set({ isOnline: false, homeMode: false });
+      },
       toggleHomeMode: () => set((state) => ({ homeMode: !state.homeMode })),
 
-      acceptOrder: () => {
-        const { incomingOrder } = get();
+      acceptOrder: async () => {
+        const { incomingOrder, token } = get();
         if (incomingOrder) {
+          let accepted = false;
+          if (token) {
+            try {
+              const res = await fetch(`${apiUrl}/api/v1/orders/${incomingOrder.id}/accept`, {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                  Authorization: `Bearer ${token}`
+                }
+              });
+              if (!res.ok) {
+                const error = await res.json();
+                console.warn(error.message || "Failed to accept order via API");
+              } else {
+                accepted = true;
+              }
+            } catch (e) {
+              console.error("Order acceptance API failed:", e);
+            }
+          }
+          
+          if (!accepted) {
+            // Fallback for unauthenticated testing or API failure
+            import("../utils/socketService").then(({ socketService }) => {
+              socketService.emit("driver_accepted_order", {
+                orderId: incomingOrder.id,
+                driverInfo: { id: "mock_driver_123", name: "Mock Driver", phone: "+1 (555) 987-6543", vehicle: "Mock Vehicle" }
+              });
+            });
+          }
+
           set({
             currentOrder: { ...incomingOrder, status: "accepted" },
             incomingOrder: null,
@@ -245,6 +334,45 @@ export const useDriverStore = create<DriverState>()(
         const { currentOrder } = get();
         if (!currentOrder) return;
         set({ currentStep: step });
+      },
+
+      updateOrderStatus: async (status: OrderStatus) => {
+        const { currentOrder, token } = get();
+        if (!currentOrder) return;
+
+        let updated = false;
+        if (token) {
+          try {
+            const res = await fetch(`${apiUrl}/api/v1/orders/${currentOrder.id}/status`, {
+              method: "PATCH",
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${token}`
+              },
+              body: JSON.stringify({ status })
+            });
+            if (res.ok) {
+              updated = true;
+            } else {
+              console.warn("Failed to update status on server:", res.status);
+            }
+          } catch (e) {
+            console.error("Failed to update order status via API:", e);
+          }
+        }
+
+        // Also emit via socket to ensure real-time notification
+        import("../utils/socketService").then(({ socketService }) => {
+          socketService.emit("order_status_update", {
+            orderId: currentOrder.id,
+            status: status
+          });
+        });
+
+        // Update local state
+        set({
+          currentOrder: { ...currentOrder, status: status }
+        });
       },
 
       completeOrder: () => {
@@ -293,6 +421,7 @@ export const useDriverStore = create<DriverState>()(
           hasCompletedOnboarding: false,
           driverName: "",
           driverPhone: "",
+          driverUserId: null,
           token: null,
           isOnline: false,
           currentOrder: null,
@@ -310,6 +439,8 @@ export const useDriverStore = create<DriverState>()(
 
       incrementUnreadCount: () => set((state) => ({ unreadCount: state.unreadCount + 1 })),
 
+      setIsChatActive: (isChatActive) => set({ isChatActive }),
+
       loginWithPassword: async (phone: string, password: string) => {
         try {
           const response = await fetch(`${apiUrl}/api/v1/auth/login-password`, {
@@ -325,6 +456,7 @@ export const useDriverStore = create<DriverState>()(
             hasCompletedOnboarding: false,
             driverName: data.user.name,
             driverPhone: data.user.phone,
+            driverUserId: data.user.id,
             token: data.token,
           });
         } catch (err: any) {
@@ -340,6 +472,7 @@ export const useDriverStore = create<DriverState>()(
         hasCompletedOnboarding: state.hasCompletedOnboarding,
         driverName: state.driverName,
         driverPhone: state.driverPhone,
+        driverUserId: state.driverUserId,
         token: state.token,
         earnings: state.earnings,
         orderHistory: state.orderHistory,

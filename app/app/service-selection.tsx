@@ -24,6 +24,8 @@ import { MapBackground, MapBackgroundRef } from "@/components/MapBackground";
 import { BottomSheet } from "@/components/BottomSheet";
 import { customFetch } from "@/utils/api/custom-fetch";
 import { LocationPickerSheet } from "@/components/LocationPickerSheet";
+import { socketService } from "@/utils/socketService";
+import { useDeliveryStore } from "@/contexts/deliveryStore";
 
 const { height: SCREEN_HEIGHT } = Dimensions.get("window");
 
@@ -37,6 +39,7 @@ export default function ServiceSelectionScreen() {
   const [selectedPlace, setSelectedPlace] = useState<any | null>(null);
   const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(null);
   const mapRef = useRef<MapBackgroundRef>(null);
+  const { setOrderId: setGlobalOrderId, setDriver: setGlobalDriver, setStatus: setGlobalStatus, unreadCount } = useDeliveryStore();
 
   const { theme } = useThemeStore();
   const colors = Colors[theme];
@@ -53,6 +56,8 @@ export default function ServiceSelectionScreen() {
   const [searchingStatus, setSearchingStatus] = useState<string>("Initializing booking...");
   const [driverLocation, setDriverLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [showFareBreakdown, setShowFareBreakdown] = useState(false);
+  const [currentOrderId, setCurrentOrderId] = useState<string | null>(null);
+  const [driverInfo, setDriverInfo] = useState<any>(null);
   
   // Staggered animated values for radar pulses
   const pulse1 = useRef(new Animated.Value(0)).current;
@@ -108,7 +113,6 @@ export default function ServiceSelectionScreen() {
         }
       }, 1000);
       
-      // Pan map to selected address coordinates immediately so it's centered as booking begins
       const selectedCoords = getSelectedCoords();
       if (selectedCoords) {
         setTimeout(() => {
@@ -116,63 +120,59 @@ export default function ServiceSelectionScreen() {
         }, 50);
       }
 
-      const successTimer = setTimeout(() => {
-        setBookingState("success");
-        clearInterval(statusTimer);
-
-        const selectedCoords = getSelectedCoords();
-        if (selectedCoords) {
-          const mockDriver = {
-            lat: selectedCoords.lat + 0.003,
-            lng: selectedCoords.lng - 0.002,
-          };
-          setDriverLocation(mockDriver);
-          // Show location with a tiny timeout to ensure marker is registered/mounted first
-          setTimeout(() => {
-            mapRef.current?.panTo(mockDriver.lat, mockDriver.lng, 0.015);
-          }, 100);
-        }
-      }, 4000);
-
       pulse1.setValue(0);
       pulse2.setValue(0);
       pulse3.setValue(0);
 
       Animated.loop(
         Animated.parallel([
-          Animated.timing(pulse1, {
-            toValue: 1,
-            duration: 2000,
-            easing: Easing.out(Easing.ease),
-            useNativeDriver: true,
-          }),
-          Animated.sequence([
-            Animated.delay(400),
-            Animated.timing(pulse2, {
-              toValue: 1,
-              duration: 1600,
-              easing: Easing.out(Easing.ease),
-              useNativeDriver: true,
-            })
-          ]),
-          Animated.sequence([
-            Animated.delay(800),
-            Animated.timing(pulse3, {
-              toValue: 1,
-              duration: 1200,
-              easing: Easing.out(Easing.ease),
-              useNativeDriver: true,
-            })
-          ])
+          Animated.timing(pulse1, { toValue: 1, duration: 2000, easing: Easing.out(Easing.ease), useNativeDriver: true }),
+          Animated.sequence([ Animated.delay(400), Animated.timing(pulse2, { toValue: 1, duration: 1600, easing: Easing.out(Easing.ease), useNativeDriver: true }) ]),
+          Animated.sequence([ Animated.delay(800), Animated.timing(pulse3, { toValue: 1, duration: 1200, easing: Easing.out(Easing.ease), useNativeDriver: true }) ])
         ])
       ).start();
 
       return () => {
         clearInterval(statusTimer);
-        clearTimeout(successTimer);
       };
     }
   }, [bookingState, selectedAddress]);
+
+  useEffect(() => {
+    if (currentOrderId && bookingState === "booking") {
+      socketService.connect();
+      socketService.trackOrder(currentOrderId);
+
+      const handleOrderAccepted = (data: any) => {
+        if (data.orderId === currentOrderId) {
+          setBookingState("success");
+          setDriverInfo(data.driver);
+          
+          // Hydrate global store for tracking and chat
+          setGlobalOrderId(data.orderId);
+          setGlobalDriver(data.driver);
+          setGlobalStatus("driver_assigned");
+
+          const selectedCoords = getSelectedCoords();
+          if (selectedCoords) {
+            const mockDriver = {
+              lat: selectedCoords.lat + 0.003,
+              lng: selectedCoords.lng - 0.002,
+            };
+            setDriverLocation(mockDriver);
+            setTimeout(() => {
+              mapRef.current?.panTo(mockDriver.lat, mockDriver.lng, 0.015);
+            }, 100);
+          }
+        }
+      };
+
+      socketService.on("order_accepted", handleOrderAccepted);
+      return () => {
+        socketService.off("order_accepted", handleOrderAccepted);
+      };
+    }
+  }, [currentOrderId, bookingState]);
 
   const [secondsRemaining, setSecondsRemaining] = useState<number>(0);
 
@@ -211,22 +211,45 @@ export default function ServiceSelectionScreen() {
     return `${hStr}:${mStr}:${sStr}`;
   };
 
-  const handleBook = () => {
+  const handleBook = async () => {
     if (!selectedAddress) {
       Alert.alert("Location required", "Please select a location address for booking.");
       return;
     }
     setBookingState("booking");
+    try {
+      const selectedCoords = getSelectedCoords();
+      const orderStops = [
+        { address: selectedAddress.label || selectedAddress.addressLine || "Location", latitude: selectedCoords?.lat, longitude: selectedCoords?.lng, type: "pickup" }
+      ];
+      const fare = calculateFareDetails();
+      const res = await customFetch<{ _id: string }>("/api/v1/orders", {
+        method: "POST",
+        body: JSON.stringify({
+          stops: orderStops,
+          serviceType: "helper",
+          totals: { total: fare.total, subtotal: fare.baseFare },
+          radius: fare.radius,
+          duration: fare.hours,
+        })
+      });
+      setCurrentOrderId(res._id);
+    } catch (e: any) {
+      Alert.alert("Booking Failed", e.message);
+      setBookingState("idle");
+    }
   };
 
   const handleCancelBooking = () => {
     setBookingState("idle");
     setDriverLocation(null);
+    setCurrentOrderId(null);
   };
 
   const handleReset = () => {
     setBookingState("idle");
     setDriverLocation(null);
+    setCurrentOrderId(null);
   };
 
   useEffect(() => {
@@ -343,6 +366,8 @@ export default function ServiceSelectionScreen() {
               style={StyleSheet.absoluteFill} 
               driverLocation={driverLocation}
               userLocation={selectedCoords}
+              radiusCenter={selectedCoords}
+              radiusMeters={fareDetails.radius * 1000}
               initialRegion={selectedCoords ? {
                 latitude: selectedCoords.lat - 0.003, // offset slightly for bottom sheet layout
                 longitude: selectedCoords.lng,
@@ -689,7 +714,7 @@ export default function ServiceSelectionScreen() {
                     style={styles.helperAvatar} 
                   />
                   <View style={styles.helperInfo}>
-                    <Text style={styles.helperName}>Sarah Jenkins</Text>
+                    <Text style={styles.helperName}>{driverInfo?.name || "Sarah Jenkins"}</Text>
                     <Text style={styles.helperTag}>General Helper & Task Specialist</Text>
                     <View style={styles.helperRatingRow}>
                       <Ionicons name="star" size={14} color="#EAB308" />
@@ -721,24 +746,42 @@ export default function ServiceSelectionScreen() {
 
                 <View style={styles.sheetSuccessActionsRow}>
                   <TouchableOpacity 
-                    style={[styles.successCallBtn, { flex: 1 }]}
+                    style={[styles.successCallBtn, { flex: 1, marginBottom: 10 }]}
                     onPress={() => {
-                      Alert.alert("Calling Sarah...", "Connecting you to your helper at +1 (555) 019-2834.");
+                      router.push("/tracking");
                     }}
                   >
-                    <Ionicons name="call" size={18} color={colors.text} style={{ marginRight: 6 }} />
-                    <Text style={styles.successCallBtnText}>Call Sarah</Text>
+                    <Feather name="map-pin" size={18} color={colors.text} style={{ marginRight: 6 }} />
+                    <Text style={styles.successCallBtnText}>Track Order</Text>
                   </TouchableOpacity>
 
                   <TouchableOpacity 
-                    style={[styles.successChatBtn, { flex: 1, marginBottom: 0 }]}
+                    style={[styles.successChatBtn, { flex: 1, marginBottom: 10, position: "relative" }]}
                     onPress={() => {
-                      handleReset();
-                      router.push({ pathname: "/chat", params: { placeId: "helper-sarah" } });
+                      router.push("/chat");
                     }}
                   >
                     <Ionicons name="chatbubble-ellipses" size={18} color={colors.surface} style={{ marginRight: 6 }} />
-                    <Text style={styles.successChatBtnText}>Chat with Sarah</Text>
+                    <Text style={styles.successChatBtnText}>Chat with {driverInfo?.name ? driverInfo.name.split(" ")[0] : "Sarah"}</Text>
+                    {unreadCount > 0 && (
+                      <View style={{
+                        position: "absolute",
+                        top: -5,
+                        right: -5,
+                        backgroundColor: colors.error || "#ba1a1a",
+                        minWidth: 18,
+                        height: 18,
+                        borderRadius: 9,
+                        alignItems: "center",
+                        justifyContent: "center",
+                        paddingHorizontal: 5,
+                        borderWidth: 1.5,
+                        borderColor: colors.surface,
+                        elevation: 4,
+                      }}>
+                        <Text style={{ color: "#fff", fontSize: 9, fontWeight: "900" }}>{unreadCount}</Text>
+                      </View>
+                    )}
                   </TouchableOpacity>
                 </View>
               </View>
