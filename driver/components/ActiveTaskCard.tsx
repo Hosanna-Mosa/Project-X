@@ -15,7 +15,8 @@ export function ActiveTaskCard({ mode, time, pickup, dropoff, onGo }: ActiveTask
 
   return (
     <View style={styles.card}>
-      <View style={styles.header}>          <View style={[styles.badge, isRide ? styles.badgeRide : styles.badgeDelivery]}>
+      <View style={styles.header}>
+          <View style={[styles.badge, isRide ? styles.badgeRide : styles.badgeDelivery]}>
           <Text style={[styles.badgeText, !isRide && styles.badgeTextDelivery]}>{isRide ? "Next Ride" : "Next Delivery"}</Text>
         </View>
         <Text style={styles.time}>{time}</Text>

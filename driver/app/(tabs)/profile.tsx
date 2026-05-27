@@ -55,7 +55,13 @@ export default function ProfileScreen() {
         </View>
 
         {/* Sign Out */}
-        <Pressable style={styles.signOutButton}>
+        <Pressable
+          style={styles.signOutButton}
+          onPress={() => {
+            useDriverStore.getState().logout();
+            router.replace("/auth");
+          }}
+        >
           <Text style={styles.signOutText}>Sign Out</Text>
         </Pressable>
 

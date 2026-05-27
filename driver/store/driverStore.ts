@@ -281,7 +281,7 @@ export const useDriverStore = create<DriverState>()(
         set({ driverLocation: { lat, lng } }),
   
       setAuthenticated: (name: string, phone: string, token: string) =>
-        set({ isAuthenticated: true, driverName: name, driverPhone: phone, token }),
+        set({ isAuthenticated: true, driverName: name, driverPhone: phone, token, hasCompletedOnboarding: false }),
   
       setOnboardingCompleted: () => set({ hasCompletedOnboarding: true }),
       resetOnboarding: () => set({ hasCompletedOnboarding: false }),
@@ -290,6 +290,7 @@ export const useDriverStore = create<DriverState>()(
         AsyncStorage.removeItem("driver-store"); // Clear persistence on logout
         set({
           isAuthenticated: false,
+          hasCompletedOnboarding: false,
           driverName: "",
           driverPhone: "",
           token: null,
@@ -321,6 +322,7 @@ export const useDriverStore = create<DriverState>()(
 
           set({
             isAuthenticated: true,
+            hasCompletedOnboarding: false,
             driverName: data.user.name,
             driverPhone: data.user.phone,
             token: data.token,
