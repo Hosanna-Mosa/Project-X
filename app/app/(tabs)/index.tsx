@@ -52,6 +52,7 @@ export default function HomeScreen() {
   const [activeService, setActiveService] = useState<'Food' | 'Meat'>('Food');
   const [isLocationSheetOpen, setIsLocationSheetOpen] = useState(false);
   const [selectedAddress, setSelectedAddress] = useState<any>(null);
+  const [foodFilter, setFoodFilter] = useState<'all' | 'veg' | 'nonveg'>('all');
 
   const getCoords = async () => {
     if (selectedAddress?.location?.coordinates) {
@@ -154,6 +155,31 @@ export default function HomeScreen() {
         </ScrollView>
       )}
 
+      {activeService === 'Food' && (
+        <View style={styles.vegFilterRow}>
+          <TouchableOpacity 
+            style={[styles.vegFilterChip, foodFilter === 'all' && styles.vegFilterChipActive]}
+            onPress={() => setFoodFilter('all')}
+          >
+            <Text style={[styles.vegFilterText, foodFilter === 'all' && styles.vegFilterTextActive]}>All</Text>
+          </TouchableOpacity>
+          <TouchableOpacity 
+            style={[styles.vegFilterChip, foodFilter === 'veg' && styles.vegFilterChipVegActive]}
+            onPress={() => setFoodFilter('veg')}
+          >
+            <View style={[styles.vegFilterDot, { backgroundColor: '#16A34A' }]} />
+            <Text style={[styles.vegFilterText, foodFilter === 'veg' && styles.vegFilterTextActive]}>Veg</Text>
+          </TouchableOpacity>
+          <TouchableOpacity 
+            style={[styles.vegFilterChip, foodFilter === 'nonveg' && styles.vegFilterChipNonVegActive]}
+            onPress={() => setFoodFilter('nonveg')}
+          >
+            <View style={[styles.vegFilterDot, { backgroundColor: '#E11D48' }]} />
+            <Text style={[styles.vegFilterText, foodFilter === 'nonveg' && styles.vegFilterTextActive]}>Non-Veg</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
       {activeService === 'Meat' && (
         <View style={styles.meatBannerRow}>
           <Text style={styles.meatBannerTitle}>🥩 Nearby Meat Centers</Text>
@@ -161,24 +187,7 @@ export default function HomeScreen() {
         </View>
       )}
 
-      <View style={styles.filterRow}>
-        <TouchableOpacity style={styles.filterChip}>
-          <Text style={styles.filterChipText}>Filter</Text>
-          <Ionicons name="options-outline" size={14} color={colors.text} />
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.filterChip}>
-          <Text style={styles.filterChipText}>Sort by</Text>
-          <Ionicons name="chevron-down" size={14} color={colors.text} />
-        </TouchableOpacity>
-        {activeService === 'Food' && (
-          <TouchableOpacity style={styles.filterChip}>
-            <Text style={styles.filterChipText}>99 Store</Text>
-          </TouchableOpacity>
-        )}
-        <TouchableOpacity style={styles.filterChip}>
-          <Text style={styles.filterChipText}>Offers</Text>
-        </TouchableOpacity>
-      </View>
+     
     </>
   );
 
@@ -202,10 +211,16 @@ export default function HomeScreen() {
     extrapolate: 'clamp',
   });
 
+  const headerTopRowTranslateY = scrollY.interpolate({
+    inputRange: [0, 100],
+    outputRange: [0, 60],
+    extrapolate: 'clamp',
+  });
+
   return (
     <View style={styles.root}>
       <Animated.FlatList
-        data={activeService === 'Meat' ? meatCenters : restaurants}
+        data={activeService === 'Meat' ? meatCenters : foodFilter === 'all' ? restaurants : restaurants.filter(r => foodFilter === 'veg' ? r.isPureVeg : !r.isPureVeg)}
         keyExtractor={(item) => item._id}
         renderItem={({ item }) => <RestaurantListItem {...item} isMeat={activeService === 'Meat'} />}
         ListHeaderComponent={renderHeader}
@@ -238,7 +253,7 @@ export default function HomeScreen() {
             transform: [{ translateY: headerTranslateY }] 
           }
         ]}>
-          <Animated.View style={[styles.headerTopRow, { opacity: topRowOpacity }]}>
+          <Animated.View style={[styles.headerTopRow, { opacity: topRowOpacity, transform: [{ translateY: headerTopRowTranslateY }] }]}>
             <View style={styles.locationInfoBox}>
               <View style={styles.deliveryTitleRow}>
                 <Ionicons name="location" size={14} color={colors.primary} style={{marginRight: 6}} />
@@ -503,6 +518,48 @@ const createStyles = (colors: typeof Colors.light) => StyleSheet.create({
     fontWeight: "600",
     color: colors.text,
     textAlign: "center",
+  },
+  vegFilterRow: {
+    flexDirection: "row",
+    paddingHorizontal: 16,
+    gap: 10,
+    marginBottom: 12,
+  },
+  vegFilterChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: colors.surface,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    borderWidth: 1.5,
+    borderColor: colors.border,
+    gap: 6,
+  },
+  vegFilterChipActive: {
+    borderColor: colors.text,
+    backgroundColor: colors.text,
+  },
+  vegFilterChipVegActive: {
+    borderColor: '#16A34A',
+    backgroundColor: '#16A34A',
+  },
+  vegFilterChipNonVegActive: {
+    borderColor: '#E11D48',
+    backgroundColor: '#E11D48',
+  },
+  vegFilterText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: colors.text,
+  },
+  vegFilterTextActive: {
+    color: '#FFFFFF',
+  },
+  vegFilterDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
   },
   filterRow: {
     flexDirection: "row",

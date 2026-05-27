@@ -2,6 +2,7 @@ import mongoose, { Schema, Document } from "mongoose";
 
 export interface IOTP extends Document {
   phone: string;
+  email?: string;
   code: string;
   expiresAt: Date;
   isUsed: boolean;
@@ -11,6 +12,7 @@ export interface IOTP extends Document {
 const OTPSchema: Schema = new Schema(
   {
     phone: { type: String, required: true },
+    email: { type: String },
     code: { type: String, required: true },
     expiresAt: { type: Date, required: true },
     isUsed: { type: Boolean, default: false },
@@ -19,6 +21,7 @@ const OTPSchema: Schema = new Schema(
 );
 
 OTPSchema.index({ phone: 1, code: 1 });
+OTPSchema.index({ email: 1, code: 1 });
 OTPSchema.index({ expiresAt: 1 }, { expireAfterSeconds: 0 }); // Auto-expire documents
 
 export default mongoose.model<IOTP>("OTP", OTPSchema);

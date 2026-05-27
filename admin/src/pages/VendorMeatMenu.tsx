@@ -3,6 +3,8 @@ import { VendorLayout } from "@/components/layout/VendorLayout";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { adminFetch } from "@/lib/api-client";
 import { Switch } from "@/components/ui/switch";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { Drumstick, AlertCircle, Plus, Trash2, Check, X, IndianRupee, Pencil } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
@@ -31,12 +33,15 @@ const blankItem = {
 export default function VendorMeatMenu() {
   const queryClient = useQueryClient();
   const vendorData = JSON.parse(localStorage.getItem("vendor_data") || "{}");
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editPrice, setEditPrice] = useState<string>("");
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [newItem, setNewItem] = useState(blankItem);
 
+  // Fetch ALL items (available + unavailable)
   const { data: menu, isLoading } = useQuery({
-    queryKey: ["meat-menu", vendorData._id],
-    queryFn: () => adminFetch<MeatItem[]>(`/meat/menu/${vendorData._id}?includeUnavailable=true`),
+    queryKey: ["meat-menu-vendor", vendorData._id],
+    queryFn: () => adminFetch<MeatItem[]>(`/meat/vendor-menu/${vendorData._id}`),
     enabled: !!vendorData._id,
   });
 
@@ -47,186 +52,175 @@ export default function VendorMeatMenu() {
         body: JSON.stringify({ isAvailable }),
       }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["meat-menu"] });
+      queryClient.invalidateQueries({ queryKey: ["meat-menu-vendor"] });
       toast.success("Availability updated");
     },
     onError: () => toast.error("Failed to update availability"),
   });
 
-  const addMeatMutation = useMutation({
-    mutationFn: (data: typeof blankItem) =>
-      adminFetch("/meat/items", {
-        method: "POST",
-        body: JSON.stringify({
-          ...data,
-          meatCenterId: vendorData._id,
-          price: Number(data.price),
-        }),
+  const priceMutation = useMutation({
+    mutationFn: ({ itemId, price }: { itemId: string; price: number }) =>
+      adminFetch(`/meat/items/${itemId}/price`, {
+        method: "PUT",
+        body: JSON.stringify({ price }),
       }),
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["meat-menu"] });
-      toast.success("Meat item added successfully");
-      setIsAddOpen(false);
-      setNewItem(blankItem);
+      queryClient.invalidateQueries({ queryKey: ["meat-menu-vendor"] });
+      toast.success("Price updated successfully");
+      setEditingId(null);
     },
-    onError: (error: any) => toast.error(error.message || "Failed to add meat item"),
+    onError: () => toast.error("Failed to update price"),
   });
 
-  const deleteMeatMutation = useMutation({
-    mutationFn: (itemId: string) => adminFetch(`/meat/items/${itemId}`, { method: "DELETE" }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["meat-menu"] });
-      toast.success("Meat item removed");
-    },
-    onError: () => toast.error("Failed to remove meat item"),
-  });
+  const startEditing = (item: MeatItem) => {
+    setEditingId(item._id);
+    setEditPrice(item.price.toString());
+  };
 
-  const handleSubmit = (event: React.FormEvent) => {
-    event.preventDefault();
-    if (!newItem.name.trim() || !newItem.weight.trim() || !newItem.price || !newItem.category.trim()) {
-      toast.error("Please enter name, weight, price and category");
+  const cancelEditing = () => {
+    setEditingId(null);
+    setEditPrice("");
+  };
+
+  const savePrice = (itemId: string) => {
+    const parsed = parseFloat(editPrice);
+    if (isNaN(parsed) || parsed <= 0) {
+      toast.error("Please enter a valid price");
       return;
     }
-    addMeatMutation.mutate(newItem);
+    priceMutation.mutate({ itemId, price: parsed });
   };
 
   return (
-    <VendorLayout searchPlaceholder="Search meat inventory...">
-      <div className="mx-auto max-w-5xl space-y-8">
-        <div className="flex items-center justify-between gap-4">
-          <div>
-            <h1 className="text-3xl font-bold text-foreground">Meat Inventory</h1>
-            <p className="text-muted-foreground">Add meat products and manage stock shown in the customer app.</p>
-          </div>
-
-          <Dialog open={isAddOpen} onOpenChange={setIsAddOpen}>
-            <DialogTrigger asChild>
-              <Button className="flex h-11 items-center gap-2 rounded-xl px-6">
-                <Plus className="h-4 w-4" />
-                Add Meat Item
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="rounded-3xl sm:max-w-[500px]">
-              <DialogHeader>
-                <DialogTitle className="text-xl">Add Meat Item</DialogTitle>
-              </DialogHeader>
-              <form onSubmit={handleSubmit} className="space-y-4 py-4">
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Product Name</label>
-                  <Input
-                    value={newItem.name}
-                    onChange={(event) => setNewItem({ ...newItem, name: event.target.value })}
-                    placeholder="e.g. Chicken Curry Cut"
-                  />
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">Weight</label>
-                    <Input
-                      value={newItem.weight}
-                      onChange={(event) => setNewItem({ ...newItem, weight: event.target.value })}
-                      placeholder="e.g. 500g"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">Price</label>
-                    <Input
-                      type="number"
-                      value={newItem.price}
-                      onChange={(event) => setNewItem({ ...newItem, price: event.target.value })}
-                      placeholder="180"
-                    />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">Category</label>
-                    <Input
-                      value={newItem.category}
-                      onChange={(event) => setNewItem({ ...newItem, category: event.target.value })}
-                      placeholder="Chicken"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <label className="text-sm font-medium">Image URL</label>
-                    <Input
-                      value={newItem.image}
-                      onChange={(event) => setNewItem({ ...newItem, image: event.target.value })}
-                      placeholder="Optional"
-                    />
-                  </div>
-                </div>
-
-                <Button type="submit" className="mt-4 h-11 w-full rounded-xl" disabled={addMeatMutation.isPending}>
-                  {addMeatMutation.isPending ? "Adding..." : "Add Item"}
-                </Button>
-              </form>
-            </DialogContent>
-          </Dialog>
+    <VendorLayout>
+      <div className="space-y-8 max-w-5xl mx-auto">
+        <div>
+          <h1 className="text-3xl font-bold text-foreground">Meat Inventory</h1>
+          <p className="text-muted-foreground">Manage stock availability and update your daily prices.</p>
         </div>
 
         <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
           {isLoading ? (
-            <p>Loading your items...</p>
-          ) : menu?.length === 0 ? (
-            <div className="col-span-full rounded-3xl border-2 border-dashed border-border bg-muted/20 py-20 text-center">
-              <Drumstick className="mx-auto mb-4 h-12 w-12 text-muted-foreground" />
-              <h3 className="text-lg font-bold">Your meat inventory is empty</h3>
-              <p className="mt-1 text-muted-foreground">Add products to show them in the app's Meat section.</p>
-            </div>
+            <p className="text-muted-foreground col-span-full text-center py-12">Loading your items...</p>
+          ) : !menu || menu.length === 0 ? (
+            <p className="text-muted-foreground col-span-full text-center py-12">No meat items found for your center.</p>
           ) : (
-            menu?.map((item) => (
+            menu.map((item) => (
               <div
                 key={item._id}
-                className="flex items-center justify-between rounded-3xl border border-border bg-card p-6 shadow-sm"
+                className={`bg-card border ${
+                  item.isAvailable ? "border-border" : "border-dashed border-muted-foreground/30"
+                } p-6 rounded-3xl shadow-sm transition-all`}
               >
-                <div className="flex items-center gap-4">
-                  <div className={`flex h-14 w-14 items-center justify-center rounded-2xl ${item.isAvailable ? "bg-primary/10" : "bg-muted"}`}>
-                    <Drumstick className={`h-7 w-7 ${item.isAvailable ? "text-primary" : "text-muted-foreground"}`} />
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-4">
+                    <div
+                      className={`h-14 w-14 rounded-2xl flex items-center justify-center ${
+                        item.isAvailable ? "bg-primary/10" : "bg-muted"
+                      }`}
+                    >
+                      <Drumstick
+                        className={`h-7 w-7 ${item.isAvailable ? "text-primary" : "text-muted-foreground"}`}
+                      />
+                    </div>
+                    <div>
+                      <h3 className="font-bold text-lg">{item.name}</h3>
+                      <p className="text-sm text-muted-foreground">{item.weight}</p>
+                      <p className="text-[10px] uppercase text-muted-foreground/60 font-semibold mt-0.5">
+                        {item.category}
+                      </p>
+                    </div>
                   </div>
-                  <div>
-                    <h3 className="text-lg font-bold">{item.name}</h3>
-                    <p className="text-sm text-muted-foreground">Weight: {item.weight}</p>
-                    <p className="text-xs text-muted-foreground">Category: {item.category}</p>
-                    <p className="mt-1 font-bold text-primary">Rs.{item.price}</p>
+
+                  <div className="flex flex-col items-end gap-2">
+                    <span
+                      className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase ${
+                        item.isAvailable
+                          ? "bg-success/10 text-success"
+                          : "bg-destructive/10 text-destructive"
+                      }`}
+                    >
+                      {item.isAvailable ? "In Stock" : "Out of Stock"}
+                    </span>
+                    <Switch
+                      checked={item.isAvailable}
+                      onCheckedChange={(val) =>
+                        toggleMutation.mutate({ itemId: item._id, isAvailable: val })
+                      }
+                      disabled={toggleMutation.isPending}
+                    />
                   </div>
                 </div>
 
-                <div className="flex flex-col items-end gap-2">
-                  <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ${
-                    item.isAvailable ? "bg-success/10 text-success" : "bg-destructive/10 text-destructive"
-                  }`}>
-                    {item.isAvailable ? "In Stock" : "Out of Stock"}
-                  </span>
-                  <Switch
-                    checked={item.isAvailable}
-                    onCheckedChange={(value) => toggleMutation.mutate({ itemId: item._id, isAvailable: value })}
-                    disabled={toggleMutation.isPending}
-                  />
-                  {!item.isGlobalItem && (
-                    <button
-                      type="button"
-                      onClick={() => deleteMeatMutation.mutate(item._id)}
-                      className="mt-2 inline-flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-semibold text-destructive hover:bg-destructive/10"
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                      Remove
-                    </button>
-                  )}
+                {/* Price Section */}
+                <div className="mt-5 pt-4 border-t border-border">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                      Selling Price
+                    </span>
+
+                    {editingId === item._id ? (
+                      <div className="flex items-center gap-2">
+                        <div className="relative">
+                          <IndianRupee className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                          <Input
+                            type="number"
+                            step="1"
+                            min="1"
+                            value={editPrice}
+                            onChange={(e) => setEditPrice(e.target.value)}
+                            className="pl-9 h-9 w-28 text-sm font-semibold"
+                            autoFocus
+                          />
+                        </div>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="h-9 w-9 text-success hover:text-success hover:bg-success/10"
+                          onClick={() => savePrice(item._id)}
+                          disabled={priceMutation.isPending}
+                        >
+                          <Check className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="h-9 w-9 text-muted-foreground hover:text-foreground"
+                          onClick={cancelEditing}
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-3">
+                        <span className="text-xl font-bold text-foreground">₹{item.price}</span>
+                        <button
+                          onClick={() => startEditing(item)}
+                          className="p-1.5 rounded-lg hover:bg-muted transition-colors"
+                        >
+                          <Pencil className="h-4 w-4 text-muted-foreground hover:text-primary transition-colors" />
+                        </button>
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
             ))
           )}
         </div>
 
-        <div className="flex items-start gap-4 rounded-2xl bg-muted/30 p-6">
-          <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-muted-foreground" />
-          <p className="text-sm text-muted-foreground">
-            <strong>Note:</strong> Items added here are saved as meat inventory and are fetched by the app's Meat section.
-            Use the <strong>In Stock</strong> switch to hide sold-out products from customers.
-          </p>
+        <div className="bg-muted/30 p-6 rounded-2xl flex items-start gap-4">
+          <AlertCircle className="h-5 w-5 text-muted-foreground shrink-0 mt-0.5" />
+          <div className="text-sm text-muted-foreground space-y-1">
+            <p>
+              <strong>Your daily controls:</strong> You can update the <strong>price</strong> and toggle
+              <strong> availability</strong> for each item below.
+            </p>
+            <p>
+              Item names, weights, and categories are managed by the Admin and cannot be changed.
+              New items are added automatically by the Admin through global pricing updates.
+            </p>
+          </div>
         </div>
       </div>
     </VendorLayout>

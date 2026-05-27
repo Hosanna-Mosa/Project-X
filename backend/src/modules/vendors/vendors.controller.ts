@@ -1,6 +1,89 @@
 import { Request, Response } from "express";
 import bcrypt from "bcryptjs";
 import Vendor from "../../database/models/Vendor";
+import OTP from "../../database/models/OTP";
+import { sendEmail, generateOTP, getOTPEmailHtml } from "../../services/email.service";
+import type { AuthRequest } from "../../middleware/auth.middleware";
+
+export const forgotVendorPassword = async (req: Request, res: Response) => {
+  try {
+    const { email } = req.body;
+    if (!email) {
+      return res.status(400).json({ message: "Email is required" });
+    }
+
+    const vendor = await Vendor.findOne({ email });
+    if (!vendor) {
+      return res.status(404).json({ message: "No account found with this email" });
+    }
+
+    // Generate OTP and save
+    const otp = generateOTP();
+    await OTP.create({
+      phone: vendor.phone,
+      email,
+      code: otp,
+      expiresAt: new Date(Date.now() + 10 * 60 * 1000), // 10 minutes
+    });
+
+    // Send email
+    await sendEmail({
+      to: email,
+      subject: "Password Reset OTP — Precision Nav",
+      html: getOTPEmailHtml(otp),
+      text: `Your OTP for password reset is: ${otp}. It expires in 10 minutes.`,
+    });
+
+    res.json({ message: "OTP sent to your email" });
+  } catch (error) {
+    console.error("Error in forgot password:", error);
+    res.status(500).json({ message: "Internal server error" });
+  }
+};
+
+export const resetVendorPassword = async (req: Request, res: Response) => {
+  try {
+    const { email, otp, newPassword } = req.body;
+
+    if (!email || !otp || !newPassword) {
+      return res.status(400).json({ message: "Email, OTP, and new password are required" });
+    }
+
+    if (newPassword.length < 6) {
+      return res.status(400).json({ message: "Password must be at least 6 characters" });
+    }
+
+    // Verify OTP
+    const otpRecord = await OTP.findOne({
+      email,
+      code: otp,
+      isUsed: false,
+      expiresAt: { $gt: new Date() },
+    });
+
+    if (!otpRecord) {
+      return res.status(400).json({ message: "Invalid or expired OTP" });
+    }
+
+    // Mark OTP as used
+    otpRecord.isUsed = true;
+    await otpRecord.save();
+
+    // Update password
+    const vendor = await Vendor.findOne({ email });
+    if (!vendor) {
+      return res.status(404).json({ message: "Account not found" });
+    }
+
+    vendor.password = newPassword;
+    await vendor.save();
+
+    res.json({ message: "Password reset successfully. You can now sign in with your new password." });
+  } catch (error) {
+    console.error("Error resetting password:", error);
+    res.status(500).json({ message: "Internal server error" });
+  }
+};
 
 export const getNearbyVendors = async (req: Request, res: Response) => {
   try {
@@ -456,6 +539,38 @@ export const searchGooglePlaces = async (req: Request, res: Response) => {
     res.json(results);
   } catch (error) {
     console.error("Error searching Google Places:", error);
+    res.status(500).json({ message: "Internal server error" });
+  }
+};
+
+export const changeVendorPassword = async (req: AuthRequest, res: Response) => {
+  try {
+    const { currentPassword, newPassword } = req.body;
+
+    if (!currentPassword || !newPassword) {
+      return res.status(400).json({ message: "Current password and new password are required" });
+    }
+
+    if (newPassword.length < 6) {
+      return res.status(400).json({ message: "New password must be at least 6 characters" });
+    }
+
+    const vendor = await Vendor.findById(req.user?.userId);
+    if (!vendor) {
+      return res.status(404).json({ message: "Vendor not found" });
+    }
+
+    const isMatch = await vendor.matchPassword(currentPassword);
+    if (!isMatch) {
+      return res.status(401).json({ message: "Current password is incorrect" });
+    }
+
+    vendor.password = newPassword;
+    await vendor.save();
+
+    res.json({ message: "Password changed successfully" });
+  } catch (error) {
+    console.error("Error changing password:", error);
     res.status(500).json({ message: "Internal server error" });
   }
 };

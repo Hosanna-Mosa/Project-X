@@ -1,8 +1,93 @@
 import { Request, Response } from "express";
 import MeatCenter from "../../database/models/MeatCenter";
+import MeatItem from "../../database/models/MeatItem";
+import MeatGlobalPrice from "../../database/models/MeatGlobalPrice";
+import OTP from "../../database/models/OTP";
 import Vendor from "../../database/models/Vendor";
 import FoodItem from "../../database/models/FoodItem";
 import generateToken from "../../utils/generateToken";
+import { sendEmail, generateOTP, getOTPEmailHtml } from "../../services/email.service";
+import type { AuthRequest } from "../../middleware/auth.middleware";
+
+export const forgotMeatVendorPassword = async (req: Request, res: Response) => {
+  try {
+    const { email } = req.body;
+    if (!email) {
+      return res.status(400).json({ message: "Email is required" });
+    }
+
+    const center = await MeatCenter.findOne({ email });
+    if (!center) {
+      return res.status(404).json({ message: "No account found with this email" });
+    }
+
+    // Generate OTP and save
+    const otp = generateOTP();
+    await OTP.create({
+      phone: center.phone,
+      email,
+      code: otp,
+      expiresAt: new Date(Date.now() + 10 * 60 * 1000), // 10 minutes
+    });
+
+    // Send email
+    await sendEmail({
+      to: email,
+      subject: "Password Reset OTP — Precision Nav",
+      html: getOTPEmailHtml(otp),
+      text: `Your OTP for password reset is: ${otp}. It expires in 10 minutes.`,
+    });
+
+    res.json({ message: "OTP sent to your email" });
+  } catch (error) {
+    console.error("Error in forgot password:", error);
+    res.status(500).json({ message: "Internal server error" });
+  }
+};
+
+export const resetMeatVendorPassword = async (req: Request, res: Response) => {
+  try {
+    const { email, otp, newPassword } = req.body;
+
+    if (!email || !otp || !newPassword) {
+      return res.status(400).json({ message: "Email, OTP, and new password are required" });
+    }
+
+    if (newPassword.length < 6) {
+      return res.status(400).json({ message: "Password must be at least 6 characters" });
+    }
+
+    // Verify OTP
+    const otpRecord = await OTP.findOne({
+      email,
+      code: otp,
+      isUsed: false,
+      expiresAt: { $gt: new Date() },
+    });
+
+    if (!otpRecord) {
+      return res.status(400).json({ message: "Invalid or expired OTP" });
+    }
+
+    // Mark OTP as used
+    otpRecord.isUsed = true;
+    await otpRecord.save();
+
+    // Update password
+    const center = await MeatCenter.findOne({ email });
+    if (!center) {
+      return res.status(404).json({ message: "Account not found" });
+    }
+
+    center.password = newPassword;
+    await center.save();
+
+    res.json({ message: "Password reset successfully. You can now sign in with your new password." });
+  } catch (error) {
+    console.error("Error resetting password:", error);
+    res.status(500).json({ message: "Internal server error" });
+  }
+};
 
 const DEFAULT_MEAT_IMAGE = "https://images.unsplash.com/photo-1587593810167-a84920ea0781?w=800";
 
@@ -191,9 +276,6 @@ export const getNearbyMeatCenters = async (req: Request, res: Response) => {
   }
 };
 
-import MeatItem from "../../database/models/MeatItem";
-import MeatGlobalPrice from "../../database/models/MeatGlobalPrice";
-
 const DEFAULT_MEAT_ITEMS = [
   { name: "Chicken 250g", weight: "250g", price: 60, category: "Chicken" },
   { name: "Chicken 500g", weight: "500g", price: 120, category: "Chicken" },
@@ -356,6 +438,7 @@ const buildOnboardedMeatItems = (meatVendor: any) => {
 };
 
 
+// Customer-facing — only returns available items
 export const getMeatCenterMenu = async (req: Request, res: Response) => {
   try {
     const { centerId } = req.params;
@@ -389,11 +472,99 @@ export const getMeatCenterMenu = async (req: Request, res: Response) => {
   }
 };
 
-export const updateMeatItemAvailability = async (req: Request, res: Response) => {
+// Vendor-facing — returns ALL items regardless of availability
+export const getVendorMeatMenu = async (req: AuthRequest, res: Response) => {
+  try {
+    const { centerId } = req.params;
+    
+    // Verify vendor owns this center
+    if (req.user?.userId !== centerId) {
+      return res.status(403).json({ message: "Access denied: you do not own this center" });
+    }
+    
+    const items = await MeatItem.find({ meatCenterId: centerId }).sort({ category: 1, name: 1 });
+    res.json(items);
+  } catch (error) {
+    res.status(500).json({ message: "Internal server error" });
+  }
+};
+
+export const updateMeatItemAvailability = async (req: AuthRequest, res: Response) => {
   try {
     const { itemId } = req.params;
     const { isAvailable } = req.body;
-    const item = await MeatItem.findByIdAndUpdate(itemId, { isAvailable }, { new: true });
+    
+    const item = await MeatItem.findById(itemId);
+    if (!item) {
+      return res.status(404).json({ message: "Item not found" });
+    }
+    
+    // Verify vendor owns the center this item belongs to
+    if (req.user?.userId !== item.meatCenterId.toString()) {
+      return res.status(403).json({ message: "Access denied: you do not own this item" });
+    }
+    
+    item.isAvailable = isAvailable;
+    await item.save();
+    res.json(item);
+  } catch (error) {
+    res.status(500).json({ message: "Internal server error" });
+  }
+};
+
+export const changeMeatVendorPassword = async (req: AuthRequest, res: Response) => {
+  try {
+    const { currentPassword, newPassword } = req.body;
+
+    if (!currentPassword || !newPassword) {
+      return res.status(400).json({ message: "Current password and new password are required" });
+    }
+
+    if (newPassword.length < 6) {
+      return res.status(400).json({ message: "New password must be at least 6 characters" });
+    }
+
+    const center = await MeatCenter.findById(req.user?.userId);
+    if (!center) {
+      return res.status(404).json({ message: "Meat center not found" });
+    }
+
+    const isMatch = await center.matchPassword(currentPassword);
+    if (!isMatch) {
+      return res.status(401).json({ message: "Current password is incorrect" });
+    }
+
+    center.password = newPassword;
+    await center.save();
+
+    res.json({ message: "Password changed successfully" });
+  } catch (error) {
+    console.error("Error changing password:", error);
+    res.status(500).json({ message: "Internal server error" });
+  }
+};
+
+export const updateMeatItemPrice = async (req: AuthRequest, res: Response) => {
+  try {
+    const { itemId } = req.params;
+    const { price } = req.body;
+
+    if (price == null || price < 0) {
+      return res.status(400).json({ message: "Valid price is required" });
+    }
+
+    const item = await MeatItem.findById(itemId);
+    if (!item) {
+      return res.status(404).json({ message: "Item not found" });
+    }
+
+    // Verify vendor owns the center this item belongs to
+    if (req.user?.userId !== item.meatCenterId.toString()) {
+      return res.status(403).json({ message: "Access denied: you do not own this item" });
+    }
+
+    item.price = price;
+    await item.save();
     res.json(item);
   } catch (error) {
     res.status(500).json({ message: "Internal server error" });
