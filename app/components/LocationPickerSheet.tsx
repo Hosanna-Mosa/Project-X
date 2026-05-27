@@ -141,7 +141,14 @@ export function LocationPickerSheet({ isOpen, onClose, onSelectAddress }: Props)
     <TouchableOpacity 
       style={styles.addressCard}
       onPress={() => {
-        onSelectAddress?.(item);
+        const addressWithCoords = { ...item };
+        if (!addressWithCoords.coordinates && item.location?.coordinates) {
+          addressWithCoords.coordinates = {
+            lng: item.location.coordinates[0],
+            lat: item.location.coordinates[1],
+          };
+        }
+        onSelectAddress?.(addressWithCoords);
         onClose();
       }}
     >

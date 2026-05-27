@@ -11,10 +11,17 @@ async function listUsers() {
     await mongoose.connect(MONGO_URI);
     console.log("Connected to MongoDB Database:", mongoose.connection.name);
 
-    const users = await User.find({}, "name phone role password");
+    const users = await User.find({}, "name phone role addresses");
     console.log("Total Users found:", users.length);
     users.forEach(u => {
-      console.log(`- Name: ${u.name}, Phone: ${u.phone}, Role: ${u.role}, Password: ${u.password}`);
+      console.log(`\n- Name: ${u.name}, Phone: ${u.phone}`);
+      if (u.addresses && u.addresses.length > 0) {
+        u.addresses.forEach((addr: any) => {
+          console.log(`  * Label: ${addr.label}, Address: ${addr.addressLine}, Coords: ${JSON.stringify(addr.location?.coordinates)}`);
+        });
+      } else {
+        console.log("  * No addresses saved.");
+      }
     });
     
     process.exit(0);

@@ -331,7 +331,7 @@ export default function RideConfirmationScreen() {
         Alert.alert("Permission Denied", "Location permission is required.");
         return;
       }
-      const loc = await Location.getCurrentPositionAsync({});
+      const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
       const coords = {
         latitude: loc.coords.latitude,
         longitude: loc.coords.longitude,

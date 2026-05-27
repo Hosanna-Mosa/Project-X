@@ -60,7 +60,7 @@ export default function HomeScreen() {
     }
     let { status } = await Location.requestForegroundPermissionsAsync();
     if (status !== 'granted') return { lat: 17.4447, lng: 78.3498 };
-    const loc = await Location.getCurrentPositionAsync({});
+    const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
     return { lat: loc.coords.latitude, lng: loc.coords.longitude };
   };
 

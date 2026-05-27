@@ -13,6 +13,7 @@ interface Props {
   stops?: DeliveryStop[];
   polyline?: string;
   driverLocation?: { lat: number; lng: number } | null;
+  userLocation?: { lat: number; lng: number } | null;
   onLocationUpdate?: (coords: { lat: number, lng: number }) => void;
   markers?: any[];
   initialRegion?: Region;
@@ -105,6 +106,7 @@ export const MapBackground = forwardRef<MapBackgroundRef, Props>(({
   initialRegion,
   polyline, 
   driverLocation,
+  userLocation,
   onLocationUpdate,
   onMarkerPress 
 }, ref) => {
@@ -169,6 +171,22 @@ export const MapBackground = forwardRef<MapBackgroundRef, Props>(({
     }
   }));
 
+  // Auto-center map on userLocation and driverLocation dynamically
+  useEffect(() => {
+    if (internalMapRef.current && userLocation && driverLocation) {
+      internalMapRef.current.fitToCoordinates([
+        { latitude: Number(userLocation.lat), longitude: Number(userLocation.lng) },
+        { latitude: Number(driverLocation.lat), longitude: Number(driverLocation.lng) }
+      ], {
+        edgePadding: { top: 120, right: 80, bottom: 430, left: 80 }, // keep bottom high to clear the success BottomSheet
+        animated: true,
+      });
+    } else if (internalMapRef.current && userLocation) {
+      const regionForUser = getRegionForLocation(userLocation.lat, userLocation.lng, 0.015, 0.015);
+      internalMapRef.current.animateToRegion(regionForUser, 1000);
+    }
+  }, [userLocation, driverLocation]);
+
   useEffect(() => {
     if (initialRegion) {
       setRegion(initialRegion);
@@ -188,7 +206,7 @@ export const MapBackground = forwardRef<MapBackgroundRef, Props>(({
           return;
         }
 
-        let location = await Location.getCurrentPositionAsync({});
+        let location = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
         locationRef.current = { lat: location.coords.latitude, lng: location.coords.longitude };
         setRegion(getRegionForLocation(location.coords.latitude, location.coords.longitude));
         if (onLocationUpdate) {
@@ -222,6 +240,12 @@ export const MapBackground = forwardRef<MapBackgroundRef, Props>(({
           showsCompass={false}
           showsMyLocationButton={false}
           pointerEvents="auto"
+          onMapReady={() => {
+            if (userLocation && internalMapRef.current) {
+              const regionForUser = getRegionForLocation(userLocation.lat, userLocation.lng, 0.015, 0.015);
+              internalMapRef.current.animateToRegion(regionForUser, 500);
+            }
+          }}
         >
           {markers.map((item) => (
             <Marker
@@ -244,19 +268,40 @@ export const MapBackground = forwardRef<MapBackgroundRef, Props>(({
             )
           ))}
           
-          {driverLocation && (
+          {userLocation && (
             <Marker
-              coordinate={{ latitude: driverLocation.lat, longitude: driverLocation.lng }}
+              key="user-location-pin"
+              coordinate={{ latitude: Number(userLocation.lat), longitude: Number(userLocation.lng) }}
               anchor={{ x: 0.5, y: 0.5 }}
-              flat={true}
             >
-              <View style={styles.driverMarker}>
-                <View style={styles.driverBadge}>
-                  <Feather name="truck" size={12} color="#fff" />
-                </View>
-                <View style={styles.driverPulse} />
+              <View style={styles.userMarkerWrap}>
+                <View style={styles.userMarkerBadge} />
               </View>
             </Marker>
+          )}
+
+          {driverLocation && (
+            Platform.OS === 'web' ? (
+              <Marker
+                coordinate={{ latitude: driverLocation.lat, longitude: driverLocation.lng }}
+                title="Sarah Jenkins (Helper)"
+                pinColor="#000000"
+              />
+            ) : (
+              <Marker
+                coordinate={{ latitude: driverLocation.lat, longitude: driverLocation.lng }}
+                anchor={{ x: 0.5, y: 0.5 }}
+                flat={true}
+                tracksViewChanges={true}
+              >
+                <View style={styles.driverMarker}>
+                  <View style={styles.driverBadge}>
+                    <Feather name="user" size={14} color="#fff" />
+                  </View>
+                  <View style={styles.driverPulse} />
+                </View>
+              </Marker>
+            )
           )}
 
           {polyline && (
@@ -396,5 +441,24 @@ const styles = StyleSheet.create({
     height: 8,
     backgroundColor: '#EF4444',
     marginTop: -2,
+  },
+  userMarkerWrap: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: 40,
+    height: 40,
+  },
+  userMarkerBadge: {
+    backgroundColor: '#10B981',
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    borderWidth: 2,
+    borderColor: '#fff',
+    elevation: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 3,
   }
 });

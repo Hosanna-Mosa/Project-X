@@ -8,9 +8,14 @@ import {
   View,
   ActivityIndicator,
   Image,
+  ScrollView,
+  Animated,
+  Easing,
+  Alert,
+  Dimensions,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Feather, FontAwesome5 } from "@expo/vector-icons";
+import { Feather, FontAwesome5, Ionicons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
 import * as Location from "expo-location";
 import { useThemeStore } from "@/contexts/themeStore";
@@ -18,6 +23,9 @@ import Colors from "@/constants/colors";
 import { MapBackground, MapBackgroundRef } from "@/components/MapBackground";
 import { BottomSheet } from "@/components/BottomSheet";
 import { customFetch } from "@/utils/api/custom-fetch";
+import { LocationPickerSheet } from "@/components/LocationPickerSheet";
+
+const { height: SCREEN_HEIGHT } = Dimensions.get("window");
 
 export default function ServiceSelectionScreen() {
   const insets = useSafeAreaInsets();
@@ -34,6 +42,193 @@ export default function ServiceSelectionScreen() {
   const colors = Colors[theme];
   const styles = React.useMemo(() => createStyles(colors), [theme]);
 
+  // "Hours book" specific state
+  const [selectedAddress, setSelectedAddress] = useState<any | null>(null);
+  const [isLocationSheetOpen, setIsLocationSheetOpen] = useState(false);
+  const [durationOption, setDurationOption] = useState<string>("1");
+  const [customDuration, setCustomDuration] = useState<string>("");
+  const [radiusOption, setRadiusOption] = useState<string>("2");
+  const [customRadius, setCustomRadius] = useState<string>("");
+  const [bookingState, setBookingState] = useState<"idle" | "booking" | "success">("idle");
+  const [searchingStatus, setSearchingStatus] = useState<string>("Initializing booking...");
+  const [driverLocation, setDriverLocation] = useState<{ lat: number; lng: number } | null>(null);
+  const [showFareBreakdown, setShowFareBreakdown] = useState(false);
+  
+  // Staggered animated values for radar pulses
+  const pulse1 = useRef(new Animated.Value(0)).current;
+  const pulse2 = useRef(new Animated.Value(0)).current;
+  const pulse3 = useRef(new Animated.Value(0)).current;
+
+  // Fetch current GPS location on mount if label is "Task"
+  useEffect(() => {
+    if (label === "Task") {
+      (async () => {
+        try {
+          let { status } = await Location.requestForegroundPermissionsAsync();
+          if (status !== 'granted') return;
+          const location = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
+          const currentCoords = { lat: location.coords.latitude, lng: location.coords.longitude };
+          setCoords(currentCoords);
+          
+          const [place] = await Location.reverseGeocodeAsync({
+            latitude: currentCoords.lat,
+            longitude: currentCoords.lng,
+          });
+          if (place) {
+            const addressStr = `${place.name || place.streetNumber || ""} ${place.street || ""}, ${place.city || ""}, ${place.region || ""} ${place.postalCode || ""}`.trim();
+            setSelectedAddress({
+              addressLine: addressStr || "Current Location",
+              coordinates: currentCoords,
+              label: "Current Location",
+            });
+          }
+        } catch (error) {
+          console.error("Error fetching current location in Task:", error);
+        }
+      })();
+    }
+  }, [label]);
+
+  // Handle booking status updates and pulse animations
+  useEffect(() => {
+    let statusTimer: any;
+    if (bookingState === "booking") {
+      const statuses = [
+        "Analyzing helper availability...",
+        "Checking distance radius...",
+        "Locating closest captains...",
+        "Almost matched, finalizing booking...",
+      ];
+      let i = 0;
+      setSearchingStatus(statuses[0]);
+      statusTimer = setInterval(() => {
+        i++;
+        if (i < statuses.length) {
+          setSearchingStatus(statuses[i]);
+        }
+      }, 1000);
+      
+      // Pan map to selected address coordinates immediately so it's centered as booking begins
+      const selectedCoords = getSelectedCoords();
+      if (selectedCoords) {
+        setTimeout(() => {
+          mapRef.current?.panTo(selectedCoords.lat, selectedCoords.lng, 0.015);
+        }, 50);
+      }
+
+      const successTimer = setTimeout(() => {
+        setBookingState("success");
+        clearInterval(statusTimer);
+
+        const selectedCoords = getSelectedCoords();
+        if (selectedCoords) {
+          const mockDriver = {
+            lat: selectedCoords.lat + 0.003,
+            lng: selectedCoords.lng - 0.002,
+          };
+          setDriverLocation(mockDriver);
+          // Show location with a tiny timeout to ensure marker is registered/mounted first
+          setTimeout(() => {
+            mapRef.current?.panTo(mockDriver.lat, mockDriver.lng, 0.015);
+          }, 100);
+        }
+      }, 4000);
+
+      pulse1.setValue(0);
+      pulse2.setValue(0);
+      pulse3.setValue(0);
+
+      Animated.loop(
+        Animated.parallel([
+          Animated.timing(pulse1, {
+            toValue: 1,
+            duration: 2000,
+            easing: Easing.out(Easing.ease),
+            useNativeDriver: true,
+          }),
+          Animated.sequence([
+            Animated.delay(400),
+            Animated.timing(pulse2, {
+              toValue: 1,
+              duration: 1600,
+              easing: Easing.out(Easing.ease),
+              useNativeDriver: true,
+            })
+          ]),
+          Animated.sequence([
+            Animated.delay(800),
+            Animated.timing(pulse3, {
+              toValue: 1,
+              duration: 1200,
+              easing: Easing.out(Easing.ease),
+              useNativeDriver: true,
+            })
+          ])
+        ])
+      ).start();
+
+      return () => {
+        clearInterval(statusTimer);
+        clearTimeout(successTimer);
+      };
+    }
+  }, [bookingState, selectedAddress]);
+
+  const [secondsRemaining, setSecondsRemaining] = useState<number>(0);
+
+  // Initialize countdown when success occurs
+  useEffect(() => {
+    if (bookingState === "success") {
+      const hours = durationOption === "custom" 
+        ? parseFloat(customDuration) || 1 
+        : parseFloat(durationOption) || 1;
+      setSecondsRemaining(Math.round(hours * 3600));
+    }
+  }, [bookingState, durationOption, customDuration]);
+
+  // Handle countdown interval
+  useEffect(() => {
+    let interval: any = null;
+    if (bookingState === "success" && secondsRemaining > 0) {
+      interval = setInterval(() => {
+        setSecondsRemaining((prev) => Math.max(0, prev - 1));
+      }, 1000);
+    }
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [bookingState, secondsRemaining]);
+
+  const formatCountdown = (secs: number) => {
+    const h = Math.floor(secs / 3600);
+    const m = Math.floor((secs % 3600) / 60);
+    const s = secs % 60;
+    
+    const hStr = h.toString().padStart(2, "0");
+    const mStr = m.toString().padStart(2, "0");
+    const sStr = s.toString().padStart(2, "0");
+    
+    return `${hStr}:${mStr}:${sStr}`;
+  };
+
+  const handleBook = () => {
+    if (!selectedAddress) {
+      Alert.alert("Location required", "Please select a location address for booking.");
+      return;
+    }
+    setBookingState("booking");
+  };
+
+  const handleCancelBooking = () => {
+    setBookingState("idle");
+    setDriverLocation(null);
+  };
+
+  const handleReset = () => {
+    setBookingState("idle");
+    setDriverLocation(null);
+  };
+
   useEffect(() => {
     (async () => {
       try {
@@ -41,7 +236,7 @@ export default function ServiceSelectionScreen() {
         if (status !== 'granted') return;
 
         setLoading(true);
-        const location = await Location.getCurrentPositionAsync({});
+        const location = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
         const currentCoords = { lat: location.coords.latitude, lng: location.coords.longitude };
         setCoords(currentCoords);
 
@@ -72,10 +267,493 @@ export default function ServiceSelectionScreen() {
     }
   };
 
+  const getSelectedCoords = () => {
+    if (!selectedAddress) return null;
+    if (selectedAddress.coordinates) return selectedAddress.coordinates;
+    if (selectedAddress.location?.coordinates) {
+      return {
+        lng: selectedAddress.location.coordinates[0],
+        lat: selectedAddress.location.coordinates[1],
+      };
+    }
+    return null;
+  };
+
+  const calculateFareDetails = () => {
+    const hours = durationOption === "custom" 
+      ? parseFloat(customDuration) || 1 
+      : parseFloat(durationOption) || 1;
+      
+    const radius = radiusOption === "custom" 
+      ? parseFloat(customRadius) || 2 
+      : parseFloat(radiusOption) || 2;
+
+    const baseFare = 99;
+    const hourlyRate = 120;
+    const durationCharge = Math.round(hours * hourlyRate);
+    
+    let radiusCharge = 0;
+    if (radius <= 2) {
+      radiusCharge = 0;
+    } else if (radius <= 5) {
+      radiusCharge = 29;
+    } else if (radius <= 10) {
+      radiusCharge = 59;
+    } else if (radius <= 15) {
+      radiusCharge = 89;
+    } else {
+      radiusCharge = Math.round(radius * 8);
+    }
+    
+    const platformFee = 15;
+    const subtotal = baseFare + durationCharge + radiusCharge + platformFee;
+    const taxes = Math.round(subtotal * 0.05); // 5% GST
+    const total = subtotal + taxes;
+
+    return {
+      baseFare,
+      durationCharge,
+      hours,
+      radius,
+      radiusCharge,
+      platformFee,
+      taxes,
+      total,
+    };
+  };
+
   const handleMarkerPress = (place: any) => {
     setSelectedPlace(place);
     mapRef.current?.panTo(place.lat, place.lng, 0.005);
   };
+
+  if (label === "Task") {
+    const finalDuration = durationOption === "custom" ? customDuration || "Custom" : durationOption;
+    const finalRadius = radiusOption === "custom" ? customRadius || "Custom" : radiusOption;
+    const selectedCoords = getSelectedCoords();
+    const fareDetails = calculateFareDetails();
+
+    return (
+      <View style={styles.root}>
+        {/* Background Map - visible in booking and success states */}
+        {bookingState !== "idle" && (
+          <View style={StyleSheet.absoluteFill}>
+            <MapBackground 
+              ref={mapRef}
+              style={StyleSheet.absoluteFill} 
+              driverLocation={driverLocation}
+              userLocation={selectedCoords}
+              initialRegion={selectedCoords ? {
+                latitude: selectedCoords.lat - 0.003, // offset slightly for bottom sheet layout
+                longitude: selectedCoords.lng,
+                latitudeDelta: 0.015,
+                longitudeDelta: 0.015,
+              } : undefined}
+            />
+          </View>
+        )}
+
+        {/* Clean Background when map is hidden (idle state) */}
+        {bookingState === "idle" && (
+          <View style={[StyleSheet.absoluteFill, { backgroundColor: colors.background }]} />
+        )}
+
+        {/* Top Header */}
+        <View style={[styles.taskHeader, { 
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
+          zIndex: 10,
+          paddingTop: insets.top + (Platform.OS === 'web' ? 20 : 12),
+          borderBottomWidth: bookingState === "idle" ? 1 : 0,
+          borderColor: colors.border,
+          backgroundColor: bookingState === "idle" ? colors.surface : (theme === 'dark' ? 'rgba(15, 23, 42, 0.85)' : 'rgba(255, 255, 255, 0.85)'),
+          shadowColor: '#000',
+          shadowOffset: { width: 0, height: 2 },
+          shadowOpacity: bookingState === "idle" ? 0 : 0.05,
+          shadowRadius: 10,
+          elevation: bookingState === "idle" ? 0 : 4
+        }]}>
+          <TouchableOpacity 
+            style={styles.backBtn} 
+            onPress={() => {
+              if (bookingState === "booking") {
+                handleCancelBooking();
+              } else if (bookingState === "success") {
+                handleReset();
+              } else {
+                router.back();
+              }
+            }}
+          >
+            <Feather name="arrow-left" size={24} color={colors.text} />
+          </TouchableOpacity>
+          <Text style={styles.taskHeaderTitle}>Hours book</Text>
+          <View style={{ width: 44 }} />
+        </View>
+
+        {/* First Phase: Idle Configuration Form (No BottomSheet, normal ScrollView directly below header) */}
+        {bookingState === "idle" ? (
+          <ScrollView 
+            style={{ marginTop: insets.top + (Platform.OS === 'web' ? 20 : 12) + 59, flex: 1 }}
+            contentContainerStyle={[styles.taskScrollContent, { paddingBottom: insets.bottom + 20 }]} 
+            showsVerticalScrollIndicator={false}
+          >
+            {/* Address Selection Card */}
+            <View style={styles.taskSectionCard}>
+              <Text style={styles.taskSectionLabel}>SELECT WORK LOCATION</Text>
+              <TouchableOpacity 
+                style={styles.taskAddressBox} 
+                onPress={() => setIsLocationSheetOpen(true)}
+                activeOpacity={0.8}
+              >
+                <View style={styles.taskAddressIconWrap}>
+                  <Ionicons name="location" size={22} color={colors.text} />
+                </View>
+                <View style={styles.taskAddressTextWrap}>
+                  <Text style={styles.taskAddressTitle}>
+                    {selectedAddress?.label || "Select Address"}
+                  </Text>
+                  <Text style={styles.taskAddressSub} numberOfLines={2}>
+                    {selectedAddress?.addressLine || "Tap here to search and select the address where you need the work done"}
+                  </Text>
+                </View>
+                <Feather name="edit-2" size={16} color={colors.textSecondary} />
+              </TouchableOpacity>
+            </View>
+
+            {/* Time Duration Section */}
+            <View style={styles.taskSectionCard}>
+              <View style={styles.sectionHeaderRow}>
+                <Text style={styles.taskSectionLabel}>WORK TIME DURATION</Text>
+                {durationOption !== "custom" && (
+                  <Text style={styles.selectionIndicator}>{durationOption} {durationOption === "1" ? "Hour" : "Hours"}</Text>
+                )}
+              </View>
+              <View style={styles.presetGrid}>
+                {["1", "2", "3", "4"].map((opt) => (
+                  <TouchableOpacity
+                    key={opt}
+                    style={[
+                      styles.presetPill,
+                      durationOption === opt && styles.presetPillActive
+                    ]}
+                    onPress={() => {
+                      setDurationOption(opt);
+                      setCustomDuration("");
+                    }}
+                  >
+                    <Text style={[
+                      styles.presetPillText,
+                      durationOption === opt && styles.presetPillTextActive
+                    ]}>
+                      {opt} {opt === "1" ? "Hr" : "Hrs"}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+                <TouchableOpacity
+                  style={[
+                    styles.presetPill,
+                    durationOption === "custom" && styles.presetPillActive
+                  ]}
+                  onPress={() => setDurationOption("custom")}
+                >
+                  <Text style={[
+                    styles.presetPillText,
+                    durationOption === "custom" && styles.presetPillTextActive
+                  ]}>
+                    Custom
+                  </Text>
+                </TouchableOpacity>
+              </View>
+
+              {durationOption === "custom" && (
+                <View style={styles.customInputWrapper}>
+                  <Text style={styles.customInputLabel}>Specify Hours</Text>
+                  <View style={styles.customInputContainer}>
+                    <Feather name="clock" size={18} color={colors.textSecondary} style={{ marginRight: 8 }} />
+                    <TextInput
+                      style={styles.customTextInput}
+                      placeholder="Enter custom duration (e.g., 6)"
+                      placeholderTextColor={colors.textMuted}
+                      keyboardType="numeric"
+                      value={customDuration}
+                      onChangeText={setCustomDuration}
+                    />
+                    <Text style={styles.inputUnit}>hours</Text>
+                  </View>
+                </View>
+              )}
+            </View>
+
+            {/* Distance Radius Section */}
+            <View style={styles.taskSectionCard}>
+              <View style={styles.sectionHeaderRow}>
+                <Text style={styles.taskSectionLabel}>WORKER DISTANCE RADIUS</Text>
+                {radiusOption !== "custom" && (
+                  <Text style={styles.selectionIndicator}>Within {radiusOption} km</Text>
+                )}
+              </View>
+              <View style={styles.presetGrid}>
+                {["2", "5", "10", "15"].map((opt) => (
+                  <TouchableOpacity
+                    key={opt}
+                    style={[
+                      styles.presetPill,
+                      radiusOption === opt && styles.presetPillActive
+                    ]}
+                    onPress={() => {
+                      setRadiusOption(opt);
+                      setCustomRadius("");
+                    }}
+                  >
+                    <Text style={[
+                      styles.presetPillText,
+                      radiusOption === opt && styles.presetPillTextActive
+                    ]}>
+                      {opt} km
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+                <TouchableOpacity
+                  style={[
+                    styles.presetPill,
+                    radiusOption === "custom" && styles.presetPillActive
+                  ]}
+                  onPress={() => setRadiusOption("custom")}
+                >
+                  <Text style={[
+                    styles.presetPillText,
+                    radiusOption === "custom" && styles.presetPillTextActive
+                  ]}>
+                    Custom
+                  </Text>
+                </TouchableOpacity>
+              </View>
+
+              {radiusOption === "custom" && (
+                <View style={styles.customInputWrapper}>
+                  <Text style={styles.customInputLabel}>Specify Distance</Text>
+                  <View style={styles.customInputContainer}>
+                    <Feather name="navigation" size={18} color={colors.textSecondary} style={{ marginRight: 8 }} />
+                    <TextInput
+                      style={styles.customTextInput}
+                      placeholder="Enter custom distance (e.g., 25)"
+                      placeholderTextColor={colors.textMuted}
+                      keyboardType="numeric"
+                      value={customRadius}
+                      onChangeText={setCustomRadius}
+                    />
+                    <Text style={styles.inputUnit}>km</Text>
+                  </View>
+                </View>
+              )}
+            </View>
+
+            {/* Estimated Fare Card */}
+            <View style={styles.taskSectionCard}>
+              <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+                <View>
+                  <Text style={styles.taskSectionLabel}>ESTIMATED FARE</Text>
+                  <Text style={{ fontSize: 24, fontWeight: "900", color: colors.text }}>₹{fareDetails.total}</Text>
+                </View>
+                <TouchableOpacity 
+                  style={{ 
+                    flexDirection: "row", 
+                    alignItems: "center", 
+                    backgroundColor: colors.surfaceSecondary, 
+                    paddingHorizontal: 12, 
+                    paddingVertical: 6, 
+                    borderRadius: 8 
+                  }}
+                  onPress={() => setShowFareBreakdown(!showFareBreakdown)}
+                  activeOpacity={0.8}
+                >
+                  <Text style={{ fontSize: 13, fontWeight: "700", color: colors.primary, marginRight: 4 }}>
+                    {showFareBreakdown ? "Hide Details" : "View Bill"}
+                  </Text>
+                  <Feather name={showFareBreakdown ? "chevron-up" : "chevron-down"} size={16} color={colors.primary} />
+                </TouchableOpacity>
+              </View>
+
+              {showFareBreakdown && (
+                <View style={{ marginTop: 14, borderTopWidth: 1, borderColor: colors.borderLight, paddingTop: 14, gap: 10 }}>
+                  <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
+                    <Text style={{ fontSize: 13, color: colors.textSecondary, fontWeight: "500" }}>Base Reservation Fee</Text>
+                    <Text style={{ fontSize: 13, color: colors.text, fontWeight: "700" }}>₹{fareDetails.baseFare}</Text>
+                  </View>
+                  <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
+                    <Text style={{ fontSize: 13, color: colors.textSecondary, fontWeight: "500" }}>
+                      Duration Charge ({fareDetails.hours} {fareDetails.hours === 1 ? "hr" : "hrs"} @ ₹120/hr)
+                    </Text>
+                    <Text style={{ fontSize: 13, color: colors.text, fontWeight: "700" }}>₹{fareDetails.durationCharge}</Text>
+                  </View>
+                  <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
+                    <Text style={{ fontSize: 13, color: colors.textSecondary, fontWeight: "500" }}>
+                      Travel Radius Allowance ({fareDetails.radius} km)
+                    </Text>
+                    <Text style={{ fontSize: 13, color: colors.text, fontWeight: "700" }}>₹{fareDetails.radiusCharge}</Text>
+                  </View>
+                  <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
+                    <Text style={{ fontSize: 13, color: colors.textSecondary, fontWeight: "500" }}>Platform Fee</Text>
+                    <Text style={{ fontSize: 13, color: colors.text, fontWeight: "700" }}>₹{fareDetails.platformFee}</Text>
+                  </View>
+                  <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
+                    <Text style={{ fontSize: 13, color: colors.textSecondary, fontWeight: "500" }}>Taxes & GST (5%)</Text>
+                    <Text style={{ fontSize: 13, color: colors.text, fontWeight: "700" }}>₹{fareDetails.taxes}</Text>
+                  </View>
+                </View>
+              )}
+            </View>
+
+            {/* Information Card */}
+            <View style={styles.infoCard}>
+              <Ionicons name="information-circle-outline" size={20} color={colors.textSecondary} />
+              <Text style={styles.infoText}>
+                This will request available helpers within your specified radius to book them for the hours selected. You'll be matched with a captain instantly.
+              </Text>
+            </View>
+
+            {/* Book Button */}
+            <TouchableOpacity 
+              style={styles.bookButton} 
+              onPress={handleBook}
+              activeOpacity={0.9}
+            >
+              <Text style={styles.bookButtonText}>Book Helper Now</Text>
+              <Feather name="arrow-right" size={20} color={colors.surface} />
+            </TouchableOpacity>
+          </ScrollView>
+        ) : (
+          /* Second & Third Phase: Bottom Sheet overlays map for finding and success states */
+          <BottomSheet 
+            style={styles.bottomSheet}
+            defaultHeight={bookingState === "success" ? 395 : 240}
+          >
+            {bookingState === "booking" && (
+              <View style={styles.sheetBookingContainer}>
+                <View style={styles.sheetRadarRow}>
+                  <View style={styles.sheetRadarContainer}>
+                    <Animated.View style={[styles.sheetPulseCircle, {
+                      transform: [{ scale: pulse1.interpolate({ inputRange: [0, 1], outputRange: [1, 3.2] }) }],
+                      opacity: pulse1.interpolate({ inputRange: [0, 1], outputRange: [0.6, 0] })
+                    }]} />
+                    <Animated.View style={[styles.sheetPulseCircle, {
+                      transform: [{ scale: pulse2.interpolate({ inputRange: [0, 1], outputRange: [1, 2.5] }) }],
+                      opacity: pulse2.interpolate({ inputRange: [0, 1], outputRange: [0.6, 0] })
+                    }]} />
+                    <View style={styles.sheetCenterRadarIcon}>
+                      <Ionicons name="search" size={20} color={colors.surface} />
+                    </View>
+                  </View>
+                  <View style={styles.sheetRadarTextCol}>
+                    <Text style={styles.sheetRadarTitle}>Finding Your Helper</Text>
+                    <Text style={styles.sheetRadarStatus}>{searchingStatus}</Text>
+                  </View>
+                </View>
+
+                <View style={styles.sheetRadarDetailsCard}>
+                  <Text style={styles.sheetRadarDetailsText}>
+                    Requesting work duration of <Text style={{ fontWeight: '700' }}>{finalDuration} {finalDuration === "1" ? "hour" : "hours"}</Text> within a <Text style={{ fontWeight: '700' }}>{finalRadius} km</Text> radius. Est. Fare: <Text style={{ fontWeight: '700', color: colors.primary }}>₹{fareDetails.total}</Text>
+                  </Text>
+                </View>
+
+                <TouchableOpacity 
+                  style={styles.sheetCancelBookingBtn} 
+                  onPress={handleCancelBooking}
+                >
+                  <Text style={styles.sheetCancelBookingText}>Cancel Request</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+
+            {bookingState === "success" && (
+              <View style={styles.sheetSuccessContainer}>
+                <View style={styles.sheetSuccessHeaderRow}>
+                  <View style={styles.sheetSuccessIconBadge}>
+                    <Feather name="check" size={24} color={colors.surface} />
+                  </View>
+                  <View style={styles.sheetSuccessTextCol}>
+                    <Text style={styles.sheetSuccessTitle}>Helper Found & Booked!</Text>
+                    <Text style={styles.sheetSuccessSubtitle}>
+                      Captain has accepted your request.
+                    </Text>
+                  </View>
+                </View>
+
+                {/* Helper Details */}
+                <View style={styles.helperCard}>
+                  <Image 
+                    source={{ uri: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150" }} 
+                    style={styles.helperAvatar} 
+                  />
+                  <View style={styles.helperInfo}>
+                    <Text style={styles.helperName}>Sarah Jenkins</Text>
+                    <Text style={styles.helperTag}>General Helper & Task Specialist</Text>
+                    <View style={styles.helperRatingRow}>
+                      <Ionicons name="star" size={14} color="#EAB308" />
+                      <Text style={styles.helperRating}>4.9</Text>
+                      <Text style={styles.helperTasks}>• 148 tasks completed</Text>
+                    </View>
+                  </View>
+                </View>
+
+                <View style={styles.successMetaBox}>
+                  <View style={styles.successMetaItem}>
+                    <Text style={styles.metaItemLabel}>TIME REMAINING</Text>
+                    <View style={{ flexDirection: "row", alignItems: "center", gap: 4, marginTop: 2 }}>
+                      <Feather name="clock" size={13} color={colors.primary} />
+                      <Text style={[styles.metaItemValue, { color: colors.primary }]}>{formatCountdown(secondsRemaining)}</Text>
+                    </View>
+                  </View>
+                  <View style={styles.metaDivider} />
+                  <View style={styles.successMetaItem}>
+                    <Text style={styles.metaItemLabel}>TOTAL FARE</Text>
+                    <Text style={styles.metaItemValue}>₹{fareDetails.total}</Text>
+                  </View>
+                  <View style={styles.metaDivider} />
+                  <View style={styles.successMetaItem}>
+                    <Text style={styles.metaItemLabel}>EST. ARRIVAL</Text>
+                    <Text style={styles.metaItemValue}>8-12 mins</Text>
+                  </View>
+                </View>
+
+                <View style={styles.sheetSuccessActionsRow}>
+                  <TouchableOpacity 
+                    style={[styles.successCallBtn, { flex: 1 }]}
+                    onPress={() => {
+                      Alert.alert("Calling Sarah...", "Connecting you to your helper at +1 (555) 019-2834.");
+                    }}
+                  >
+                    <Ionicons name="call" size={18} color={colors.text} style={{ marginRight: 6 }} />
+                    <Text style={styles.successCallBtnText}>Call Sarah</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity 
+                    style={[styles.successChatBtn, { flex: 1, marginBottom: 0 }]}
+                    onPress={() => {
+                      handleReset();
+                      router.push({ pathname: "/chat", params: { placeId: "helper-sarah" } });
+                    }}
+                  >
+                    <Ionicons name="chatbubble-ellipses" size={18} color={colors.surface} style={{ marginRight: 6 }} />
+                    <Text style={styles.successChatBtnText}>Chat with Sarah</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            )}
+          </BottomSheet>
+        )}
+
+        <LocationPickerSheet
+          isOpen={isLocationSheetOpen}
+          onClose={() => setIsLocationSheetOpen(false)}
+          onSelectAddress={(address) => setSelectedAddress(address)}
+        />
+      </View>
+    );
+  }
 
   return (
     <View style={styles.root}>
@@ -481,5 +1159,532 @@ const createStyles = (colors: typeof Colors.light) => StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 10,
     elevation: 5,
+  },
+  taskHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 16,
+    paddingBottom: 15,
+    borderBottomWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
+  },
+  taskHeaderTitle: {
+    fontSize: 18,
+    fontWeight: "800",
+    color: colors.text,
+  },
+  taskScrollContent: {
+    padding: 16,
+    paddingBottom: 40,
+    gap: 16,
+  },
+  taskSectionCard: {
+    backgroundColor: colors.surface,
+    borderRadius: 16,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: colors.border,
+    shadowColor: colors.shadow || "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 6,
+    elevation: 2,
+  },
+  sectionHeaderRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 12,
+  },
+  selectionIndicator: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: colors.primary,
+  },
+  taskSectionLabel: {
+    fontSize: 11,
+    fontWeight: "800",
+    color: colors.textSecondary,
+    letterSpacing: 0.8,
+    marginBottom: 8,
+  },
+  taskAddressBox: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: colors.surfaceSecondary,
+    borderRadius: 12,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  taskAddressIconWrap: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: colors.surface,
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: 12,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  taskAddressTextWrap: {
+    flex: 1,
+    marginRight: 8,
+  },
+  taskAddressTitle: {
+    fontSize: 15,
+    fontWeight: "700",
+    color: colors.text,
+    marginBottom: 2,
+  },
+  taskAddressSub: {
+    fontSize: 12,
+    color: colors.textSecondary,
+    lineHeight: 16,
+  },
+  presetGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+    marginTop: 4,
+  },
+  presetPill: {
+    flex: 1,
+    minWidth: 70,
+    height: 44,
+    borderRadius: 12,
+    borderWidth: 1.5,
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  presetPillActive: {
+    borderColor: colors.primary,
+    backgroundColor: colors.primary,
+  },
+  presetPillText: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: colors.text,
+  },
+  presetPillTextActive: {
+    color: colors.surface,
+  },
+  customInputWrapper: {
+    marginTop: 14,
+    borderTopWidth: 1,
+    borderColor: colors.borderLight,
+    paddingTop: 14,
+  },
+  customInputLabel: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: colors.textSecondary,
+    marginBottom: 8,
+  },
+  customInputContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: colors.surfaceSecondary,
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    height: 44,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  customTextInput: {
+    flex: 1,
+    fontSize: 14,
+    fontWeight: "600",
+    color: colors.text,
+  },
+  inputUnit: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: colors.textSecondary,
+    marginLeft: 8,
+  },
+  infoCard: {
+    flexDirection: "row",
+    gap: 10,
+    backgroundColor: colors.surfaceSecondary,
+    borderRadius: 12,
+    padding: 12,
+    alignItems: "center",
+  },
+  infoText: {
+    flex: 1,
+    fontSize: 12,
+    color: colors.textSecondary,
+    lineHeight: 16,
+    fontWeight: "500",
+  },
+  bookButton: {
+    backgroundColor: colors.primary,
+    borderRadius: 16,
+    height: 54,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    marginTop: 8,
+    shadowColor: colors.shadow || "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 10,
+    elevation: 4,
+  },
+  bookButtonText: {
+    color: colors.surface,
+    fontSize: 16,
+    fontWeight: "800",
+  },
+  overlayContainer: {
+    backgroundColor: "rgba(15, 23, 42, 0.78)",
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 24,
+    zIndex: 1000,
+  },
+  radarContainer: {
+    width: 160,
+    height: 160,
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: 32,
+  },
+  pulseCircle: {
+    position: "absolute",
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    backgroundColor: colors.primary,
+  },
+  centerRadarIcon: {
+    width: 68,
+    height: 68,
+    borderRadius: 34,
+    backgroundColor: colors.primary,
+    justifyContent: "center",
+    alignItems: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 5,
+  },
+  radarTitle: {
+    fontSize: 22,
+    fontWeight: "900",
+    color: "#fff",
+    marginBottom: 8,
+    textAlign: "center",
+  },
+  radarStatus: {
+    fontSize: 15,
+    fontWeight: "600",
+    color: "#94A3B8",
+    marginBottom: 20,
+    textAlign: "center",
+  },
+  radarDetails: {
+    fontSize: 13,
+    fontWeight: "500",
+    color: "#64748B",
+    textAlign: "center",
+    backgroundColor: "rgba(15, 23, 42, 0.4)",
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 20,
+    overflow: "hidden",
+    marginBottom: 40,
+  },
+  cancelBookingBtn: {
+    borderWidth: 1.5,
+    borderColor: "rgba(255, 255, 255, 0.3)",
+    borderRadius: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+  },
+  cancelBookingText: {
+    color: "#fff",
+    fontSize: 14,
+    fontWeight: "700",
+  },
+  successCard: {
+    backgroundColor: colors.surface,
+    borderRadius: 24,
+    padding: 24,
+    alignItems: "center",
+    width: "100%",
+    maxWidth: 360,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.2,
+    shadowRadius: 20,
+    elevation: 10,
+  },
+  successIconBadge: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    backgroundColor: colors.success || "#10B981",
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: 16,
+    shadowColor: colors.success || "#10B981",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 5,
+  },
+  successTitle: {
+    fontSize: 22,
+    fontWeight: "900",
+    color: colors.text,
+    marginBottom: 8,
+    textAlign: "center",
+  },
+  successSubtitle: {
+    fontSize: 14,
+    color: colors.textSecondary,
+    textAlign: "center",
+    lineHeight: 20,
+    marginBottom: 20,
+  },
+  helperCard: {
+    flexDirection: "row",
+    backgroundColor: colors.surfaceSecondary,
+    borderRadius: 16,
+    padding: 12,
+    alignItems: "center",
+    width: "100%",
+    borderWidth: 1,
+    borderColor: colors.border,
+    marginBottom: 20,
+  },
+  helperAvatar: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    marginRight: 12,
+  },
+  helperInfo: {
+    flex: 1,
+  },
+  helperName: {
+    fontSize: 15,
+    fontWeight: "800",
+    color: colors.text,
+  },
+  helperTag: {
+    fontSize: 11,
+    fontWeight: "600",
+    color: colors.textSecondary,
+    marginTop: 2,
+  },
+  helperRatingRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginTop: 4,
+  },
+  helperRating: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: colors.text,
+    marginLeft: 4,
+    marginRight: 6,
+  },
+  helperTasks: {
+    fontSize: 11,
+    color: colors.textMuted,
+    fontWeight: "500",
+  },
+  successMetaBox: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    backgroundColor: colors.surfaceSecondary,
+    borderRadius: 16,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    width: "100%",
+    borderWidth: 1,
+    borderColor: colors.border,
+    marginBottom: 20,
+  },
+  successMetaItem: {
+    flex: 1,
+    alignItems: "center",
+  },
+  metaItemLabel: {
+    fontSize: 9,
+    fontWeight: "800",
+    color: colors.textMuted,
+    letterSpacing: 0.5,
+    marginBottom: 4,
+  },
+  metaItemValue: {
+    fontSize: 13,
+    fontWeight: "800",
+    color: colors.text,
+  },
+  metaDivider: {
+    width: 1,
+    height: 20,
+    backgroundColor: colors.border,
+  },
+  successChatBtn: {
+    backgroundColor: colors.primary,
+    borderRadius: 14,
+    height: 48,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    width: "100%",
+    marginBottom: 10,
+  },
+  successChatBtnText: {
+    color: colors.surface,
+    fontSize: 15,
+    fontWeight: "800",
+  },
+  successCallBtn: {
+    backgroundColor: "transparent",
+    borderRadius: 14,
+    height: 48,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    width: "100%",
+    borderWidth: 1.5,
+    borderColor: colors.border,
+  },
+  successCallBtnText: {
+    color: colors.text,
+    fontSize: 15,
+    fontWeight: "800",
+  },
+  sheetBookingContainer: {
+    paddingVertical: 10,
+    paddingHorizontal: 5,
+    gap: 16,
+  },
+  sheetRadarRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 16,
+  },
+  sheetRadarContainer: {
+    width: 60,
+    height: 60,
+    justifyContent: "center",
+    alignItems: "center",
+    position: "relative",
+  },
+  sheetPulseCircle: {
+    position: "absolute",
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    backgroundColor: colors.primary,
+  },
+  sheetCenterRadarIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: colors.primary,
+    justifyContent: "center",
+    alignItems: "center",
+    elevation: 3,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    zIndex: 5,
+  },
+  sheetRadarTextCol: {
+    flex: 1,
+    gap: 4,
+  },
+  sheetRadarTitle: {
+    fontSize: 18,
+    fontWeight: "900",
+    color: colors.text,
+  },
+  sheetRadarStatus: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: colors.textSecondary,
+  },
+  sheetRadarDetailsCard: {
+    backgroundColor: colors.surfaceSecondary,
+    borderRadius: 12,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  sheetRadarDetailsText: {
+    fontSize: 13,
+    color: colors.textSecondary,
+    lineHeight: 18,
+  },
+  sheetCancelBookingBtn: {
+    backgroundColor: colors.surfaceSecondary,
+    borderRadius: 12,
+    height: 48,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  sheetCancelBookingText: {
+    color: colors.error || "#EF4444",
+    fontSize: 14,
+    fontWeight: "700",
+  },
+  sheetSuccessContainer: {
+    paddingVertical: 10,
+    paddingHorizontal: 5,
+    gap: 16,
+  },
+  sheetSuccessHeaderRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 14,
+  },
+  sheetSuccessIconBadge: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: colors.success || "#10B981",
+    justifyContent: "center",
+    alignItems: "center",
+    shadowColor: colors.success || "#10B981",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+  },
+  sheetSuccessTextCol: {
+    flex: 1,
+    gap: 2,
+  },
+  sheetSuccessTitle: {
+    fontSize: 18,
+    fontWeight: "900",
+    color: colors.text,
+  },
+  sheetSuccessSubtitle: {
+    fontSize: 13,
+    color: colors.textSecondary,
+  },
+  sheetSuccessActionsRow: {
+    flexDirection: "row",
+    gap: 10,
+    width: "100%",
   },
 });

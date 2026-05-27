@@ -49,7 +49,7 @@ export default function MapPickerScreen() {
     (async () => {
       let { status } = await Location.requestForegroundPermissionsAsync();
       if (status === 'granted') {
-        let location = await Location.getCurrentPositionAsync({});
+        let location = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
         setRegion({
           ...region,
           latitude: location.coords.latitude,
