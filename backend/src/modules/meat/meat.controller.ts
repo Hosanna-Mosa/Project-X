@@ -1,10 +1,29 @@
 import { Request, Response } from "express";
 import MeatCenter from "../../database/models/MeatCenter";
+import Vendor from "../../database/models/Vendor";
+import FoodItem from "../../database/models/FoodItem";
 import generateToken from "../../utils/generateToken";
+
+const DEFAULT_MEAT_IMAGE = "https://images.unsplash.com/photo-1587593810167-a84920ea0781?w=800";
+
+const getDistanceInMeters = (fromLat: number, fromLng: number, toLat: number, toLng: number) => {
+  const toRad = (value: number) => (value * Math.PI) / 180;
+  const earthRadius = 6371000;
+  const deltaLat = toRad(toLat - fromLat);
+  const deltaLng = toRad(toLng - fromLng);
+  const a =
+    Math.sin(deltaLat / 2) * Math.sin(deltaLat / 2) +
+    Math.cos(toRad(fromLat)) * Math.cos(toRad(toLat)) *
+      Math.sin(deltaLng / 2) * Math.sin(deltaLng / 2);
+
+  return earthRadius * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+};
 
 export const loginMeatCenter = async (req: Request, res: Response) => {
   try {
-    const { email, phone, password } = req.body;
+    const email = String(req.body.email || "").trim().toLowerCase();
+    const phone = String(req.body.phone || "").replace(/\D/g, "");
+    const password = String(req.body.password || "");
 
     if (!password || (!email && !phone)) {
       return res.status(400).json({ message: "Email/phone and password are required" });
@@ -41,7 +60,7 @@ export const loginMeatCenter = async (req: Request, res: Response) => {
 
 export const getNearbyMeatCenters = async (req: Request, res: Response) => {
   try {
-    const { lat, lng, page = 1, limit = 20, category } = req.query;
+    const { lat, lng, page = 1, limit = 20, category, all } = req.query;
 
     if (!lat || !lng) {
       return res.status(400).json({ message: "Latitude and Longitude are required" });
@@ -49,14 +68,52 @@ export const getNearbyMeatCenters = async (req: Request, res: Response) => {
 
     const userLat = parseFloat(lat as string);
     const userLng = parseFloat(lng as string);
-    const skip = (Number(page) - 1) * Number(limit);
+    if (!Number.isFinite(userLat) || !Number.isFinite(userLng)) {
+      return res.status(400).json({ message: "Latitude and Longitude must be valid numbers" });
+    }
+
+    const pageNumber = Math.max(1, Number(page) || 1);
+    const requestedLimit = Math.max(1, Number(limit) || 20);
+    const fetchAll = all === "true";
+    const skip = fetchAll ? 0 : (pageNumber - 1) * requestedLimit;
+    const pageLimit = requestedLimit;
 
     const matchStage: any = {};
     if (category) {
       matchStage.categories = { $in: [category] };
     }
 
-    const pipeline: any[] = [
+    if (fetchAll) {
+      const [centers, meatVendors] = await Promise.all([
+        MeatCenter.find(matchStage).lean(),
+        Vendor.find({ ...matchStage, partnerType: "meat" }).lean(),
+      ]);
+
+      const formattedCenters = [...centers, ...meatVendors].map((center: any) => {
+        const [centerLng = userLng, centerLat = userLat] = center.location?.coordinates || [];
+        const distanceInMeters = getDistanceInMeters(userLat, userLng, centerLat, centerLng);
+        const distanceInKm = distanceInMeters / 1000;
+        const travelTimeMinutes = (distanceInKm / 20) * 60;
+        const totalEstimatedTime = Math.round(travelTimeMinutes + 15);
+
+        return {
+          ...center,
+          role: "meat_vendor",
+          partnerType: "meat",
+          image: center.image || DEFAULT_MEAT_IMAGE,
+          rating: center.rating || 0,
+          reviews: center.reviews || "0",
+          time: `${totalEstimatedTime}-${totalEstimatedTime + 10} min`,
+          distance: distanceInKm < 1
+            ? `${Math.round(distanceInMeters)} metres`
+            : `${distanceInKm.toFixed(1)} km`,
+        };
+      });
+
+      return res.json(formattedCenters);
+    }
+
+    const centerPipeline: any[] = [
       {
         $geoNear: {
           near: {
@@ -71,21 +128,55 @@ export const getNearbyMeatCenters = async (req: Request, res: Response) => {
     ];
 
     if (Object.keys(matchStage).length > 0) {
-      pipeline.push({ $match: matchStage });
+      centerPipeline.push({ $match: matchStage });
     }
 
-    pipeline.push({ $skip: skip });
-    pipeline.push({ $limit: Number(limit) });
+    if (!fetchAll) {
+      centerPipeline.push({ $limit: skip + pageLimit });
+    }
 
-    const centers = await MeatCenter.aggregate(pipeline);
+    const vendorPipeline: any[] = [
+      {
+        $geoNear: {
+          near: {
+            type: "Point",
+            coordinates: [userLng, userLat],
+          },
+          distanceField: "distance",
+          spherical: true,
+          key: "location",
+          query: { partnerType: "meat" },
+        },
+      },
+    ];
 
-    const formattedCenters = centers.map((center) => {
+    if (Object.keys(matchStage).length > 0) {
+      vendorPipeline.push({ $match: matchStage });
+    }
+
+    if (!fetchAll) {
+      vendorPipeline.push({ $limit: skip + pageLimit });
+    }
+
+    const [centers, meatVendors] = await Promise.all([
+      MeatCenter.aggregate(centerPipeline),
+      Vendor.aggregate(vendorPipeline),
+    ]);
+
+    const sortedCenters = [...centers, ...meatVendors].sort((a, b) => (a.distance || 0) - (b.distance || 0));
+    const pageCenters = fetchAll ? sortedCenters : sortedCenters.slice(skip, skip + pageLimit);
+    const formattedCenters = pageCenters.map((center) => {
       const distanceInKm = center.distance / 1000;
       const travelTimeMinutes = (distanceInKm / 20) * 60;
       const totalEstimatedTime = Math.round(travelTimeMinutes + 15);
       
       return {
         ...center,
+        role: "meat_vendor",
+        partnerType: "meat",
+        image: center.image || DEFAULT_MEAT_IMAGE,
+        rating: center.rating || 0,
+        reviews: center.reviews || "0",
         time: `${totalEstimatedTime}-${totalEstimatedTime + 10} min`,
         distance: distanceInKm < 1 
           ? `${Math.round(center.distance)} metres` 
@@ -143,6 +234,43 @@ export const createMeatCenter = async (req: Request, res: Response) => {
   }
 };
 
+export const addMeatItem = async (req: Request, res: Response) => {
+  try {
+    const { meatCenterId, name, weight, price, category, image } = req.body;
+
+    if (!meatCenterId || !name || !weight || price === undefined || !category) {
+      return res.status(400).json({ message: "Center, name, weight, price and category are required" });
+    }
+
+    const item = new MeatItem({
+      meatCenterId,
+      name,
+      weight,
+      price,
+      category,
+      image,
+      isGlobalItem: false,
+    });
+
+    await item.save();
+    res.status(201).json(item);
+  } catch (error) {
+    console.error("Error adding meat item:", error);
+    res.status(500).json({ message: "Internal server error" });
+  }
+};
+
+export const deleteMeatItem = async (req: Request, res: Response) => {
+  try {
+    const { itemId } = req.params;
+    await MeatItem.findByIdAndDelete(itemId);
+    res.json({ message: "Meat item deleted successfully" });
+  } catch (error) {
+    console.error("Error deleting meat item:", error);
+    res.status(500).json({ message: "Internal server error" });
+  }
+};
+
 // Admin Controller to update prices globally
 export const updateGlobalMeatPrices = async (req: Request, res: Response) => {
   try {
@@ -181,12 +309,81 @@ export const getGlobalMeatPrices = async (req: Request, res: Response) => {
   }
 };
 
+const parsePrice = (value: unknown) => {
+  if (typeof value === "number") return value;
+  const parsed = Number(String(value || "").replace(/[^\d.]/g, ""));
+  return Number.isFinite(parsed) ? parsed : 0;
+};
+
+const buildOnboardedMeatItems = (meatVendor: any) => {
+  const operations = meatVendor.operations || {};
+  const manualCategories = Array.isArray(operations.menuCategories) ? operations.menuCategories : [];
+  const uploadedRows = Array.isArray(operations.menuUploadRows) ? operations.menuUploadRows : [];
+
+  const manualItems = manualCategories.flatMap((category: any) =>
+    (Array.isArray(category.items) ? category.items : []).map((item: any, index: number) => ({
+      _id: `${meatVendor._id}-${category._id || category.name}-${item._id || index}`,
+      meatCenterId: meatVendor._id,
+      name: item.name,
+      description: item.description,
+      weight: "Custom",
+      price: parsePrice(item.price),
+      category: category.name || "Meat",
+      image: DEFAULT_MEAT_IMAGE,
+      images: [DEFAULT_MEAT_IMAGE],
+      isAvailable: true,
+      isVeg: false,
+      isGlobalItem: false,
+    }))
+  );
+
+  const uploadedItems = uploadedRows.map((row: any, index: number) => ({
+    _id: `${meatVendor._id}-upload-${index}`,
+    meatCenterId: meatVendor._id,
+    name: row.itemName,
+    description: row.description,
+    weight: "Custom",
+    price: parsePrice(row.price),
+    category: row.category || "Meat",
+    image: DEFAULT_MEAT_IMAGE,
+    images: [DEFAULT_MEAT_IMAGE],
+    isAvailable: true,
+    isVeg: false,
+    isGlobalItem: false,
+  }));
+
+  return [...manualItems, ...uploadedItems].filter((item) => item.name && item.price > 0);
+};
+
 
 export const getMeatCenterMenu = async (req: Request, res: Response) => {
   try {
     const { centerId } = req.params;
-    const items = await MeatItem.find({ meatCenterId: centerId, isAvailable: true });
-    res.json(items);
+    const includeUnavailable = req.query.includeUnavailable === "true";
+    const items = await MeatItem.find({
+      meatCenterId: centerId,
+      ...(includeUnavailable ? {} : { isAvailable: true }),
+    }).lean();
+
+    if (includeUnavailable) {
+      return res.json(items);
+    }
+
+    const meatVendor = await Vendor.findOne({ _id: centerId, partnerType: "meat" }).lean();
+    if (!meatVendor) {
+      return res.json(items);
+    }
+
+    const legacyFoodItems = await FoodItem.find({ vendorId: centerId, isAvailable: true }).lean();
+    const legacyAsMeatItems = legacyFoodItems.map((item) => ({
+      ...item,
+      weight: "Custom",
+      image: item.images?.[0],
+      isVeg: false,
+      isGlobalItem: false,
+    }));
+
+    res.json([...items, ...legacyAsMeatItems, ...buildOnboardedMeatItems(meatVendor)]);
   } catch (error) {
     res.status(500).json({ message: "Internal server error" });
   }

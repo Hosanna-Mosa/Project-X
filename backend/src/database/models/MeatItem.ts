@@ -6,7 +6,7 @@ export interface IMeatItem extends Document {
   weight: string; // e.g. "250g", "500g", "Full"
   price: number;
   image?: string;
-  category: "Chicken" | "Mutton";
+  category: string;
   isAvailable: boolean;
   isGlobalItem: boolean; // True for the standard 5 items
 }
@@ -18,7 +18,7 @@ const MeatItemSchema: Schema = new Schema(
     weight: { type: String, required: true },
     price: { type: Number, required: true },
     image: { type: String },
-    category: { type: String, enum: ["Chicken", "Mutton"], default: "Chicken" },
+    category: { type: String, default: "Chicken" },
     isAvailable: { type: Boolean, default: true },
     isGlobalItem: { type: Boolean, default: true },
   },

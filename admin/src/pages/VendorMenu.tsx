@@ -1,4 +1,5 @@
 import { useState, useCallback } from "react";
+import { Navigate } from "react-router-dom";
 import { VendorLayout } from "@/components/layout/VendorLayout";
 import { Plus, Utensils, IndianRupee, Trash2, Edit2, Search, Filter, Upload, X, Loader2 } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -81,7 +82,7 @@ export default function VendorMenu() {
   const { data: menu, isLoading } = useQuery({
     queryKey: ["vendor-menu", vendorData._id],
     queryFn: () => adminFetch<FoodItem[]>(`/food/vendor/${vendorData._id}`),
-    enabled: !!vendorData._id
+    enabled: !!vendorData._id && vendorData.role !== "meat_vendor"
   });
 
   const addFoodMutation = useMutation({
@@ -124,6 +125,10 @@ export default function VendorMenu() {
     }
     addFoodMutation.mutate(newItem);
   };
+
+  if (vendorData.role === "meat_vendor") {
+    return <Navigate to="/vendor/meat-menu" replace />;
+  }
 
   return (
     <VendorLayout searchPlaceholder="Search menu items...">

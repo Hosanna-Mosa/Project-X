@@ -59,13 +59,18 @@ export default function RestaurantMenu() {
         const response = await fetch(endpoint);
         const data = await response.json();
         
-        // Meat items have slightly different structure
-        const normalizedData = data.map((item: any) => ({
-          ...item,
-          isVeg: false,
-          images: item.images || [item.image || 'https://images.unsplash.com/photo-1587593810167-a84920ea0781?w=400'],
-          description: item.description || `Fresh ${item.name} - ${item.weight}`
-        }));
+        const normalizedData = data.map((item: any) => {
+          if (isMeat === "true") {
+            return {
+              ...item,
+              isVeg: false,
+              images: item.images || [item.image || "https://images.unsplash.com/photo-1587593810167-a84920ea0781?w=400"],
+              description: item.description || `Fresh ${item.name} - ${item.weight}`,
+            };
+          }
+
+          return item;
+        });
 
         setMenu(normalizedData);
         if (normalizedData.length > 0) {

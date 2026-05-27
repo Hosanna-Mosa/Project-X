@@ -8,6 +8,7 @@ export interface IVendor extends Document {
   password?: string;
   googlePlaceId?: string;
   onboardingStatus?: "draft" | "submitted";
+  partnerType?: "food" | "meat";
   owner?: {
     name?: string;
     email?: string;
@@ -39,6 +40,15 @@ export interface IVendor extends Document {
     menuSetupMode?: "upload" | "manual";
     menuReferenceFileName?: string;
     menuUploadValid?: boolean;
+    menuUploadRows?: {
+      category: string;
+      itemName: string;
+      price: string;
+      description?: string;
+      type?: string;
+      isBestseller?: string;
+      imageFileName?: string;
+    }[];
     menuCategories?: {
       name: string;
       items: {
@@ -92,6 +102,11 @@ const VendorSchema: Schema = new Schema(
       enum: ["draft", "submitted"],
       default: "draft",
     },
+    partnerType: {
+      type: String,
+      enum: ["food", "meat"],
+      default: "food",
+    },
     owner: {
       name: { type: String },
       email: { type: String },
@@ -138,6 +153,20 @@ const VendorSchema: Schema = new Schema(
       menuSetupMode: { type: String, enum: ["upload", "manual"], default: "manual" },
       menuReferenceFileName: { type: String },
       menuUploadValid: { type: Boolean, default: false },
+      menuUploadRows: {
+        type: [
+          {
+            category: { type: String },
+            itemName: { type: String },
+            price: { type: String },
+            description: { type: String },
+            type: { type: String },
+            isBestseller: { type: String },
+            imageFileName: { type: String },
+          },
+        ],
+        default: [],
+      },
       menuCategories: {
         type: [
           {

@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { useGoogleMaps } from "../hooks/useGoogleMaps";
 import { apiFetch } from "../lib/api-client";
 
@@ -22,8 +22,88 @@ const CUISINE_OPTIONS = [
   "Thai", "Healthy", "Desserts", "Beverages", "Mughlai",
 ];
 
+const MEAT_CATEGORY_OPTIONS = ["Chicken", "Mutton", "Fish", "Prawns", "Eggs", "Ready to Cook"];
 const DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
 const MENU_UPLOAD_COLUMNS = ["category", "itemName", "price", "description", "type", "isBestseller"];
+const MENU_TEMPLATE_FILE = "/menu_items_reference_template.xlsx";
+
+type PartnerType = "food" | "meat";
+
+const PARTNER_COPY: Record<PartnerType, {
+  sidebarTitle: string;
+  infoTitle: string;
+  infoIntro: string;
+  detailsTitle: string;
+  businessLabel: string;
+  businessPlaceholder: string;
+  categoryLabel: string;
+  categoryHelp: string;
+  operatingHelp: string;
+  menuTitle: string;
+  menuHelp: string;
+  manualEmptyTitle: string;
+  manualEmptyHelp: string;
+  manualCategoryHelp: string;
+  gstExemptLabel: string;
+  safetyTitle: string;
+  safetyUploadDescription: string;
+  contractServiceText: string;
+  summaryLabel: string;
+}> = {
+  food: {
+    sidebarTitle: "Restaurant Onboarding",
+    infoTitle: "Restaurant Information",
+    infoIntro: "Tell us about your restaurant to get started.",
+    detailsTitle: "Restaurant Details",
+    businessLabel: "Restaurant Name",
+    businessPlaceholder: "e.g. Paradise Biryani",
+    categoryLabel: "Cuisine / Food Category",
+    categoryHelp: "Select all that apply to your restaurant",
+    operatingHelp: "Add multiple time slots if your restaurant has break times.",
+    menuTitle: "Menu Setup",
+    menuHelp: "Set up your restaurant's operating hours and add your menu items.",
+    manualEmptyTitle: "No menu items yet",
+    manualEmptyHelp: "Add your first category to start building your menu",
+    manualCategoryHelp: "Add categories (e.g. Appetizers, Main Course) and their items",
+    gstExemptLabel: "My restaurant is exempt / Composition scheme",
+    safetyTitle: "Food Safety License",
+    safetyUploadDescription: "Upload a clear scan or photo of your FSSAI license",
+    contractServiceText: "the sale and delivery of food items",
+    summaryLabel: "Restaurant",
+  },
+  meat: {
+    sidebarTitle: "Meat Center Onboarding",
+    infoTitle: "Meat Center Information",
+    infoIntro: "Tell us about your meat center to get started.",
+    detailsTitle: "Meat Center Details",
+    businessLabel: "Meat Center Name",
+    businessPlaceholder: "e.g. Fresh Cuts Meat Center",
+    categoryLabel: "Meat Categories",
+    categoryHelp: "Select the product categories available at your center",
+    operatingHelp: "Add multiple time slots if your meat center has break times.",
+    menuTitle: "Meat Product Setup",
+    menuHelp: "Set up your meat center's operating hours.",
+    manualEmptyTitle: "No meat products yet",
+    manualEmptyHelp: "Add your first product category to start building your list",
+    manualCategoryHelp: "Add categories (e.g. Chicken, Mutton, Fish) and their products",
+    gstExemptLabel: "My meat center is exempt / Composition scheme",
+    safetyTitle: "FSSAI License",
+    safetyUploadDescription: "Upload a clear scan or photo of your FSSAI license",
+    contractServiceText: "the sale and delivery of meat products",
+    summaryLabel: "Meat Center",
+  },
+};
+
+interface UploadedMenuRow {
+  id: string;
+  category: string;
+  itemName: string;
+  price: string;
+  description: string;
+  type: string;
+  isBestseller: string;
+  image: File | null;
+}
 
 type DayTimeSlots = Record<string, { open: string; close: string }[]>;
 
@@ -52,6 +132,198 @@ function TimePicker({ value, onChange, label }: {
     </div>
   );
 }
+
+const normalizeHeader = (value: string) => value.toLowerCase().replace(/[^a-z0-9]/g, "");
+
+const toCanonicalHeader = (value: string) => {
+  const normalized = normalizeHeader(value);
+  if (["category", "menucategory", "productcategory"].includes(normalized)) return "category";
+  if (["itemname", "item", "name", "productname", "product"].includes(normalized)) return "itemName";
+  if (["price", "priceinr", "price₹", "price rs", "rate"].map(normalizeHeader).includes(normalized)) return "price";
+  if (["description", "desc", "details"].includes(normalized)) return "description";
+  if (["type", "veg/nonveg", "cuttype", "producttype"].map(normalizeHeader).includes(normalized)) return "type";
+  if (["isbestseller", "bestseller", "tags", "tag"].includes(normalized)) return "isBestseller";
+  return normalized;
+};
+
+const parseCsvLine = (line: string) => {
+  const values: string[] = [];
+  let current = "";
+  let inQuotes = false;
+
+  for (let i = 0; i < line.length; i += 1) {
+    const char = line[i];
+    const next = line[i + 1];
+
+    if (char === '"' && inQuotes && next === '"') {
+      current += '"';
+      i += 1;
+    } else if (char === '"') {
+      inQuotes = !inQuotes;
+    } else if (char === "," && !inQuotes) {
+      values.push(current.trim());
+      current = "";
+    } else {
+      current += char;
+    }
+  }
+
+  values.push(current.trim());
+  return values;
+};
+
+const rowsFromTable = (rows: string[][]) => {
+  if (rows.length === 0) {
+    throw new Error("The uploaded sheet is empty.");
+  }
+
+  const headers = rows[0].map(toCanonicalHeader);
+  const headerIndex = new Map(headers.map((header, index) => [header, index]));
+  const missingColumns = MENU_UPLOAD_COLUMNS.filter((column) => !headerIndex.has(column));
+
+  if (missingColumns.length > 0) {
+    throw new Error(`Missing columns: ${missingColumns.join(", ")}`);
+  }
+
+  const parsedRows = rows.slice(1)
+    .map((row) => ({
+      id: crypto.randomUUID(),
+      category: row[headerIndex.get("category") ?? -1]?.trim() || "",
+      itemName: row[headerIndex.get("itemName") ?? -1]?.trim() || "",
+      price: row[headerIndex.get("price") ?? -1]?.trim() || "",
+      description: row[headerIndex.get("description") ?? -1]?.trim() || "",
+      type: row[headerIndex.get("type") ?? -1]?.trim() || "",
+      isBestseller: row[headerIndex.get("isBestseller") ?? -1]?.trim() || "",
+      image: null,
+    }))
+    .filter((row) => row.category || row.itemName || row.price || row.description || row.type || row.isBestseller);
+
+  if (parsedRows.length === 0) {
+    throw new Error("Add at least one item row to the uploaded sheet.");
+  }
+
+  return parsedRows;
+};
+
+const readFileAsText = (file: File) =>
+  new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result || ""));
+    reader.onerror = () => reject(new Error("Unable to read the uploaded menu sheet."));
+    reader.readAsText(file);
+  });
+
+const parseCsvRows = async (file: File) => {
+  const text = await readFileAsText(file);
+  const rows = text
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .map(parseCsvLine);
+
+  return rowsFromTable(rows);
+};
+
+const getCellColumnIndex = (cellRef: string) => {
+  const letters = (cellRef.match(/[A-Z]+/i)?.[0] || "").toUpperCase();
+  return letters.split("").reduce((sum, letter) => sum * 26 + letter.charCodeAt(0) - 64, 0) - 1;
+};
+
+const getXmlText = async (bytes: Uint8Array, method: number) => {
+  if (method === 0) {
+    return new TextDecoder().decode(bytes);
+  }
+
+  const DecompressionCtor = (window as any).DecompressionStream;
+  if (!DecompressionCtor) {
+    throw new Error("This browser cannot read XLSX files here. Please upload a CSV file.");
+  }
+
+  const blobBuffer = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer;
+  const stream = new Blob([blobBuffer]).stream().pipeThrough(new DecompressionCtor("deflate-raw"));
+  return new TextDecoder().decode(await new Response(stream).arrayBuffer());
+};
+
+const readZipEntries = async (buffer: ArrayBuffer) => {
+  const data = new Uint8Array(buffer);
+  const view = new DataView(buffer);
+  let eocdOffset = -1;
+
+  for (let i = data.length - 22; i >= 0; i -= 1) {
+    if (view.getUint32(i, true) === 0x06054b50) {
+      eocdOffset = i;
+      break;
+    }
+  }
+
+  if (eocdOffset === -1) {
+    throw new Error("Unable to read the XLSX file.");
+  }
+
+  const totalEntries = view.getUint16(eocdOffset + 10, true);
+  let centralOffset = view.getUint32(eocdOffset + 16, true);
+  const entries = new Map<string, () => Promise<string>>();
+
+  for (let i = 0; i < totalEntries; i += 1) {
+    if (view.getUint32(centralOffset, true) !== 0x02014b50) break;
+
+    const method = view.getUint16(centralOffset + 10, true);
+    const compressedSize = view.getUint32(centralOffset + 20, true);
+    const fileNameLength = view.getUint16(centralOffset + 28, true);
+    const extraLength = view.getUint16(centralOffset + 30, true);
+    const commentLength = view.getUint16(centralOffset + 32, true);
+    const localOffset = view.getUint32(centralOffset + 42, true);
+    const nameBytes = data.slice(centralOffset + 46, centralOffset + 46 + fileNameLength);
+    const name = new TextDecoder().decode(nameBytes);
+
+    const localNameLength = view.getUint16(localOffset + 26, true);
+    const localExtraLength = view.getUint16(localOffset + 28, true);
+    const dataStart = localOffset + 30 + localNameLength + localExtraLength;
+    const compressedBytes = data.slice(dataStart, dataStart + compressedSize);
+
+    entries.set(name, () => getXmlText(compressedBytes, method));
+    centralOffset += 46 + fileNameLength + extraLength + commentLength;
+  }
+
+  return entries;
+};
+
+const parseSharedStrings = (xmlText?: string) => {
+  if (!xmlText) return [];
+  const xml = new DOMParser().parseFromString(xmlText, "application/xml");
+  return Array.from(xml.getElementsByTagName("si")).map((item) =>
+    Array.from(item.getElementsByTagName("t")).map((textNode) => textNode.textContent || "").join("")
+  );
+};
+
+const parseXlsxRows = async (file: File) => {
+  const entries = await readZipEntries(await file.arrayBuffer());
+  const sheetEntry = entries.get("xl/worksheets/sheet1.xml");
+
+  if (!sheetEntry) {
+    throw new Error("The XLSX file must include a first worksheet.");
+  }
+
+  const sharedStrings = entries.get("xl/sharedStrings.xml")
+    ? parseSharedStrings(await entries.get("xl/sharedStrings.xml")!())
+    : [];
+  const sheetXml = new DOMParser().parseFromString(await sheetEntry(), "application/xml");
+  const rows = Array.from(sheetXml.getElementsByTagName("row")).map((row) => {
+    const values: string[] = [];
+    Array.from(row.getElementsByTagName("c")).forEach((cell) => {
+      const ref = cell.getAttribute("r") || "";
+      const index = getCellColumnIndex(ref);
+      const type = cell.getAttribute("t");
+      const valueNode = cell.getElementsByTagName("v")[0];
+      const inlineNode = cell.getElementsByTagName("t")[0];
+      const rawValue = valueNode?.textContent || inlineNode?.textContent || "";
+      values[index] = type === "s" ? sharedStrings[Number(rawValue)] || "" : rawValue;
+    });
+    return values.map((value) => value || "");
+  });
+
+  return rowsFromTable(rows);
+};
 
 // ─── File Uploader ─────────────────────────────────────────────────────────────
 
@@ -146,7 +418,7 @@ function FileUploader({
           </div>
 
           <p className="text-[10px] text-secondary-app/40 mt-2">
-            {accept.includes(".xlsx") ? "CSV, XLS, XLSX (max 10MB)" : "PDF, JPG, PNG (max 10MB)"}
+            {accept.includes(".xlsx") ? "CSV, XLSX (max 10MB)" : "PDF, JPG, PNG (max 10MB)"}
           </p>
         </div>
       )}
@@ -156,11 +428,22 @@ function FileUploader({
 
 // ─── Menu Item Form ────────────────────────────────────────────────────────────
 
-function ItemForm({ initialItem, onSave, onCancel }: { initialItem?: MenuItem; onSave: (item: MenuItem) => void; onCancel: () => void }) {
+function ItemForm({
+  initialItem,
+  onSave,
+  onCancel,
+  partnerType = "food",
+}: {
+  initialItem?: MenuItem;
+  onSave: (item: MenuItem) => void;
+  onCancel: () => void;
+  partnerType?: PartnerType;
+}) {
+  const isMeatItem = partnerType === "meat";
   const [name, setName] = useState(initialItem?.name || "");
   const [price, setPrice] = useState(initialItem?.price || "");
   const [description, setDescription] = useState(initialItem?.description || "");
-  const [isVeg, setIsVeg] = useState(initialItem?.isVeg ?? true);
+  const [isVeg, setIsVeg] = useState(initialItem?.isVeg ?? !isMeatItem);
   const [isBestseller, setIsBestseller] = useState(initialItem?.isBestseller || false);
   const [photo, setPhoto] = useState<File | null>(initialItem?.photo || null);
 
@@ -181,12 +464,14 @@ function ItemForm({ initialItem, onSave, onCancel }: { initialItem?: MenuItem; o
     <div className="space-y-4">
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div>
-          <label className="block text-sm font-semibold mb-1.5">Item Name <span className="text-brand-kinetic">*</span></label>
+          <label className="block text-sm font-semibold mb-1.5">
+            {isMeatItem ? "Product Name" : "Item Name"} <span className="text-brand-kinetic">*</span>
+          </label>
           <input
             type="text"
             value={name}
             onChange={(e) => setName(e.target.value)}
-            placeholder="e.g. Butter Chicken"
+            placeholder={isMeatItem ? "e.g. Chicken Curry Cut 500g" : "e.g. Butter Chicken"}
             className="w-full px-4 py-2.5 rounded-xl border border-gray-200 bg-white outline-none focus:border-brand-kinetic focus:ring-2 focus:ring-brand-kinetic/10 transition-all text-sm"
           />
         </div>
@@ -207,47 +492,48 @@ function ItemForm({ initialItem, onSave, onCancel }: { initialItem?: MenuItem; o
         <textarea
           value={description}
           onChange={(e) => setDescription(e.target.value)}
-          placeholder="e.g. Creamy tomato-based curry with tender chicken pieces"
+          placeholder={isMeatItem ? "e.g. Fresh cut pieces, cleaned and packed" : "e.g. Creamy tomato-based curry with tender chicken pieces"}
           rows={2}
           className="w-full px-4 py-2.5 rounded-xl border border-gray-200 bg-white outline-none focus:border-brand-kinetic focus:ring-2 focus:ring-brand-kinetic/10 transition-all text-sm resize-none"
         />
       </div>
 
       <div className="flex flex-wrap gap-6">
-        {/* Veg/Non-Veg Toggle */}
-        <div>
-          <label className="block text-sm font-semibold mb-1.5">Type</label>
-          <div className="flex gap-2">
-            <button
-              type="button"
-              onClick={() => setIsVeg(true)}
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg border text-xs font-semibold transition-all ${
-                isVeg
-                  ? "bg-green-50 text-green-700 border-green-300"
-                  : "bg-white text-secondary-app border-gray-200"
-              }`}
-            >
-              <span className="w-3 h-3 rounded-sm border-2 border-green-500 flex items-center justify-center shrink-0">
-                <span className="w-1.5 h-1.5 rounded-full bg-green-500" />
-              </span>
-              Veg
-            </button>
-            <button
-              type="button"
-              onClick={() => setIsVeg(false)}
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg border text-xs font-semibold transition-all ${
-                !isVeg
-                  ? "bg-red-50 text-red-700 border-red-300"
-                  : "bg-white text-secondary-app border-gray-200"
-              }`}
-            >
-              <span className="w-3 h-3 rounded-sm border-2 border-red-500 flex items-center justify-center shrink-0">
-                <span className="w-1.5 h-1.5 rounded-full bg-red-500" />
-              </span>
-              Non-Veg
-            </button>
+        {!isMeatItem && (
+          <div>
+            <label className="block text-sm font-semibold mb-1.5">Type</label>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => setIsVeg(true)}
+                className={`flex items-center gap-2 px-4 py-2 rounded-lg border text-xs font-semibold transition-all ${
+                  isVeg
+                    ? "bg-green-50 text-green-700 border-green-300"
+                    : "bg-white text-secondary-app border-gray-200"
+                }`}
+              >
+                <span className="w-3 h-3 rounded-sm border-2 border-green-500 flex items-center justify-center shrink-0">
+                  <span className="w-1.5 h-1.5 rounded-full bg-green-500" />
+                </span>
+                Veg
+              </button>
+              <button
+                type="button"
+                onClick={() => setIsVeg(false)}
+                className={`flex items-center gap-2 px-4 py-2 rounded-lg border text-xs font-semibold transition-all ${
+                  !isVeg
+                    ? "bg-red-50 text-red-700 border-red-300"
+                    : "bg-white text-secondary-app border-gray-200"
+                }`}
+              >
+                <span className="w-3 h-3 rounded-sm border-2 border-red-500 flex items-center justify-center shrink-0">
+                  <span className="w-1.5 h-1.5 rounded-full bg-red-500" />
+                </span>
+                Non-Veg
+              </button>
+            </div>
           </div>
-        </div>
+        )}
 
         {/* Bestseller Toggle */}
         <div>
@@ -262,14 +548,16 @@ function ItemForm({ initialItem, onSave, onCancel }: { initialItem?: MenuItem; o
             }`}
           >
             <Icon name="local_fire_department" className="text-base" />
-            Bestseller
+            {isMeatItem ? "Featured" : "Bestseller"}
           </button>
         </div>
       </div>
 
       {/* Photo Upload */}
       <div>
-        <label className="block text-sm font-semibold mb-1.5">Item Photo <span className="text-gray-400 font-normal">(Optional)</span></label>
+        <label className="block text-sm font-semibold mb-1.5">
+          {isMeatItem ? "Product Photo" : "Item Photo"} <span className="text-gray-400 font-normal">(Optional)</span>
+        </label>
         <div className="flex items-center gap-3">
           {photo ? (
             <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-gray-50 border border-gray-200">
@@ -318,7 +606,7 @@ function ItemForm({ initialItem, onSave, onCancel }: { initialItem?: MenuItem; o
           disabled={!name.trim() || !price}
           className="px-5 py-2.5 rounded-xl bg-brand-kinetic text-white text-sm font-semibold hover:bg-brand-kinetic/90 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          {initialItem ? "Update Item" : "Add to Menu"}
+          {initialItem ? "Update Item" : isMeatItem ? "Add Product" : "Add to Menu"}
         </button>
       </div>
     </div>
@@ -346,6 +634,18 @@ interface MenuCategory {
 // ─── Main Component ────────────────────────────────────────────────────────────
 
 export default function PartnerOnboarding() {
+  const [searchParams] = useSearchParams();
+  const partnerType: PartnerType = searchParams.get("type") === "meat" ? "meat" : "food";
+  const isMeatPartner = partnerType === "meat";
+  const copy = PARTNER_COPY[partnerType];
+  const categoryOptions = isMeatPartner ? MEAT_CATEGORY_OPTIONS : CUISINE_OPTIONS;
+  const onboardingSteps = STEPS.map((stepItem) =>
+    stepItem.num === 1
+      ? { ...stepItem, label: copy.infoTitle }
+      : stepItem.num === 2
+        ? { ...stepItem, label: isMeatPartner ? "Operational Details" : stepItem.label }
+        : stepItem
+  );
   const [step, setStep] = useState(1);
   const [submitted, setSubmitted] = useState(false);
   const [showSaveModal, setShowSaveModal] = useState(false);
@@ -559,6 +859,8 @@ export default function PartnerOnboarding() {
 
   const [ownerName, setOwnerName] = useState("");
   const [ownerEmail, setOwnerEmail] = useState("");
+  const [portalPassword, setPortalPassword] = useState("");
+  const [confirmPortalPassword, setConfirmPortalPassword] = useState("");
   const [ownerPhone, setOwnerPhone] = useState("");
   const [otpSent, setOtpSent] = useState(false);
   const [otp, setOtp] = useState("");
@@ -637,6 +939,7 @@ export default function PartnerOnboarding() {
   const [menuReferenceFile, setMenuReferenceFile] = useState<File | null>(null);
   const [menuUploadValid, setMenuUploadValid] = useState(false);
   const [menuUploadError, setMenuUploadError] = useState("");
+  const [menuUploadRows, setMenuUploadRows] = useState<UploadedMenuRow[]>([]);
   const [menuCategories, setMenuCategories] = useState<MenuCategory[]>([]);
   const [editingItem, setEditingItem] = useState<{ categoryId: string; item?: MenuItem } | null>(null);
   const [showCategoryDialog, setShowCategoryDialog] = useState(false);
@@ -685,42 +988,34 @@ export default function PartnerOnboarding() {
     setShowCategoryDialog(false);
   };
 
-  const validateMenuReferenceFile = (file: File | null) => {
+  const validateMenuReferenceFile = async (file: File | null) => {
     setMenuReferenceFile(file);
     setMenuUploadValid(false);
     setMenuUploadError("");
+    setMenuUploadRows([]);
 
     if (!file) return;
 
     const extension = file.name.split(".").pop()?.toLowerCase();
-    if (!["csv", "xls", "xlsx"].includes(extension || "")) {
-      setMenuUploadError("Upload a CSV, XLS, or XLSX menu sheet.");
+    if (!["csv", "xlsx"].includes(extension || "")) {
+      setMenuUploadError("Upload a CSV or XLSX menu sheet.");
       return;
     }
 
-    if (extension !== "csv") {
+    try {
+      const rows = extension === "csv" ? await parseCsvRows(file) : await parseXlsxRows(file);
+      setMenuUploadRows(rows);
       setMenuUploadValid(true);
-      return;
+    } catch (err: any) {
+      setMenuUploadError(err?.message || "Unable to read the uploaded menu sheet.");
+      setMenuUploadValid(false);
     }
+  };
 
-    const reader = new FileReader();
-    reader.onload = () => {
-      const firstLine = String(reader.result || "").split(/\r?\n/)[0] || "";
-      const uploadedColumns = firstLine.split(",").map((column) => column.trim());
-      const missingColumns = MENU_UPLOAD_COLUMNS.filter((column) => !uploadedColumns.includes(column));
-
-      if (missingColumns.length > 0) {
-        setMenuUploadError(`Missing columns: ${missingColumns.join(", ")}`);
-        setMenuUploadValid(false);
-        return;
-      }
-
-      setMenuUploadValid(true);
-    };
-    reader.onerror = () => {
-      setMenuUploadError("Unable to read the uploaded menu sheet.");
-    };
-    reader.readAsText(file);
+  const updateMenuUploadRowImage = (rowId: string, image: File | null) => {
+    setMenuUploadRows((rows) =>
+      rows.map((row) => row.id === rowId ? { ...row, image } : row)
+    );
   };
 
   // ── Step 3: Documents & Legal ───────────────────────────────────────────
@@ -762,6 +1057,8 @@ export default function PartnerOnboarding() {
       cuisines.length > 0 &&
       ownerName.length > 0 &&
       ownerEmail.includes("@") &&
+      portalPassword.length >= 6 &&
+      portalPassword === confirmPortalPassword &&
       otpVerified &&
       area.length > 0 &&
       city.length > 0 &&
@@ -775,7 +1072,11 @@ export default function PartnerOnboarding() {
     );
 
     if (!timingsComplete) return false;
-    if (menuSetupMode === "upload") return menuReferenceFile !== null && menuUploadValid;
+    if (isMeatPartner) return true;
+
+    if (menuSetupMode === "upload") {
+      return menuReferenceFile !== null && menuUploadValid && menuUploadRows.length > 0 && menuUploadRows.every((row) => row.image);
+    }
     return menuCategories.length > 0 && menuCategories.some((c) => c.items.length > 0);
   };
 
@@ -811,10 +1112,12 @@ export default function PartnerOnboarding() {
 
     return {
       status,
+      partnerType,
       restaurantName,
       cuisines,
       ownerName,
       ownerEmail,
+      portalPassword,
       ownerPhone,
       otp: otp || "1234",
       otpVerified,
@@ -836,6 +1139,15 @@ export default function PartnerOnboarding() {
       menuSetupMode,
       menuReferenceFile: menuReferenceFile ? { name: menuReferenceFile.name } : null,
       menuUploadValid,
+      menuUploadRows: menuUploadRows.map((row) => ({
+        category: row.category,
+        itemName: row.itemName,
+        price: row.price,
+        description: row.description,
+        type: row.type,
+        isBestseller: row.isBestseller,
+        image: row.image ? { name: row.image.name } : null,
+      })),
       menuCategories: menuCategories.map((category) => ({
         name: category.name,
         items: category.items.map((item) => ({
@@ -913,6 +1225,7 @@ export default function PartnerOnboarding() {
           <h1 className="font-display text-3xl font-bold mb-4">Application Submitted!</h1>
           <p className="text-secondary-app mb-8 leading-relaxed">
             Thank you for partnering with Hybrid. Our team will review your application and reach out within 24 hours to help you go live.
+            After approval, sign in to the vendor portal with your owner email or phone number and the password you set.
           </p>
           <Link
             to="/"
@@ -935,11 +1248,11 @@ export default function PartnerOnboarding() {
           <Link to="/partner" className="font-display text-xl font-extrabold text-brand-kinetic tracking-tighter">
             HYBRID<span className="text-on-surface"> Partner</span>
           </Link>
-          <p className="text-xs text-secondary-app mt-2 font-medium">Restaurant Onboarding</p>
+          <p className="text-xs text-secondary-app mt-2 font-medium">{copy.sidebarTitle}</p>
         </div>
 
         <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
-          {STEPS.map((s, i) => {
+          {onboardingSteps.map((s, i) => {
             const isActive = s.num === step;
             const isCompleted = s.num < step;
             return (
@@ -1006,7 +1319,7 @@ export default function PartnerOnboarding() {
               {/* Mobile step indicator */}
               <div className="lg:hidden flex items-center gap-2 text-sm">
                 <span className="font-semibold text-on-surface">Step {step}/4</span>
-                <span className="text-secondary-app">— {STEPS[step - 1].label}</span>
+                <span className="text-secondary-app">— {onboardingSteps[step - 1].label}</span>
               </div>
             </div>
             <div className="flex items-center gap-3">
@@ -1027,7 +1340,7 @@ export default function PartnerOnboarding() {
           {/* Mobile Progress Bar */}
           <div className="lg:hidden px-4 pb-3">
             <div className="flex items-center justify-between gap-1">
-              {STEPS.map((s) => {
+              {onboardingSteps.map((s) => {
                 const isActive = s.num === step;
                 const isCompleted = s.num < step;
                 return (
@@ -1053,8 +1366,8 @@ export default function PartnerOnboarding() {
           {step === 1 && (
             <div>
               <div className="mb-8">
-                <h1 className="font-display text-2xl lg:text-3xl font-bold mb-2">Restaurant Information</h1>
-                <p className="text-secondary-app text-sm">Tell us about your restaurant to get started.</p>
+                <h1 className="font-display text-2xl lg:text-3xl font-bold mb-2">{copy.infoTitle}</h1>
+                <p className="text-secondary-app text-sm">{copy.infoIntro}</p>
               </div>
 
               {/* ── Section 1.1: Restaurant Details ── */}
@@ -1063,31 +1376,31 @@ export default function PartnerOnboarding() {
                   <div className="w-8 h-8 rounded-lg bg-brand-kinetic/10 flex items-center justify-center">
                     <Icon name="store" className="text-base text-brand-kinetic" />
                   </div>
-                  <h2 className="font-display text-lg font-bold">Restaurant Details</h2>
+                  <h2 className="font-display text-lg font-bold">{copy.detailsTitle}</h2>
                 </div>
 
                 <div className="space-y-5 bg-white rounded-2xl border border-gray-200 p-6">
                   <div>
                     <label className="block text-sm font-semibold mb-2">
-                      Restaurant Name <span className="text-brand-kinetic">*</span>
+                      {copy.businessLabel} <span className="text-brand-kinetic">*</span>
                     </label>
                     <p className="text-xs text-secondary-app mb-2">The public name displayed to customers</p>
                     <input
                       type="text"
                       value={restaurantName}
                       onChange={(e) => setRestaurantName(e.target.value)}
-                      placeholder="e.g. Paradise Biryani"
+                      placeholder={copy.businessPlaceholder}
                       className="w-full px-4 py-3 rounded-xl border border-gray-200 bg-white outline-none focus:border-brand-kinetic focus:ring-2 focus:ring-brand-kinetic/10 transition-all text-sm"
                     />
                   </div>
 
                   <div>
                     <label className="block text-sm font-semibold mb-2">
-                      Cuisine / Food Category <span className="text-brand-kinetic">*</span>
+                      {copy.categoryLabel} <span className="text-brand-kinetic">*</span>
                     </label>
-                    <p className="text-xs text-secondary-app mb-2">Select all that apply to your restaurant</p>
+                    <p className="text-xs text-secondary-app mb-2">{copy.categoryHelp}</p>
                     <div className="flex flex-wrap gap-2">
-                      {CUISINE_OPTIONS.map((c) => (
+                      {categoryOptions.map((c) => (
                         <button
                           key={c}
                           type="button"
@@ -1146,6 +1459,49 @@ export default function PartnerOnboarding() {
                         className="w-full px-4 py-3 rounded-xl border border-gray-200 bg-white outline-none focus:border-brand-kinetic focus:ring-2 focus:ring-brand-kinetic/10 transition-all text-sm"
                       />
                     </div>
+                  </div>
+
+                  <div className="rounded-xl border border-brand-kinetic/20 bg-brand-kinetic/5 p-4">
+                    <div className="mb-4 flex items-start gap-3">
+                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white text-brand-kinetic shadow-sm">
+                        <Icon name="admin_panel_settings" className="text-lg" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-semibold text-on-surface">Vendor portal login</p>
+                        <p className="mt-1 text-xs text-secondary-app">
+                          The owner email or phone number and this password will be used to sign in to the vendor panel after approval.
+                        </p>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                      <div>
+                        <label className="block text-sm font-semibold mb-2">
+                          Password <span className="text-brand-kinetic">*</span>
+                        </label>
+                        <input
+                          type="password"
+                          value={portalPassword}
+                          onChange={(e) => setPortalPassword(e.target.value)}
+                          placeholder="Minimum 6 characters"
+                          className="w-full px-4 py-3 rounded-xl border border-gray-200 bg-white outline-none focus:border-brand-kinetic focus:ring-2 focus:ring-brand-kinetic/10 transition-all text-sm"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-semibold mb-2">
+                          Confirm Password <span className="text-brand-kinetic">*</span>
+                        </label>
+                        <input
+                          type="password"
+                          value={confirmPortalPassword}
+                          onChange={(e) => setConfirmPortalPassword(e.target.value)}
+                          placeholder="Re-enter password"
+                          className="w-full px-4 py-3 rounded-xl border border-gray-200 bg-white outline-none focus:border-brand-kinetic focus:ring-2 focus:ring-brand-kinetic/10 transition-all text-sm"
+                        />
+                      </div>
+                    </div>
+                    {confirmPortalPassword && portalPassword !== confirmPortalPassword && (
+                      <p className="mt-2 text-xs font-medium text-red-600">Passwords do not match.</p>
+                    )}
                   </div>
 
                   {/* Phone with OTP */}
@@ -1447,8 +1803,10 @@ export default function PartnerOnboarding() {
           {step === 2 && (
             <div>
               <div className="mb-8">
-                <h1 className="font-display text-2xl lg:text-3xl font-bold mb-2">Menu &amp; Operational Details</h1>
-                <p className="text-secondary-app text-sm">Set up your restaurant's operating hours and add your menu items.</p>
+                <h1 className="font-display text-2xl lg:text-3xl font-bold mb-2">
+                  {isMeatPartner ? "Operational Details" : "Menu & Operational Details"}
+                </h1>
+                <p className="text-secondary-app text-sm">{copy.menuHelp}</p>
               </div>
 
               {/* ── Section 2.1: Operational Timings ── */}
@@ -1513,7 +1871,7 @@ export default function PartnerOnboarding() {
                         Add Slot
                       </button>
                     </div>
-                    <p className="text-xs text-secondary-app mb-3">Add multiple time slots if your restaurant has break times.</p>
+                    <p className="text-xs text-secondary-app mb-3">{copy.operatingHelp}</p>
                     <div className="flex flex-wrap gap-2 mb-4">
                       {selectedDays.map((day) => (
                         <button
@@ -1567,18 +1925,21 @@ export default function PartnerOnboarding() {
               </section>
 
               {/* ── Section 2.2: Menu Setup ── */}
-              <section className="mb-10">
-                <div className="flex items-center gap-2 mb-6">
-                  <div className="w-8 h-8 rounded-lg bg-brand-kinetic/10 flex items-center justify-center">
-                    <Icon name="menu_book" className="text-base text-brand-kinetic" />
+              {!isMeatPartner && (
+                <section className="mb-10">
+                  <div className="flex items-center gap-2 mb-6">
+                    <div className="w-8 h-8 rounded-lg bg-brand-kinetic/10 flex items-center justify-center">
+                      <Icon name="menu_book" className="text-base text-brand-kinetic" />
+                    </div>
+                    <h2 className="font-display text-lg font-bold">{copy.menuTitle}</h2>
                   </div>
-                  <h2 className="font-display text-lg font-bold">Menu Setup</h2>
-                </div>
 
-                <div className="space-y-5">
+                  <div className="space-y-5">
                   {/* Setup Mode Toggle */}
                   <div className="bg-white rounded-2xl border border-gray-200 p-6">
-                    <label className="block text-sm font-semibold mb-3">How would you like to set up your menu?</label>
+                    <label className="block text-sm font-semibold mb-3">
+                      How would you like to set up your {isMeatPartner ? "product list" : "menu"}?
+                    </label>
                     <div className="flex gap-3">
                       <button
                         type="button"
@@ -1602,20 +1963,43 @@ export default function PartnerOnboarding() {
                         }`}
                       >
                         <Icon name="upload_file" className="text-lg" />
-                        Upload Menu Reference
+                        Upload {isMeatPartner ? "Product" : "Menu"} Reference
                       </button>
                     </div>
+                    {menuSetupMode === "upload" && (
+                      <div className="mt-4 flex flex-col gap-3 rounded-xl border border-brand-kinetic/20 bg-brand-kinetic/5 p-4 sm:flex-row sm:items-center sm:justify-between">
+                        <div className="flex items-start gap-3">
+                          <div className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white text-brand-kinetic shadow-sm">
+                            <Icon name="table_view" className="text-lg" />
+                          </div>
+                          <div>
+                            <p className="text-sm font-semibold text-on-surface">Spreadsheet example</p>
+                            <p className="mt-1 text-xs text-secondary-app">
+                              Use this template and keep the same columns. Item photos are uploaded below after the sheet is read.
+                            </p>
+                          </div>
+                        </div>
+                        <a
+                          href={MENU_TEMPLATE_FILE}
+                          download
+                          className="inline-flex items-center justify-center gap-2 rounded-lg border border-brand-kinetic/30 bg-white px-4 py-2 text-xs font-semibold text-brand-kinetic transition-all hover:bg-brand-kinetic/10"
+                        >
+                          <Icon name="download" className="text-base" />
+                          Download template
+                        </a>
+                      </div>
+                    )}
                   </div>
 
                   {/* Upload Mode */}
                   {menuSetupMode === "upload" && (
                     <div className="bg-white rounded-2xl border border-gray-200 p-6">
                       <FileUploader
-                        label="Upload Your Menu"
-                        desc="Upload a clear photo or PDF of your menu — our team will digitize it for you"
+                        label={isMeatPartner ? "Upload Your Product Sheet" : "Upload Your Menu"}
+                        desc={`Upload your completed CSV or XLSX ${isMeatPartner ? "product" : "menu"} spreadsheet`}
                         file={menuReferenceFile}
                         onChange={validateMenuReferenceFile}
-                        accept=".csv,.xls,.xlsx"
+                        accept=".csv,.xlsx"
                       />
                       <p className="mt-3 text-xs text-secondary-app">
                         Required columns: {MENU_UPLOAD_COLUMNS.join(", ")}
@@ -1629,7 +2013,79 @@ export default function PartnerOnboarding() {
                       {menuUploadValid && menuReferenceFile && (
                         <div className="mt-3 flex items-center gap-2 rounded-lg border border-green-200 bg-green-50 px-3 py-2 text-xs font-medium text-green-700">
                           <Icon name="check_circle" className="text-base" />
-                          Menu sheet accepted.
+                          Sheet accepted. Add item images below to continue.
+                        </div>
+                      )}
+                      {menuUploadRows.length > 0 && (
+                        <div className="mt-4 overflow-hidden rounded-xl border border-gray-200">
+                          <div className="flex items-center justify-between gap-3 border-b border-gray-200 bg-gray-50 px-4 py-3">
+                            <div>
+                              <p className="text-sm font-semibold text-on-surface">Item images</p>
+                              <p className="text-xs text-secondary-app">
+                                {menuUploadRows.filter((row) => row.image).length}/{menuUploadRows.length} images added
+                              </p>
+                            </div>
+                            <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-secondary-app">
+                              Required
+                            </span>
+                          </div>
+                          <div className="overflow-x-auto">
+                            <table className="w-full min-w-[680px] text-left text-sm">
+                              <thead className="bg-white text-xs font-semibold uppercase tracking-wide text-secondary-app">
+                                <tr>
+                                  <th className="px-4 py-3">Category</th>
+                                  <th className="px-4 py-3">Item</th>
+                                  <th className="px-4 py-3">Price</th>
+                                  <th className="px-4 py-3">Type</th>
+                                  <th className="px-4 py-3">Image</th>
+                                </tr>
+                              </thead>
+                              <tbody className="divide-y divide-gray-100 bg-white">
+                                {menuUploadRows.map((row) => (
+                                  <tr key={row.id}>
+                                    <td className="px-4 py-3 text-secondary-app">{row.category || "-"}</td>
+                                    <td className="px-4 py-3 font-semibold text-on-surface">{row.itemName || "-"}</td>
+                                    <td className="px-4 py-3 text-secondary-app">{row.price || "-"}</td>
+                                    <td className="px-4 py-3 text-secondary-app">{row.type || "-"}</td>
+                                    <td className="px-4 py-3">
+                                      {row.image ? (
+                                        <div className="flex items-center gap-2">
+                                          <Icon name="image" className="text-lg text-green-600" />
+                                          <span className="max-w-[150px] truncate text-xs font-semibold text-green-700">
+                                            {row.image.name}
+                                          </span>
+                                          <button
+                                            type="button"
+                                            onClick={() => updateMenuUploadRowImage(row.id, null)}
+                                            className="text-gray-400 transition-colors hover:text-red-500"
+                                            aria-label={`Remove image for ${row.itemName || "item"}`}
+                                          >
+                                            <Icon name="close" className="text-sm" />
+                                          </button>
+                                        </div>
+                                      ) : (
+                                        <label className="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-dashed border-gray-300 px-3 py-2 text-xs font-semibold text-secondary-app transition-all hover:border-brand-kinetic/40 hover:text-brand-kinetic">
+                                          <Icon name="add_photo_alternate" className="text-base" />
+                                          Upload image
+                                          <input
+                                            type="file"
+                                            accept="image/*"
+                                            className="hidden"
+                                            onChange={(e) => updateMenuUploadRowImage(row.id, e.target.files?.[0] || null)}
+                                          />
+                                        </label>
+                                      )}
+                                    </td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                          {!menuUploadRows.every((row) => row.image) && (
+                            <div className="border-t border-amber-200 bg-amber-50 px-4 py-3 text-xs font-medium text-amber-700">
+                              Upload an image for every item before moving to the next step.
+                            </div>
+                          )}
                         </div>
                       )}
                       <div className="mt-4 p-4 rounded-xl bg-blue-50 border border-blue-200">
@@ -1638,7 +2094,7 @@ export default function PartnerOnboarding() {
                           <div>
                             <p className="text-sm font-semibold text-blue-800">Our team will handle the rest</p>
                             <p className="text-xs text-blue-600 mt-1">
-                              Once you submit your application, our onboarding specialist will digitize your menu, verify pricing, and set everything up for you within 24 hours.
+                              Once you submit your application, our onboarding specialist will review your sheet and item images, verify pricing, and set everything up for you within 24 hours.
                             </p>
                           </div>
                         </div>
@@ -1652,10 +2108,10 @@ export default function PartnerOnboarding() {
                       <div className="bg-white rounded-2xl border border-gray-200 p-6">
                         <div className="flex items-center justify-between mb-5">
                           <div>
-                            <label className="text-sm font-semibold">Menu Categories &amp; Items</label>
-                            <p className="text-xs text-secondary-app mt-1">
-                              Add categories (e.g. Appetizers, Main Course) and their items
-                            </p>
+                            <label className="text-sm font-semibold">
+                              {isMeatPartner ? "Product Categories & Items" : "Menu Categories & Items"}
+                            </label>
+                            <p className="text-xs text-secondary-app mt-1">{copy.manualCategoryHelp}</p>
                           </div>
                           {menuCategories.length > 0 && (
                             <span className="text-xs font-semibold text-secondary-app bg-gray-100 px-3 py-1 rounded-full">
@@ -1670,8 +2126,8 @@ export default function PartnerOnboarding() {
                             <div className="w-16 h-16 rounded-2xl bg-gray-100 flex items-center justify-center mx-auto mb-4">
                               <Icon name="restaurant_menu" className="text-3xl text-gray-400" />
                             </div>
-                            <p className="text-sm font-semibold text-on-surface mb-1">No menu items yet</p>
-                            <p className="text-xs text-secondary-app mb-5">Add your first category to start building your menu</p>
+                            <p className="text-sm font-semibold text-on-surface mb-1">{copy.manualEmptyTitle}</p>
+                            <p className="text-xs text-secondary-app mb-5">{copy.manualEmptyHelp}</p>
                           </div>
                         ) : (
                           /* Category + Item List */
@@ -1840,6 +2296,7 @@ export default function PartnerOnboarding() {
 
                           <ItemForm
                             initialItem={editingItem.item}
+                            partnerType={partnerType}
                             onSave={(item) => {
                               setMenuCategories(
                                 menuCategories.map((cat) => {
@@ -1864,8 +2321,9 @@ export default function PartnerOnboarding() {
                       )}
                     </div>
                   )}
-                </div>
-              </section>
+                  </div>
+                </section>
+              )}
             </div>
           )}
 
@@ -1945,7 +2403,7 @@ export default function PartnerOnboarding() {
                           onChange={() => setGstExempt(!gstExempt)}
                           className="accent-brand-kinetic"
                         />
-                        My restaurant is exempt / Composition scheme
+                        {copy.gstExemptLabel}
                       </label>
                     </div>
                     {!gstExempt && (
@@ -1967,20 +2425,22 @@ export default function PartnerOnboarding() {
                     )}
                     {gstExempt && (
                       <div className="p-4 rounded-xl bg-blue-50 border border-blue-200">
-                        <p className="text-xs font-medium text-blue-700">Noted — your restaurant is marked as GST exempt/composition scheme.</p>
+                        <p className="text-xs font-medium text-blue-700">
+                          Noted — your {isMeatPartner ? "meat center" : "restaurant"} is marked as GST exempt/composition scheme.
+                        </p>
                       </div>
                     )}
                   </div>
                 </div>
               </section>
 
-              {/* ── Section 3.2: Food Safety License ── */}
+              {/* ── Section 3.2: Safety License ── */}
               <section className="mb-10">
                 <div className="flex items-center gap-2 mb-6">
                   <div className="w-8 h-8 rounded-lg bg-brand-kinetic/10 flex items-center justify-center">
                     <Icon name="verified" className="text-base text-brand-kinetic" />
                   </div>
-                  <h2 className="font-display text-lg font-bold">Food Safety License</h2>
+                  <h2 className="font-display text-lg font-bold">{copy.safetyTitle}</h2>
                 </div>
 
                 <div className="space-y-5 bg-white rounded-2xl border border-gray-200 p-6">
@@ -2013,7 +2473,7 @@ export default function PartnerOnboarding() {
 
                   <FileUploader
                     label="Upload FSSAI License Copy"
-                    desc="Upload a clear scan or photo of your FSSAI license"
+                    desc={copy.safetyUploadDescription}
                     required
                     file={fssaiFile}
                     onChange={setFssaiFile}
@@ -2201,7 +2661,7 @@ export default function PartnerOnboarding() {
                         This Partner Merchant Agreement ("Agreement") is entered into between the merchant ("Partner") and HYBRID Technologies Inc. ("Platform").
                       </p>
                       <p className="mb-2">
-                        <strong className="text-on-surface">1. Services:</strong> The Platform agrees to list the Partner's restaurant and facilitate the sale and delivery of food items to end customers through the HYBRID platform.
+                        <strong className="text-on-surface">1. Services:</strong> The Platform agrees to list the Partner's {isMeatPartner ? "meat center" : "restaurant"} and facilitate {copy.contractServiceText} to end customers through the HYBRID platform.
                       </p>
                       <p className="mb-2">
                         <strong className="text-on-surface">2. Commission:</strong> Partner agrees to pay a commission on each order as per the agreed commission structure. Commission rates are subject to review and modification with 30 days' notice.
@@ -2210,10 +2670,10 @@ export default function PartnerOnboarding() {
                         <strong className="text-on-surface">3. Payment Terms:</strong> All payments due to Partner will be settled on a weekly basis, net of commissions, fees, and applicable taxes. Partner is responsible for providing accurate bank account details.
                       </p>
                       <p className="mb-2">
-                        <strong className="text-on-surface">4. Menu & Pricing:</strong> Partner retains the right to set menu prices. The Platform may suggest pricing optimization. Partner must maintain accurate menu listings and availability.
+                        <strong className="text-on-surface">4. {isMeatPartner ? "Products" : "Menu"} & Pricing:</strong> Partner retains the right to set prices. The Platform may suggest pricing optimization. Partner must maintain accurate listings and availability.
                       </p>
                       <p className="mb-2">
-                        <strong className="text-on-surface">5. Quality Standards:</strong> Partner agrees to maintain food quality, hygiene standards, and packaging requirements as specified by the Platform. Non-compliance may result in de-listing.
+                        <strong className="text-on-surface">5. Quality Standards:</strong> Partner agrees to maintain quality, hygiene standards, and packaging requirements as specified by the Platform. Non-compliance may result in de-listing.
                       </p>
                       <p className="mb-2">
                         <strong className="text-on-surface">6. Term & Termination:</strong> This agreement shall remain in effect until terminated by either party with 30 days' written notice. The Platform reserves the right to terminate immediately for breach of terms.
@@ -2222,7 +2682,7 @@ export default function PartnerOnboarding() {
                         <strong className="text-on-surface">7. Data & Privacy:</strong> Partner agrees to the collection and use of customer order data for analytics and platform improvement purposes, in accordance with applicable data protection laws.
                       </p>
                       <p className="mb-2">
-                        <strong className="text-on-surface">8. Indemnification:</strong> Partner agrees to indemnify and hold the Platform harmless from any claims arising from the quality or safety of food products, delivery delays, or any breach of applicable laws.
+                        <strong className="text-on-surface">8. Indemnification:</strong> Partner agrees to indemnify and hold the Platform harmless from any claims arising from the quality or safety of products, delivery delays, or any breach of applicable laws.
                       </p>
                       <p className="mt-3 text-on-surface">
                         By accepting this agreement, you acknowledge that you have read, understood, and agreed to all the terms and conditions outlined above.
@@ -2288,7 +2748,7 @@ export default function PartnerOnboarding() {
 
                 <div className="space-y-3">
                   {[
-                    { label: "Restaurant", value: restaurantName, detail: `${cuisines.join(", ")} · ${area}, ${city}` },
+                    { label: copy.summaryLabel, value: restaurantName, detail: `${cuisines.join(", ")} · ${area}, ${city}` },
                     { label: "Owner", value: ownerName, detail: `${ownerEmail} · ${ownerPhone}` },
                     { label: "Hours", value: `${selectedDays.length} days/week`, detail: selectedDays.map(day => `${day}: ${(dayTimeSlots[day] || []).map(s => `${s.open} - ${s.close}`).join(", ")}`).join(" | ") },
                     { label: "Documents", value: "All uploaded ✓", detail: `PAN · ${gstExempt ? "GST Exempt" : "GST"} · FSSAI · Bank` },
