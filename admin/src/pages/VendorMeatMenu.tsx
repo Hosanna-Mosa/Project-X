@@ -4,7 +4,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { adminFetch } from "@/lib/api-client";
 import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
-import { Drumstick, AlertCircle, Plus, Trash2 } from "lucide-react";
+import { Drumstick, AlertCircle, Plus, Trash2, Check, X, IndianRupee, Pencil } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
