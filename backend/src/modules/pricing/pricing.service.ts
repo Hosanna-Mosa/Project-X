@@ -40,6 +40,11 @@ const DEFAULT_RATES: Record<ServiceType, RateConfig> = {
     perKmRate: parseFloat(process.env.RATE_DELIVERY_PER_KM || "12"),
     perMinRate: parseFloat(process.env.RATE_DELIVERY_PER_MIN || "2"),
   },
+  [ServiceType.HELPER]: {
+    baseFare: parseFloat(process.env.RATE_HELPER_BASE || "99"),
+    perKmRate: parseFloat(process.env.RATE_HELPER_PER_KM || "15"),
+    perMinRate: parseFloat(process.env.RATE_HELPER_PER_MIN || "2"),
+  },
 };
 
 export class PricingService {

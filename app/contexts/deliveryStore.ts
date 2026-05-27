@@ -60,6 +60,7 @@ export interface DeliveryState {
   driver: any | null;
   activeChat: ChatMessage[];
   unreadCount: number;
+  isChatActive: boolean;
   vendorId: string | null;
   setCurrentLocation: (address: string) => void;
   setCurrentCoords: (coords: { lat: number; lng: number }) => void;
@@ -84,6 +85,7 @@ export interface DeliveryState {
   clearChat: () => void;
   setUnreadCount: (count: number) => void;
   incrementUnreadCount: () => void;
+  setIsChatActive: (active: boolean) => void;
 }
 
 const generateId = () =>
@@ -103,6 +105,7 @@ const initialState = {
   driver: null,
   activeChat: [],
   unreadCount: 0,
+  isChatActive: false,
   vendorId: null,
 };
 
@@ -205,4 +208,5 @@ export const useDeliveryStore = create<DeliveryState>((set, get) => ({
   clearChat: () => set({ activeChat: [], unreadCount: 0 }),
   setUnreadCount: (unreadCount) => set({ unreadCount }),
   incrementUnreadCount: () => set((state) => ({ unreadCount: state.unreadCount + 1 })),
+  setIsChatActive: (isChatActive) => set({ isChatActive }),
 }));

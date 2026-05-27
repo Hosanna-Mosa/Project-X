@@ -1,6 +1,7 @@
 import mongoose from "mongoose";
 import Order, { OrderStatus, ServiceType, StopType } from "../../database/models/Order";
 import User from "../../database/models/User";
+import Driver from "../../database/models/Driver";
 import { RoutingService } from "../routing/routing.service";
 import { PricingService } from "../pricing/pricing.service";
 import { SocketManager } from "../../sockets/socket.manager";
@@ -9,7 +10,7 @@ export class OrdersService {
   private routingService = new RoutingService();
   private pricingService = new PricingService();
 
-  async createOrder(userId: string, stopsData: any[], serviceType?: ServiceType, vendorId?: string, totals?: any) {
+  async createOrder(userId: string, stopsData: any[], serviceType?: ServiceType, vendorId?: string, totals?: any, radius?: number, duration?: number) {
     if (!mongoose.Types.ObjectId.isValid(userId)) {
       throw new Error("Invalid User ID format");
     }
@@ -65,21 +66,37 @@ export class OrdersService {
       };
     }
 
-    const orderStops = optimizationResult.optimizedStops.map((stop: any, index: number) => ({
-      sequence: index + 1,
-      location: {
-        type: "Point",
-        coordinates: [stop.longitude, stop.latitude],
-      },
-      address: stop.address,
-      type: stop.type || StopType.PICKUP,
-      items: {
-        lines: stop.items || [],
-        instructions: stop.instructions,
-        deliveryAddress: stop.deliveryAddress,
-        totals: stop.type === StopType.DROP ? totals : undefined,
-      },
-    }));
+    const orderStops = optimizationResult.optimizedStops.map((stop: any, index: number) => {
+      let normalizedType = StopType.DROP;
+      if (stop.type) {
+        const typeLC = stop.type.toLowerCase();
+        if (typeLC === "pickup") {
+          normalizedType = StopType.PICKUP;
+        } else if (typeLC === "stop") {
+          normalizedType = StopType.STOP;
+        } else {
+          normalizedType = StopType.DROP;
+        }
+      } else {
+        normalizedType = index === 0 ? StopType.PICKUP : StopType.DROP;
+      }
+
+      return {
+        sequence: index + 1,
+        location: {
+          type: "Point",
+          coordinates: [stop.longitude, stop.latitude],
+        },
+        address: stop.address,
+        type: normalizedType,
+        items: {
+          lines: stop.items || [],
+          instructions: stop.instructions,
+          deliveryAddress: stop.deliveryAddress,
+          totals: normalizedType === StopType.DROP ? totals : undefined,
+        },
+      };
+    });
 
     const order = new Order({
       user: userId,
@@ -90,6 +107,8 @@ export class OrdersService {
       priceBreakdown,
       status: isRide ? OrderStatus.SEARCHING_DRIVER : OrderStatus.SEARCHING_DRIVER,
       stops: orderStops,
+      radius,
+      duration,
     });
 
     const savedOrder = await order.save();
@@ -108,7 +127,8 @@ export class OrdersService {
         id: savedOrder._id,
         serviceType: effectiveType,
         distance: `${optimizationResult.totalDistance} km`,
-        duration: `${optimizationResult.estimatedTime} min`,
+        duration: duration ? `${duration} hrs` : `${optimizationResult.estimatedTime} min`,
+        radius: radius,
         earnings: Math.round(savedOrder.totalPrice * 0.8),
         customerName: user.name || "Customer",
         customerPhone: user.phone || "N/A",
@@ -181,7 +201,18 @@ export class OrdersService {
     if (!order) throw new Error("Order not found");
     
     order.status = status;
-    return order.save();
+    const savedOrder = await order.save();
+
+    // Broadcast status change via Socket
+    const socketManager = SocketManager.getInstance();
+    if (socketManager) {
+      socketManager.emitToOrderRoom(orderId.toString(), "order_status_update", {
+        orderId: orderId.toString(),
+        status: status,
+      });
+    }
+
+    return savedOrder;
   }
 
   async getUserOrders(userId: string) {
@@ -192,5 +223,45 @@ export class OrdersService {
     return Order.find({ vendor: vendorId })
       .populate("user")
       .sort({ createdAt: -1 });
+  }
+
+  async acceptOrder(orderId: string, driverUserId: string) {
+    if (!mongoose.Types.ObjectId.isValid(orderId)) {
+      throw new Error("Invalid order ID");
+    }
+
+    const driver = await Driver.findOne({ user: driverUserId });
+    if (!driver) throw new Error("Driver profile not found");
+
+    const order = await Order.findById(orderId);
+    if (!order) throw new Error("Order not found");
+
+    if (order.status !== OrderStatus.SEARCHING_DRIVER) {
+      throw new Error("Order is no longer available");
+    }
+
+    order.driver = driver._id;
+    order.status = OrderStatus.DRIVER_ASSIGNED;
+    const savedOrder = await order.save();
+
+    // Broadcast to the customer that order is accepted
+    const socketManager = SocketManager.getInstance();
+    if (socketManager) {
+      // Driver details to send to customer
+      const driverUser = await User.findById(driver.user);
+      const driverInfo = {
+        id: driver._id,
+        name: driverUser?.name || "Driver",
+        phone: driverUser?.phone || "",
+        vehicle: driver.vehicleType || "unknown",
+      };
+      
+      socketManager.emitToOrderRoom(orderId.toString(), "order_accepted", {
+        orderId: orderId.toString(),
+        driver: driverInfo,
+      });
+    }
+
+    return savedOrder;
   }
 }

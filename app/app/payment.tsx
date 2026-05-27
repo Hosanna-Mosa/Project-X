@@ -131,7 +131,7 @@ export default function PaymentScreen() {
                 storeName: vendor?.name || "Restaurant",
                 latitude: pickupLat,
                 longitude: pickupLng,
-                type: "PICKUP",
+                type: "pickup",
                 items: [],
               },
               {
@@ -140,7 +140,7 @@ export default function PaymentScreen() {
                 deliveryAddress,
                 latitude: dropLat,
                 longitude: dropLng,
-                type: "DROP",
+                type: "drop",
                 instructions: params.instructions || "",
                 items: orderItems,
               },
@@ -155,9 +155,11 @@ export default function PaymentScreen() {
       const finalOrder = verifyData.order;
       setOrderId(finalOrder._id || finalOrder.id);
       setStatus("confirmed");
-      clearCart();
       Alert.alert("Order placed", "Payment successful. Your order is now being assigned.");
-      router.replace("/(tabs)/orders");
+      router.replace({
+        pathname: "/finding-driver",
+        params: { orderId: finalOrder._id || finalOrder.id }
+      });
     } catch (error: any) {
       console.error("Food payment failed", error);
       Alert.alert("Payment failed", error.message || "Please try again.");

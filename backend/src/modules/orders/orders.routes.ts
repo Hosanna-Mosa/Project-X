@@ -13,5 +13,6 @@ router.get("/estimate-fare", authenticateToken, ordersController.estimateFare.bi
 router.get("/vendor/:vendorId", ordersController.getVendorOrders.bind(ordersController));
 router.get("/:id", authenticateToken, ordersController.getOrder.bind(ordersController));
 router.patch("/:id/status", authenticateToken, ordersController.updateStatus.bind(ordersController));
+router.post("/:id/accept", authenticateToken, authorizeRole([UserRole.DRIVER]), ordersController.accept.bind(ordersController));
 
 export default router;

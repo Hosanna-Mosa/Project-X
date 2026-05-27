@@ -570,30 +570,35 @@ export default function RideConfirmationScreen() {
           <View style={styles.actionRow}>
             <TouchableOpacity
               style={styles.bookBtn}
-              onPress={() =>
-                router.push({
-                  pathname: "/pickup-confirmation",
-                  params: {
-                    serviceId: params.serviceId,
-                    rideId: selectedRide.id,
-                    rideName: selectedRide.name,
-                    ridePrice: selectedRide.price,
-                    pickupName: params.pickupName,
-                    dropName: params.dropName,
-                    pickupLat: params.pickupLat,
-                    pickupLng: params.pickupLng,
-                    dropLat: params.dropLat,
-                    dropLng: params.dropLng,
-                    stops: params.stops,
-                    estimatedMinutes: fareEstimate?.estimatedMinutes?.toString() || "",
-                    distanceInKm: fareEstimate?.distanceInKm?.toString() || "",
-                    fareTotal: backendFare?.toString() || "",
-                  },
-                })
-              }
+              onPress={async () => {
+                if (fareLoading) return;
+                setFareLoading(true); // Re-using this state for booking loading
+                try {
+                  const orderStops = [
+                    { address: params.pickupName, latitude: pickupCoords.latitude, longitude: pickupCoords.longitude, type: "pickup" },
+                    ...stops.map((s: any) => ({ address: s.name, latitude: s.lat, longitude: s.lng, type: "stop" })),
+                    { address: params.dropName, latitude: dropCoords.latitude, longitude: dropCoords.longitude, type: "drop" }
+                  ];
+                  const res = await customFetch<{ _id: string }>("/api/v1/orders", {
+                    method: "POST",
+                    body: JSON.stringify({
+                      stops: orderStops,
+                      serviceType: serviceType,
+                    })
+                  });
+                  router.push({
+                    pathname: "/finding-driver",
+                    params: { orderId: res._id }
+                  });
+                } catch (e: any) {
+                  Alert.alert("Booking Failed", e.message);
+                } finally {
+                  setFareLoading(false);
+                }
+              }}
             >
               <Text style={styles.bookBtnText}>
-                {fareLoading ? "Loading fare..." : `Choose ${selectedRide.name}`}
+                {fareLoading ? "Loading..." : `Choose ${selectedRide.name}`}
               </Text>
             </TouchableOpacity>
 
