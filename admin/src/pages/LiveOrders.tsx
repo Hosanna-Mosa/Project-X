@@ -79,7 +79,7 @@ export default function LiveOrders() {
               ) : (
                 orders.map((o: any) => (
                   <tr key={o._id} className="border-t border-border hover:bg-muted/30 transition-colors">
-                    <td className="px-6 py-4 text-sm font-medium text-primary">#{o._id.substring(o._id.length - 6).toUpperCase()}</td>
+                    <td className="px-6 py-4 text-sm font-medium text-primary">{o._id.startsWith("ORD-") ? o._id : `#${o._id.substring(o._id.length - 6).toUpperCase()}`}</td>
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-3">
                         <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center text-xs font-semibold text-primary">

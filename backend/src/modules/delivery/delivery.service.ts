@@ -2,6 +2,7 @@ import { DriverService } from "../drivers/drivers.service";
 import Order, { OrderStatus } from "../../database/models/Order";
 import Driver from "../../database/models/Driver";
 import { SocketManager } from "../../sockets/socket.manager";
+import mongoose from "mongoose";
 
 export class DeliveryService {
   private driverService = new DriverService();
@@ -33,7 +34,11 @@ export class DeliveryService {
   }
 
   async acceptOrder(orderId: string, driverId: string) {
-    const order = await Order.findById(orderId).populate("user");
+    let query: any = { _id: orderId };
+    if (mongoose.Types.ObjectId.isValid(orderId)) {
+      query = { $or: [{ _id: orderId }, { _id: new mongoose.Types.ObjectId(orderId) }] };
+    }
+    const order = await Order.findOne(query).populate("user");
 
     if (!order) throw new Error("Order not found");
     if (order.status !== OrderStatus.SEARCHING_DRIVER) {

@@ -1,6 +1,7 @@
 import React, { useEffect } from "react";
 import { useDriverStore } from "@/store/driverStore";
 import { socketService } from "@/utils/socketService";
+import { Alert } from "react-native";
 
 export function GlobalSocketHandler() {
   const currentOrderId = useDriverStore((s) => s.currentOrder?.id);
@@ -36,8 +37,34 @@ export function GlobalSocketHandler() {
 
     socketService.on("receive_message", handleReceiveMessage);
 
+    const handleStatusUpdate = (data: any) => {
+      console.log("[GlobalSocketHandler] Order status update received:", data);
+      const { orderId, status } = data;
+      
+      const store = useDriverStore.getState();
+      const current = store.currentOrder;
+      
+      if (current && (current.id === orderId || current.id.toString() === orderId.toString())) {
+        if (current.status !== status) {
+          useDriverStore.setState({
+            currentOrder: {
+              ...current,
+              status: status
+            }
+          });
+
+          if (status === "picking_items") {
+            Alert.alert("Order Prepared", "The order is prepared and ready for pickup!");
+          }
+        }
+      }
+    };
+
+    socketService.on("order_status_update", handleStatusUpdate);
+
     return () => {
       socketService.off("receive_message", handleReceiveMessage);
+      socketService.off("order_status_update", handleStatusUpdate);
     };
   }, [currentOrderId]);
 

@@ -62,7 +62,7 @@ export default function VendorDashboard() {
     const handleNewOrder = (data: any) => {
       console.log("[SOCKET] New order received:", data);
       playChime();
-      toast.success(`New order received! Order #${data.id.slice(-6).toUpperCase()}`, {
+      toast.success(`New order received! Order ${data.id.startsWith("ORD-") ? data.id : `#${data.id.slice(-6).toUpperCase()}`}`, {
         duration: 8000,
         action: {
           label: "Refresh",
@@ -217,7 +217,7 @@ export default function VendorDashboard() {
                           <Package className="h-5 w-5 text-primary" />
                         </div>
                         <div>
-                          <p className="text-sm font-semibold text-foreground">Order #{order._id.slice(-6).toUpperCase()}</p>
+                          <p className="text-sm font-semibold text-foreground">Order {order._id.startsWith("ORD-") ? order._id : `#${order._id.slice(-6).toUpperCase()}`}</p>
                           <p className="text-xs text-muted-foreground">{order.user?.name || "Anonymous"}</p>
                         </div>
                       </div>
@@ -275,7 +275,7 @@ export default function VendorDashboard() {
                 <div>
                   <span className="text-muted-foreground">Order ID:</span>
                   <span className="font-bold text-foreground ml-1 text-primary">
-                    #{selectedOrder._id.toUpperCase()}
+                    {selectedOrder._id.startsWith("ORD-") ? selectedOrder._id : `#${selectedOrder._id.toUpperCase()}`}
                   </span>
                 </div>
                 <div className="text-right">

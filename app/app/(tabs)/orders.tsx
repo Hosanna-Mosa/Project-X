@@ -7,7 +7,7 @@ import {
   View,
 } from "react-native";
 import { Feather } from "@expo/vector-icons";
-import { router } from "expo-router";
+import { router, useFocusEffect } from "expo-router";
 import Colors from "@/constants/colors";
 import { useThemeStore } from "@/contexts/themeStore";
 import { ScreenWrapper } from "@/components/ScreenWrapper";
@@ -46,9 +46,11 @@ export default function OrdersScreen() {
   const [orders, setOrders] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    fetchOrders();
-  }, []);
+  useFocusEffect(
+    React.useCallback(() => {
+      fetchOrders();
+    }, [])
+  );
 
   const fetchOrders = async () => {
     try {
@@ -139,7 +141,7 @@ export default function OrdersScreen() {
                   </View>
                   <View style={styles.orderInfo}>
                     <Text style={styles.orderType}>{order.stops?.length > 1 ? "Multi-Stop Delivery" : "Single Stop Delivery"}</Text>
-                    <Text style={styles.orderId}>{order._id.substring(order._id.length - 8).toUpperCase()}</Text>
+                    <Text style={styles.orderId}>{order._id.startsWith("ORD-") ? order._id : order._id.substring(order._id.length - 8).toUpperCase()}</Text>
                   </View>
                   <View
                     style={[

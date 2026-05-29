@@ -240,10 +240,22 @@ export default function ServiceSelectionScreen() {
     }
   };
 
-  const handleCancelBooking = () => {
+  const handleCancelBooking = async () => {
+    const orderIdToCancel = currentOrderId;
     setBookingState("idle");
     setDriverLocation(null);
     setCurrentOrderId(null);
+
+    if (orderIdToCancel) {
+      try {
+        await customFetch(`/api/v1/orders/${orderIdToCancel}/status`, {
+          method: "PATCH",
+          body: JSON.stringify({ status: "CANCELLED" }),
+        });
+      } catch (e: any) {
+        console.error("Failed to cancel order on backend:", e);
+      }
+    }
   };
 
   const handleReset = () => {

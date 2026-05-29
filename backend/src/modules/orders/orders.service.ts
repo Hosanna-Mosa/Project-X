@@ -2,6 +2,7 @@ import mongoose from "mongoose";
 import Order, { OrderStatus, ServiceType, StopType } from "../../database/models/Order";
 import User from "../../database/models/User";
 import Driver from "../../database/models/Driver";
+import Vendor from "../../database/models/Vendor";
 import { RoutingService } from "../routing/routing.service";
 import { PricingService } from "../pricing/pricing.service";
 import { SocketManager } from "../../sockets/socket.manager";
@@ -101,7 +102,17 @@ export class OrdersService {
     const deliveryOtp = Math.floor(1000 + Math.random() * 9000).toString();
     const restaurantPickupCode = Math.floor(1000 + Math.random() * 9000).toString();
 
+    const generateIndustrialOrderId = () => {
+      const date = new Date();
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      const random = Math.floor(1000 + Math.random() * 9000); // 4-digit random number
+      return `ORD-${year}${month}${day}-${random}`;
+    };
+
     const order = new Order({
+      _id: generateIndustrialOrderId(),
       user: userId,
       vendor: vendorId,
       serviceType: effectiveType,
@@ -126,6 +137,21 @@ export class OrdersService {
       isRide,
     };
 
+    // Fetch vendor details for broadcast
+    let vendorName = "Restaurant";
+    let vendorPhone = "";
+    if (vendorId) {
+      try {
+        const vendorObj = await Vendor.findById(vendorId);
+        if (vendorObj) {
+          vendorName = vendorObj.name;
+          vendorPhone = vendorObj.phone;
+        }
+      } catch (err) {
+        console.error("Error fetching vendor for order broadcast:", err);
+      }
+    }
+
     // BROADCAST to drivers
     const socketManager = SocketManager.getInstance();
     if (socketManager) {
@@ -138,6 +164,8 @@ export class OrdersService {
         earnings: Math.round(savedOrder.totalPrice * 0.8),
         customerName: user.name || "Customer",
         customerPhone: user.phone || "N/A",
+        vendorName,
+        vendorPhone,
         status: "pending",
         timestamp: new Date(),
         restaurantPickupCode: savedOrder.restaurantPickupCode,
@@ -220,15 +248,22 @@ export class OrdersService {
     return deg * (Math.PI / 180);
   }
 
+  private getOrderQuery(orderId: string): any {
+    if (mongoose.Types.ObjectId.isValid(orderId)) {
+      return { $or: [{ _id: orderId }, { _id: new mongoose.Types.ObjectId(orderId) }] };
+    }
+    return { _id: orderId };
+  }
+
   async getOrderById(orderId: string) {
-    if (!mongoose.Types.ObjectId.isValid(orderId)) {
+    if (!orderId) {
       return null;
     }
-    return Order.findById(orderId).populate("user").populate("driver");
+    return Order.findOne(this.getOrderQuery(orderId)).populate("user").populate("driver").populate("vendor");
   }
 
   async updateOrderStatus(orderId: string, status: OrderStatus) {
-    const order = await Order.findById(orderId);
+    const order = await Order.findOne(this.getOrderQuery(orderId));
     if (!order) throw new Error("Order not found");
     
     order.status = status;
@@ -249,9 +284,17 @@ export class OrdersService {
           status: status,
         });
       }
+
+      // Broadcast order cancellation to all online drivers
+      if (status === OrderStatus.CANCELLED) {
+        socketManager.broadcastToDrivers("order_cancelled", {
+          orderId: orderId.toString(),
+        });
+      }
     }
 
-    return savedOrder;
+    const populated = await Order.findOne(this.getOrderQuery(orderId)).populate("user").populate("driver").populate("vendor");
+    return populated || savedOrder;
   }
 
   async getUserOrders(userId: string) {
@@ -265,14 +308,14 @@ export class OrdersService {
   }
 
   async acceptOrder(orderId: string, driverUserId: string) {
-    if (!mongoose.Types.ObjectId.isValid(orderId)) {
+    if (!orderId) {
       throw new Error("Invalid order ID");
     }
 
     const driver = await Driver.findOne({ user: driverUserId });
     if (!driver) throw new Error("Driver profile not found");
 
-    const order = await Order.findById(orderId);
+    const order = await Order.findOne(this.getOrderQuery(orderId));
     if (!order) throw new Error("Order not found");
 
     if (order.status !== OrderStatus.SEARCHING_DRIVER) {
@@ -301,6 +344,7 @@ export class OrdersService {
       });
     }
 
-    return savedOrder;
+    const populated = await Order.findOne(this.getOrderQuery(orderId)).populate("user").populate("driver").populate("vendor");
+    return populated || savedOrder;
   }
 }

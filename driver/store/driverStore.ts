@@ -2,6 +2,8 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
 import Constants from "expo-constants";
+import { Alert } from "react-native";
+import { router } from "expo-router";
 import { socketService } from "../utils/socketService";
 
 const apiUrl = process.env.EXPO_PUBLIC_API_URL;
@@ -52,6 +54,8 @@ export interface Order {
   restaurantPickupCode?: string;
   deliveryOtp?: string;
   polyline?: string;
+  vendorName?: string;
+  vendorPhone?: string;
 }
 
 export interface CompletedOrder {
@@ -259,6 +263,24 @@ export const useDriverStore = create<DriverState>()(
             console.log("New order received:", data);
             get().setIncomingOrder(data as Order);
           });
+          socketService.on("order_cancelled", (data: any) => {
+            console.log("Order cancelled received:", data);
+            const orderId = data.orderId || data.id;
+            if (!orderId) return;
+
+            const incoming = get().incomingOrder;
+            if (incoming && (incoming.id === orderId || incoming.id.toString() === orderId.toString())) {
+              set({ incomingOrder: null });
+              Alert.alert("Order Cancelled", "This incoming order was cancelled by the customer.");
+            }
+
+            const current = get().currentOrder;
+            if (current && (current.id === orderId || current.id.toString() === orderId.toString())) {
+              set({ currentOrder: null, currentStep: 0 });
+              Alert.alert("Order Cancelled", "The active order has been cancelled by the customer.");
+              router.push("/(tabs)");
+            }
+          });
         });
 
         set({ isOnline: true, activeServices: services });
@@ -282,6 +304,8 @@ export const useDriverStore = create<DriverState>()(
         
         import("../utils/socketService").then(({ socketService }) => {
           socketService.off("new_order", () => {}); // Remove listener
+          socketService.off("order_cancelled", () => {}); // Remove listener
+          socketService.disconnect();
         });
 
         set({ isOnline: false, homeMode: false });
@@ -338,6 +362,8 @@ export const useDriverStore = create<DriverState>()(
             restaurantPickupCode: orderFromApi.restaurantPickupCode,
             deliveryOtp: orderFromApi.deliveryOtp,
             polyline: orderFromApi.polyline,
+            vendorName: orderFromApi.vendor?.name || (orderFromApi.vendor && typeof orderFromApi.vendor === "object" ? orderFromApi.vendor.name : null) || incomingOrder?.vendorName,
+            vendorPhone: orderFromApi.vendor?.phone || (orderFromApi.vendor && typeof orderFromApi.vendor === "object" ? orderFromApi.vendor.phone : null) || incomingOrder?.vendorPhone,
             stops: orderFromApi.stops.map((s: any) => ({
               id: s._id,
               type: s.type.toLowerCase() === "drop" ? "delivery" : s.type.toLowerCase(),
@@ -417,6 +443,8 @@ export const useDriverStore = create<DriverState>()(
           restaurantPickupCode: orderFromApi.restaurantPickupCode,
           deliveryOtp: orderFromApi.deliveryOtp,
           polyline: orderFromApi.polyline,
+          vendorName: orderFromApi.vendor?.name || (orderFromApi.vendor && typeof orderFromApi.vendor === "object" ? orderFromApi.vendor.name : null) || currentOrder?.vendorName,
+          vendorPhone: orderFromApi.vendor?.phone || (orderFromApi.vendor && typeof orderFromApi.vendor === "object" ? orderFromApi.vendor.phone : null) || currentOrder?.vendorPhone,
           stops: orderFromApi.stops.map((s: any) => ({
             id: s._id,
             type: s.type.toLowerCase() === "drop" ? "delivery" : s.type.toLowerCase(),
