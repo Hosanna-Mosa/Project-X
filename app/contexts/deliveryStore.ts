@@ -13,6 +13,7 @@ export interface DeliveryStop {
   items: DeliveryItem[];
   lat?: number;
   lng?: number;
+  type?: string;
 }
 
 export interface RouteInfo {

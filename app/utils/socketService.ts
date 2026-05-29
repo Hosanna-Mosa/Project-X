@@ -5,6 +5,7 @@ const SOCKET_URL = process.env.EXPO_PUBLIC_API_URL || "";
 class SocketService {
   private socket: Socket | null = null;
   private static instance: SocketService;
+  private trackedOrderId: string | null = null;
 
   private constructor() {}
 
@@ -26,12 +27,19 @@ class SocketService {
 
     this.socket.on("connect", () => {
       console.log("Connected to Real-time Hub (Customer)");
+      if (this.trackedOrderId) {
+        this.socket?.emit("track_order", this.trackedOrderId);
+      }
     });
   }
 
   public trackOrder(orderId: string) {
-    if (!this.socket) this.connect();
-    this.socket?.emit("track_order", orderId);
+    this.trackedOrderId = orderId;
+    if (!this.socket) {
+      this.connect();
+    } else {
+      this.socket.emit("track_order", orderId);
+    }
   }
 
   public on(event: string, callback: (data: any) => void) {
@@ -51,6 +59,7 @@ class SocketService {
   public disconnect() {
     this.socket?.disconnect();
     this.socket = null;
+    this.trackedOrderId = null;
   }
 }
 

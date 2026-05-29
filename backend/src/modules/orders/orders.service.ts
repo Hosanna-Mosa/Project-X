@@ -98,6 +98,9 @@ export class OrdersService {
       };
     });
 
+    const deliveryOtp = Math.floor(1000 + Math.random() * 9000).toString();
+    const restaurantPickupCode = Math.floor(1000 + Math.random() * 9000).toString();
+
     const order = new Order({
       user: userId,
       vendor: vendorId,
@@ -109,6 +112,9 @@ export class OrdersService {
       stops: orderStops,
       radius,
       duration,
+      deliveryOtp,
+      restaurantPickupCode,
+      polyline: optimizationResult.polyline,
     });
 
     const savedOrder = await order.save();
@@ -134,6 +140,7 @@ export class OrdersService {
         customerPhone: user.phone || "N/A",
         status: "pending",
         timestamp: new Date(),
+        restaurantPickupCode: savedOrder.restaurantPickupCode,
         stops: savedOrder.stops.map(s => ({
           id: (s as any)._id,
           type: s.type.toLowerCase(),
@@ -144,6 +151,30 @@ export class OrdersService {
           items: s.items,
         }))
       });
+
+      // NOTIFY vendor/restaurant
+      if (vendorId) {
+        console.log(`[SOCKET] Emitting new_order_vendor to vendor ${vendorId}`);
+        socketManager.emitToUser(vendorId.toString(), "new_order_vendor", {
+          id: savedOrder._id,
+          serviceType: effectiveType,
+          totalPrice: savedOrder.totalPrice,
+          customerName: user.name || "Customer",
+          customerPhone: user.phone || "N/A",
+          status: savedOrder.status,
+          timestamp: savedOrder.createdAt,
+          restaurantPickupCode: savedOrder.restaurantPickupCode,
+          stops: savedOrder.stops.map(s => ({
+            id: (s as any)._id,
+            type: s.type.toLowerCase(),
+            locationName: s.address?.split(',')[0],
+            address: s.address,
+            lat: s.location.coordinates[1],
+            lng: s.location.coordinates[0],
+            items: s.items,
+          }))
+        });
+      }
     }
 
     return result;
@@ -210,6 +241,14 @@ export class OrdersService {
         orderId: orderId.toString(),
         status: status,
       });
+
+      // ALSO: if the order has a vendor, emit to the vendor room!
+      if (order.vendor) {
+        socketManager.emitToUser(order.vendor.toString(), "order_status_update_vendor", {
+          orderId: orderId.toString(),
+          status: status,
+        });
+      }
     }
 
     return savedOrder;

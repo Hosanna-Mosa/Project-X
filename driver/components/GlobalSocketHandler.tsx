@@ -11,7 +11,7 @@ export function GlobalSocketHandler() {
     if (!currentOrderId) return;
 
     socketService.connect();
-    socketService.emit("track_order", currentOrderId);
+    socketService.trackOrder(currentOrderId);
 
     const handleReceiveMessage = (data: any) => {
       if (data.from === "user") {

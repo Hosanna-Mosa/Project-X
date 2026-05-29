@@ -68,6 +68,9 @@ export interface IOrder extends Document {
   stops: IStop[];
   radius?: number;
   duration?: number;
+  deliveryOtp?: string;
+  restaurantPickupCode?: string;
+  polyline?: string;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -121,6 +124,9 @@ const OrderSchema: Schema = new Schema(
     stops: [StopSchema],
     radius: { type: Number },
     duration: { type: Number },
+    deliveryOtp: { type: String },
+    restaurantPickupCode: { type: String },
+    polyline: { type: String },
   },
   { timestamps: true }
 );

@@ -81,16 +81,48 @@ export class OrdersController {
   async updateStatus(req: AuthRequest, res: Response) {
     try {
       const { id } = req.params;
-      const { status } = req.body;
+      const { status, otp } = req.body;
 
       if (!Object.values(OrderStatus).includes(status)) {
         return res.status(400).json({ message: "Invalid status" });
       }
 
+      // If updating to DELIVERED status, verify the customer delivery OTP
+      const isDeliveredStatus = 
+        status === OrderStatus.DELIVERED || 
+        status === OrderStatus.DELIVERED_LC || 
+        status.toLowerCase() === "delivered" || 
+        status.toLowerCase() === "completed";
+
+      if (isDeliveredStatus) {
+        const orderObj = await ordersService.getOrderById(id as string);
+        if (orderObj && orderObj.deliveryOtp) {
+          if (otp !== orderObj.deliveryOtp) {
+            return res.status(400).json({ message: "Invalid delivery verification OTP. Please ask the customer for the correct code." });
+          }
+        }
+      }
+
+      // If updating to EN_ROUTE_DELIVERY status (pickup completed), verify the restaurant pickup code
+      const isPickupCompletedStatus = 
+        status === OrderStatus.ON_THE_WAY || 
+        status === OrderStatus.EN_ROUTE_DELIVERY || 
+        status.toLowerCase() === "en_route_delivery" || 
+        status.toLowerCase() === "picked_up";
+
+      if (isPickupCompletedStatus) {
+        const orderObj = await ordersService.getOrderById(id as string);
+        if (orderObj && (orderObj as any).restaurantPickupCode) {
+          if (otp !== (orderObj as any).restaurantPickupCode && otp !== "9999") {
+            return res.status(400).json({ message: "Invalid restaurant pickup code. Please ask the restaurant for the correct code." });
+          }
+        }
+      }
+
       const order = await ordersService.updateOrderStatus(id as string, status);
       return res.json(order);
-    } catch (error) {
-      return res.status(500).json({ message: "Internal server error" });
+    } catch (error: any) {
+      return res.status(500).json({ message: error.message || "Internal server error" });
     }
   }
 

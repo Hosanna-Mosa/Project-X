@@ -9,7 +9,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
-import { router } from "expo-router";
+import { router, useLocalSearchParams } from "expo-router";
 import { ActivityIndicator } from "react-native";
 import Colors from "@/constants/colors";
 import { useDeliveryStore } from "@/contexts/deliveryStore";
@@ -34,11 +34,19 @@ const STATUS_SEQUENCE: OrderStatus[] = [
 
 export default function TrackingScreen() {
   const insets = useSafeAreaInsets();
-  const { status, setStatus, currentOrderId, route, stops, setStops, driver, setDriver, unreadCount, incrementUnreadCount } = useDeliveryStore();
+  const params = useLocalSearchParams<{ orderId?: string }>();
+  const { status, setStatus, currentOrderId, setOrderId, route, setRoute, stops, setStops, driver, setDriver, unreadCount, incrementUnreadCount } = useDeliveryStore();
   const [eta, setEta] = useState(15);
+  const [deliveryOtp, setDeliveryOtp] = useState<string | null>(null);
   const [driverLocation, setDriverLocation] = useState<{ lat: number, lng: number } | null>(null);
   const [radius, setRadius] = useState<number | null>(null);
   const mapRef = React.useRef<MapBackgroundRef>(null);
+
+  useEffect(() => {
+    if (params.orderId && params.orderId !== currentOrderId) {
+      setOrderId(params.orderId);
+    }
+  }, [params.orderId, currentOrderId]);
 
   const { theme } = useThemeStore();
   const colors = Colors[theme];
@@ -73,10 +81,13 @@ export default function TrackingScreen() {
   };
 
   useEffect(() => {
-    if (currentOrderId) {
+    if (!currentOrderId) return;
+
+    const fetchOrderDetails = () => {
       customFetch<any>(`/api/v1/orders/${currentOrderId}`)
         .then((order) => {
           if (order) {
+            console.log("[POLLING] Fetched order details:", order.status);
             if (order.status) {
               setStatus(normalizeStatus(order.status));
             }
@@ -94,6 +105,7 @@ export default function TrackingScreen() {
                 address: s.address,
                 lat: s.location.coordinates[1],
                 lng: s.location.coordinates[0],
+                type: s.type,
                 items: s.items?.lines || [],
               }));
               setStops(mappedStops);
@@ -101,10 +113,25 @@ export default function TrackingScreen() {
             if (order.radius) {
               setRadius(order.radius);
             }
+            if (order.deliveryOtp) {
+              setDeliveryOtp(order.deliveryOtp);
+            }
+            if (order.polyline) {
+              setRoute({
+                totalDistance: order.totalDistance || 0,
+                estimatedTime: order.duration || 15,
+                polyline: order.polyline,
+              });
+            }
           }
         })
         .catch((err) => console.error("Error fetching order in tracking:", err));
-    }
+    };
+
+    fetchOrderDetails();
+    const interval = setInterval(fetchOrderDetails, 7000);
+
+    return () => clearInterval(interval);
   }, [currentOrderId]);
 
   useEffect(() => {
@@ -150,13 +177,77 @@ export default function TrackingScreen() {
     router.replace("/(tabs)/orders");
   };
 
+  const deliveryStop = stops?.find(s => s.type?.toLowerCase() === "delivery" || s.type?.toLowerCase() === "drop");
+  const userLocCoords = deliveryStop ? { lat: Number(deliveryStop.lat), lng: Number(deliveryStop.lng) } : null;
+
+  if (status === "delivered") {
+    const foodItems = deliveryStop?.items || [];
+    return (
+      <View style={[styles.successContainer, { backgroundColor: colors.background }]}>
+        <View style={styles.successHeaderCard}>
+          <View style={[styles.successIconCircle, { backgroundColor: colors.success + "15" }]}>
+            <Feather name="check-circle" size={80} color={colors.success} />
+          </View>
+          <Text style={[styles.successTitle, { color: colors.text }]}>Order Delivered!</Text>
+          <Text style={[styles.successSubtitle, { color: colors.textSecondary }]}>
+            Your meal has been delivered successfully by {driver?.name || "our delivery partner"}.
+          </Text>
+        </View>
+
+        <ScrollView style={styles.successDetailsScroll} showsVerticalScrollIndicator={false}>
+          {/* Order Summary */}
+          <View style={[styles.successCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+            <Text style={[styles.successCardHeader, { color: colors.text }]}>Delivered Items</Text>
+            {foodItems.map((item: any, idx: number) => (
+              <View key={idx} style={styles.successItemRow}>
+                <Text style={[styles.successItemQty, { color: colors.primary }]}>{item.quantity}x</Text>
+                <Text style={[styles.successItemName, { color: colors.text }]}>{item.name}</Text>
+              </View>
+            ))}
+            {foodItems.length === 0 && (
+              <Text style={{ color: colors.textMuted, fontSize: 13 }}>Items successfully handed over.</Text>
+            )}
+          </View>
+
+          {/* Delivery Address */}
+          {deliveryStop?.address && (
+            <View style={[styles.successCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+              <Text style={[styles.successCardHeader, { color: colors.text }]}>Delivery Address</Text>
+              <Text style={[styles.successAddressText, { color: colors.textSecondary }]}>
+                {deliveryStop.address}
+              </Text>
+            </View>
+          )}
+
+          {/* Feedback Section */}
+          <View style={[styles.successCard, { backgroundColor: colors.surface, borderColor: colors.border, alignItems: "center", gap: 10 }]}>
+            <Text style={[styles.successCardHeader, { color: colors.text, alignSelf: "flex-start" }]}>Rate your Experience</Text>
+            <View style={{ flexDirection: "row", gap: 6, marginVertical: 4 }}>
+              {[1, 2, 3, 4, 5].map((star) => (
+                <Feather key={star} name="star" size={24} color="#F59E0B" />
+              ))}
+            </View>
+            <Text style={{ fontSize: 11, color: colors.textMuted }}>Your feedback helps us improve our services.</Text>
+          </View>
+        </ScrollView>
+
+        <View style={[styles.successFooter, { paddingBottom: insets.bottom + 16 }]}>
+          <TouchableOpacity style={[styles.successHomeBtn, { backgroundColor: colors.primary }]} onPress={handleBack}>
+            <Text style={styles.successHomeBtnText}>Go Back to Home</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
+  }
+
   return (
     <View style={styles.root}>
       <MapBackground 
         ref={mapRef}
         stops={stops}
-        polyline={route?.polyline}
+        polyline={["en_route_delivery", "arrived_delivery"].includes(status) ? route?.polyline : undefined}
         driverLocation={driverLocation}
+        userLocation={userLocCoords}
         radiusCenter={
           stops?.[0]?.lat !== undefined && stops?.[0]?.lng !== undefined
             ? { lat: stops[0].lat, lng: stops[0].lng }
@@ -229,16 +320,20 @@ export default function TrackingScreen() {
 
               <View style={styles.divider} />
 
-              <OrderStatusTimeline currentStatus={status} />
-
-              {/* Simulation button removed for real-time tracking */}
-
-              {status === "delivered" && (
-                <TouchableOpacity style={styles.doneBtn} onPress={handleBack}>
-                  <Text style={styles.doneBtnText}>View Order History</Text>
-                  <Feather name="arrow-right" size={18} color="#fff" />
-                </TouchableOpacity>
+              {deliveryOtp && (
+                <View style={styles.otpCard}>
+                  <Feather name="shield" size={20} color={colors.primary} />
+                  <View style={styles.otpTextContainer}>
+                    <Text style={styles.otpTitle}>Share OTP to receive order</Text>
+                    <Text style={styles.otpSubtitle}>Only give this code when your items are safely received</Text>
+                  </View>
+                  <View style={styles.otpBadge}>
+                    <Text style={styles.otpCode}>{deliveryOtp}</Text>
+                  </View>
+                </View>
               )}
+
+              <OrderStatusTimeline currentStatus={status} />
             </>
           )}
 
@@ -450,5 +545,125 @@ const createStyles = (colors: typeof Colors.light) => StyleSheet.create({
     color: "#fff",
     fontSize: 16,
     fontWeight: "700",
+  },
+  otpCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: `${colors.primary}12`,
+    borderWidth: 1,
+    borderColor: `${colors.primary}30`,
+    borderRadius: 16,
+    padding: 14,
+    marginBottom: 16,
+    gap: 12,
+  },
+  otpTextContainer: {
+    flex: 1,
+    gap: 2,
+  },
+  otpTitle: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: colors.text,
+  },
+  otpSubtitle: {
+    fontSize: 11,
+    color: colors.textMuted,
+  },
+  otpBadge: {
+    backgroundColor: colors.primary,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 10,
+  },
+  otpCode: {
+    color: "#fff",
+    fontSize: 16,
+    fontWeight: "800",
+    letterSpacing: 1.5,
+  },
+  successContainer: {
+    flex: 1,
+    paddingHorizontal: 24,
+    paddingTop: Platform.OS === "ios" ? 60 : 40,
+    alignItems: "center",
+  },
+  successHeaderCard: {
+    alignItems: "center",
+    marginVertical: 24,
+    gap: 12,
+  },
+  successIconCircle: {
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 8,
+  },
+  successTitle: {
+    fontSize: 26,
+    fontWeight: "900",
+    textAlign: "center",
+  },
+  successSubtitle: {
+    fontSize: 14,
+    textAlign: "center",
+    lineHeight: 20,
+    paddingHorizontal: 16,
+  },
+  successDetailsScroll: {
+    flex: 1,
+    width: "100%",
+    marginBottom: 16,
+  },
+  successCard: {
+    borderRadius: 16,
+    borderWidth: 1,
+    padding: 16,
+    marginBottom: 14,
+    width: "100%",
+  },
+  successCardHeader: {
+    fontSize: 13,
+    fontWeight: "800",
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+    marginBottom: 10,
+  },
+  successItemRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingVertical: 4,
+  },
+  successItemQty: {
+    fontSize: 14,
+    fontWeight: "800",
+  },
+  successItemName: {
+    fontSize: 14,
+    fontWeight: "600",
+  },
+  successAddressText: {
+    fontSize: 13,
+    lineHeight: 18,
+  },
+  successFooter: {
+    width: "100%",
+    paddingTop: 12,
+  },
+  successHomeBtn: {
+    borderRadius: 14,
+    paddingVertical: 15,
+    alignItems: "center",
+    justifyContent: "center",
+    width: "100%",
+    elevation: 3,
+  },
+  successHomeBtnText: {
+    color: "#fff",
+    fontSize: 16,
+    fontWeight: "800",
   },
 });
