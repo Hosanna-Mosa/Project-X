@@ -180,6 +180,12 @@ export class DriverService {
             bankAccountNumber: this.maskValue(driver.bankAccountNumber, 4),
             bankIfsc: driver.bankIfsc || null,
             bankVerified: Boolean(driver.bankVerified),
+            bankAccounts: (driver.bankAccounts || []).map((ba: any) => ({
+              accountNumber: this.maskValue(ba.accountNumber, 4),
+              ifsc: ba.ifsc,
+              verified: Boolean(ba.verified),
+              isDefault: Boolean(ba.isDefault),
+            })),
             selfieImage: driver.selfieImage || null,
             createdAt: driver.createdAt,
             updatedAt: driver.updatedAt,
@@ -282,7 +288,8 @@ export class DriverService {
   async cashOut(userId: string, password: string, amount?: number) {
     const user = await User.findById(userId);
     if (!user) throw new Error("User not found");
-    if (user.password !== password) throw new Error("Invalid driver credentials");
+    const isPasswordValid = user.password ? await user.matchPassword(password) : false;
+    if (!isPasswordValid) throw new Error("Invalid driver credentials");
 
     const driver = await Driver.findOne({ user: userId });
     if (!driver) throw new Error("Driver profile not found");

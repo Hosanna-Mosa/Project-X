@@ -73,6 +73,24 @@ export class OnboardingService {
       }
     }
 
+    // If bank details were provided, also push to bankAccounts array (avoid duplicates)
+    if (data.bankAccountNumber && data.bankIfsc) {
+      const existing = (driver.bankAccounts || []).find(
+        (ba) => ba.accountNumber === data.bankAccountNumber
+      );
+      if (!existing) {
+        const bankAccounts = driver.bankAccounts || [];
+        const isFirst = bankAccounts.length === 0;
+        bankAccounts.push({
+          accountNumber: data.bankAccountNumber,
+          ifsc: data.bankIfsc,
+          verified: data.bankVerified || false,
+          isDefault: isFirst,
+        });
+        driver.bankAccounts = bankAccounts;
+      }
+    }
+
     await driver.save();
 
     return {

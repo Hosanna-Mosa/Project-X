@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -13,6 +13,7 @@ import {
 } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
+import { router, useFocusEffect } from "expo-router";
 
 import Colors from "@/constants/colors";
 import { EarningsChart } from "@/components/EarningsChart";
@@ -109,9 +110,11 @@ export default function EarningsScreen() {
     }
   }, [token]);
 
-  useEffect(() => {
-    loadEarnings();
-  }, [loadEarnings]);
+  useFocusEffect(
+    useCallback(() => {
+      loadEarnings(true);
+    }, [loadEarnings])
+  );
 
   const trendLabel = useMemo(() => {
     const prefix = earnings.trendPercent >= 0 ? "+" : "";
@@ -195,14 +198,27 @@ export default function EarningsScreen() {
             <EarningsChart data={earnings.weeklyBreakdown} />
 
             <CashOutButton
-              onPress={() => setCashOutVisible(true)}
-              disabled={!earnings.bank.verified || earnings.availableBalance < 100}
+              onPress={() => {
+                if (!earnings.bank.verified) {
+                  Alert.alert(
+                    "Bank details required",
+                    "You need to add your payout bank details before you can cash out. Would you like to set them up now?",
+                    [
+                      { text: "Not now", style: "cancel" },
+                      { text: "Add Bank Details", onPress: () => router.push("/payout-setup") },
+                    ]
+                  );
+                } else if (earnings.availableBalance < 100) {
+                  Alert.alert(
+                    "Minimum balance required",
+                    `You need at least Rs.100 to cash out. Your current available balance is ${formatCurrency(earnings.availableBalance)}.`
+                  );
+                } else {
+                  setCashOutVisible(true);
+                }
+              }}
               isLoading={isCashingOut}
             />
-
-            {!earnings.bank.verified && (
-              <Text style={styles.helperText}>Complete bank verification before cash out.</Text>
-            )}
 
             <View style={styles.sectionCard}>
               <Text style={styles.sectionTitle}>Recent Activity</Text>
@@ -365,12 +381,7 @@ const styles = StyleSheet.create({
     color: Colors.textMuted,
     marginTop: 8,
   },
-  helperText: {
-    fontFamily: "Inter_500Medium",
-    fontSize: 12,
-    color: Colors.textMuted,
-    marginTop: -8,
-  },
+
   sectionCard: {
     backgroundColor: Colors.surface,
     borderRadius: 12,

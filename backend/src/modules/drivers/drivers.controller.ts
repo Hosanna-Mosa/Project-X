@@ -2,6 +2,7 @@ import { Response } from "express";
 import { DriverService } from "./drivers.service";
 import { AuthRequest } from "../../middleware/auth.middleware";
 import Driver from "../../database/models/Driver";
+import User from "../../database/models/User";
 
 const driverService = new DriverService();
 
@@ -88,6 +89,44 @@ export class DriversController {
        ];
        const status = validationErrors.includes(error.message) ? 400 : 500;
        return res.status(status).json({ message: error.message || "Internal server error" });
+    }
+  }
+
+  async updateProfile(req: AuthRequest, res: Response) {
+    try {
+      const { userId } = req.user!;
+      const { name, username, email, phone, gender } = req.body;
+
+      // Update user fields
+      if (name || username || email || phone) {
+        const user = await User.findById(userId);
+        if (user) {
+          if (name) user.name = name;
+          if (username) user.username = username;
+          if (email) user.email = email;
+          if (phone) user.phone = phone;
+          await user.save();
+        }
+      }
+
+      // Update driver-specific fields
+      if (gender) {
+        const driver = await Driver.findOne({ user: userId });
+        if (driver) {
+          driver.gender = gender as "male" | "female";
+          await driver.save();
+        }
+      }
+
+      // Return fresh profile
+      const profile = await driverService.getProfile(userId);
+      return res.json({ message: "Profile updated", profile });
+    } catch (error: any) {
+      console.error("Update driver profile error:", error);
+      if (error.code === 11000) {
+        return res.status(400).json({ message: "Username or Email already exists" });
+      }
+      return res.status(500).json({ message: error.message || "Internal server error" });
     }
   }
 

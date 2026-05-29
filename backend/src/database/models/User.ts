@@ -1,9 +1,14 @@
 import mongoose, { Schema, Document, Types } from "mongoose";
+import bcrypt from "bcryptjs";
 
 export enum UserRole {
   USER = "USER",
   DRIVER = "DRIVER",
   ADMIN = "ADMIN",
+}
+
+export interface IUserMethods {
+  matchPassword: (password: string) => Promise<boolean>;
 }
 
 export interface IAddress {
@@ -18,7 +23,7 @@ export interface IAddress {
   };
 }
 
-export interface IUser extends Document {
+export interface IUser extends Document, IUserMethods {
   name: string;
   username?: string;
   email?: string;
@@ -77,13 +82,30 @@ const UserSchema: Schema = new Schema(
         },
       },
     ],
-  password: { type: String, default: "6473b5" },
+  password: { type: String },
   },
   { timestamps: true }
 );
+
+// Hash password before saving
+UserSchema.pre('save', async function () {
+  // `this` is a mongoose document
+  if (!this.isModified('password') || !this.password) {
+    return;
+  }
+  const salt = await bcrypt.genSalt(10);
+  this.password = await bcrypt.hash(this.password as string, salt);
+});
+
+// Match password
+UserSchema.methods.matchPassword = async function (password: string) {
+  if (!this.password) return false;
+  return await bcrypt.compare(password, this.password);
+};
 
 UserSchema.index({ defaultLocation: "2dsphere" });
 UserSchema.index({ "addresses.location": "2dsphere" });
 
 export default mongoose.model<IUser>("User", UserSchema);
+
 

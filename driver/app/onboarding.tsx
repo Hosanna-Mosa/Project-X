@@ -1,7 +1,7 @@
 import DateTimePicker, { DateTimePickerEvent } from "@react-native-community/datetimepicker";
 import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
-import { router } from "expo-router";
+import { router, useLocalSearchParams } from "expo-router";
 import React, { useEffect, useRef, useState } from "react";
 import {
   Animated,
@@ -376,7 +376,9 @@ const bannerStyles = StyleSheet.create({
 
 export default function OnboardingScreen() {
   const insets = useSafeAreaInsets();
+  const params = useLocalSearchParams();
   const setOnboardingCompleted = useDriverStore((s) => s.setOnboardingCompleted);
+  const setIdentityVerified = useDriverStore((s) => s.setIdentityVerified);
 
   // Step tracking
   const [step, setStep] = useState<1 | 2>(1);
@@ -386,6 +388,14 @@ export default function OnboardingScreen() {
 
   // ── Async State ──────────────────────────────────────────────────────────
   const [saving, setSaving] = useState(false);
+
+  // ── Jump to identity verification if `verify=identity` param is set ──
+  useEffect(() => {
+    if (params.verify === "identity") {
+      setStep(2);
+      setSectionIdx(0);
+    }
+  }, [params.verify]);
 
   // ── Fetch existing onboarding data on mount ─────────────────────────────
   useEffect(() => {
@@ -557,6 +567,7 @@ export default function OnboardingScreen() {
         const result = await res.json();
         if (result.verified) {
           setPanVerified(true);
+          setIdentityVerified(true);
           // Aadhaar section gets filtered out → PAN shifts from idx=1 to idx=0
           setSectionIdx(prev => Math.max(0, prev - 1));
           Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -565,11 +576,13 @@ export default function OnboardingScreen() {
         }
       } else {
         setPanVerified(true);
+        setIdentityVerified(true);
         setSectionIdx(prev => Math.max(0, prev - 1));
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       }
     } catch {
       setPanVerified(true);
+      setIdentityVerified(true);
       setSectionIdx(prev => Math.max(0, prev - 1));
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     } finally {
@@ -592,19 +605,22 @@ export default function OnboardingScreen() {
           const result = await res.json();
           if (result.verified) {
             setAadhaarVerified(true);
+            setIdentityVerified(true);
             Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
           } else {
             Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
           }
         } else {
           // Fallback: mark as verified locally
-          setAadhaarVerified(true);
-          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-        }
-      } catch {
-        // Dummy: always succeeds in mock mode
         setAadhaarVerified(true);
+        setIdentityVerified(true);
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      }
+    } catch {
+      // Dummy: always succeeds in mock mode
+      setAadhaarVerified(true);
+      setIdentityVerified(true);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       } finally {
         setSaving(false);
       }
