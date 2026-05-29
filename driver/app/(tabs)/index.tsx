@@ -1,5 +1,5 @@
-import React, { useState } from "react";
-import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import React, { useCallback, useEffect, useState } from "react";
+import { Alert, Linking, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
 
@@ -7,22 +7,47 @@ import Colors from "@/constants/colors";
 import { ServiceToggle } from "@/components/ServiceToggle";
 import { PerformanceCard } from "@/components/PerformanceCard";
 import { ActiveTaskCard } from "@/components/ActiveTaskCard";
-import { HighDemandAreas } from "@/components/HighDemandAreas";
+import { HighDemandAreas, Hotspot } from "@/components/HighDemandAreas";
 import { GoOnlineModal } from "@/components/GoOnlineModal";
 import IncomingOrderModal from "@/components/IncomingOrderModal";
 import { useDriverStore } from "@/store/driverStore";
 import { router } from "expo-router";
 
-const mockHotspots = [
-  { name: "Downtown Market", surge: "1.5x Surge" },
-  { name: "Airport Terminal", surge: "1.3x Surge" },
-  { name: "Riverside Mall", surge: "1.2x Surge" },
+const apiUrl = process.env.EXPO_PUBLIC_API_URL;
+
+const fallbackHotspots: Hotspot[] = [
+  {
+    id: "fallback-kr-market",
+    name: "KR Market",
+    address: "KR Market, Huriopet, Chickpet, Bengaluru, Karnataka",
+    lat: 12.9616,
+    lng: 77.5769,
+    surge: "1.5x Surge",
+  },
+  {
+    id: "fallback-kempegowda-airport",
+    name: "Kempegowda Airport",
+    address: "Kempegowda International Airport, Devanahalli, Bengaluru, Karnataka",
+    lat: 13.1986,
+    lng: 77.7066,
+    surge: "1.3x Surge",
+  },
+  {
+    id: "fallback-orion-mall",
+    name: "Orion Mall",
+    address: "Orion Mall, Dr Rajkumar Road, Rajajinagar, Bengaluru, Karnataka",
+    lat: 13.0112,
+    lng: 77.5549,
+    surge: "1.2x Surge",
+  },
 ];
 
 export default function HomeScreen() {
   const insets = useSafeAreaInsets();
   const [mode, setMode] = useState<"ride" | "delivery">("ride");
   const [showOnlineModal, setShowOnlineModal] = useState(false);
+  const [hotspots, setHotspots] = useState<Hotspot[]>(fallbackHotspots);
+  const [isLoadingHotspots, setIsLoadingHotspots] = useState(false);
   const isOnline = useDriverStore((s) => s.isOnline);
   const homeMode = useDriverStore((s) => s.homeMode);
   const activeServices = useDriverStore((s) => s.activeServices);
@@ -30,6 +55,61 @@ export default function HomeScreen() {
   const goOffline = useDriverStore((s) => s.goOffline);
   const toggleHomeMode = useDriverStore((s) => s.toggleHomeMode);
   const currentOrder = useDriverStore((s) => s.currentOrder);
+  const token = useDriverStore((s) => s.token);
+
+  const loadHighDemandAreas = useCallback(async () => {
+    if (!apiUrl || !token) {
+      setHotspots(fallbackHotspots);
+      return;
+    }
+
+    setIsLoadingHotspots(true);
+    try {
+      const response = await fetch(`${apiUrl}/api/v1/drivers/high-demand-areas?limit=5`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      if (!response.ok) throw new Error("Failed to load high demand areas");
+
+      const areas = await response.json();
+      if (Array.isArray(areas) && areas.length > 0) {
+        setHotspots(areas);
+      } else {
+        setHotspots(fallbackHotspots);
+      }
+    } catch (error) {
+      console.warn("High demand area fetch failed:", error);
+      setHotspots(fallbackHotspots);
+    } finally {
+      setIsLoadingHotspots(false);
+    }
+  }, [token]);
+
+  useEffect(() => {
+    loadHighDemandAreas();
+    const interval = setInterval(loadHighDemandAreas, 60 * 1000);
+
+    return () => clearInterval(interval);
+  }, [loadHighDemandAreas]);
+
+  const openDemandAreaInMaps = async (area: Hotspot) => {
+    const query = encodeURIComponent(
+      Number.isFinite(area.lat) && Number.isFinite(area.lng)
+        ? `${area.lat},${area.lng}`
+        : area.address,
+    );
+    const url = `https://www.google.com/maps/search/?api=1&query=${query}`;
+
+    try {
+      const supported = await Linking.canOpenURL(url);
+      if (!supported) throw new Error("Google Maps link is not supported");
+      await Linking.openURL(url);
+    } catch {
+      Alert.alert("Unable to open maps", "Please try again from this device.");
+    }
+  };
 
   const handleToggleOnline = () => {
     if (isOnline) {
@@ -195,10 +275,9 @@ export default function HomeScreen() {
         {/* High Demand Areas */}
         <View style={styles.sectionSpacing}>
           <HighDemandAreas
-            hotspots={mockHotspots}
-            onAreaPress={(area) => {
-              // Future: Open Google Maps navigation to area
-            }}
+            hotspots={hotspots}
+            isLoading={isLoadingHotspots}
+            onAreaPress={openDemandAreaInMaps}
           />
         </View>
 

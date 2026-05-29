@@ -1,5 +1,6 @@
 import React from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Feather } from "@expo/vector-icons";
 import Colors from "@/constants/colors";
 
 interface VehicleCardProps {
@@ -12,15 +13,15 @@ export function VehicleCard({ model, plate, onPress }: VehicleCardProps) {
   return (
     <Pressable style={styles.card} onPress={onPress}>
       <View style={styles.iconContainer}>
-        <Text style={styles.carIcon}>🚗</Text>
+        <Feather name="truck" size={22} color={Colors.primary} />
       </View>
       <View style={styles.details}>
         <Text style={styles.label}>Current Vehicle</Text>
-        <Text style={styles.vehicleText}>
-          {model} <Text style={styles.plate}>• {plate}</Text>
+        <Text style={styles.vehicleText} numberOfLines={1}>
+          {model} <Text style={styles.plate}>- {plate}</Text>
         </Text>
       </View>
-      <Text style={styles.chevron}>›</Text>
+      <Feather name="chevron-right" size={18} color={Colors.textMuted} />
     </Pressable>
   );
 }
@@ -44,11 +45,9 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     marginRight: 12,
   },
-  carIcon: {
-    fontSize: 22,
-  },
   details: {
     flex: 1,
+    minWidth: 0,
   },
   label: {
     fontFamily: "Inter_500Medium",
@@ -64,10 +63,5 @@ const styles = StyleSheet.create({
   plate: {
     fontFamily: "Inter_400Regular",
     color: Colors.textSecondary,
-  },
-  chevron: {
-    fontSize: 22,
-    color: Colors.textMuted,
-    marginLeft: 8,
   },
 });

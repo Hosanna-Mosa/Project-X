@@ -1,31 +1,49 @@
 import React from "react";
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { ActivityIndicator, Pressable, StyleSheet, Text, View } from "react-native";
 import { Feather } from "@expo/vector-icons";
 import Colors from "@/constants/colors";
 
-interface Hotspot {
+export interface Hotspot {
+  id: string;
   name: string;
+  address: string;
+  lat: number;
+  lng: number;
   surge: string;
+  orderCount?: number;
 }
 
 interface HighDemandAreasProps {
   hotspots: Hotspot[];
+  isLoading?: boolean;
   onAreaPress?: (area: Hotspot) => void;
 }
 
-export function HighDemandAreas({ hotspots, onAreaPress }: HighDemandAreasProps) {
+export function HighDemandAreas({ hotspots, isLoading = false, onAreaPress }: HighDemandAreasProps) {
   return (
     <View style={styles.section}>
       <Text style={styles.sectionTitle}>High Demand Areas</Text>
       <View style={styles.hotspotList}>
+        {isLoading && (
+          <View style={styles.loadingItem}>
+            <ActivityIndicator size="small" color={Colors.primary} />
+          </View>
+        )}
         {hotspots.map((spot) => (
           <Pressable
-            key={spot.name}
+            key={spot.id}
             style={styles.hotspotItem}
             onPress={() => onAreaPress?.(spot)}
           >
             <View style={styles.hotspotDot} />
-            <Text style={styles.hotspotName}>{spot.name}</Text>
+            <View style={styles.hotspotCopy}>
+              <Text style={styles.hotspotName} numberOfLines={1}>
+                {spot.name}
+              </Text>
+              <Text style={styles.hotspotAddress} numberOfLines={1}>
+                {spot.address}
+              </Text>
+            </View>
             <View style={styles.surgeChip}>
               <Text style={styles.surgeChipText}>{spot.surge}</Text>
             </View>
@@ -73,7 +91,16 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_500Medium",
     fontSize: 14,
     color: Colors.text,
+  },
+  hotspotCopy: {
     flex: 1,
+    minWidth: 0,
+  },
+  hotspotAddress: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 11,
+    color: Colors.textMuted,
+    marginTop: 2,
   },
   surgeChip: {
     backgroundColor: Colors.primaryLight,
@@ -85,5 +112,13 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_600SemiBold",
     fontSize: 11,
     color: Colors.primary,
+  },
+  loadingItem: {
+    alignItems: "center",
+    backgroundColor: Colors.surface,
+    paddingVertical: 18,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: Colors.border,
   },
 });

@@ -38,4 +38,57 @@ export class PaymentService {
 
     return generated_signature === signature;
   }
+
+  async createDriverPayout(input: {
+    name: string;
+    phone: string;
+    email?: string;
+    accountNumber: string;
+    ifsc: string;
+    amount: number;
+    notes?: Record<string, string>;
+  }) {
+    const accountNumber = process.env.RAZORPAYX_ACCOUNT_NUMBER;
+    if (!accountNumber) {
+      throw new Error("RazorpayX account number is not configured");
+    }
+
+    try {
+      const contact = await (razorpay as any).contacts.create({
+        name: input.name,
+        contact: input.phone,
+        email: input.email,
+        type: "employee",
+        reference_id: `driver_${Date.now()}`,
+      });
+
+      const fundAccount = await (razorpay as any).fundAccount.create({
+        contact_id: contact.id,
+        account_type: "bank_account",
+        bank_account: {
+          name: input.name,
+          ifsc: input.ifsc,
+          account_number: input.accountNumber,
+        },
+      });
+
+      const payout = await (razorpay as any).payouts.create({
+        account_number: accountNumber,
+        fund_account_id: fundAccount.id,
+        amount: Math.round(input.amount * 100),
+        currency: "INR",
+        mode: "IMPS",
+        purpose: "payout",
+        queue_if_low_balance: true,
+        reference_id: `driver_payout_${Date.now()}`,
+        narration: "Driver cash out",
+        notes: input.notes,
+      });
+
+      return { contact, fundAccount, payout };
+    } catch (error) {
+      console.error("Razorpay Driver Payout Error:", error);
+      throw new Error("Failed to create driver payout");
+    }
+  }
 }
