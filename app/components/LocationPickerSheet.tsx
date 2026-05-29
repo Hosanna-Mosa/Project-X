@@ -137,22 +137,30 @@ export function LocationPickerSheet({ isOpen, onClose, onSelectAddress }: Props)
 
 
 
+  const handleEditAddress = (item: any) => {
+    onClose();
+    const lat = item.location?.coordinates?.[1] ?? item.coordinates?.lat ?? "";
+    const lng = item.location?.coordinates?.[0] ?? item.coordinates?.lng ?? "";
+    const qs = `step=2&editId=${encodeURIComponent(item._id || '')}&label=${encodeURIComponent(item.label || '')}&addressLine=${encodeURIComponent(item.addressLine || '')}&phone=${encodeURIComponent(item.phone || '')}&receiverName=${encodeURIComponent(item.receiverName || '')}&lat=${encodeURIComponent(String(lat))}&lng=${encodeURIComponent(String(lng))}`;
+    router.push(`/delivery/add-address?${qs}`);
+  };
+
   const renderAddressItem = ({ item }: { item: any }) => (
-    <TouchableOpacity 
-      style={styles.addressCard}
-      onPress={() => {
-        const addressWithCoords = { ...item };
-        if (!addressWithCoords.coordinates && item.location?.coordinates) {
-          addressWithCoords.coordinates = {
-            lng: item.location.coordinates[0],
-            lat: item.location.coordinates[1],
-          };
-        }
-        onSelectAddress?.(addressWithCoords);
-        onClose();
-      }}
-    >
-      <View style={styles.addressMain}>
+    <View style={styles.addressCard}>
+      <TouchableOpacity 
+        style={styles.addressMainTouchable}
+        onPress={() => {
+          const addressWithCoords = { ...item };
+          if (!addressWithCoords.coordinates && item.location?.coordinates) {
+            addressWithCoords.coordinates = {
+              lng: item.location.coordinates[0],
+              lat: item.location.coordinates[1],
+            };
+          }
+          onSelectAddress?.(addressWithCoords);
+          onClose();
+        }}
+      >
         <View style={styles.addressIconWrap}>
           <Feather 
             name={item.label === "Home" ? "home" : item.label === "Work" ? "briefcase" : "map-pin"} 
@@ -169,8 +177,15 @@ export function LocationPickerSheet({ isOpen, onClose, onSelectAddress }: Props)
           </Text>
           {item.phone && <Text style={styles.addressPhone}>Phone: {item.phone}</Text>}
         </View>
-      </View>
-    </TouchableOpacity>
+      </TouchableOpacity>
+      <TouchableOpacity 
+        style={styles.editAddressBtn}
+        onPress={() => handleEditAddress(item)}
+        hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+      >
+        <Feather name="edit-2" size={16} color={colors.textMuted} />
+      </TouchableOpacity>
+    </View>
   );
 
   const renderSearchResult = ({ item }: { item: any }) => (
@@ -423,14 +438,24 @@ const createStyles = (colors: typeof Colors.light) => StyleSheet.create({
   },
   addressCard: {
     flexDirection: "row",
+    alignItems: "center",
     paddingVertical: 16,
     paddingHorizontal: 16,
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
   },
-  addressMain: {
+  addressMainTouchable: {
     flexDirection: "row",
     flex: 1,
+  },
+  editAddressBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: colors.surfaceSecondary,
+    alignItems: "center",
+    justifyContent: "center",
+    marginLeft: 8,
   },
   addressIconWrap: {
     width: 24,
