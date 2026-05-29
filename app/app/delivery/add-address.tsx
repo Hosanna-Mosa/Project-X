@@ -38,15 +38,33 @@ export default function AddAddressScreen() {
   const mapRef = useRef<MapView>(null);
   const searchInputRef = useRef<TextInput>(null);
 
-  const [label, setLabel] = useState("");
-  const [addressLine, setAddressLine] = useState("");
-  const [shortAddress, setShortAddress] = useState("Select an area");
+  const isEditMode = !!(params.editId && String(params.editId).length > 0);
+
+  const [label, setLabel] = useState(String(params.label || ""));
+  const [addressLine, setAddressLine] = useState(String(params.addressLine || ""));
+  const [shortAddress, setShortAddress] = useState(isEditMode ? String(params.addressLine || "Select an area") : "Select an area");
   const [cityOrCountry, setCityOrCountry] = useState("Select a city");
-  const [phone, setPhone] = useState("");
+  const [phone, setPhone] = useState(String(params.phone || ""));
+  const [receiverName, setReceiverName] = useState(String(params.receiverName || ""));
   const [loading, setLoading] = useState(false);
-  const [completeAddress, setCompleteAddress] = useState("");
+  const [completeAddress, setCompleteAddress] = useState(String(params.addressLine || ""));
   const [contactType, setContactType] = useState<"myself" | "someone_else">("someone_else");
-  const [receiverName, setReceiverName] = useState("");
+
+  // Pre-populate region if lat/lng params are provided
+  useEffect(() => {
+    if (isEditMode && params.lat && params.lng) {
+      const editLat = Number(params.lat);
+      const editLng = Number(params.lng);
+      if (!isNaN(editLat) && !isNaN(editLng)) {
+        setRegion({
+          latitude: editLat,
+          longitude: editLng,
+          latitudeDelta: 0.005,
+          longitudeDelta: 0.005,
+        });
+      }
+    }
+  }, []);
   const [step, setStep] = useState(params.step === "2" ? 2 : 1);
   const [region, setRegion] = useState({
     latitude: 27.1751,
