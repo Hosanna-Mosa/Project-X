@@ -39,6 +39,13 @@ export default function SavedAddressesScreen() {
     }
   };
 
+  const handleEditAddress = (item: any) => {
+    const lat = item.location?.coordinates?.[1] ?? item.coordinates?.lat ?? "";
+    const lng = item.location?.coordinates?.[0] ?? item.coordinates?.lng ?? "";
+    const qs = `editId=${encodeURIComponent(item._id || "")}&label=${encodeURIComponent(item.label || "")}&addressLine=${encodeURIComponent(item.addressLine || "")}&phone=${encodeURIComponent(item.phone || "")}&receiverName=${encodeURIComponent(item.receiverName || "")}&lat=${encodeURIComponent(String(lat))}&lng=${encodeURIComponent(String(lng))}`;
+    router.push(`/delivery/add-address?${qs}`);
+  };
+
   const handleDeleteAddress = (id: string) => {
     Alert.alert(
       "Delete Address",
@@ -111,7 +118,7 @@ export default function SavedAddressesScreen() {
                     {addr.phone && <Text style={styles.addressPhone}>{addr.phone}</Text>}
                   </View>
                   <View style={styles.addressActions}>
-                    <TouchableOpacity style={styles.actionBtn}>
+                    <TouchableOpacity style={styles.actionBtn} onPress={() => handleEditAddress(addr)}>
                       <Feather name="edit-2" size={18} color={Colors.light.primary} />
                     </TouchableOpacity>
                     <TouchableOpacity style={styles.actionBtn} onPress={() => handleDeleteAddress(addr._id)}>
