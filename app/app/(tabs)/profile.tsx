@@ -254,37 +254,14 @@ export default function ProfileScreen() {
 
         {/* MORE OPTIONS - Matching Image 2 */}
         <View style={[styles.section, { marginTop: 10 }]}>
-          <ListItem 
-            icon={<Feather name="users" size={20} color={colors.text} />} 
-            title="Family and teenagers" 
-            subtitle="Teenager and adult accounts"
-            onPress={() => {}}
-            colors={colors}
-          />
-          <ListItem 
-            icon={<Feather name="list" size={20} color={colors.text} />} 
-            title="Lists" 
-            onPress={() => {}}
-            colors={colors}
-          />
-          <ListItem 
-            icon={<MaterialCommunityIcons name="car-outline" size={20} color={colors.text} />} 
-            title="Rides" 
-            onPress={() => {}}
-            colors={colors}
-          />
+         
           <ListItem 
             icon={<Feather name="tag" size={20} color={colors.text} />} 
             title="Promotions" 
             onPress={() => {}}
             colors={colors}
           />
-          <ListItem 
-            icon={<Feather name="gift" size={20} color={colors.text} />} 
-            title="Send a gift" 
-            onPress={() => {}}
-            colors={colors}
-          />
+        
           <ListItem 
             icon={<Feather name="help-circle" size={20} color={colors.text} />} 
             title="Help" 
@@ -297,24 +274,14 @@ export default function ProfileScreen() {
             onPress={() => {}}
             colors={colors}
           />
-          <ListItem 
-            icon={<Feather name="user-check" size={20} color={colors.text} />} 
-            title="Manager account" 
-            onPress={() => {}}
-            colors={colors}
-          />
+        
           <ListItem 
             icon={<Feather name="info" size={20} color={colors.text} />} 
             title="About" 
             onPress={() => {}}
             colors={colors}
           />
-          <ListItem 
-            icon={<Feather name="share-2" size={20} color={colors.text} />} 
-            title="Invite friends" 
-            onPress={() => {}}
-            colors={colors}
-          />
+      
         </View>
 
         <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout}>

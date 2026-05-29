@@ -21,6 +21,12 @@ const MENU_ITEMS = [
     items: [
       { icon: "user" as const, label: "Personal Info", color: Colors.primary },
       {
+        icon: "map-pin" as const,
+        label: "Saved Addresses",
+        color: Colors.tertiary,
+        action: "saved-addresses" as const,
+      },
+      {
         icon: "credit-card" as const,
         label: "Payment Details",
         color: "#8B5CF6",
@@ -182,6 +188,9 @@ export default function ProfileScreen() {
                   style={styles.menuItem}
                   onPress={() => {
                     Haptics.selectionAsync();
+                    if (item.action === "saved-addresses") {
+                      router.push("/saved-addresses");
+                    }
                   }}
                 >
                   <View
