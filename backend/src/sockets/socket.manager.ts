@@ -58,6 +58,9 @@ export class SocketManager {
         if (data.role === "DRIVER") {
           socket.join("drivers");
         }
+        if (data.role === "VENDOR") {
+          socket.join("vendors");
+        }
         console.log(`${data.role} ${data.userId} joined their rooms`);
       });
 

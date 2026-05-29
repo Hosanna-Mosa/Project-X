@@ -12,6 +12,7 @@ import {
 import { Feather } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import * as Location from "expo-location";
 import Colors from "@/constants/colors";
 import { useAuthStore } from "@/contexts/authStore";
 import { useCartStore } from "@/contexts/cartStore";
@@ -34,6 +35,49 @@ export default function FoodCheckoutScreen() {
   const [landmark, setLandmark] = React.useState("");
   const [phone, setPhone] = React.useState(user?.phone || "");
   const [instructions, setInstructions] = React.useState("");
+
+  React.useEffect(() => {
+    const fetchLocation = async () => {
+      if (!currentCoords) {
+        try {
+          let { status } = await Location.requestForegroundPermissionsAsync();
+          if (status === "granted") {
+            const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
+            const coords = { lat: loc.coords.latitude, lng: loc.coords.longitude };
+            useDeliveryStore.getState().setCurrentCoords(coords);
+
+            const [address] = await Location.reverseGeocodeAsync({
+              latitude: coords.lat,
+              longitude: coords.lng,
+            });
+            if (address) {
+              const formatted = [
+                address.name,
+                address.street,
+                address.district || address.subregion,
+                address.city,
+                address.region,
+                address.postalCode
+              ].filter(Boolean).join(", ");
+              useDeliveryStore.getState().setCurrentLocation(formatted);
+              if (!area) {
+                setArea(formatted);
+              }
+            }
+          }
+        } catch (error) {
+          console.warn("Checkout Screen: Failed to fetch coordinates:", error);
+        }
+      }
+    };
+    fetchLocation();
+  }, [currentCoords]);
+
+  React.useEffect(() => {
+    if (currentLocation && !area) {
+      setArea(currentLocation);
+    }
+  }, [currentLocation]);
 
   const total = Number(params.total || 0);
   const subtotal = Number(params.subtotal || 0);

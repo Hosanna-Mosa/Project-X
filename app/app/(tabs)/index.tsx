@@ -18,6 +18,7 @@ import { Ionicons, FontAwesome5 } from "@expo/vector-icons";
 import { router } from "expo-router";
 import Colors from "@/constants/colors";
 import { useThemeStore } from "@/contexts/themeStore";
+import { useDeliveryStore } from "@/contexts/deliveryStore";
 import { ServiceCategory } from "@/components/ServiceCategory";
 import { LocationPickerSheet } from "@/components/LocationPickerSheet";
 import { RestaurantListItem } from "@/components/RestaurantListItem";
@@ -57,12 +58,45 @@ export default function HomeScreen() {
   const getCoords = async () => {
     if (selectedAddress?.location?.coordinates) {
       const [lng, lat] = selectedAddress.location.coordinates;
+      useDeliveryStore.getState().setCurrentCoords({ lat, lng });
+      if (selectedAddress.addressLine) {
+        useDeliveryStore.getState().setCurrentLocation(selectedAddress.addressLine);
+      } else if (selectedAddress.label) {
+        useDeliveryStore.getState().setCurrentLocation(selectedAddress.label);
+      }
       return { lat, lng };
     }
     let { status } = await Location.requestForegroundPermissionsAsync();
-    if (status !== 'granted') return { lat: 17.4447, lng: 78.3498 };
+    if (status !== 'granted') {
+      const defaultCoords = { lat: 17.4447, lng: 78.3498 };
+      useDeliveryStore.getState().setCurrentCoords(defaultCoords);
+      return defaultCoords;
+    }
     const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
-    return { lat: loc.coords.latitude, lng: loc.coords.longitude };
+    const coords = { lat: loc.coords.latitude, lng: loc.coords.longitude };
+    useDeliveryStore.getState().setCurrentCoords(coords);
+
+    try {
+      const [address] = await Location.reverseGeocodeAsync({
+        latitude: coords.lat,
+        longitude: coords.lng
+      });
+      if (address) {
+        const formatted = [
+          address.name,
+          address.street,
+          address.district || address.subregion,
+          address.city,
+          address.region,
+          address.postalCode
+        ].filter(Boolean).join(", ");
+        useDeliveryStore.getState().setCurrentLocation(formatted);
+      }
+    } catch (e) {
+      console.warn("Home Screen: Reverse geocoding failed:", e);
+    }
+
+    return coords;
   };
 
   const fetchVendors = async (lat: number, lng: number, pageNum: number = 1) => {

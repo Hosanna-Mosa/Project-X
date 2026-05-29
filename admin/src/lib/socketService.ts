@@ -1,13 +1,11 @@
 import { io, Socket } from "socket.io-client";
+import { BASE_URL } from "./api-client";
 
-const SOCKET_URL = process.env.EXPO_PUBLIC_API_URL || "";
+const SOCKET_URL = BASE_URL.replace("/api/v1", "");
 
 class SocketService {
   private socket: Socket | null = null;
   private static instance: SocketService;
-  private userId: string | null = null;
-  private role: string | null = null;
-  private orderId: string | null = null;
 
   private constructor() {}
 
@@ -21,7 +19,7 @@ class SocketService {
   public connect() {
     if (this.socket) return;
 
-    console.log(`[Driver Socket] Connecting to ${SOCKET_URL || "not configured"}/ws/v1/socket.io`);
+    console.log(`[Vendor Socket] Connecting to ${SOCKET_URL}/ws/v1/socket.io`);
 
     this.socket = io(SOCKET_URL, {
       transports: ["websocket"],
@@ -30,37 +28,18 @@ class SocketService {
     });
 
     this.socket.on("connect", () => {
-      console.log("Connected to Real-time Hub (Driver)");
-      if (this.userId && this.role) {
-        this.socket?.emit("join", { userId: this.userId, role: this.role });
-      }
-      if (this.orderId) {
-        this.socket?.emit("track_order", this.orderId);
-      }
+      console.log("Connected to Real-time Hub (Vendor)");
     });
 
     this.socket.on("disconnect", () => {
-      console.log("Disconnected from Real-time Hub (Driver)");
+      console.log("Disconnected from Real-time Hub (Vendor)");
     });
   }
 
-  public join(userId: string, role: string = "DRIVER") {
-    this.userId = userId;
-    this.role = role;
-    if (!this.socket) {
-      this.connect();
-    } else {
-      this.socket.emit("join", { userId, role });
-    }
-  }
-
-  public trackOrder(orderId: string) {
-    this.orderId = orderId;
-    if (!this.socket) {
-      this.connect();
-    } else {
-      this.socket.emit("track_order", orderId);
-    }
+  public join(userId: string, role: string = "VENDOR") {
+    if (!this.socket) this.connect();
+    this.socket?.emit("join", { userId, role });
+    console.log(`[Vendor Socket] Join room requested: userId=${userId}, role=${role}`);
   }
 
   public on(event: string, callback: (data: any) => void) {
@@ -80,9 +59,6 @@ class SocketService {
   public disconnect() {
     this.socket?.disconnect();
     this.socket = null;
-    this.userId = null;
-    this.role = null;
-    this.orderId = null;
   }
 }
 

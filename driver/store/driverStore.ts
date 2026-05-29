@@ -2,10 +2,11 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { create } from "zustand";
 import { createJSONStorage, persist } from "zustand/middleware";
 import Constants from "expo-constants";
+import { socketService } from "../utils/socketService";
 
 const apiUrl = process.env.EXPO_PUBLIC_API_URL;
 
-export type StopType = "pickup" | "delivery";
+export type StopType = "pickup" | "delivery" | "drop" | "stop";
 
 export interface StopItem {
   name: string;
@@ -48,6 +49,9 @@ export interface Order {
   timestamp: Date;
   serviceType?: string;
   radius?: number;
+  restaurantPickupCode?: string;
+  deliveryOtp?: string;
+  polyline?: string;
 }
 
 export interface CompletedOrder {
@@ -99,7 +103,7 @@ interface DriverState {
   acceptOrder: () => void;
   rejectOrder: () => void;
   updateStep: (step: number) => void;
-  updateOrderStatus: (status: OrderStatus) => Promise<void>;
+  updateOrderStatus: (status: OrderStatus, otp?: string) => Promise<void>;
   completeOrder: () => void;
   setIncomingOrder: (order: Order | null) => void;
   updateDriverLocation: (lat: number, lng: number) => void;
@@ -288,6 +292,7 @@ export const useDriverStore = create<DriverState>()(
         const { incomingOrder, token } = get();
         if (incomingOrder) {
           let accepted = false;
+          let orderFromApi: any = null;
           if (token) {
             try {
               const res = await fetch(`${apiUrl}/api/v1/orders/${incomingOrder.id}/accept`, {
@@ -302,6 +307,7 @@ export const useDriverStore = create<DriverState>()(
                 console.warn(error.message || "Failed to accept order via API");
               } else {
                 accepted = true;
+                orderFromApi = await res.json();
               }
             } catch (e) {
               console.error("Order acceptance API failed:", e);
@@ -318,8 +324,33 @@ export const useDriverStore = create<DriverState>()(
             });
           }
 
+          const orderToSet = orderFromApi ? {
+            id: orderFromApi._id || orderFromApi.id,
+            distance: `${orderFromApi.totalDistance || 0} km`,
+            duration: `${orderFromApi.duration || 0} min`,
+            earnings: Math.round(orderFromApi.totalPrice * 0.8),
+            status: orderFromApi.status,
+            customerName: orderFromApi.user?.name || incomingOrder.customerName,
+            customerPhone: orderFromApi.user?.phone || incomingOrder.customerPhone,
+            timestamp: new Date(orderFromApi.createdAt),
+            serviceType: orderFromApi.serviceType,
+            radius: orderFromApi.radius,
+            restaurantPickupCode: orderFromApi.restaurantPickupCode,
+            deliveryOtp: orderFromApi.deliveryOtp,
+            polyline: orderFromApi.polyline,
+            stops: orderFromApi.stops.map((s: any) => ({
+              id: s._id,
+              type: s.type.toLowerCase() === "drop" ? "delivery" : s.type.toLowerCase(),
+              locationName: s.address?.split(',')[0],
+              address: s.address,
+              lat: s.location.coordinates[1],
+              lng: s.location.coordinates[0],
+              items: s.items,
+            }))
+          } : { ...incomingOrder, status: "accepted" };
+
           set({
-            currentOrder: { ...incomingOrder, status: "accepted" },
+            currentOrder: orderToSet as any,
             incomingOrder: null,
             currentStep: 0,
             activeChat: [],
@@ -336,11 +367,12 @@ export const useDriverStore = create<DriverState>()(
         set({ currentStep: step });
       },
 
-      updateOrderStatus: async (status: OrderStatus) => {
+      updateOrderStatus: async (status: OrderStatus, otp?: string) => {
         const { currentOrder, token } = get();
         if (!currentOrder) return;
 
         let updated = false;
+        let orderFromApi: any = null;
         if (token) {
           try {
             const res = await fetch(`${apiUrl}/api/v1/orders/${currentOrder.id}/status`, {
@@ -349,29 +381,55 @@ export const useDriverStore = create<DriverState>()(
                 "Content-Type": "application/json",
                 Authorization: `Bearer ${token}`
               },
-              body: JSON.stringify({ status })
+              body: JSON.stringify({ status, otp })
             });
             if (res.ok) {
               updated = true;
+              orderFromApi = await res.json();
             } else {
-              console.warn("Failed to update status on server:", res.status);
+              const errData = await res.json().catch(() => ({}));
+              throw new Error(errData.message || "Failed to update status on server");
             }
-          } catch (e) {
+          } catch (e: any) {
             console.error("Failed to update order status via API:", e);
+            throw e;
           }
         }
 
         // Also emit via socket to ensure real-time notification
-        import("../utils/socketService").then(({ socketService }) => {
-          socketService.emit("order_status_update", {
-            orderId: currentOrder.id,
-            status: status
-          });
+        socketService.emit("order_status_update", {
+          orderId: currentOrder.id,
+          status: status
         });
 
         // Update local state
+        const orderToSet = orderFromApi ? {
+          id: orderFromApi._id || orderFromApi.id,
+          distance: `${orderFromApi.totalDistance || 0} km`,
+          duration: `${orderFromApi.duration || 0} min`,
+          earnings: Math.round(orderFromApi.totalPrice * 0.8),
+          status: orderFromApi.status,
+          customerName: orderFromApi.user?.name || currentOrder.customerName,
+          customerPhone: orderFromApi.user?.phone || currentOrder.customerPhone,
+          timestamp: new Date(orderFromApi.createdAt),
+          serviceType: orderFromApi.serviceType,
+          radius: orderFromApi.radius,
+          restaurantPickupCode: orderFromApi.restaurantPickupCode,
+          deliveryOtp: orderFromApi.deliveryOtp,
+          polyline: orderFromApi.polyline,
+          stops: orderFromApi.stops.map((s: any) => ({
+            id: s._id,
+            type: s.type.toLowerCase() === "drop" ? "delivery" : s.type.toLowerCase(),
+            locationName: s.address?.split(',')[0],
+            address: s.address,
+            lat: s.location.coordinates[1],
+            lng: s.location.coordinates[0],
+            items: s.items,
+          }))
+        } : { ...currentOrder, status: status };
+
         set({
-          currentOrder: { ...currentOrder, status: status }
+          currentOrder: orderToSet as any
         });
       },
 

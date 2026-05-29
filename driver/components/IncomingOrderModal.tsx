@@ -21,16 +21,31 @@ export default function IncomingOrderModal() {
   const insets = useSafeAreaInsets();
   const { incomingOrder, acceptOrder, rejectOrder } = useDriverStore();
   const slideAnim = React.useRef(new Animated.Value(height)).current;
+  const [secondsLeft, setSecondsLeft] = React.useState(15);
 
   useEffect(() => {
     if (incomingOrder) {
+      setSecondsLeft(15);
+      const timer = setInterval(() => {
+        setSecondsLeft((prev) => {
+          if (prev <= 1) {
+            clearInterval(timer);
+            rejectOrder();
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+
       Animated.spring(slideAnim, {
         toValue: 0,
         useNativeDriver: true,
         bounciness: 10,
       }).start();
+
+      return () => clearInterval(timer);
     }
-  }, [incomingOrder, slideAnim]);
+  }, [incomingOrder, slideAnim, rejectOrder]);
 
   if (!incomingOrder) return null;
 
@@ -52,10 +67,18 @@ export default function IncomingOrderModal() {
 
           <View style={styles.header}>
             <View style={styles.headerCopy}>
-              <Text style={styles.title}>{isHelper ? "New Helper!" : "New Request!"}</Text>
+              <Text style={styles.title}>{isHelper ? "New Helper!" : "New Delivery Request!"}</Text>
               {isHelper && <Text style={styles.subtitle}>Hours Book / Task Specialist</Text>}
             </View>
             <Text style={styles.earnings}>₹{incomingOrder.earnings || "0"}</Text>
+          </View>
+
+          {/* Response Timer Bar */}
+          <View style={styles.timerContainer}>
+            <View style={styles.timerBarBg}>
+              <View style={[styles.timerBar, { width: `${(secondsLeft / 15) * 100}%` }]} />
+            </View>
+            <Text style={styles.timerText}>Decline auto-triggers in {secondsLeft} seconds</Text>
           </View>
 
           <ScrollView
@@ -80,18 +103,55 @@ export default function IncomingOrderModal() {
               </View>
             </View>
 
-            {incomingOrder.stops?.map((stop, index) => (
-              <View key={`${stop.id || stop.address}-${index}`} style={styles.stopRow}>
-                <MaterialIcons
-                  name={stop.type === "pickup" ? "my-location" : "location-on"}
-                  size={20}
-                  color={stop.type === "pickup" ? "#16A34A" : "#EF4444"}
-                />
-                <Text style={styles.stopAddress} numberOfLines={1}>
-                  {stop.address || stop.locationName}
-                </Text>
+            {/* Route Details */}
+            <View style={styles.infoSection}>
+              <Text style={styles.sectionTitle}>ROUTE</Text>
+              {incomingOrder.stops?.map((stop, index) => (
+                <View key={`${stop.id || stop.address}-${index}`} style={styles.stopRow}>
+                  <MaterialIcons
+                    name={stop.type === "pickup" ? "my-location" : "location-on"}
+                    size={20}
+                    color={stop.type === "pickup" ? "#16A34A" : "#EF4444"}
+                  />
+                  <View style={{ flex: 1, marginLeft: 8 }}>
+                    <Text style={styles.stopLocationName}>
+                      {stop.locationName || (stop.type === "pickup" ? "Restaurant" : "Customer")}
+                    </Text>
+                    <Text style={styles.stopAddress} numberOfLines={1}>
+                      {stop.address}
+                    </Text>
+                  </View>
+                </View>
+              ))}
+            </View>
+
+            {/* Items Checklist Display */}
+            {!isHelper && (
+              <View style={styles.infoSection}>
+                <Text style={styles.sectionTitle}>ITEMS TO PICK UP</Text>
+                {incomingOrder.stops
+                  ?.filter((stop) => stop.type === "pickup" && stop.items && stop.items.length > 0)
+                  .map((stop, sIdx) => (
+                    <View key={stop.id || sIdx} style={styles.itemsRestaurantBlock}>
+                      <Text style={styles.itemsRestaurantName}>{stop.locationName}</Text>
+                      {stop.items?.map((item: any, idx: number) => (
+                        <Text key={idx} style={styles.itemRowText}>
+                          • {item.quantity}x {item.name}
+                        </Text>
+                      ))}
+                    </View>
+                  ))}
               </View>
-            ))}
+            )}
+
+            {/* Payment Mode */}
+            <View style={styles.infoSection}>
+              <Text style={styles.sectionTitle}>PAYMENT METHOD</Text>
+              <View style={styles.paymentRow}>
+                <Ionicons name="card-outline" size={18} color="#16A34A" />
+                <Text style={styles.paymentText}>Prepaid (Online Payment)</Text>
+              </View>
+            </View>
           </ScrollView>
 
           <View style={styles.actionButtons}>
@@ -124,7 +184,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#fff",
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
-    maxHeight: height * 0.82,
+    maxHeight: height * 0.85,
     paddingHorizontal: 20,
     paddingTop: 10,
     shadowColor: "#000",
@@ -146,14 +206,14 @@ const styles = StyleSheet.create({
     alignItems: "flex-start",
     justifyContent: "space-between",
     gap: 16,
-    marginBottom: 16,
+    marginBottom: 12,
   },
   headerCopy: {
     flex: 1,
     minWidth: 0,
   },
   title: {
-    fontSize: 24,
+    fontSize: 22,
     fontWeight: "800",
     color: "#111827",
   },
@@ -168,11 +228,32 @@ const styles = StyleSheet.create({
     fontWeight: "800",
     color: "#16A34A",
   },
+  timerContainer: {
+    marginBottom: 16,
+    alignItems: "center",
+  },
+  timerBarBg: {
+    width: "100%",
+    height: 6,
+    backgroundColor: "#E5E7EB",
+    borderRadius: 3,
+    overflow: "hidden",
+    marginBottom: 6,
+  },
+  timerBar: {
+    height: "100%",
+    backgroundColor: "#EF4444",
+  },
+  timerText: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: "#EF4444",
+  },
   body: {
     maxHeight: height * 0.46,
   },
   bodyContent: {
-    paddingBottom: 4,
+    paddingBottom: 16,
   },
   detailsContainer: {
     flexDirection: "row",
@@ -180,7 +261,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#F3F4F6",
     padding: 12,
     borderRadius: 12,
-    marginBottom: 20,
+    marginBottom: 16,
   },
   detailRow: {
     flexDirection: "row",
@@ -188,30 +269,78 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   detailText: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: "700",
     color: "#374151",
+  },
+  infoSection: {
+    marginBottom: 16,
+  },
+  sectionTitle: {
+    fontSize: 11,
+    fontWeight: "700",
+    color: "#9CA3AF",
+    letterSpacing: 1,
+    marginBottom: 8,
   },
   stopRow: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 12,
-    paddingHorizontal: 8,
-    paddingVertical: 7,
+    paddingVertical: 6,
+  },
+  stopLocationName: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: "#1F2937",
   },
   stopAddress: {
-    flex: 1,
-    fontSize: 15,
+    fontSize: 13,
+    color: "#6B7280",
+    marginTop: 1,
+  },
+  itemsRestaurantBlock: {
+    backgroundColor: "#F9FAFB",
+    padding: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "#E5E7EB",
+    marginBottom: 8,
+  },
+  itemsRestaurantName: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: "#4B5563",
+    marginBottom: 4,
+  },
+  itemRowText: {
+    fontSize: 13,
     color: "#374151",
+    paddingLeft: 4,
+    paddingVertical: 1,
+  },
+  paymentRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    backgroundColor: "#F0FDF4",
+    padding: 10,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "#DCFCE7",
+  },
+  paymentText: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: "#16A34A",
   },
   actionButtons: {
     flexDirection: "row",
     gap: 12,
-    marginTop: 18,
+    marginTop: 8,
   },
   rejectBtn: {
     flex: 1,
-    padding: 16,
+    padding: 15,
     borderRadius: 12,
     backgroundColor: "#F3F4F6",
     alignItems: "center",
@@ -223,7 +352,7 @@ const styles = StyleSheet.create({
   },
   acceptBtn: {
     flex: 1,
-    padding: 16,
+    padding: 15,
     borderRadius: 12,
     backgroundColor: "#111827",
     alignItems: "center",
