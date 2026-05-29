@@ -10,6 +10,8 @@ router.get("/profile", authenticateToken, usersController.getProfile.bind(usersC
 router.patch("/profile", authenticateToken, usersController.updateProfile.bind(usersController));
 router.post("/profile-pic", authenticateToken, upload.single("image"), usersController.uploadProfilePic.bind(usersController));
 
+router.post("/change-password", authenticateToken, usersController.changePassword.bind(usersController));
+
 router.get("/addresses", authenticateToken, usersController.getAddresses.bind(usersController));
 router.post("/addresses", authenticateToken, usersController.addAddress.bind(usersController));
 router.patch("/addresses/:id", authenticateToken, usersController.updateAddress.bind(usersController));

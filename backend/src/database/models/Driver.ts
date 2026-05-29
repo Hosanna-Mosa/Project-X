@@ -34,6 +34,12 @@ export interface IDriver extends Document {
   bankAccountNumber?: string;
   bankIfsc?: string;
   bankVerified?: boolean;
+  bankAccounts?: {
+    accountNumber: string;
+    ifsc: string;
+    verified: boolean;
+    isDefault: boolean;
+  }[];
   selfieImage?: string;
   onboardingCompletedAt?: Date;
   createdAt: Date;
@@ -79,6 +85,12 @@ const DriverSchema: Schema = new Schema(
     bankAccountNumber: { type: String },
     bankIfsc: { type: String },
     bankVerified: { type: Boolean, default: false },
+    bankAccounts: [{
+      accountNumber: { type: String },
+      ifsc: { type: String },
+      verified: { type: Boolean, default: false },
+      isDefault: { type: Boolean, default: false },
+    }],
     selfieImage: { type: String },
     onboardingCompletedAt: { type: Date },
   },

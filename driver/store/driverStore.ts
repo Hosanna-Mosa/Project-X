@@ -93,6 +93,7 @@ interface DriverState {
   token: string | null;
   isAuthenticated: boolean;
   hasCompletedOnboarding: boolean;
+  identityVerified: boolean;
   activeChat: ChatMessage[];
   unreadCount: number;
   isChatActive: boolean;
@@ -109,6 +110,7 @@ interface DriverState {
   updateDriverLocation: (lat: number, lng: number) => void;
   setAuthenticated: (name: string, phone: string, token: string) => void;
   setOnboardingCompleted: () => void;
+  setIdentityVerified: (verified: boolean) => void;
   resetOnboarding: () => void;
   logout: () => void;
   addChatMessage: (msg: ChatMessage) => void;
@@ -182,6 +184,7 @@ export const useDriverStore = create<DriverState>()(
       token: null,
       isAuthenticated: false,
       hasCompletedOnboarding: false,
+      identityVerified: false,
       activeChat: [],
       unreadCount: 0,
       isChatActive: false,
@@ -470,6 +473,7 @@ export const useDriverStore = create<DriverState>()(
         set({ isAuthenticated: true, driverName: name, driverPhone: phone, token, hasCompletedOnboarding: false }),
   
       setOnboardingCompleted: () => set({ hasCompletedOnboarding: true }),
+      setIdentityVerified: (verified) => set({ identityVerified: verified }),
       resetOnboarding: () => set({ hasCompletedOnboarding: false }),
   
       logout: () => {
@@ -528,6 +532,7 @@ export const useDriverStore = create<DriverState>()(
       partialize: (state) => ({
         isAuthenticated: state.isAuthenticated,
         hasCompletedOnboarding: state.hasCompletedOnboarding,
+        identityVerified: state.identityVerified,
         driverName: state.driverName,
         driverPhone: state.driverPhone,
         driverUserId: state.driverUserId,

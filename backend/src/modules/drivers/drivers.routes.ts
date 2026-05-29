@@ -9,6 +9,7 @@ const driversController = new DriversController();
 router.patch("/status", authenticateToken, authorizeRole([UserRole.DRIVER]), driversController.updateStatus.bind(driversController));
 router.patch("/location", authenticateToken, authorizeRole([UserRole.DRIVER]), driversController.updateLocation.bind(driversController));
 router.get("/profile", authenticateToken, authorizeRole([UserRole.DRIVER]), driversController.profile.bind(driversController));
+router.patch("/profile", authenticateToken, authorizeRole([UserRole.DRIVER]), driversController.updateProfile.bind(driversController));
 router.get("/earnings", authenticateToken, authorizeRole([UserRole.DRIVER]), driversController.earnings.bind(driversController));
 router.post("/cash-out", authenticateToken, authorizeRole([UserRole.DRIVER]), driversController.cashOut.bind(driversController));
 router.get("/high-demand-areas", authenticateToken, authorizeRole([UserRole.DRIVER]), driversController.highDemandAreas.bind(driversController));

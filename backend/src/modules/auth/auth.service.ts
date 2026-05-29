@@ -8,7 +8,7 @@ export class AuthService {
     return { success: true, message: "OTP sent successfully" };
   }
 
-  async verifyOTP(phone: string, _code: string, role: UserRole, name?: string) {
+  async verifyOTP(phone: string, _code: string, role: UserRole, name?: string, password?: string) {
     // Dummy mode — ANY code is accepted. No DB lookup needed.
     console.log(`[DUMMY AUTH] Verifying OTP for ${phone}. Code: ${_code} — accepted.`);
 
@@ -18,16 +18,20 @@ export class AuthService {
       if (!name) {
         return { isNewUser: true };
       }
-      // Create new user (Signup as DRIVER)
+      if (!password) {
+        throw new Error("Password is required for new user registration");
+      }
+      // Create new user with password
       user = new User({
         name,
         phone,
         role,
+        password,
       });
       await user.save();
 
       // Driver record will be created on first onboarding save (getOrCreateDriver)
-      console.log(`[DUMMY AUTH] New user created: ${name} (${phone})`);
+      console.log(`[DUMMY AUTH] New user created: ${name} (${phone}) with password`);
     }
 
     const token = this.generateToken((user._id as any).toString(), user.role);
@@ -38,12 +42,15 @@ export class AuthService {
     const user = await User.findOne({ phone });
 
     if (!user) {
-      throw new Error("User not found");
+      throw new Error("User not found. Please sign up first.");
     }
 
-    // Since it's a default password, we check directly or with bcrypt if we used it.
-    // Given the prompt, we'll check directly.
-    if (user.password !== password) {
+    if (!user.password) {
+      throw new Error("No password set on this account. Please use OTP login.");
+    }
+
+    const isMatch = await user.matchPassword(password);
+    if (!isMatch) {
       throw new Error("Invalid password");
     }
 

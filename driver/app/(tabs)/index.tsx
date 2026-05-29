@@ -53,6 +53,8 @@ export default function HomeScreen() {
   const activeServices = useDriverStore((s) => s.activeServices);
   const goOnline = useDriverStore((s) => s.goOnline);
   const goOffline = useDriverStore((s) => s.goOffline);
+  const identityVerified = useDriverStore((s) => s.identityVerified);
+  const setIdentityVerified = useDriverStore((s) => s.setIdentityVerified);
   const toggleHomeMode = useDriverStore((s) => s.toggleHomeMode);
   const currentOrder = useDriverStore((s) => s.currentOrder);
   const token = useDriverStore((s) => s.token);
@@ -114,10 +116,46 @@ export default function HomeScreen() {
   const handleToggleOnline = () => {
     if (isOnline) {
       goOffline();
-    } else {
-      setShowOnlineModal(true);
+      return;
     }
+
+    // Check identity verification before allowing go-online
+    if (!identityVerified) {
+      Alert.alert(
+        "Identity Verification Required",
+        "To start receiving orders, you must verify at least one government ID (Aadhaar or PAN Card).",
+        [
+          { text: "Not Now", style: "cancel" },
+          {
+            text: "Verify Now",
+            onPress: () => router.push("/identity-verify"),
+          },
+        ]
+      );
+      return;
+    }
+
+    setShowOnlineModal(true);
   };
+
+  // Load identity status from profile on mount
+  useEffect(() => {
+    if (!token) return;
+    (async () => {
+      try {
+        const res = await fetch(`${apiUrl}/api/v1/drivers/profile`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (!res.ok) return;
+        const data = await res.json();
+        if (data.verification?.identity != null) {
+          setIdentityVerified(data.verification.identity);
+        }
+      } catch {
+        // silently ignore — store defaults to false
+      }
+    })();
+  }, [token]);
 
   const handleGoOnline = (services: ("food" | "ride")[]) => {
     goOnline(services);
