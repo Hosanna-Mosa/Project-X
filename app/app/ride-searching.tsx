@@ -214,12 +214,24 @@ export default function RideSearchingScreen() {
     setCancelConfirmVisible(false);
     setCancelReasonVisible(false);
   };
-  const cancelRide = () => {
+  const cancelRide = async () => {
+    const orderIdToCancel = currentOrderId;
     setCancelConfirmVisible(false);
     setCancelReasonVisible(false);
     setTripDetailsVisible(false);
     setCurrentOrderId(null);
     router.push("/(tabs)");
+
+    if (orderIdToCancel) {
+      try {
+        await customFetch(`/api/v1/orders/${orderIdToCancel}/status`, {
+          method: "PATCH",
+          body: JSON.stringify({ status: "CANCELLED" }),
+        });
+      } catch (error) {
+        console.error("Failed to cancel order on backend:", error);
+      }
+    }
   };
   /* void [
       `${params.pickupName}\n\nTo\n\n${params.dropName}\n\nRide: ${params.rideName || "Bike Ride"}\nFare: ₹${fare}`,

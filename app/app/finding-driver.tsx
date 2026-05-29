@@ -6,6 +6,7 @@ import { useThemeStore } from "@/contexts/themeStore";
 import { socketService } from "@/utils/socketService";
 import { Ionicons } from "@expo/vector-icons";
 import { useDeliveryStore } from "@/contexts/deliveryStore";
+import { customFetch } from "@/utils/api/custom-fetch";
 
 export default function FindingDriverScreen() {
   const { orderId } = useLocalSearchParams<{ orderId: string }>();
@@ -56,8 +57,18 @@ export default function FindingDriverScreen() {
     };
   }, [orderId]);
 
-  const handleCancel = () => {
+  const handleCancel = async () => {
     router.push("/(tabs)");
+    if (orderId) {
+      try {
+        await customFetch(`/api/v1/orders/${orderId}/status`, {
+          method: "PATCH",
+          body: JSON.stringify({ status: "CANCELLED" }),
+        });
+      } catch (error) {
+        console.error("Failed to cancel order on backend:", error);
+      }
+    }
   };
 
   return (

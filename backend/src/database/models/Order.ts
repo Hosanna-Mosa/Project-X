@@ -50,7 +50,8 @@ export interface IStop {
   items?: any;
 }
 
-export interface IOrder extends Document {
+export interface IOrder extends Omit<Document, "_id"> {
+  _id: string;
   user: mongoose.Types.ObjectId;
   vendor?: mongoose.Types.ObjectId;
   driver?: mongoose.Types.ObjectId;
@@ -99,6 +100,7 @@ const StopSchema: Schema = new Schema({
 
 const OrderSchema: Schema = new Schema(
   {
+    _id: { type: String },
     user: { type: Schema.Types.ObjectId, ref: "User", required: true },
     vendor: { type: Schema.Types.ObjectId, ref: "Vendor" },
     driver: { type: Schema.Types.ObjectId, ref: "Driver" },

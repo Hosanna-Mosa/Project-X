@@ -9,6 +9,7 @@ import {
   Platform,
   TextInput,
   Alert,
+  Linking,
 } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import MapView, { Marker, Polyline, Circle, PROVIDER_GOOGLE } from "react-native-maps";
@@ -378,9 +379,32 @@ export default function ActiveOrderScreen() {
           <Text style={styles.stepTitle}>Order Accepted</Text>
           <View style={styles.infoBox}>
             <View style={styles.infoItem}>
-              <Text style={styles.infoLabel}>Pickup From</Text>
-              <Text style={styles.infoText}>{pickupStop?.locationName || "Restaurant"}</Text>
-              <Text style={styles.subText}>{pickupStop?.address}</Text>
+              <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+                <View style={{ flex: 1, marginRight: 8 }}>
+                  <Text style={styles.infoLabel}>Pickup From</Text>
+                  <Text style={styles.infoText}>{currentOrder.vendorName || pickupStop?.locationName || "Restaurant"}</Text>
+                  <Text style={styles.subText}>{pickupStop?.address}</Text>
+                </View>
+                <View style={{ flexDirection: "row", gap: 12, alignItems: "center" }}>
+                  <TouchableOpacity
+                    style={styles.roundCommBtn}
+                    onPress={() => Linking.openURL(`tel:${currentOrder.vendorPhone || "1234567890"}`)}
+                  >
+                    <Ionicons name="call" size={18} color="#00B7EB" />
+                  </TouchableOpacity>
+                  {pickupStop?.lat && pickupStop?.lng && (
+                    <TouchableOpacity
+                      style={styles.roundCommBtn}
+                      onPress={() => {
+                        const url = `https://www.google.com/maps/dir/?api=1&destination=${pickupStop.lat},${pickupStop.lng}`;
+                        Linking.openURL(url);
+                      }}
+                    >
+                      <Ionicons name="navigate" size={18} color="#00B7EB" />
+                    </TouchableOpacity>
+                  )}
+                </View>
+              </View>
             </View>
             <View style={styles.divider} />
             <View style={styles.infoItem}>
@@ -430,9 +454,30 @@ export default function ActiveOrderScreen() {
             </TouchableOpacity>
           </View>
 
-          <View style={styles.locationDetails}>
-            <Text style={styles.restaurantName}>{pickupStop?.locationName}</Text>
-            <Text style={styles.addressText}>{pickupStop?.address}</Text>
+          <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+            <View style={{ flex: 1, marginRight: 8 }}>
+              <Text style={styles.restaurantName}>{currentOrder.vendorName || pickupStop?.locationName || "Restaurant"}</Text>
+              <Text style={styles.addressText}>{pickupStop?.address}</Text>
+            </View>
+            <View style={{ flexDirection: "row", gap: 12, alignItems: "center" }}>
+              <TouchableOpacity
+                style={styles.roundCommBtn}
+                onPress={() => Linking.openURL(`tel:${currentOrder.vendorPhone || "1234567890"}`)}
+              >
+                <Ionicons name="call" size={18} color="#00B7EB" />
+              </TouchableOpacity>
+              {pickupStop?.lat && pickupStop?.lng && (
+                <TouchableOpacity
+                  style={styles.roundCommBtn}
+                  onPress={() => {
+                    const url = `https://www.google.com/maps/dir/?api=1&destination=${pickupStop.lat},${pickupStop.lng}`;
+                    Linking.openURL(url);
+                  }}
+                >
+                  <Ionicons name="navigate" size={18} color="#00B7EB" />
+                </TouchableOpacity>
+              )}
+            </View>
           </View>
 
           <TouchableOpacity style={styles.actionBtn} onPress={handleStatusTransition}>
@@ -457,12 +502,15 @@ export default function ActiveOrderScreen() {
 
           <View style={styles.waitNotification}>
             <Text style={styles.waitNotifyText}>
-              Click confirm to notify the restaurant that you have arrived and are waiting for package handover.
+              Awaiting restaurant preparation. You will be notified automatically when the restaurant marks the order as prepared and ready for pickup.
             </Text>
           </View>
 
-          <TouchableOpacity style={styles.actionBtn} onPress={handleStatusTransition}>
-            <Text style={styles.actionBtnText}>Confirm Restaurant Arrival</Text>
+          <TouchableOpacity 
+            style={[styles.actionBtn, { backgroundColor: "#9CA3AF" }]} 
+            disabled={true}
+          >
+            <Text style={styles.actionBtnText}>Waiting for Restaurant...</Text>
           </TouchableOpacity>
         </View>
       );
@@ -890,11 +938,6 @@ export default function ActiveOrderScreen() {
       ]}>
         <View style={styles.cardHeader}>
           <Text style={styles.orderLabel}>Order ID: {currentOrder.id}</Text>
-          <View style={[styles.statusPill, { backgroundColor: getStatusColor(currentOrder.status) }]}>
-            <Text style={styles.statusPillText}>
-              {currentOrder.status.replace("_", " ").toUpperCase()}
-            </Text>
-          </View>
         </View>
 
         <ScrollView 
