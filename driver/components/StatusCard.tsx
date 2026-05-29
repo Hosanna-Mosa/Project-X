@@ -1,5 +1,6 @@
 import React from "react";
 import { StyleSheet, Text, View } from "react-native";
+import { Feather } from "@expo/vector-icons";
 import Colors from "@/constants/colors";
 
 interface StatusCardProps {
@@ -9,15 +10,20 @@ interface StatusCardProps {
 
 export function StatusCard({ title, status }: StatusCardProps) {
   const isValid = status === "valid";
+  const isPending = status === "pending";
 
   return (
     <View style={[styles.card, isValid && styles.cardValid]}>
       <View style={[styles.iconCircle, isValid && styles.iconCircleValid]}>
-        <Text style={styles.checkmark}>✓</Text>
+        <Feather
+          name={isValid ? "check" : isPending ? "clock" : "x"}
+          size={18}
+          color={isValid ? Colors.success : isPending ? Colors.warning : Colors.error}
+        />
       </View>
       <Text style={styles.title}>{title}</Text>
-      <View style={[styles.statusBadge, isValid ? styles.statusValid : styles.statusInvalid]}>
-        <Text style={[styles.statusText, isValid ? styles.statusTextValid : styles.statusTextInvalid]}>
+      <View style={[styles.statusBadge, isValid ? styles.statusValid : isPending ? styles.statusPending : styles.statusInvalid]}>
+        <Text style={[styles.statusText, isValid ? styles.statusTextValid : isPending ? styles.statusTextPending : styles.statusTextInvalid]}>
           {status.charAt(0).toUpperCase() + status.slice(1)}
         </Text>
       </View>
@@ -51,11 +57,6 @@ const styles = StyleSheet.create({
   iconCircleValid: {
     backgroundColor: Colors.success + "20",
   },
-  checkmark: {
-    fontSize: 18,
-    color: Colors.success,
-    fontFamily: "Inter_700Bold",
-  },
   title: {
     fontFamily: "Inter_500Medium",
     fontSize: 12,
@@ -71,6 +72,9 @@ const styles = StyleSheet.create({
   statusValid: {
     backgroundColor: Colors.success + "20",
   },
+  statusPending: {
+    backgroundColor: Colors.warning + "20",
+  },
   statusInvalid: {
     backgroundColor: Colors.errorLight,
   },
@@ -80,6 +84,9 @@ const styles = StyleSheet.create({
   },
   statusTextValid: {
     color: Colors.success,
+  },
+  statusTextPending: {
+    color: Colors.warning,
   },
   statusTextInvalid: {
     color: Colors.error,
