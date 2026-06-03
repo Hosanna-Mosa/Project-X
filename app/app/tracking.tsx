@@ -35,9 +35,10 @@ const STATUS_SEQUENCE: OrderStatus[] = [
 export default function TrackingScreen() {
   const insets = useSafeAreaInsets();
   const params = useLocalSearchParams<{ orderId?: string }>();
-  const { status, setStatus, currentOrderId, setOrderId, route, setRoute, stops, setStops, driver, setDriver, unreadCount, incrementUnreadCount } = useDeliveryStore();
+  const { status, setStatus, currentOrderId, setOrderId, serviceType, setServiceType, route, setRoute, stops, setStops, driver, setDriver, unreadCount, incrementUnreadCount } = useDeliveryStore();
   const [eta, setEta] = useState(15);
   const [deliveryOtp, setDeliveryOtp] = useState<string | null>(null);
+  const [startOtp, setStartOtp] = useState<string | null>(null);
   const [driverLocation, setDriverLocation] = useState<{ lat: number, lng: number } | null>(null);
   const [radius, setRadius] = useState<number | null>(null);
   const mapRef = React.useRef<MapBackgroundRef>(null);
@@ -51,6 +52,8 @@ export default function TrackingScreen() {
   const { theme } = useThemeStore();
   const colors = Colors[theme];
   const styles = React.useMemo(() => createStyles(colors), [theme]);
+
+  const isRide = ["bike", "auto", "cab", "cab_prime"].includes(serviceType?.toLowerCase() || "");
 
   const normalizeStatus = (backendStatus: string): OrderStatus => {
     const s = backendStatus.toLowerCase();
@@ -115,6 +118,12 @@ export default function TrackingScreen() {
             }
             if (order.deliveryOtp) {
               setDeliveryOtp(order.deliveryOtp);
+            }
+            if (order.serviceType) {
+              setServiceType(order.serviceType);
+            }
+            if (order.restaurantPickupCode) {
+              setStartOtp(order.restaurantPickupCode);
             }
             if (order.polyline) {
               setRoute({
@@ -188,35 +197,62 @@ export default function TrackingScreen() {
           <View style={[styles.successIconCircle, { backgroundColor: colors.success + "15" }]}>
             <Feather name="check-circle" size={80} color={colors.success} />
           </View>
-          <Text style={[styles.successTitle, { color: colors.text }]}>Order Delivered!</Text>
+          <Text style={[styles.successTitle, { color: colors.text }]}>
+            {isRide ? "Ride Completed!" : "Order Delivered!"}
+          </Text>
           <Text style={[styles.successSubtitle, { color: colors.textSecondary }]}>
-            Your meal has been delivered successfully by {driver?.name || "our delivery partner"}.
+            {isRide
+              ? `You have arrived safely at your destination with ${driver?.name || "your captain"}.`
+              : `Your meal has been delivered successfully by ${driver?.name || "our delivery partner"}.`}
           </Text>
         </View>
 
         <ScrollView style={styles.successDetailsScroll} showsVerticalScrollIndicator={false}>
-          {/* Order Summary */}
-          <View style={[styles.successCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-            <Text style={[styles.successCardHeader, { color: colors.text }]}>Delivered Items</Text>
-            {foodItems.map((item: any, idx: number) => (
-              <View key={idx} style={styles.successItemRow}>
-                <Text style={[styles.successItemQty, { color: colors.primary }]}>{item.quantity}x</Text>
-                <Text style={[styles.successItemName, { color: colors.text }]}>{item.name}</Text>
-              </View>
-            ))}
-            {foodItems.length === 0 && (
-              <Text style={{ color: colors.textMuted, fontSize: 13 }}>Items successfully handed over.</Text>
-            )}
-          </View>
-
-          {/* Delivery Address */}
-          {deliveryStop?.address && (
+          {isRide ? (
             <View style={[styles.successCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-              <Text style={[styles.successCardHeader, { color: colors.text }]}>Delivery Address</Text>
-              <Text style={[styles.successAddressText, { color: colors.textSecondary }]}>
-                {deliveryStop.address}
-              </Text>
+              <Text style={[styles.successCardHeader, { color: colors.text }]}>Ride Route</Text>
+              <View style={{ gap: 8, paddingVertical: 4 }}>
+                <View style={{ flexDirection: "row", gap: 8, alignItems: "center" }}>
+                  <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: colors.success }} />
+                  <Text style={{ fontSize: 13, color: colors.text, flex: 1 }} numberOfLines={2}>
+                    {stops?.find((s) => s.type === "pickup")?.address || "Pickup Location"}
+                  </Text>
+                </View>
+                <View style={{ width: 2, height: 12, backgroundColor: colors.border, marginLeft: 3 }} />
+                <View style={{ flexDirection: "row", gap: 8, alignItems: "center" }}>
+                  <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: colors.error }} />
+                  <Text style={{ fontSize: 13, color: colors.text, flex: 1 }} numberOfLines={2}>
+                    {deliveryStop?.address || "Destination Location"}
+                  </Text>
+                </View>
+              </View>
             </View>
+          ) : (
+            <>
+              {/* Order Summary */}
+              <View style={[styles.successCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+                <Text style={[styles.successCardHeader, { color: colors.text }]}>Delivered Items</Text>
+                {foodItems.map((item: any, idx: number) => (
+                  <View key={idx} style={styles.successItemRow}>
+                    <Text style={[styles.successItemQty, { color: colors.primary }]}>{item.quantity}x</Text>
+                    <Text style={[styles.successItemName, { color: colors.text }]}>{item.name}</Text>
+                  </View>
+                ))}
+                {foodItems.length === 0 && (
+                  <Text style={{ color: colors.textMuted, fontSize: 13 }}>Items successfully handed over.</Text>
+                )}
+              </View>
+
+              {/* Delivery Address */}
+              {deliveryStop?.address && (
+                <View style={[styles.successCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+                  <Text style={[styles.successCardHeader, { color: colors.text }]}>Delivery Address</Text>
+                  <Text style={[styles.successAddressText, { color: colors.textSecondary }]}>
+                    {deliveryStop.address}
+                  </Text>
+                </View>
+              )}
+            </>
           )}
 
           {/* Feedback Section */}
@@ -285,8 +321,12 @@ export default function TrackingScreen() {
                 <View style={styles.radarCircle} />
                 <Feather name="search" size={30} color={colors.primary} />
               </View>
-              <Text style={styles.findingTitle}>Finding your delivery partner...</Text>
-              <Text style={styles.findingSubtitle}>We're connecting you with the nearest professional driver.</Text>
+              <Text style={styles.findingTitle}>
+                {isRide ? "Finding your captain..." : "Finding your delivery partner..."}
+              </Text>
+              <Text style={styles.findingSubtitle}>
+                {isRide ? "We're connecting you with the nearest captain." : "We're connecting you with the nearest professional driver."}
+              </Text>
               <ActivityIndicator color={colors.primary} style={{ marginTop: 24 }} />
             </View>
           ) : (
@@ -301,7 +341,9 @@ export default function TrackingScreen() {
                     <Feather name="star" size={12} color="#F59E0B" />
                     <Text style={styles.ratingText}>{driver.rating || "4.9"}</Text>
                   </View>
-                  <Text style={styles.driverMotto}>Loves delivering on time</Text>
+                  <Text style={styles.driverMotto}>
+                    {isRide ? "Loves driving safely" : "Loves delivering on time"}
+                  </Text>
                 </View>
                 <View style={styles.driverActions}>
                   <TouchableOpacity style={styles.actionBtn}>
@@ -320,7 +362,33 @@ export default function TrackingScreen() {
 
               <View style={styles.divider} />
 
-              {deliveryOtp && (
+              {isRide && startOtp && ["confirmed", "driver_assigned", "en_route_pickup", "arrived_pickup"].includes(status) && (
+                <View style={styles.otpCard}>
+                  <Feather name="shield" size={20} color={colors.primary} />
+                  <View style={styles.otpTextContainer}>
+                    <Text style={styles.otpTitle}>Start Ride OTP</Text>
+                    <Text style={styles.otpSubtitle}>Share this OTP with your captain to start the ride</Text>
+                  </View>
+                  <View style={styles.otpBadge}>
+                    <Text style={styles.otpCode}>{startOtp}</Text>
+                  </View>
+                </View>
+              )}
+
+              {isRide && deliveryOtp && ["en_route_delivery", "arrived_delivery"].includes(status) && (
+                <View style={styles.otpCard}>
+                  <Feather name="shield" size={20} color={colors.primary} />
+                  <View style={styles.otpTextContainer}>
+                    <Text style={styles.otpTitle}>End Ride OTP</Text>
+                    <Text style={styles.otpSubtitle}>Share this OTP with your captain only when you reach your destination</Text>
+                  </View>
+                  <View style={styles.otpBadge}>
+                    <Text style={styles.otpCode}>{deliveryOtp}</Text>
+                  </View>
+                </View>
+              )}
+
+              {!isRide && deliveryOtp && (
                 <View style={styles.otpCard}>
                   <Feather name="shield" size={20} color={colors.primary} />
                   <View style={styles.otpTextContainer}>
@@ -333,7 +401,7 @@ export default function TrackingScreen() {
                 </View>
               )}
 
-              <OrderStatusTimeline currentStatus={status} />
+              <OrderStatusTimeline currentStatus={status} serviceType={serviceType || undefined} />
             </>
           )}
 

@@ -1,7 +1,8 @@
 import { Request, Response } from "express";
 import { OrdersService } from "./orders.service";
 import { AuthRequest } from "../../middleware/auth.middleware";
-import { OrderStatus, ServiceType } from "../../database/models/Order";
+import Order, { OrderStatus, ServiceType } from "../../database/models/Order";
+import Driver from "../../database/models/Driver";
 
 const ordersService = new OrdersService();
 
@@ -46,7 +47,7 @@ export class OrdersController {
   async create(req: AuthRequest, res: Response) {
     console.log("Creating Order - Payload:", req.body);
     try {
-      const { stops, serviceType, vendorId, totals, radius, duration } = req.body;
+      const { stops, serviceType, vendorId, totals, radius, duration, isReserved, reservedAt } = req.body;
       const userId = req.user?.userId;
 
       if (!userId || !stops || stops.length === 0) {
@@ -54,7 +55,7 @@ export class OrdersController {
         return res.status(400).json({ message: "Incomplete order data. User and stops are required." });
       }
 
-      const order = await ordersService.createOrder(userId, stops, serviceType, vendorId, totals, radius, duration);
+      const order = await ordersService.createOrder(userId, stops, serviceType, vendorId, totals, radius, duration, isReserved, reservedAt);
 
       // Trigger Matching Driver logic (in background or service)
       // For now, return order
@@ -152,6 +153,26 @@ export class OrdersController {
       return res.json(orders);
     } catch (error) {
       return res.status(500).json({ message: "Internal server error" });
+    }
+  }
+
+  async getDriverScheduledOrders(req: AuthRequest, res: Response) {
+    try {
+      const userId = req.user?.userId;
+      if (!userId) return res.status(401).json({ message: "Unauthorized" });
+
+      const driver = await Driver.findOne({ user: userId });
+      if (!driver) return res.status(404).json({ message: "Driver not found" });
+
+      const orders = await Order.find({
+        driver: driver._id,
+        isReserved: true,
+        status: OrderStatus.DRIVER_ASSIGNED,
+      }).populate("user").sort({ reservedAt: 1 });
+
+      return res.json(orders);
+    } catch (error: any) {
+      return res.status(500).json({ message: error.message || "Internal server error" });
     }
   }
 

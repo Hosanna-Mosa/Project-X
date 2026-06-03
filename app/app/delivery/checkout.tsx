@@ -23,7 +23,7 @@ const apiUrl = process.env.EXPO_PUBLIC_API_URL;
 export default function CheckoutScreen() {
   const insets = useSafeAreaInsets();
   const [isProcessing, setIsProcessing] = React.useState(false);
-  const { stops, price, paymentMethod, setStatus, route, resetDelivery, setOrderId, vendorId } = useDeliveryStore();
+  const { stops, price, paymentMethod, setStatus, route, resetDelivery, setOrderId, setServiceType, vendorId } = useDeliveryStore();
   const { user } = useAuthStore();
 
   const { theme } = useThemeStore();
@@ -83,6 +83,7 @@ export default function CheckoutScreen() {
         const data = await verifyResponse.json();
         const finalOrder = data.order;
         setOrderId(finalOrder._id || finalOrder.id);
+        setServiceType("delivery");
         setStatus("confirmed");
         Alert.alert("Success", "Delivery confirmed and paid!");
         router.push("/tracking");

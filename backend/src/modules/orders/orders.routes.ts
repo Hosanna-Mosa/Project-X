@@ -8,6 +8,7 @@ const ordersController = new OrdersController();
 
 // Create order - simplifying route to / for easier frontend integration
 router.post("/", authenticateToken, ordersController.create.bind(ordersController));
+router.get("/driver/scheduled", authenticateToken, authorizeRole([UserRole.DRIVER]), ordersController.getDriverScheduledOrders.bind(ordersController));
 router.get("/", authenticateToken, ordersController.getUserOrders.bind(ordersController));
 router.get("/estimate-fare", authenticateToken, ordersController.estimateFare.bind(ordersController));
 router.get("/vendor/:vendorId", ordersController.getVendorOrders.bind(ordersController));

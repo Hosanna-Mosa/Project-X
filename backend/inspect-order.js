@@ -7,20 +7,19 @@ async function run() {
     await mongoose.connect(DATABASE_URL);
     console.log("Connected to MongoDB!");
     
-    // Find the latest order
-    const order = await mongoose.connection.db.collection('orders')
+    // Find the latest 10 orders
+    const orders = await mongoose.connection.db.collection('orders')
       .find({})
       .sort({ createdAt: -1 })
-      .limit(1)
-      .next();
+      .limit(10)
+      .toArray();
       
-    if (!order) {
+    if (orders.length === 0) {
       console.log("No orders found in DB!");
     } else {
-      console.log("Order ID:", order._id);
-      console.log("Status:", order.status);
-      console.log("Stops:", JSON.stringify(order.stops, null, 2));
-      console.log("Polyline length:", order.polyline ? order.polyline.length : 0);
+      orders.forEach(order => {
+        console.log(`Order ID: ${order._id} | Status: ${order.status} | isReserved: ${order.isReserved} | Driver: ${order.driver} | CreatedAt: ${order.createdAt}`);
+      });
     }
   } catch (err) {
     console.error("DB Error:", err);

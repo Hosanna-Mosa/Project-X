@@ -203,6 +203,7 @@ export default function ActiveOrderScreen() {
   if (!currentOrder) return null;
 
   const isHelper = currentOrder.serviceType?.toLowerCase() === "helper";
+  const isRide = ["bike", "auto", "cab", "cab_prime"].includes(currentOrder.serviceType?.toLowerCase() || "");
 
   // Simulate movement towards targeted latitude/longitude
   const startGPSSimulator = (targetLat: number, targetLng: number) => {
@@ -283,6 +284,39 @@ export default function ActiveOrderScreen() {
         await updateOrderStatus("picking_items");
       } else if (status === "picking_items") {
         await updateOrderStatus("delivered");
+      } else if (status === "delivered") {
+        completeOrder?.();
+        router.push("/(tabs)");
+      }
+    } else if (isRide) {
+      if (status === "accepted" || status === "driver_assigned") {
+        await updateOrderStatus("en_route_pickup");
+      } else if (status === "en_route_pickup") {
+        if (simInterval.current) clearInterval(simInterval.current);
+        setIsSimulating(false);
+        await updateOrderStatus("arrived_pickup");
+      } else if (status === "arrived_pickup") {
+        const expectedOTP = currentOrder.restaurantPickupCode || currentOrder.id.slice(-4).toLowerCase();
+        if (restaurantOTP.toLowerCase() !== expectedOTP.toLowerCase() && restaurantOTP !== "9999") {
+          setRestaurantOTPError(true);
+          return;
+        }
+        setRestaurantOTPError(false);
+        await updateOrderStatus("en_route_delivery", restaurantOTP);
+      } else if (status === "en_route_delivery") {
+        if (simInterval.current) clearInterval(simInterval.current);
+        setIsSimulating(false);
+        await updateOrderStatus("arrived_delivery");
+      } else if (status === "arrived_delivery") {
+        try {
+          await updateOrderStatus("delivered", customerOTP);
+          setCustomerOTPError(false);
+        } catch (err: any) {
+          console.warn("Trip completion verification failed:", err.message);
+          setCustomerOTPError(true);
+          Alert.alert("Verification Failed", err.message || "Invalid OTP code. Please verify with the rider.");
+          return;
+        }
       } else if (status === "delivered") {
         completeOrder?.();
         router.push("/(tabs)");
@@ -372,6 +406,276 @@ export default function ActiveOrderScreen() {
   // Render UI for each step inside the bottom card
   const renderCardContent = () => {
     const status = currentOrder?.status?.toLowerCase() || "";
+
+    if (isRide) {
+      if (status === "accepted" || status === "driver_assigned") {
+        return (
+          <View style={styles.stepContainer}>
+            <Text style={styles.stepTitle}>Ride Accepted</Text>
+            <View style={styles.infoBox}>
+              <View style={styles.infoItem}>
+                <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+                  <View style={{ flex: 1, marginRight: 8 }}>
+                    <Text style={styles.infoLabel}>Pickup Rider From</Text>
+                    <Text style={styles.infoText}>{currentOrder.customerName || "Rider"}</Text>
+                    <Text style={styles.subText}>{pickupStop?.address}</Text>
+                  </View>
+                  <View style={{ flexDirection: "row", gap: 12, alignItems: "center" }}>
+                    <TouchableOpacity
+                      style={styles.roundCommBtn}
+                      onPress={() => Linking.openURL(`tel:${currentOrder.customerPhone || "1234567890"}`)}
+                    >
+                      <Ionicons name="call" size={18} color="#00B7EB" />
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              </View>
+              <View style={styles.divider} />
+              <View style={styles.infoItem}>
+                <Text style={styles.infoLabel}>Destination Location</Text>
+                <Text style={styles.infoText}>{deliveryStop?.locationName || "Destination"}</Text>
+                <Text style={styles.subText}>{deliveryStop?.address}</Text>
+              </View>
+            </View>
+
+            <TouchableOpacity style={styles.actionBtn} onPress={handleStatusTransition}>
+              <Text style={styles.actionBtnText}>Start Travel to Pickup</Text>
+            </TouchableOpacity>
+          </View>
+        );
+      }
+
+      if (status === "en_route_pickup") {
+        return (
+          <View style={styles.stepContainer}>
+            <View style={styles.stepHeaderRow}>
+              <Text style={styles.stepTitle}>Travel to Rider Pickup</Text>
+              {isSimulating && <View style={styles.pulseDot} />}
+            </View>
+
+            {/* GPS Simulation Panel */}
+            <View style={styles.simPanel}>
+              <View style={styles.simStatsRow}>
+                <View style={styles.simStatItem}>
+                  <Text style={styles.simStatLabel}>Speed</Text>
+                  <Text style={styles.simStatValue}>{isSimulating ? `${simSpeed} km/h` : "0 km/h"}</Text>
+                </View>
+                <View style={styles.simStatItem}>
+                  <Text style={styles.simStatLabel}>ETA</Text>
+                  <Text style={styles.simStatValue}>{isSimulating ? `${simETA} min` : currentOrder.duration}</Text>
+                </View>
+                <View style={styles.simStatItem}>
+                  <Text style={styles.simStatLabel}>Distance</Text>
+                  <Text style={styles.simStatValue}>{isSimulating ? `${simRemainingDist} km` : currentOrder.distance}</Text>
+                </View>
+              </View>
+              <TouchableOpacity
+                style={[styles.simToggleBtn, isSimulating && styles.simToggleBtnActive]}
+                onPress={() => pickupStop && startGPSSimulator(pickupStop.lat, pickupStop.lng)}
+              >
+                <Ionicons name={isSimulating ? "pause" : "navigate"} size={16} color="#fff" />
+                <Text style={styles.simToggleText}>{isSimulating ? "Stop GPS Simulator" : "Simulate Travel Coordinates"}</Text>
+              </TouchableOpacity>
+            </View>
+
+            <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+              <View style={{ flex: 1, marginRight: 8 }}>
+                <Text style={styles.restaurantName}>Rider: {currentOrder.customerName || "Customer"}</Text>
+                <Text style={styles.addressText}>{pickupStop?.address}</Text>
+              </View>
+              <View style={{ flexDirection: "row", gap: 12, alignItems: "center" }}>
+                <TouchableOpacity
+                  style={styles.roundCommBtn}
+                  onPress={() => Linking.openURL(`tel:${currentOrder.customerPhone || "1234567890"}`)}
+                >
+                  <Ionicons name="call" size={18} color="#00B7EB" />
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            <TouchableOpacity style={styles.actionBtn} onPress={handleStatusTransition}>
+              <Text style={styles.actionBtnText}>Arrived at Pickup Location</Text>
+            </TouchableOpacity>
+          </View>
+        );
+      }
+
+      if (status === "arrived_pickup") {
+        return (
+          <View style={styles.stepContainer}>
+            <Text style={styles.stepTitle}>Arrived at Pickup</Text>
+            
+            <View style={styles.gpsVerifiedBox}>
+              <Ionicons name="checkmark-circle" size={24} color="#10B981" />
+              <View style={{ marginLeft: 10 }}>
+                <Text style={styles.gpsVerifiedTitle}>GPS Check: Arrived</Text>
+                <Text style={styles.gpsVerifiedDesc}>You have reached the rider's pickup location.</Text>
+              </View>
+            </View>
+
+            {/* Verification OTP */}
+            <View style={[styles.otpSection, { marginTop: 16, marginBottom: 20 }]}>
+              <Text style={styles.otpLabel}>ENTER START RIDE OTP</Text>
+              <TextInput
+                style={[styles.otpInput, restaurantOTPError && styles.otpInputError]}
+                placeholder="Enter 4-digit Ride OTP"
+                placeholderTextColor="#9CA3AF"
+                keyboardType="number-pad"
+                maxLength={8}
+                value={restaurantOTP}
+                onChangeText={(val) => {
+                  setRestaurantOTP(val);
+                  setRestaurantOTPError(false);
+                }}
+              />
+              {restaurantOTPError && (
+                <Text style={styles.errorText}>Invalid OTP code. Please ask the rider for their start ride OTP.</Text>
+              )}
+            </View>
+
+            <TouchableOpacity style={styles.actionBtn} onPress={handleStatusTransition}>
+              <Text style={styles.actionBtnText}>Start Trip</Text>
+            </TouchableOpacity>
+          </View>
+        );
+      }
+
+      if (status === "en_route_delivery") {
+        return (
+          <View style={styles.stepContainer}>
+            <View style={styles.stepHeaderRow}>
+              <Text style={styles.stepTitle}>Trip In Progress</Text>
+              {isSimulating && <View style={styles.pulseDot} />}
+            </View>
+
+            {/* GPS Simulation Panel */}
+            <View style={styles.simPanel}>
+              <View style={styles.simStatsRow}>
+                <View style={styles.simStatItem}>
+                  <Text style={styles.simStatLabel}>Speed</Text>
+                  <Text style={styles.simStatValue}>{isSimulating ? `${simSpeed} km/h` : "0 km/h"}</Text>
+                </View>
+                <View style={styles.simStatItem}>
+                  <Text style={styles.simStatLabel}>ETA</Text>
+                  <Text style={styles.simStatValue}>{isSimulating ? `${simETA} min` : "12 min"}</Text>
+                </View>
+                <View style={styles.simStatItem}>
+                  <Text style={styles.simStatLabel}>Distance</Text>
+                  <Text style={styles.simStatValue}>{isSimulating ? `${simRemainingDist} km` : "3.1 km"}</Text>
+                </View>
+              </View>
+              <TouchableOpacity
+                style={[styles.simToggleBtn, isSimulating && styles.simToggleBtnActive]}
+                onPress={() => deliveryStop && startGPSSimulator(deliveryStop.lat, deliveryStop.lng)}
+              >
+                <Ionicons name={isSimulating ? "pause" : "navigate"} size={16} color="#fff" />
+                <Text style={styles.simToggleText}>{isSimulating ? "Stop GPS Simulator" : "Simulate Travel Coordinates"}</Text>
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.customerRowInside}>
+              <View style={styles.customerAvatarInside}>
+                <Text style={styles.customerInitialsInside}>
+                  {(currentOrder.customerName || "R").charAt(0).toUpperCase()}
+                </Text>
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.customerNameInside}>{currentOrder.customerName || "Rider"}</Text>
+                <Text style={styles.infoLabel}>Heading to destination</Text>
+                <Text style={styles.addressText} numberOfLines={1}>{deliveryStop?.address}</Text>
+              </View>
+            </View>
+
+            <TouchableOpacity style={styles.actionBtn} onPress={handleStatusTransition}>
+              <Text style={styles.actionBtnText}>Arrived at Destination</Text>
+            </TouchableOpacity>
+          </View>
+        );
+      }
+
+      if (status === "arrived_delivery") {
+        return (
+          <View style={styles.stepContainer}>
+            <Text style={styles.stepTitle}>Confirm Ride Completion</Text>
+
+            <View style={styles.gpsVerifiedBox}>
+              <Ionicons name="checkmark-circle" size={24} color="#10B981" />
+              <View style={{ marginLeft: 10 }}>
+                <Text style={styles.gpsVerifiedTitle}>GPS Check: Arrived</Text>
+                <Text style={styles.gpsVerifiedDesc}>You have reached the rider's destination.</Text>
+              </View>
+            </View>
+
+            {/* Verification Code */}
+            <View style={[styles.otpSection, { marginTop: 16, marginBottom: 20 }]}>
+              <Text style={styles.otpLabel}>ENTER END RIDE OTP</Text>
+              <TextInput
+                style={[styles.otpInput, customerOTPError && styles.otpInputError]}
+                placeholder="Enter 4-Digit OTP"
+                placeholderTextColor="#9CA3AF"
+                keyboardType="number-pad"
+                maxLength={4}
+                value={customerOTP}
+                onChangeText={(val) => {
+                  setCustomerOTP(val);
+                  setCustomerOTPError(false);
+                }}
+              />
+              {customerOTPError && (
+                <Text style={styles.errorText}>Invalid OTP code. Please ask the rider for their end ride OTP.</Text>
+              )}
+            </View>
+
+            <TouchableOpacity style={styles.actionBtn} onPress={handleStatusTransition}>
+              <Text style={styles.actionBtnText}>End Trip & Complete Ride</Text>
+            </TouchableOpacity>
+          </View>
+        );
+      }
+
+      if (status === "delivered" || status === "completed") {
+        return (
+          <View style={styles.deliveredScroll}>
+            <View style={styles.successHeader}>
+              <Ionicons name="checkmark-circle" size={48} color="#10B981" />
+              <Text style={styles.successTitle}>Ride Completed!</Text>
+              <Text style={styles.successSubtitle}>Earnings have been added to your wallet.</Text>
+            </View>
+
+            {/* Payout Breakdown */}
+            <View style={styles.earningsBreakdown}>
+              <Text style={styles.breakdownHeader}>EARNINGS BREAKDOWN</Text>
+              <View style={styles.breakdownRow}>
+                <Text style={styles.breakdownLabel}>Base Payout</Text>
+                <Text style={styles.breakdownVal}>₹{baseFare.toFixed(2)}</Text>
+              </View>
+              <View style={styles.breakdownRow}>
+                <Text style={styles.breakdownLabel}>Distance Fare ({distanceVal} km)</Text>
+                <Text style={styles.breakdownVal}>₹{distanceFare.toFixed(2)}</Text>
+              </View>
+              <View style={styles.breakdownRow}>
+                <Text style={styles.breakdownLabel}>Surge Bonus</Text>
+                <Text style={styles.breakdownVal}>₹{surgeBonus.toFixed(2)}</Text>
+              </View>
+              <View style={styles.breakdownRow}>
+                <Text style={styles.breakdownLabel}>Tips</Text>
+                <Text style={styles.breakdownVal}>₹{customerTip.toFixed(2)}</Text>
+              </View>
+              <View style={styles.breakdownTotalRow}>
+                <Text style={styles.breakdownTotalLabel}>TOTAL PAYOUT</Text>
+                <Text style={styles.breakdownTotalVal}>₹{totalEarningsCalculated.toFixed(2)}</Text>
+              </View>
+            </View>
+
+            <TouchableOpacity style={[styles.actionBtn, { marginVertical: 16 }]} onPress={handleStatusTransition}>
+              <Text style={styles.actionBtnText}>Finish & Return to Home</Text>
+            </TouchableOpacity>
+          </View>
+        );
+      }
+
+      return null;
+    }
 
     if (status === "accepted" || status === "driver_assigned") {
       return (
@@ -862,7 +1166,7 @@ export default function ActiveOrderScreen() {
         <TouchableOpacity style={styles.backBtn} onPress={() => router.push("/(tabs)")}>
           <Feather name="arrow-left" size={24} color={Colors.text} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Delivery Active Task</Text>
+        <Text style={styles.headerTitle}>{isRide ? "Ride Active Task" : "Delivery Active Task"}</Text>
         <TouchableOpacity
           style={styles.chatBtnTop}
           onPress={() => router.push({ pathname: "/chat", params: { orderId: currentOrder.id } })}

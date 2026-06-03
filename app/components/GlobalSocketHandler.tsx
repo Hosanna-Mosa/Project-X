@@ -1,12 +1,52 @@
 import React, { useEffect } from "react";
+import { Alert } from "react-native";
+import { router } from "expo-router";
 import { useDeliveryStore } from "@/contexts/deliveryStore";
+import { useAuthStore } from "@/contexts/authStore";
 import { socketService } from "@/utils/socketService";
 
 export function GlobalSocketHandler() {
   const currentOrderId = useDeliveryStore((s) => s.currentOrderId);
   const addChatMessage = useDeliveryStore((s) => s.addChatMessage);
   const incrementUnreadCount = useDeliveryStore((s) => s.incrementUnreadCount);
+  const user = useAuthStore((s) => s.user);
 
+  // Connection and user room joining effect
+  useEffect(() => {
+    if (!user) return;
+
+    socketService.connect();
+    socketService.emit("join", { userId: user.id || user._id, role: "CUSTOMER" });
+
+    const onUpcomingReservedRide = (data: any) => {
+      console.log("Customer received upcoming reserved ride:", data);
+      Alert.alert(
+        "Upcoming Reserved Ride!",
+        `Your reserved ride with ${data.driverName} starts in 15 minutes!`,
+        [
+          {
+            text: "Track Driver",
+            onPress: () => {
+              useDeliveryStore.setState({
+                currentOrderId: data.orderId,
+                serviceType: data.serviceType,
+                status: "driver_assigned",
+              });
+              router.push("/tracking");
+            }
+          }
+        ]
+      );
+    };
+
+    socketService.on("upcoming_reserved_ride", onUpcomingReservedRide);
+
+    return () => {
+      socketService.off("upcoming_reserved_ride", onUpcomingReservedRide);
+    };
+  }, [user]);
+
+  // Chat messages and order tracking effect
   useEffect(() => {
     if (!currentOrderId) return;
 

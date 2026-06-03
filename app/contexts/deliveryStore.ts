@@ -58,6 +58,7 @@ export interface DeliveryState {
   currentLocation: string;
   currentCoords: { lat: number; lng: number } | null;
   currentOrderId: string | null;
+  serviceType: string | null;
   driver: any | null;
   activeChat: ChatMessage[];
   unreadCount: number;
@@ -66,6 +67,7 @@ export interface DeliveryState {
   setCurrentLocation: (address: string) => void;
   setCurrentCoords: (coords: { lat: number; lng: number }) => void;
   setOrderId: (id: string | null) => void;
+  setServiceType: (type: string | null) => void;
   setDriver: (driver: any) => void;
   setVendorId: (id: string | null) => void;
   addStop: (address: string, storeName?: string, items?: DeliveryItem[], lat?: number, lng?: number) => void;
@@ -103,6 +105,7 @@ const initialState = {
   currentLocation: "340 Main St, San Francisco, CA 94105",
   currentCoords: null,
   currentOrderId: null,
+  serviceType: null,
   driver: null,
   activeChat: [],
   unreadCount: 0,
@@ -115,6 +118,7 @@ export const useDeliveryStore = create<DeliveryState>((set, get) => ({
   setCurrentLocation: (currentLocation) => set({ currentLocation }),
   setCurrentCoords: (currentCoords) => set({ currentCoords }),
   setOrderId: (currentOrderId) => set({ currentOrderId }),
+  setServiceType: (serviceType) => set({ serviceType }),
   setDriver: (driver) => set({ driver }),
   setVendorId: (vendorId) => set({ vendorId }),
 

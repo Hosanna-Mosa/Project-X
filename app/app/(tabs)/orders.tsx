@@ -12,6 +12,7 @@ import Colors from "@/constants/colors";
 import { useThemeStore } from "@/contexts/themeStore";
 import { ScreenWrapper } from "@/components/ScreenWrapper";
 import { customFetch } from "@/utils/api/custom-fetch";
+import { useDeliveryStore } from "@/contexts/deliveryStore";
 import { ActivityIndicator } from "react-native";
 
 type FilterType = "all" | "active" | "past";
@@ -35,6 +36,18 @@ const STATUS_LABELS: Record<string, string> = {
   PICKED_UP: "Picked Up",
   DELIVERED: "Delivered",
   CANCELLED: "Cancelled",
+};
+
+const getServiceLabel = (type: string) => {
+  switch (type) {
+    case "bike": return "Bike Ride";
+    case "auto": return "Auto Ride";
+    case "cab": return "Cab Ride";
+    case "cab_prime": return "Cab Prime Ride";
+    case "helper": return "Helper Booking";
+    case "delivery": return "Delivery Service";
+    default: return "Delivery";
+  }
 };
 
 export default function OrdersScreen() {
@@ -116,13 +129,28 @@ export default function OrdersScreen() {
           </View>
         ) : (
           filtered.map((order) => {
-            const isActive = ["SEARCHING_DRIVER", "DRIVER_ASSIGNED", "PICKED_UP"].includes(order.status);
+            const isActive = ["SEARCHING_DRIVER", "DRIVER_ASSIGNED", "PICKED_UP", "ON_THE_WAY", "EN_ROUTE_PICKUP", "ARRIVED_PICKUP", "PICKING_ITEMS", "EN_ROUTE_DELIVERY", "ARRIVED_DELIVERY", "IN_TRANSIT"].includes(order.status);
+            const isRide = ["bike", "auto", "cab", "cab_prime"].includes(order.serviceType);
+            const iconName = isRide ? "map-pin" : (order.stops?.length > 1 ? "git-branch" : "shopping-bag");
+            
+            const serviceLabel = getServiceLabel(order.serviceType);
+            const orderTitle = order.isReserved 
+              ? `Reserved ${serviceLabel}`
+              : (order.serviceType === "delivery" 
+                ? (order.stops?.length > 1 ? "Multi-Stop Delivery" : "Single Stop Delivery") 
+                : serviceLabel);
+
             return (
               <TouchableOpacity
                 key={order._id}
-                style={styles.orderCard}
+                style={[
+                  styles.orderCard,
+                  order.isReserved && isActive && { borderColor: colors.primary, borderWidth: 2 }
+                ]}
                 onPress={() => {
                   if (isActive) {
+                    const { setServiceType } = useDeliveryStore.getState();
+                    setServiceType(order.serviceType || "delivery");
                     router.push({
                       pathname: "/tracking",
                       params: { orderId: order._id }
@@ -134,13 +162,13 @@ export default function OrdersScreen() {
                 <View style={styles.orderCardTop}>
                   <View style={styles.orderTypeIcon}>
                     <Feather
-                      name={order.stops?.length > 1 ? "git-branch" : "shopping-bag"}
+                      name={iconName}
                       size={16}
                       color={colors.primary}
                     />
                   </View>
                   <View style={styles.orderInfo}>
-                    <Text style={styles.orderType}>{order.stops?.length > 1 ? "Multi-Stop Delivery" : "Single Stop Delivery"}</Text>
+                    <Text style={styles.orderType}>{orderTitle}</Text>
                     <Text style={styles.orderId}>{order._id.startsWith("ORD-") ? order._id : order._id.substring(order._id.length - 8).toUpperCase()}</Text>
                   </View>
                   <View
@@ -167,6 +195,14 @@ export default function OrdersScreen() {
                 </View>
 
                 <View style={styles.orderDetails}>
+                  {order.isReserved && (
+                    <View style={styles.scheduledBadge}>
+                      <Feather name="calendar" size={12} color={colors.primary} />
+                      <Text style={styles.scheduledBadgeText}>
+                        Scheduled: {new Date(order.reservedAt).toLocaleString([], { weekday: 'short', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                      </Text>
+                    </View>
+                  )}
                   <View style={styles.detailRow}>
                     <Feather name="map-pin" size={12} color={colors.textMuted} />
                     <Text style={styles.detailText} numberOfLines={1}>
@@ -362,6 +398,21 @@ const createStyles = (colors: typeof Colors.light) => StyleSheet.create({
   trackBtnText: {
     fontSize: 11,
     fontWeight: "600",
+    color: colors.primary,
+  },
+  scheduledBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: `${colors.primary}10`,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    borderRadius: 8,
+    gap: 6,
+    marginBottom: 4,
+  },
+  scheduledBadgeText: {
+    fontSize: 11,
+    fontWeight: "700",
     color: colors.primary,
   },
 });

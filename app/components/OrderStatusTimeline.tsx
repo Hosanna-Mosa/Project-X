@@ -38,19 +38,49 @@ const STATUS_ORDER: OrderStatus[] = [
   "delivered",
 ];
 
+const RIDE_STEPS: StatusStep[] = [
+  { key: "confirmed", label: "Ride Booked", time: "12:30 PM" },
+  { key: "driver_assigned", label: "Captain Assigned", time: "12:32 PM" },
+  { key: "en_route_pickup", label: "Captain on the Way", description: "Captain is heading to your pickup location" },
+  { key: "arrived_pickup", label: "Captain Arrived", description: "Captain has arrived at your location" },
+  { key: "en_route_delivery", label: "Trip In Progress", description: "Traveling to destination" },
+  { key: "arrived_delivery", label: "Arrived at Destination" },
+  { key: "delivered", label: "Trip Completed" },
+];
+
+const RIDE_STATUS_ORDER: OrderStatus[] = [
+  "confirmed",
+  "driver_assigned",
+  "en_route_pickup",
+  "arrived_pickup",
+  "en_route_delivery",
+  "arrived_delivery",
+  "delivered",
+];
+
 interface Props {
   currentStatus: OrderStatus;
+  serviceType?: string;
 }
 
-export function OrderStatusTimeline({ currentStatus }: Props) {
-  const currentIndex = STATUS_ORDER.indexOf(currentStatus);
+export function OrderStatusTimeline({ currentStatus, serviceType }: Props) {
+  const isRide = ["bike", "auto", "cab", "cab_prime"].includes(serviceType?.toLowerCase() || "");
+  const steps = isRide ? RIDE_STEPS : STEPS;
+  const statusOrder = isRide ? RIDE_STATUS_ORDER : STATUS_ORDER;
+
+  let effectiveStatus = currentStatus;
+  if (isRide && currentStatus === "picking_items") {
+    effectiveStatus = "arrived_pickup";
+  }
+
+  const currentIndex = statusOrder.indexOf(effectiveStatus);
   const { theme } = useThemeStore();
   const colors = Colors[theme];
   const styles = React.useMemo(() => createStyles(colors), [theme]);
 
   return (
     <View style={styles.container}>
-      {STEPS.map((step, index) => {
+      {steps.map((step, index) => {
         const isDone = index < currentIndex;
         const isActive = index === currentIndex;
         const isPending = index > currentIndex;

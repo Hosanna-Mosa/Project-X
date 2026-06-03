@@ -56,6 +56,8 @@ export interface Order {
   polyline?: string;
   vendorName?: string;
   vendorPhone?: string;
+  isReserved?: boolean;
+  reservedAt?: Date | string;
 }
 
 export interface CompletedOrder {
@@ -123,6 +125,7 @@ interface DriverState {
   incrementUnreadCount: () => void;
   setIsChatActive: (active: boolean) => void;
   loginWithPassword: (phone: string, password: string) => Promise<void>;
+  startReservedRide: (orderId: string) => Promise<void>;
 }
 
 export const useMockIncomingOrder = (): Order => ({
@@ -284,6 +287,24 @@ export const useDriverStore = create<DriverState>()(
               router.push("/(tabs)");
             }
           });
+          socketService.on("upcoming_reserved_ride", (data: any) => {
+            console.log("Upcoming reserved ride alert received:", data);
+            
+            Alert.alert(
+              "Upcoming Reserved Ride!",
+              `Your scheduled ride for ${data.customerName} starts in 15 minutes! Please prepare to travel.`,
+              [
+                {
+                  text: "Start Travel",
+                  onPress: async () => {
+                    const { startReservedRide } = get();
+                    await startReservedRide(data.orderId);
+                  }
+                }
+              ],
+              { cancelable: false }
+            );
+          });
         });
 
         set({ isOnline: true, activeServices: services });
@@ -308,6 +329,7 @@ export const useDriverStore = create<DriverState>()(
         import("../utils/socketService").then(({ socketService }) => {
           socketService.off("new_order", () => {}); // Remove listener
           socketService.off("order_cancelled", () => {}); // Remove listener
+          socketService.off("upcoming_reserved_ride", () => {}); // Remove listener
           socketService.disconnect();
         });
 
@@ -315,9 +337,74 @@ export const useDriverStore = create<DriverState>()(
       },
       toggleHomeMode: () => set((state) => ({ homeMode: !state.homeMode })),
 
+      startReservedRide: async (orderId: string) => {
+        const { token } = get();
+        let orderFromApi: any = null;
+        if (token) {
+          try {
+            const res = await fetch(`${apiUrl}/api/v1/orders/${orderId}`, {
+              headers: { Authorization: `Bearer ${token}` }
+            });
+            if (res.ok) {
+              orderFromApi = await res.json();
+            }
+          } catch (err) {
+            console.error("Failed to fetch reserved order details on start travel:", err);
+          }
+        }
+
+        const orderToSet = orderFromApi ? {
+          id: orderFromApi._id || orderFromApi.id,
+          distance: `${orderFromApi.totalDistance || 0} km`,
+          duration: `${orderFromApi.duration || 0} min`,
+          earnings: Math.round(orderFromApi.totalPrice * 0.8),
+          status: orderFromApi.status,
+          customerName: orderFromApi.user?.name || "Customer",
+          customerPhone: orderFromApi.user?.phone || "N/A",
+          timestamp: new Date(orderFromApi.createdAt),
+          serviceType: orderFromApi.serviceType,
+          radius: orderFromApi.radius,
+          restaurantPickupCode: orderFromApi.restaurantPickupCode,
+          deliveryOtp: orderFromApi.deliveryOtp,
+          polyline: orderFromApi.polyline,
+          vendorName: orderFromApi.vendor?.name,
+          vendorPhone: orderFromApi.vendor?.phone,
+          stops: orderFromApi.stops.map((s: any) => ({
+            id: s._id,
+            type: s.type.toLowerCase() === "drop" ? "delivery" : s.type.toLowerCase(),
+            locationName: s.address?.split(',')[0],
+            address: s.address,
+            lat: s.location.coordinates[1],
+            lng: s.location.coordinates[0],
+            items: s.items,
+          }))
+        } : {
+          id: orderId,
+          distance: "N/A",
+          duration: "N/A",
+          earnings: 0,
+          status: "driver_assigned",
+          customerName: "Customer",
+          customerPhone: "N/A",
+          timestamp: new Date(),
+          serviceType: "ride",
+          stops: [],
+        };
+
+        set({
+          currentOrder: orderToSet as any,
+          currentStep: 0,
+          activeChat: [],
+          unreadCount: 0,
+        });
+        
+        router.push("/active-order");
+      },
+
       acceptOrder: async () => {
         const { incomingOrder, token } = get();
         if (incomingOrder) {
+          const isReserved = incomingOrder.isReserved;
           let accepted = false;
           let orderFromApi: any = null;
           if (token) {
@@ -349,6 +436,21 @@ export const useDriverStore = create<DriverState>()(
                 driverInfo: { id: "mock_driver_123", name: "Mock Driver", phone: "+1 (555) 987-6543", vehicle: "Mock Vehicle" }
               });
             });
+          }
+
+          if (isReserved) {
+            Alert.alert(
+              "Ride Reserved Successfully",
+              "You have successfully accepted this scheduled ride reservation. We will notify you 15 minutes before the pickup time.",
+              [{ text: "OK" }]
+            );
+            set({
+              currentOrder: null,
+              incomingOrder: null,
+              activeChat: [],
+              unreadCount: 0,
+            });
+            return;
           }
 
           const orderToSet = orderFromApi ? {

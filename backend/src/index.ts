@@ -38,6 +38,62 @@ app.use(express.json());
 SocketManager.getInstance(server);
 
 // Database Initialization
+import Order, { OrderStatus } from "./database/models/Order";
+
+function startReservedRideScheduler() {
+  setInterval(async () => {
+    try {
+      const now = new Date();
+      const fifteenMinutesFromNow = new Date(now.getTime() + 15 * 60 * 1000);
+
+      // Find orders starting in the next 15 minutes that haven't been notified yet
+      const upcomingOrders = await Order.find({
+        isReserved: true,
+        status: OrderStatus.DRIVER_ASSIGNED,
+        notified15Min: { $ne: true },
+        reservedAt: { $lte: fifteenMinutesFromNow }
+      }).populate("user").populate({
+        path: "driver",
+        populate: { path: "user" }
+      });
+
+      for (const order of upcomingOrders) {
+        order.notified15Min = true;
+        await order.save();
+
+        const socketManager = SocketManager.getInstance();
+        if (socketManager) {
+          const orderUser = order.user as any;
+          const driverObj = order.driver as any;
+          const driverUser = driverObj?.user as any;
+
+          const payload = {
+            orderId: order._id,
+            isReserved: true,
+            reservedAt: order.reservedAt,
+            serviceType: order.serviceType,
+            customerName: orderUser?.name || "Customer",
+            customerPhone: orderUser?.phone || "",
+            driverName: driverUser?.name || "Driver",
+            driverPhone: driverUser?.phone || "",
+          };
+
+          console.log(`[RESERVATION SCHEDULER] Notifying customer ${orderUser?._id} and driver ${driverUser?._id} of upcoming ride ${order._id}`);
+
+          if (orderUser?._id) {
+            socketManager.emitToUser(orderUser._id.toString(), "upcoming_reserved_ride", payload);
+          }
+          if (driverUser?._id) {
+            socketManager.emitToUser(driverUser._id.toString(), "upcoming_reserved_ride", payload);
+          }
+        }
+      }
+    } catch (error) {
+      console.error("Error in reserved ride scheduler:", error);
+    }
+  }, 15000); // check every 15 seconds
+}
+
 connectDB().then(async () => {
   // Sample Route
   app.get("/", (req, res) => {
@@ -61,6 +117,7 @@ connectDB().then(async () => {
 
   server.listen(PORT, () => {
     console.log(`Server is running on port ${PORT}`);
+    startReservedRideScheduler();
   });
 }).catch((error) => {
   console.error("Database initialization failed", error);

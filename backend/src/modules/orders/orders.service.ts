@@ -11,7 +11,7 @@ export class OrdersService {
   private routingService = new RoutingService();
   private pricingService = new PricingService();
 
-  async createOrder(userId: string, stopsData: any[], serviceType?: ServiceType, vendorId?: string, totals?: any, radius?: number, duration?: number) {
+  async createOrder(userId: string, stopsData: any[], serviceType?: ServiceType, vendorId?: string, totals?: any, radius?: number, duration?: number, isReserved?: boolean, reservedAt?: Date | string) {
     if (!mongoose.Types.ObjectId.isValid(userId)) {
       throw new Error("Invalid User ID format");
     }
@@ -119,10 +119,12 @@ export class OrdersService {
       totalDistance: optimizationResult.totalDistance,
       totalPrice,
       priceBreakdown,
-      status: isRide ? OrderStatus.SEARCHING_DRIVER : OrderStatus.SEARCHING_DRIVER,
+      status: isReserved ? OrderStatus.CREATED : OrderStatus.SEARCHING_DRIVER,
       stops: orderStops,
       radius,
       duration,
+      isReserved,
+      reservedAt: reservedAt ? new Date(reservedAt) : undefined,
       deliveryOtp,
       restaurantPickupCode,
       polyline: optimizationResult.polyline,
@@ -169,6 +171,8 @@ export class OrdersService {
         status: "pending",
         timestamp: new Date(),
         restaurantPickupCode: savedOrder.restaurantPickupCode,
+        isReserved: savedOrder.isReserved,
+        reservedAt: savedOrder.reservedAt,
         stops: savedOrder.stops.map(s => ({
           id: (s as any)._id,
           type: s.type.toLowerCase(),
@@ -181,7 +185,7 @@ export class OrdersService {
       });
 
       // NOTIFY vendor/restaurant
-      if (vendorId) {
+      if (vendorId && !isReserved) {
         console.log(`[SOCKET] Emitting new_order_vendor to vendor ${vendorId}`);
         socketManager.emitToUser(vendorId.toString(), "new_order_vendor", {
           id: savedOrder._id,
@@ -259,7 +263,13 @@ export class OrdersService {
     if (!orderId) {
       return null;
     }
-    return Order.findOne(this.getOrderQuery(orderId)).populate("user").populate("driver").populate("vendor");
+    return Order.findOne(this.getOrderQuery(orderId))
+      .populate("user")
+      .populate({
+        path: "driver",
+        populate: { path: "user" }
+      })
+      .populate("vendor");
   }
 
   async updateOrderStatus(orderId: string, status: OrderStatus) {
@@ -318,7 +328,7 @@ export class OrdersService {
     const order = await Order.findOne(this.getOrderQuery(orderId));
     if (!order) throw new Error("Order not found");
 
-    if (order.status !== OrderStatus.SEARCHING_DRIVER) {
+    if (order.status !== OrderStatus.SEARCHING_DRIVER && !(order.isReserved && order.status === OrderStatus.CREATED)) {
       throw new Error("Order is no longer available");
     }
 
@@ -338,10 +348,19 @@ export class OrdersService {
         vehicle: driver.vehicleType || "unknown",
       };
       
-      socketManager.emitToOrderRoom(orderId.toString(), "order_accepted", {
+      const payload = {
         orderId: orderId.toString(),
         driver: driverInfo,
-      });
+        isReserved: order.isReserved,
+        reservedAt: order.reservedAt,
+      };
+
+      socketManager.emitToOrderRoom(orderId.toString(), "order_accepted", payload);
+
+      // Also emit directly to the customer's user room
+      if (order.user) {
+        socketManager.emitToUser(order.user.toString(), "order_accepted", payload);
+      }
     }
 
     const populated = await Order.findOne(this.getOrderQuery(orderId)).populate("user").populate("driver").populate("vendor");
