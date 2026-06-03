@@ -188,7 +188,7 @@ export default function ProfileScreen() {
                   style={styles.menuItem}
                   onPress={() => {
                     Haptics.selectionAsync();
-                    if (item.action === "saved-addresses") {
+                    if ((item as any).action === "saved-addresses") {
                       router.push("/saved-addresses");
                     }
                   }}

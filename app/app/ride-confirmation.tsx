@@ -10,6 +10,7 @@ import {
   Platform,
   Share,
   Alert,
+  Modal,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons, Feather, MaterialCommunityIcons } from "@expo/vector-icons";
@@ -65,6 +66,49 @@ export default function RideConfirmationScreen() {
   );
   const [fareEstimate, setFareEstimate] = useState<FareEstimate | null>(null);
   const [fareLoading, setFareLoading] = useState(false);
+
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [reserveDate, setReserveDate] = useState<Date>(new Date());
+
+  const getInitialTimeParts = () => {
+    const now = new Date();
+    now.setHours(now.getHours() + 1);
+    let hourVal = now.getHours();
+    const ampmVal = hourVal >= 12 ? "PM" : "AM";
+    hourVal = hourVal % 12;
+    hourVal = hourVal ? hourVal : 12;
+    
+    let minVal = Math.round(now.getMinutes() / 5) * 5;
+    if (minVal >= 60) minVal = 0;
+    const minStr = String(minVal).padStart(2, "0");
+    
+    return {
+      hour: String(hourVal),
+      minute: minStr,
+      ampm: ampmVal
+    };
+  };
+
+  const initialTime = React.useMemo(() => getInitialTimeParts(), []);
+  const [reserveHour, setReserveHour] = useState<string>(initialTime.hour);
+  const [reserveMinute, setReserveMinute] = useState<string>(initialTime.minute);
+  const [reserveAmpm, setReserveAmpm] = useState<string>(initialTime.ampm);
+  const [selectedDateTime, setSelectedDateTime] = useState<Date | null>(null);
+
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [reservedOrderDetails, setReservedOrderDetails] = useState<any>(null);
+
+  const dateOptions = React.useMemo(() => {
+    const arr = [];
+    const today = new Date();
+    for (let i = 0; i < 7; i++) {
+      const d = new Date(today);
+      d.setDate(today.getDate() + i);
+      arr.push(d);
+    }
+    return arr;
+  }, []);
+
   const serviceType = normalizeServiceType(params.serviceId);
 
   const pickupCoords = {
@@ -259,19 +303,37 @@ export default function RideConfirmationScreen() {
 
     return RIDE_GROUPS.map((group) => ({
       ...group,
-      options: group.options.map((option) => ({
-        ...option,
-        price: priceFor(option.id, option.price),
-        eta: backendEta || option.eta,
-      })),
-    }));
-  }, [RIDE_GROUPS, backendEta, backendFare]);
+      options: group.options.map((option) => {
+        const isReserve = option.id.includes("reserve");
+        const formattedTime = isReserve && selectedDateTime
+          ? `${selectedDateTime.toLocaleDateString([], { month: "short", day: "numeric" })} · ${selectedDateTime.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`
+          : option.time;
 
-  const [selectedRide, setSelectedRide] = useState(displayRideGroups[0].options[0]);
+        return {
+          ...option,
+          price: priceFor(option.id, option.price),
+          eta: isReserve ? undefined : (backendEta || option.eta),
+          time: formattedTime,
+        };
+      }),
+    }));
+  }, [RIDE_GROUPS, backendEta, backendFare, selectedDateTime]);
+
+  const [selectedRideId, setSelectedRideId] = useState<string>("");
 
   React.useEffect(() => {
-    setSelectedRide(displayRideGroups[0].options[0]);
+    if (displayRideGroups[0]?.options[0]?.id && !selectedRideId) {
+      setSelectedRideId(displayRideGroups[0].options[0].id);
+    }
   }, [displayRideGroups]);
+
+  const selectedRide = React.useMemo(() => {
+    for (const group of displayRideGroups) {
+      const found = group.options.find((opt) => opt.id === selectedRideId);
+      if (found) return found;
+    }
+    return displayRideGroups[0]?.options[0] || { id: "", name: "", price: "", time: "", description: "" };
+  }, [displayRideGroups, selectedRideId]);
   const [userLocation, setUserLocation] = useState<{
     latitude: number;
     longitude: number;
@@ -523,9 +585,14 @@ export default function RideConfirmationScreen() {
                   key={option.id}
                   style={[
                     styles.rideOption,
-                    selectedRide.id === option.id && styles.rideOptionSelected,
+                    selectedRideId === option.id && styles.rideOptionSelected,
                   ]}
-                  onPress={() => setSelectedRide(option)}
+                  onPress={() => {
+                    setSelectedRideId(option.id);
+                    if (option.id.includes("reserve")) {
+                      setShowDatePicker(true);
+                    }
+                  }}
                 >
                   <View style={styles.rideImageContainer}>
                     <Image
@@ -572,7 +639,14 @@ export default function RideConfirmationScreen() {
               style={styles.bookBtn}
               onPress={async () => {
                 if (fareLoading) return;
-                setFareLoading(true); // Re-using this state for booking loading
+                
+                const isReserved = selectedRide.id.includes("reserve");
+                if (isReserved && !selectedDateTime) {
+                  setShowDatePicker(true);
+                  return;
+                }
+
+                setFareLoading(true);
                 try {
                   const orderStops = [
                     { address: params.pickupName, latitude: pickupCoords.latitude, longitude: pickupCoords.longitude, type: "pickup" },
@@ -584,11 +658,18 @@ export default function RideConfirmationScreen() {
                     body: JSON.stringify({
                       stops: orderStops,
                       serviceType: serviceType,
+                      isReserved,
+                      reservedAt: isReserved ? selectedDateTime?.toISOString() : undefined,
                     })
                   });
+
                   router.push({
                     pathname: "/finding-driver",
-                    params: { orderId: res._id }
+                    params: { 
+                      orderId: res._id,
+                      isReserved: isReserved ? "true" : "false",
+                      dateTimeStr: selectedDateTime ? selectedDateTime.toLocaleString([], { weekday: 'short', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : ""
+                    }
                   });
                 } catch (e: any) {
                   Alert.alert("Booking Failed", e.message);
@@ -598,16 +679,236 @@ export default function RideConfirmationScreen() {
               }}
             >
               <Text style={styles.bookBtnText}>
-                {fareLoading ? "Loading..." : `Choose ${selectedRide.name}`}
+                {fareLoading 
+                  ? "Loading..." 
+                  : selectedRide.id.includes("reserve")
+                    ? (selectedDateTime ? `Confirm ${selectedRide.name}` : `Schedule ${selectedRide.name}`)
+                    : `Choose ${selectedRide.name}`}
               </Text>
             </TouchableOpacity>
 
-            <TouchableOpacity style={styles.calendarBtn}>
+            <TouchableOpacity 
+              style={styles.calendarBtn}
+              onPress={() => {
+                const reserveOption = displayRideGroups[0].options.find(
+                  (opt) => opt.id.includes("reserve") && opt.capacity === selectedRide.capacity
+                );
+                if (reserveOption) {
+                  setSelectedRideId(reserveOption.id);
+                }
+                setShowDatePicker(true);
+              }}
+            >
               <Feather name="calendar" size={24} color="#000" />
             </TouchableOpacity>
           </View>
         </View>
       </View>
+
+      {/* ─── Custom Premium Date-Time Picker Modal ─── */}
+      <Modal
+        visible={showDatePicker}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowDatePicker(false)}
+      >
+        <View style={styles.sheetOverlay}>
+          <TouchableOpacity
+            activeOpacity={1}
+            style={styles.sheetScrim}
+            onPress={() => setShowDatePicker(false)}
+          />
+          <View style={styles.datePickerSheet}>
+            <View style={styles.sheetHandle} />
+            <Text style={styles.datePickerTitle}>Schedule a ride</Text>
+            <Text style={styles.datePickerSub}>Select your preferred pickup day and time</Text>
+
+            {/* Date Selector Row */}
+            <Text style={styles.pickerSectionLabel}>Select Date</Text>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              style={styles.datesContainer}
+              contentContainerStyle={{ gap: 10, paddingRight: 20 }}
+            >
+              {dateOptions.map((date: Date, idx: number) => {
+                const isSelected = reserveDate.toDateString() === date.toDateString();
+                const dayName = idx === 0 ? "Today" : idx === 1 ? "Tomorrow" : date.toLocaleDateString([], { weekday: 'short' });
+                const dateStr = date.toLocaleDateString([], { month: 'short', day: 'numeric' });
+                return (
+                  <TouchableOpacity
+                    key={idx}
+                    style={[styles.dateCard, isSelected && styles.dateCardActive]}
+                    onPress={() => setReserveDate(date)}
+                    activeOpacity={0.8}
+                  >
+                    <Text style={[styles.dateDayText, isSelected && styles.dateDayTextActive]}>{dayName}</Text>
+                    <Text style={[styles.dateValText, isSelected && styles.dateValTextActive]}>{dateStr}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+
+            {/* Hour Selector */}
+            <Text style={styles.pickerSectionLabel}>Hour</Text>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              style={styles.timeScroll}
+              contentContainerStyle={{ gap: 8 }}
+            >
+              {["1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12"].map((hr) => {
+                const isSelected = reserveHour === hr;
+                return (
+                  <TouchableOpacity
+                    key={hr}
+                    style={[styles.timeChip, isSelected && styles.timeChipActive]}
+                    onPress={() => setReserveHour(hr)}
+                    activeOpacity={0.8}
+                  >
+                    <Text style={[styles.timeChipText, isSelected && styles.timeChipTextActive]}>{hr}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+
+            {/* Minute Selector */}
+            <Text style={styles.pickerSectionLabel}>Minute</Text>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              style={styles.timeScroll}
+              contentContainerStyle={{ gap: 8 }}
+            >
+              {["00", "05", "10", "15", "20", "25", "30", "35", "40", "45", "50", "55"].map((min) => {
+                const isSelected = reserveMinute === min;
+                return (
+                  <TouchableOpacity
+                    key={min}
+                    style={[styles.timeChip, isSelected && styles.timeChipActive]}
+                    onPress={() => setReserveMinute(min)}
+                    activeOpacity={0.8}
+                  >
+                    <Text style={[styles.timeChipText, isSelected && styles.timeChipTextActive]}>{min}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+
+            {/* AM/PM Selector */}
+            <View style={styles.ampmRow}>
+              {["AM", "PM"].map((period) => {
+                const isSelected = reserveAmpm === period;
+                return (
+                  <TouchableOpacity
+                    key={period}
+                    style={[styles.ampmBtn, isSelected && styles.ampmBtnActive]}
+                    onPress={() => setReserveAmpm(period)}
+                    activeOpacity={0.8}
+                  >
+                    <Text style={[styles.ampmBtnText, isSelected && styles.ampmBtnTextActive]}>{period}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+
+            {/* Confirm Button */}
+            <TouchableOpacity
+              style={styles.confirmTimeBtn}
+              onPress={() => {
+                const finalD = new Date(reserveDate);
+                let hr = parseInt(reserveHour);
+                if (reserveAmpm === "PM" && hr < 12) hr += 12;
+                if (reserveAmpm === "AM" && hr === 12) hr = 0;
+                finalD.setHours(hr, parseInt(reserveMinute), 0, 0);
+                setSelectedDateTime(finalD);
+                setShowDatePicker(false);
+              }}
+              activeOpacity={0.9}
+            >
+              <Text style={styles.confirmTimeBtnText}>Set Pickup Time</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* ─── Success Modal for Reservations ─── */}
+      <Modal
+        visible={showSuccessModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => {
+          setShowSuccessModal(false);
+          router.replace("/(tabs)");
+        }}
+      >
+        <View style={styles.successModalOverlay}>
+          <View style={styles.successModalBox}>
+            <View style={styles.successIconOuter}>
+              <View style={styles.successIconInner}>
+                <Ionicons name="checkmark" size={40} color="#fff" />
+              </View>
+            </View>
+
+            <Text style={styles.successModalTitle}>Reservation Confirmed!</Text>
+            <Text style={styles.successModalSub}>Your ride has been scheduled successfully.</Text>
+
+            {reservedOrderDetails && (
+              <View style={styles.detailsCard}>
+                <View style={styles.detailsRow}>
+                  <Text style={styles.detailsLabel}>Service</Text>
+                  <Text style={styles.detailsValue}>{reservedOrderDetails.rideName}</Text>
+                </View>
+                <View style={styles.detailsRow}>
+                  <Text style={styles.detailsLabel}>Pickup Time</Text>
+                  <Text style={[styles.detailsValue, { color: colors.primary }]}>{reservedOrderDetails.dateTimeStr}</Text>
+                </View>
+                <View style={styles.detailsRow}>
+                  <Text style={styles.detailsLabel}>Est. Price</Text>
+                  <Text style={styles.detailsValue}>{reservedOrderDetails.price}</Text>
+                </View>
+                <View style={styles.addressSection}>
+                  <View style={styles.addressLineItem}>
+                    <View style={[styles.addrDot, { backgroundColor: "#22c55e" }]} />
+                    <Text style={styles.addressCardText} numberOfLines={1}>
+                      {getDisplayName(reservedOrderDetails.pickupName)}
+                    </Text>
+                  </View>
+                  <View style={styles.addrLineConnector} />
+                  <View style={styles.addressLineItem}>
+                    <View style={[styles.addrDot, { backgroundColor: "#ef4444" }]} />
+                    <Text style={styles.addressCardText} numberOfLines={1}>
+                      {getDisplayName(reservedOrderDetails.dropName)}
+                    </Text>
+                  </View>
+                </View>
+              </View>
+            )}
+
+            <View style={{ width: '100%', gap: 10 }}>
+              <TouchableOpacity
+                style={styles.doneBtn}
+                onPress={() => {
+                  setShowSuccessModal(false);
+                  router.replace("/(tabs)");
+                }}
+              >
+                <Text style={styles.doneBtnText}>Back to Home</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.viewOrdersBtn}
+                onPress={() => {
+                  setShowSuccessModal(false);
+                  router.replace("/(tabs)/orders");
+                }}
+              >
+                <Text style={styles.viewOrdersBtnText}>View My Orders</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -900,5 +1201,288 @@ const createStyles = (colors: typeof Colors.light, insets: any) =>
       fontSize: 10,
       fontWeight: "900",
       transform: [{ rotate: "-45deg" }],
+    },
+
+    // Custom Date-Picker Modal
+    sheetOverlay: {
+      flex: 1,
+      justifyContent: "flex-end",
+    },
+    sheetScrim: {
+      ...StyleSheet.absoluteFillObject,
+      backgroundColor: "rgba(15, 23, 42, 0.68)",
+    },
+    sheetHandle: {
+      alignSelf: "center",
+      width: 46,
+      height: 4,
+      borderRadius: 2,
+      backgroundColor: colors.border || "#E2E8F0",
+      marginBottom: 20,
+    },
+    datePickerSheet: {
+      backgroundColor: colors.surface,
+      borderTopLeftRadius: 26,
+      borderTopRightRadius: 26,
+      paddingTop: 16,
+      paddingHorizontal: 20,
+      paddingBottom: Platform.OS === "ios" ? 34 : 24,
+      shadowColor: "#000",
+      shadowOffset: { width: 0, height: -4 },
+      shadowOpacity: 0.12,
+      shadowRadius: 16,
+      elevation: 16,
+    },
+    datePickerTitle: {
+      fontSize: 20,
+      fontWeight: "800",
+      color: colors.text,
+      marginBottom: 4,
+    },
+    datePickerSub: {
+      fontSize: 13,
+      color: colors.textSecondary,
+      marginBottom: 20,
+      fontWeight: "500",
+    },
+    pickerSectionLabel: {
+      fontSize: 13,
+      fontWeight: "700",
+      color: colors.textSecondary,
+      textTransform: "uppercase",
+      letterSpacing: 0.5,
+      marginBottom: 8,
+      marginTop: 4,
+    },
+    datesContainer: {
+      marginBottom: 16,
+    },
+    dateCard: {
+      paddingVertical: 10,
+      paddingHorizontal: 16,
+      borderRadius: 12,
+      backgroundColor: colors.surfaceSecondary || "#F1F5F9",
+      alignItems: "center",
+      minWidth: 80,
+      borderWidth: 1.5,
+      borderColor: "transparent",
+    },
+    dateCardActive: {
+      backgroundColor: colors.primary + "15",
+      borderColor: colors.primary,
+    },
+    dateDayText: {
+      fontSize: 12,
+      fontWeight: "600",
+      color: colors.textSecondary,
+      marginBottom: 2,
+    },
+    dateDayTextActive: {
+      color: colors.primary,
+      fontWeight: "700",
+    },
+    dateValText: {
+      fontSize: 14,
+      fontWeight: "700",
+      color: colors.text,
+    },
+    dateValTextActive: {
+      color: colors.primary,
+    },
+    timeScroll: {
+      marginBottom: 16,
+    },
+    timeChip: {
+      paddingVertical: 8,
+      paddingHorizontal: 14,
+      borderRadius: 20,
+      backgroundColor: colors.surfaceSecondary || "#F1F5F9",
+      alignItems: "center",
+      justifyContent: "center",
+      borderWidth: 1.5,
+      borderColor: "transparent",
+    },
+    timeChipActive: {
+      backgroundColor: colors.primary + "15",
+      borderColor: colors.primary,
+    },
+    timeChipText: {
+      fontSize: 14,
+      fontWeight: "700",
+      color: colors.text,
+    },
+    timeChipTextActive: {
+      color: colors.primary,
+    },
+    ampmRow: {
+      flexDirection: "row",
+      gap: 12,
+      marginBottom: 20,
+    },
+    ampmBtn: {
+      flex: 1,
+      paddingVertical: 12,
+      borderRadius: 12,
+      backgroundColor: colors.surfaceSecondary || "#F1F5F9",
+      alignItems: "center",
+      borderWidth: 1.5,
+      borderColor: "transparent",
+    },
+    ampmBtnActive: {
+      backgroundColor: colors.primary + "15",
+      borderColor: colors.primary,
+    },
+    ampmBtnText: {
+      fontSize: 14,
+      fontWeight: "700",
+      color: colors.text,
+    },
+    ampmBtnTextActive: {
+      color: colors.primary,
+    },
+    confirmTimeBtn: {
+      backgroundColor: colors.primary || "#000",
+      paddingVertical: 15,
+      borderRadius: 12,
+      alignItems: "center",
+      justifyContent: "center",
+      marginTop: 8,
+    },
+    confirmTimeBtnText: {
+      color: "#fff",
+      fontSize: 16,
+      fontWeight: "700",
+    },
+
+    // Success Modal
+    successModalOverlay: {
+      flex: 1,
+      backgroundColor: "rgba(15, 23, 42, 0.75)",
+      justifyContent: "center",
+      alignItems: "center",
+      padding: 24,
+    },
+    successModalBox: {
+      backgroundColor: colors.surface,
+      borderRadius: 24,
+      padding: 24,
+      width: "100%",
+      maxWidth: 360,
+      alignItems: "center",
+      shadowColor: "#000",
+      shadowOffset: { width: 0, height: 10 },
+      shadowOpacity: 0.1,
+      shadowRadius: 20,
+      elevation: 10,
+    },
+    successIconOuter: {
+      width: 80,
+      height: 80,
+      borderRadius: 40,
+      backgroundColor: "#22c55e15",
+      alignItems: "center",
+      justifyContent: "center",
+      marginBottom: 16,
+    },
+    successIconInner: {
+      width: 60,
+      height: 60,
+      borderRadius: 30,
+      backgroundColor: "#22c55e",
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    successModalTitle: {
+      fontSize: 20,
+      fontWeight: "800",
+      color: colors.text,
+      textAlign: "center",
+      marginBottom: 6,
+    },
+    successModalSub: {
+      fontSize: 13,
+      color: colors.textSecondary,
+      textAlign: "center",
+      marginBottom: 20,
+      lineHeight: 18,
+    },
+    detailsCard: {
+      backgroundColor: colors.surfaceSecondary || "#F8FAFC",
+      borderRadius: 16,
+      padding: 16,
+      width: "100%",
+      gap: 10,
+      marginBottom: 24,
+    },
+    detailsRow: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "center",
+    },
+    detailsLabel: {
+      fontSize: 12,
+      color: colors.textSecondary,
+      fontWeight: "600",
+    },
+    detailsValue: {
+      fontSize: 13,
+      color: colors.text,
+      fontWeight: "700",
+    },
+    addressSection: {
+      borderTopWidth: 1,
+      borderTopColor: colors.borderLight || "#E2E8F0",
+      paddingTop: 10,
+      marginTop: 4,
+      gap: 6,
+    },
+    addressLineItem: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 8,
+    },
+    addrDot: {
+      width: 6,
+      height: 6,
+      borderRadius: 3,
+    },
+    addressCardText: {
+      fontSize: 11,
+      color: colors.textSecondary,
+      fontWeight: "500",
+      flex: 1,
+    },
+    addrLineConnector: {
+      width: 1,
+      height: 8,
+      backgroundColor: colors.border || "#CBD5E1",
+      marginLeft: 2.5,
+    },
+    doneBtn: {
+      backgroundColor: colors.primary || "#000",
+      paddingVertical: 14,
+      borderRadius: 12,
+      alignItems: "center",
+      justifyContent: "center",
+      width: "100%",
+    },
+    doneBtnText: {
+      color: "#fff",
+      fontSize: 15,
+      fontWeight: "700",
+    },
+    viewOrdersBtn: {
+      paddingVertical: 14,
+      borderRadius: 12,
+      alignItems: "center",
+      justifyContent: "center",
+      width: "100%",
+      borderWidth: 1.5,
+      borderColor: colors.border || "#E2E8F0",
+    },
+    viewOrdersBtnText: {
+      color: colors.text,
+      fontSize: 15,
+      fontWeight: "700",
     },
   });

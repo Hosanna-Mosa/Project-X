@@ -69,9 +69,12 @@ export interface IOrder extends Omit<Document, "_id"> {
   stops: IStop[];
   radius?: number;
   duration?: number;
+  isReserved?: boolean;
+  reservedAt?: Date;
   deliveryOtp?: string;
   restaurantPickupCode?: string;
   polyline?: string;
+  notified15Min?: boolean;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -126,9 +129,12 @@ const OrderSchema: Schema = new Schema(
     stops: [StopSchema],
     radius: { type: Number },
     duration: { type: Number },
+    isReserved: { type: Boolean, default: false },
+    reservedAt: { type: Date },
     deliveryOtp: { type: String },
     restaurantPickupCode: { type: String },
     polyline: { type: String },
+    notified15Min: { type: Boolean, default: false },
   },
   { timestamps: true }
 );

@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from "react";
-import { Alert, Linking, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Alert, Linking, Pressable, ScrollView, StyleSheet, Text, View, TouchableOpacity } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
 
@@ -58,6 +58,35 @@ export default function HomeScreen() {
   const toggleHomeMode = useDriverStore((s) => s.toggleHomeMode);
   const currentOrder = useDriverStore((s) => s.currentOrder);
   const token = useDriverStore((s) => s.token);
+
+  const [scheduledRides, setScheduledRides] = useState<any[]>([]);
+  const [loadingScheduled, setLoadingScheduled] = useState(false);
+
+  const loadScheduledRides = useCallback(async () => {
+    if (!apiUrl || !token) return;
+    setLoadingScheduled(true);
+    try {
+      const response = await fetch(`${apiUrl}/api/v1/orders/driver/scheduled`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+      if (response.ok) {
+        const data = await response.json();
+        setScheduledRides(data);
+      }
+    } catch (error) {
+      console.warn("Failed to load driver scheduled rides:", error);
+    } finally {
+      setLoadingScheduled(false);
+    }
+  }, [token]);
+
+  useEffect(() => {
+    loadScheduledRides();
+    const interval = setInterval(loadScheduledRides, 30 * 1000);
+    return () => clearInterval(interval);
+  }, [loadScheduledRides]);
 
   const loadHighDemandAreas = useCallback(async () => {
     if (!apiUrl || !token) {
@@ -310,6 +339,72 @@ export default function HomeScreen() {
           </>
         )}
 
+        {/* Scheduled Rides Section */}
+        {scheduledRides.length > 0 && (
+          <View style={styles.sectionSpacing}>
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionTitle}>Scheduled Rides ({scheduledRides.length})</Text>
+            </View>
+            <View style={{ gap: 12, marginTop: 8 }}>
+              {scheduledRides.map((ride) => {
+                const pickup = ride.stops?.[0]?.address || "Pickup Location";
+                const drop = ride.stops?.[ride.stops.length - 1]?.address || "Drop Location";
+                const dateStr = ride.reservedAt ? new Date(ride.reservedAt).toLocaleString([], {
+                  weekday: 'short',
+                  month: 'short',
+                  day: 'numeric',
+                  hour: '2-digit',
+                  minute: '2-digit'
+                }) : "N/A";
+                
+                return (
+                  <View key={ride._id} style={styles.scheduledCard}>
+                    <View style={styles.scheduledHeader}>
+                      <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                        <Feather name="calendar" size={16} color={Colors.primary} />
+                        <Text style={styles.scheduledTime}>{dateStr}</Text>
+                      </View>
+                      <Text style={styles.scheduledPrice}>₹{Math.round(ride.totalPrice * 0.8)}</Text>
+                    </View>
+                    
+                    <View style={styles.scheduledBody}>
+                      <View style={styles.addressLine}>
+                        <View style={[styles.dot, { backgroundColor: Colors.success }]} />
+                        <Text style={styles.addressText} numberOfLines={1}>{pickup}</Text>
+                      </View>
+                      <View style={styles.connectorLine} />
+                      <View style={styles.addressLine}>
+                        <View style={[styles.dot, { backgroundColor: Colors.error }]} />
+                        <Text style={styles.addressText} numberOfLines={1}>{drop}</Text>
+                      </View>
+                    </View>
+                    
+                    <View style={styles.scheduledFooter}>
+                      <View>
+                        <Text style={styles.customerName}>Rider: {ride.user?.name || "Customer"}</Text>
+                        <View style={styles.badge}>
+                          <Text style={styles.badgeText}>{ride.serviceType?.toUpperCase()}</Text>
+                        </View>
+                      </View>
+                      
+                      <TouchableOpacity 
+                        style={[styles.startRideBtn, currentOrder && { opacity: 0.5 }]}
+                        disabled={!!currentOrder}
+                        onPress={() => {
+                          const { startReservedRide } = useDriverStore.getState();
+                          startReservedRide(ride._id);
+                        }}
+                      >
+                        <Text style={styles.startRideBtnText}>Start Ride</Text>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                );
+              })}
+            </View>
+          </View>
+        )}
+
         {/* High Demand Areas */}
         <View style={styles.sectionSpacing}>
           <HighDemandAreas
@@ -353,6 +448,17 @@ const styles = StyleSheet.create({
   content: {
     padding: 16,
     gap: 16,
+  },
+  startRideBtn: {
+    backgroundColor: Colors.primary,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+  },
+  startRideBtnText: {
+    color: '#fff',
+    fontFamily: 'Inter_600SemiBold',
+    fontSize: 14,
   },
   header: {
     flexDirection: "row",
@@ -557,5 +663,88 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: Colors.textSecondary,
     lineHeight: 18,
+  },
+  scheduledCard: {
+    backgroundColor: Colors.surface,
+    borderRadius: 14,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 3,
+    elevation: 2,
+  },
+  scheduledHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    borderBottomWidth: 1,
+    borderColor: Colors.border,
+    paddingBottom: 10,
+    marginBottom: 10,
+  },
+  scheduledTime: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 14,
+    color: Colors.text,
+  },
+  scheduledPrice: {
+    fontFamily: "Inter_700Bold",
+    fontSize: 15,
+    color: Colors.success,
+  },
+  scheduledBody: {
+    gap: 8,
+    marginBottom: 10,
+  },
+  addressLine: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  dot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+  addressText: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 13,
+    color: Colors.textSecondary,
+    flex: 1,
+  },
+  connectorLine: {
+    width: 1,
+    height: 12,
+    backgroundColor: Colors.border,
+    marginLeft: 3.5,
+    marginTop: -6,
+    marginBottom: -6,
+  },
+  scheduledFooter: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    borderTopWidth: 1,
+    borderColor: Colors.border,
+    paddingTop: 10,
+  },
+  customerName: {
+    fontFamily: "Inter_500Medium",
+    fontSize: 12,
+    color: Colors.textMuted,
+  },
+  badge: {
+    backgroundColor: Colors.primaryLight,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+  },
+  badgeText: {
+    fontFamily: "Inter_700Bold",
+    fontSize: 10,
+    color: Colors.primaryDark,
   },
 });

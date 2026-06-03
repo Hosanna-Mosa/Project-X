@@ -35,7 +35,7 @@ export default function PaymentScreen() {
   const colors = Colors[theme];
   const styles = React.useMemo(() => createStyles(colors), [colors]);
   const { items, vendorId, clearCart, getItemCount } = useCartStore();
-  const { setOrderId, setStatus } = useDeliveryStore();
+  const { setOrderId, setStatus, setServiceType } = useDeliveryStore();
   const { user, token } = useAuthStore();
   const [processing, setProcessing] = React.useState(false);
   const [vendor, setVendor] = React.useState<VendorDetails | null>(null);
@@ -154,6 +154,7 @@ export default function PaymentScreen() {
 
       const finalOrder = verifyData.order;
       setOrderId(finalOrder._id || finalOrder.id);
+      setServiceType("delivery");
       setStatus("confirmed");
       Alert.alert("Order placed", "Payment successful. Your order is now being assigned.");
       router.replace({

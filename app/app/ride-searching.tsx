@@ -55,7 +55,7 @@ export default function RideSearchingScreen() {
   const { theme } = useThemeStore();
   const colors = Colors[theme];
   const styles = React.useMemo(() => createStyles(colors, insets), [colors, insets]);
-  const { currentOrderId, setOrderId: setCurrentOrderId, setDriver: setGlobalDriver, setStatus: setGlobalStatus } = useDeliveryStore();
+  const { currentOrderId, setOrderId: setCurrentOrderId, setServiceType: setGlobalServiceType, setDriver: setGlobalDriver, setStatus: setGlobalStatus } = useDeliveryStore();
   const mapRef = React.useRef<MapView>(null);
 
   const params = useLocalSearchParams<{
@@ -149,6 +149,7 @@ export default function RideSearchingScreen() {
         const id = order?._id || order?.id;
         if (id) {
           setCurrentOrderId(id);
+          setGlobalServiceType(normalizeServiceType(params.serviceId));
         }
       } catch (error: any) {
         console.error("Create ride order error:", error);
@@ -166,6 +167,7 @@ export default function RideSearchingScreen() {
     pickupCoords.latitude,
     pickupCoords.longitude,
     setCurrentOrderId,
+    setGlobalServiceType,
   ]);
 
   React.useEffect(() => {

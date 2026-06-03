@@ -25,7 +25,8 @@ export default function IncomingOrderModal() {
 
   useEffect(() => {
     if (incomingOrder) {
-      setSecondsLeft(15);
+      const totalSeconds = incomingOrder.isReserved ? 60 : 15;
+      setSecondsLeft(totalSeconds);
       const timer = setInterval(() => {
         setSecondsLeft((prev) => {
           if (prev <= 1) {
@@ -50,6 +51,27 @@ export default function IncomingOrderModal() {
   if (!incomingOrder) return null;
 
   const isHelper = incomingOrder.serviceType?.toLowerCase() === "helper";
+  const isRide = ["bike", "auto", "cab", "cab_prime"].includes(incomingOrder.serviceType?.toLowerCase() || "");
+  const maxSeconds = incomingOrder.isReserved ? 60 : 15;
+
+  let modalTitle = "New Request!";
+  if (incomingOrder.isReserved) {
+    modalTitle = "New Reserved Ride!";
+  } else if (isRide) {
+    modalTitle = "New Ride Request!";
+  } else if (isHelper) {
+    modalTitle = "New Helper!";
+  } else {
+    modalTitle = "New Delivery Request!";
+  }
+
+  const formattedDate = incomingOrder.reservedAt ? new Date(incomingOrder.reservedAt).toLocaleString([], {
+    weekday: 'short',
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit'
+  }) : "N/A";
 
   return (
     <Modal visible transparent animationType="none" onRequestClose={rejectOrder}>
@@ -67,8 +89,14 @@ export default function IncomingOrderModal() {
 
           <View style={styles.header}>
             <View style={styles.headerCopy}>
-              <Text style={styles.title}>{isHelper ? "New Helper!" : "New Delivery Request!"}</Text>
-              {isHelper && <Text style={styles.subtitle}>Hours Book / Task Specialist</Text>}
+              <Text style={styles.title}>{modalTitle}</Text>
+              {incomingOrder.isReserved ? (
+                <Text style={[styles.subtitle, { color: "#1E3A8A", fontWeight: "700" }]}>
+                  Scheduled: {formattedDate}
+                </Text>
+              ) : (
+                isHelper && <Text style={styles.subtitle}>Hours Book / Task Specialist</Text>
+              )}
             </View>
             <Text style={styles.earnings}>₹{incomingOrder.earnings || "0"}</Text>
           </View>
@@ -76,7 +104,7 @@ export default function IncomingOrderModal() {
           {/* Response Timer Bar */}
           <View style={styles.timerContainer}>
             <View style={styles.timerBarBg}>
-              <View style={[styles.timerBar, { width: `${(secondsLeft / 15) * 100}%` }]} />
+              <View style={[styles.timerBar, { width: `${(secondsLeft / maxSeconds) * 100}%` }]} />
             </View>
             <Text style={styles.timerText}>Decline auto-triggers in {secondsLeft} seconds</Text>
           </View>
@@ -161,8 +189,11 @@ export default function IncomingOrderModal() {
             <TouchableOpacity
               style={styles.acceptBtn}
               onPress={async () => {
+                const isReserved = incomingOrder.isReserved;
                 await acceptOrder();
-                router.push("/active-order");
+                if (!isReserved) {
+                  router.push("/active-order");
+                }
               }}
             >
               <Text style={styles.acceptText}>Accept Order</Text>
