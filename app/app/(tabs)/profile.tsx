@@ -142,8 +142,19 @@ export default function ProfileScreen() {
         style={[styles.header, { paddingTop: insets.top + 20 }]}
       >
         <View style={styles.headerTitleRow}>
+          <TouchableOpacity
+            style={styles.headerBackBtn}
+            onPress={() => {
+              if (router.canGoBack()) router.back();
+              else router.replace("/(tabs)");
+            }}
+          >
+            <Feather name="arrow-left" size={18} color="#fff" />
+          </TouchableOpacity>
           <Text style={styles.headerTitle}>My Profile</Text>
-          {loading && <ActivityIndicator size="small" color="#fff" />}
+          <View style={styles.headerStatusSlot}>
+            {loading && <ActivityIndicator size="small" color="#fff" />}
+          </View>
         </View>
         
         <View style={styles.profileInfoRow}>
@@ -193,7 +204,7 @@ export default function ProfileScreen() {
           <GridItem 
             icon={<MaterialCommunityIcons name="file-document-outline" size={24} color={colors.text} />} 
             label="Orders" 
-            onPress={() => router.push("/orders")} 
+            onPress={() => router.push("/(tabs)/orders")} 
             colors={colors}
           />
         </View>
@@ -479,14 +490,29 @@ const createStyles = (colors: typeof Colors.light, theme: string) => StyleSheet.
   },
   headerTitleRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 25,
+    gap: 12,
+  },
+  headerBackBtn: {
+    width: 34,
+    height: 34,
+    borderRadius: 12,
+    backgroundColor: 'rgba(255,255,255,0.14)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.22)',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   headerTitle: {
+    flex: 1,
     fontSize: 24,
     fontWeight: "800",
     color: "#fff",
+  },
+  headerStatusSlot: {
+    width: 34,
+    alignItems: 'flex-end',
   },
   profileInfoRow: {
     flexDirection: 'row',

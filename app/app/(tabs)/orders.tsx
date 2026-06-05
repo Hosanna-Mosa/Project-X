@@ -87,7 +87,18 @@ export default function OrdersScreen() {
   return (
     <ScreenWrapper>
       <View style={styles.header}>
-        <Text style={styles.title}>My Orders</Text>
+        <View style={styles.headerLeft}>
+          <TouchableOpacity
+            style={styles.backBtn}
+            onPress={() => {
+              if (router.canGoBack()) router.back();
+              else router.replace("/(tabs)");
+            }}
+          >
+            <Feather name="arrow-left" size={18} color={colors.text} />
+          </TouchableOpacity>
+          <Text style={styles.title}>My Orders</Text>
+        </View>
         <TouchableOpacity style={styles.filterIconBtn}>
           <Feather name="sliders" size={18} color={colors.text} />
         </TouchableOpacity>
@@ -249,6 +260,21 @@ const createStyles = (colors: typeof Colors.light) => StyleSheet.create({
     alignItems: "center",
     paddingHorizontal: 20,
     paddingVertical: 16,
+  },
+  headerLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+  },
+  backBtn: {
+    width: 34,
+    height: 34,
+    borderRadius: 10,
+    backgroundColor: colors.surface,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: colors.border,
   },
   title: {
     fontSize: 18,

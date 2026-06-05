@@ -87,7 +87,7 @@ export const resetVendorPassword = async (req: Request, res: Response) => {
 
 export const getNearbyVendors = async (req: Request, res: Response) => {
   try {
-    const { lat, lng, page = 1, limit = 20 } = req.query;
+    const { lat, lng, page = 1, limit = 20, radius } = req.query;
 
     if (!lat || !lng) {
       return res.status(400).json({ message: "Latitude and Longitude are required" });
@@ -95,6 +95,7 @@ export const getNearbyVendors = async (req: Request, res: Response) => {
 
     const userLat = parseFloat(lat as string);
     const userLng = parseFloat(lng as string);
+    const radiusInMeters = radius ? Math.max(1000, Number(radius) || 0) : null;
     const skip = (Number(page) - 1) * Number(limit);
 
     console.log(`[API] Fetching nearby vendors - Lat: ${userLat}, Lng: ${userLng}, Page: ${page}`);
@@ -108,6 +109,7 @@ export const getNearbyVendors = async (req: Request, res: Response) => {
             coordinates: [userLng, userLat],
           },
           distanceField: "distance",
+          ...(radiusInMeters ? { maxDistance: radiusInMeters } : {}),
           spherical: true,
           key: "location",
           query: { partnerType: { $ne: "meat" } },

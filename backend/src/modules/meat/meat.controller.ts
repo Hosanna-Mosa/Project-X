@@ -145,7 +145,7 @@ export const loginMeatCenter = async (req: Request, res: Response) => {
 
 export const getNearbyMeatCenters = async (req: Request, res: Response) => {
   try {
-    const { lat, lng, page = 1, limit = 20, category, all } = req.query;
+    const { lat, lng, page = 1, limit = 20, category, all, radius } = req.query;
 
     if (!lat || !lng) {
       return res.status(400).json({ message: "Latitude and Longitude are required" });
@@ -162,6 +162,7 @@ export const getNearbyMeatCenters = async (req: Request, res: Response) => {
     const fetchAll = all === "true";
     const skip = fetchAll ? 0 : (pageNumber - 1) * requestedLimit;
     const pageLimit = requestedLimit;
+    const radiusInMeters = radius ? Math.max(1000, Number(radius) || 0) : null;
 
     const matchStage: any = {};
     if (category) {
@@ -174,7 +175,14 @@ export const getNearbyMeatCenters = async (req: Request, res: Response) => {
         Vendor.find({ ...matchStage, partnerType: "meat" }).lean(),
       ]);
 
-      const formattedCenters = [...centers, ...meatVendors].map((center: any) => {
+      const filteredCenters = radiusInMeters
+        ? [...centers, ...meatVendors].filter((center: any) => {
+          const [centerLng = userLng, centerLat = userLat] = center.location?.coordinates || [];
+          return getDistanceInMeters(userLat, userLng, centerLat, centerLng) <= radiusInMeters;
+        })
+        : [...centers, ...meatVendors];
+
+      const formattedCenters = filteredCenters.map((center: any) => {
         const [centerLng = userLng, centerLat = userLat] = center.location?.coordinates || [];
         const distanceInMeters = getDistanceInMeters(userLat, userLng, centerLat, centerLng);
         const distanceInKm = distanceInMeters / 1000;
@@ -206,6 +214,7 @@ export const getNearbyMeatCenters = async (req: Request, res: Response) => {
             coordinates: [userLng, userLat],
           },
           distanceField: "distance",
+          ...(radiusInMeters ? { maxDistance: radiusInMeters } : {}),
           spherical: true,
           key: "location"
         },
@@ -228,6 +237,7 @@ export const getNearbyMeatCenters = async (req: Request, res: Response) => {
             coordinates: [userLng, userLat],
           },
           distanceField: "distance",
+          ...(radiusInMeters ? { maxDistance: radiusInMeters } : {}),
           spherical: true,
           key: "location",
           query: { partnerType: "meat" },
