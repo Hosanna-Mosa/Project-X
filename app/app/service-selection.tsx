@@ -31,7 +31,10 @@ const { height: SCREEN_HEIGHT } = Dimensions.get("window");
 
 export default function ServiceSelectionScreen() {
   const insets = useSafeAreaInsets();
-  const { label } = useLocalSearchParams<{ label: string }>();
+  const { label, radiusKm } = useLocalSearchParams<{ label: string; radiusKm?: string }>();
+  const initialRadiusKm = Number(radiusKm);
+  const hasRoutedRadius = Number.isFinite(initialRadiusKm) && initialRadiusKm > 0;
+  const routedRadiusKm = hasRoutedRadius ? String(initialRadiusKm) : "2";
   const [mapType, setMapType] = useState<"standard" | "satellite">("standard");
   const [searchText, setSearchText] = useState("");
   const [nearbyPlaces, setNearbyPlaces] = useState<any[]>([]);
@@ -50,8 +53,8 @@ export default function ServiceSelectionScreen() {
   const [isLocationSheetOpen, setIsLocationSheetOpen] = useState(false);
   const [durationOption, setDurationOption] = useState<string>("1");
   const [customDuration, setCustomDuration] = useState<string>("");
-  const [radiusOption, setRadiusOption] = useState<string>("2");
-  const [customRadius, setCustomRadius] = useState<string>("");
+  const [radiusOption, setRadiusOption] = useState<string>(["2", "5", "10", "15"].includes(routedRadiusKm) ? routedRadiusKm : "custom");
+  const [customRadius, setCustomRadius] = useState<string>(["2", "5", "10", "15"].includes(routedRadiusKm) ? "" : routedRadiusKm);
   const [bookingState, setBookingState] = useState<"idle" | "booking" | "success">("idle");
   const [searchingStatus, setSearchingStatus] = useState<string>("Initializing booking...");
   const [driverLocation, setDriverLocation] = useState<{ lat: number; lng: number } | null>(null);
@@ -292,7 +295,8 @@ export default function ServiceSelectionScreen() {
 
   const fetchNearby = async (lat: number, lng: number, keyword: string) => {
     try {
-      const data = await customFetch<any[]>(`/api/v1/places/nearby?lat=${lat}&lng=${lng}&radius=5000&keyword=${encodeURIComponent(keyword)}`);
+      const radiusMeters = hasRoutedRadius ? Math.round(initialRadiusKm * 1000) : 5000;
+      const data = await customFetch<any[]>(`/api/v1/places/nearby?lat=${lat}&lng=${lng}&radius=${radiusMeters}&keyword=${encodeURIComponent(keyword)}`);
       setNearbyPlaces(data);
       if (data.length > 0) {
         setTimeout(() => mapRef.current?.fitToMarkers(data), 1000);
