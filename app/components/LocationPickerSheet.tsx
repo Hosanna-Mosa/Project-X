@@ -165,7 +165,7 @@ export function LocationPickerSheet({ isOpen, onClose, onSelectAddress }: Props)
           <Feather 
             name={item.label === "Home" ? "home" : item.label === "Work" ? "briefcase" : "map-pin"} 
             size={20} 
-            color="#06B6D4" 
+            color={colors.primary} 
           />
         </View>
         <View style={styles.addressContent}>
@@ -236,7 +236,7 @@ export function LocationPickerSheet({ isOpen, onClose, onSelectAddress }: Props)
           </View>
           
           <View style={styles.searchRow}>
-            <Feather name="search" size={20} color="#06B6D4" style={styles.searchIcon} />
+            <Feather name="search" size={20} color={colors.primary} style={styles.searchIcon} />
             <TextInput 
               style={styles.searchInput} 
               placeholder="Search for area, street name..."
@@ -258,7 +258,7 @@ export function LocationPickerSheet({ isOpen, onClose, onSelectAddress }: Props)
             <View style={{ flexShrink: 1 }}>
               <TouchableOpacity style={styles.blinkitActionRow} onPress={handleUseCurrentLocation}>
                 <View style={styles.actionIconLeft}>
-                  <Feather name="crosshair" size={22} color="#06B6D4" />
+                  <Feather name="crosshair" size={22} color={colors.primary} />
                 </View>
                 <View style={styles.actionTextContainer}>
                   <Text style={styles.actionTitle}>Use current location</Text>
@@ -277,7 +277,7 @@ export function LocationPickerSheet({ isOpen, onClose, onSelectAddress }: Props)
                 }}
               >
                 <View style={styles.actionIconLeft}>
-                  <Feather name="plus" size={22} color="#06B6D4" />
+                  <Feather name="plus" size={22} color={colors.primary} />
                 </View>
                 <View style={styles.actionTextContainer}>
                   <Text style={styles.actionTitle}>Add new address</Text>
@@ -409,7 +409,7 @@ const createStyles = (colors: typeof Colors.light) => StyleSheet.create({
   actionTitle: {
     fontSize: 15,
     fontWeight: "600",
-    color: "#06B6D4",
+    color: colors.primary,
     marginBottom: 2,
   },
   actionSubtitle: {

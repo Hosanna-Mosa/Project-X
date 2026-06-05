@@ -328,7 +328,7 @@ export default function AddAddressScreen() {
           <View style={styles.bottomOverlay}>
             <View style={{ alignItems: "center", marginBottom: 16 }}>
               <TouchableOpacity style={styles.useCurrentLocBtn} onPress={handleUseCurrentLocation}>
-                <Feather name="crosshair" size={16} color="#06B6D4" />
+                <Feather name="crosshair" size={16} color="#000000" />
                 <Text style={styles.useCurrentLocText}>Use current location</Text>
               </TouchableOpacity>
             </View>
@@ -369,7 +369,7 @@ export default function AddAddressScreen() {
               {/* City Row */}
               <View style={styles.locationInfoRow}>
                 <View style={styles.iconBox}>
-                  <FontAwesome5 name="building" size={20} color="#06B6D4" />
+                  <FontAwesome5 name="building" size={20} color="#000000" />
                 </View>
                 <View style={styles.locationTextWrap}>
                   <Text style={styles.locationLabelText}>City</Text>
@@ -383,7 +383,7 @@ export default function AddAddressScreen() {
               {/* Area Row */}
               <View style={styles.locationInfoRow}>
                 <View style={styles.iconBox}>
-                  <Feather name="map-pin" size={20} color="#06B6D4" />
+                  <Feather name="map-pin" size={20} color="#000000" />
                 </View>
                 <View style={styles.locationTextWrap}>
                   <Text style={styles.locationLabelText}>Select an area, street</Text>
@@ -480,7 +480,7 @@ export default function AddAddressScreen() {
           <View style={styles.modalSheet}>
             <Text style={styles.modalTitle}>Select a city</Text>
             <View style={styles.modalSearchBox}>
-              <Feather name="search" size={20} color="#06B6D4" />
+              <Feather name="search" size={20} color="#000000" />
               <TextInput 
                 placeholder="Search for a city" 
                 style={styles.modalSearchInput} 
@@ -524,7 +524,7 @@ export default function AddAddressScreen() {
           <View style={styles.modalSheet}>
             <Text style={styles.modalTitle}>Select an area</Text>
             <View style={styles.modalSearchBox}>
-              <Feather name="search" size={20} color="#06B6D4" />
+              <Feather name="search" size={20} color="#000000" />
               <TextInput 
                 placeholder="Search for area, street name..." 
                 style={styles.modalSearchInput} 
@@ -731,7 +731,7 @@ const styles = StyleSheet.create({
   },
   useCurrentLocText: {
     marginLeft: 8,
-    color: "#06B6D4",
+    color: "#000000",
     fontWeight: "700",
     fontSize: 11,
   },
@@ -782,16 +782,16 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     borderRadius: 4,
     borderWidth: 1,
-    borderColor: "#06B6D4",
+    borderColor: "#000000",
   },
   changeBtnText: {
-    color: "#06B6D4",
+    color: "#000000",
     fontSize: 10,
     fontWeight: "700",
     textTransform: "uppercase",
   },
   primaryBtn: {
-    backgroundColor: "#06B6D4",
+    backgroundColor: "#000000",
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
@@ -809,7 +809,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   helpLinkText: {
-    color: "#06B6D4",
+    color: "#000000",
     fontSize: 11,
     fontWeight: "600",
     textDecorationLine: "underline",
@@ -872,7 +872,7 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   changeActionText: {
-    color: "#06B6D4",
+    color: "#000000",
     fontWeight: "700",
     fontSize: 11,
     marginLeft: 8,
@@ -935,13 +935,13 @@ const styles = StyleSheet.create({
     marginRight: 8,
   },
   radioCircleActive: {
-    borderColor: "#06B6D4",
+    borderColor: "#000000",
   },
   radioDot: {
     width: 10,
     height: 10,
     borderRadius: 5,
-    backgroundColor: "#06B6D4",
+    backgroundColor: "#000000",
   },
   radioLabel: {
     fontSize: 13,
@@ -959,7 +959,7 @@ const styles = StyleSheet.create({
     borderTopColor: "#F3F4F6",
   },
   nextBtn: {
-    backgroundColor: "#06B6D4",
+    backgroundColor: "#000000",
     borderRadius: 8,
     paddingVertical: 12,
     alignItems: "center",

@@ -6,6 +6,7 @@ import {
   Text,
   TouchableOpacity,
   View,
+  Linking,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
@@ -54,6 +55,7 @@ export default function TrackingScreen() {
   const styles = React.useMemo(() => createStyles(colors), [theme]);
 
   const isRide = ["bike", "auto", "cab", "cab_prime"].includes(serviceType?.toLowerCase() || "");
+  const isHelper = serviceType?.toLowerCase() === "helper";
 
   const normalizeStatus = (backendStatus: string): OrderStatus => {
     const s = backendStatus.toLowerCase();
@@ -198,12 +200,15 @@ export default function TrackingScreen() {
             <Feather name="check-circle" size={80} color={colors.success} />
           </View>
           <Text style={[styles.successTitle, { color: colors.text }]}>
-            {isRide ? "Ride Completed!" : "Order Delivered!"}
+            {isRide ? "Ride Completed!" : (isHelper ? "Task Completed!" : "Order Delivered!")}
           </Text>
           <Text style={[styles.successSubtitle, { color: colors.textSecondary }]}>
             {isRide
               ? `You have arrived safely at your destination with ${driver?.name || "your captain"}.`
-              : `Your meal has been delivered successfully by ${driver?.name || "our delivery partner"}.`}
+              : (isHelper
+                  ? `Your helper task has been completed successfully by ${driver?.name || "your helper"}.`
+                  : `Your meal has been delivered successfully by ${driver?.name || "our delivery partner"}.`
+                )}
           </Text>
         </View>
 
@@ -229,16 +234,29 @@ export default function TrackingScreen() {
             </View>
           ) : (
             <>
-              {/* Order Summary */}
+              {/* Order Summary / Task Details */}
               <View style={[styles.successCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-                <Text style={[styles.successCardHeader, { color: colors.text }]}>Delivered Items</Text>
-                {foodItems.map((item: any, idx: number) => (
-                  <View key={idx} style={styles.successItemRow}>
-                    <Text style={[styles.successItemQty, { color: colors.primary }]}>{item.quantity}x</Text>
-                    <Text style={[styles.successItemName, { color: colors.text }]}>{item.name}</Text>
+                <Text style={[styles.successCardHeader, { color: colors.text }]}>
+                  {isHelper ? "Task Details" : "Delivered Items"}
+                </Text>
+                {isHelper ? (
+                  <View style={{ gap: 8 }}>
+                     <Text style={{ fontSize: 14, color: colors.text }}>
+                       Service: <Text style={{ fontWeight: "700" }}>General Helper & Task Specialist</Text>
+                     </Text>
+                     <Text style={{ fontSize: 14, color: colors.text }}>
+                       Booked Location: <Text style={{ fontWeight: "700" }}>{stops?.[0]?.address || "N/A"}</Text>
+                     </Text>
                   </View>
-                ))}
-                {foodItems.length === 0 && (
+                ) : (
+                  foodItems.map((item: any, idx: number) => (
+                    <View key={idx} style={styles.successItemRow}>
+                      <Text style={[styles.successItemQty, { color: colors.primary }]}>{item.quantity}x</Text>
+                      <Text style={[styles.successItemName, { color: colors.text }]}>{item.name}</Text>
+                    </View>
+                  ))
+                )}
+                {!isHelper && foodItems.length === 0 && (
                   <Text style={{ color: colors.textMuted, fontSize: 13 }}>Items successfully handed over.</Text>
                 )}
               </View>
@@ -322,10 +340,10 @@ export default function TrackingScreen() {
                 <Feather name="search" size={30} color={colors.primary} />
               </View>
               <Text style={styles.findingTitle}>
-                {isRide ? "Finding your captain..." : "Finding your delivery partner..."}
+                {isRide ? "Finding your captain..." : (isHelper ? "Finding your helper..." : "Finding your delivery partner...")}
               </Text>
               <Text style={styles.findingSubtitle}>
-                {isRide ? "We're connecting you with the nearest captain." : "We're connecting you with the nearest professional driver."}
+                {isRide ? "We're connecting you with the nearest captain." : (isHelper ? "We're connecting you with the nearest professional helper." : "We're connecting you with the nearest professional driver.")}
               </Text>
               <ActivityIndicator color={colors.primary} style={{ marginTop: 24 }} />
             </View>
@@ -342,11 +360,14 @@ export default function TrackingScreen() {
                     <Text style={styles.ratingText}>{driver.rating || "4.9"}</Text>
                   </View>
                   <Text style={styles.driverMotto}>
-                    {isRide ? "Loves driving safely" : "Loves delivering on time"}
+                    {isRide ? "Loves driving safely" : (isHelper ? "Here to help you with tasks" : "Loves delivering on time")}
                   </Text>
                 </View>
                 <View style={styles.driverActions}>
-                  <TouchableOpacity style={styles.actionBtn}>
+                  <TouchableOpacity 
+                    style={styles.actionBtn}
+                    onPress={() => Linking.openURL(`tel:${driver.phone || "1234567890"}`)}
+                  >
                     <Feather name="phone" size={18} color={colors.textSecondary} />
                   </TouchableOpacity>
                   <TouchableOpacity style={styles.actionBtn} onPress={() => router.push("/chat")}>
