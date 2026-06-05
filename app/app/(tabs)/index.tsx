@@ -23,14 +23,110 @@ import { ServiceCategory } from "@/components/ServiceCategory";
 import { LocationPickerSheet } from "@/components/LocationPickerSheet";
 import { RestaurantListItem } from "@/components/RestaurantListItem";
 
-const FOOD_CATEGORIES = [
-  { id: 1, name: "Corner", image: "https://images.unsplash.com/photo-1578985545062-69928b1d9587?w=200" },
-  { id: 2, name: "South Indian", image: "https://images.unsplash.com/photo-1589302168068-964664d93dc0?w=200" },
-  { id: 3, name: "Dosa", image: "https://images.unsplash.com/photo-1541518763669-27fef04b14ea?w=200" },
-  { id: 4, name: "Vada", image: "https://images.unsplash.com/photo-1610192244261-3f33de3f55e4?w=200" },
-  { id: 5, name: "Poori", image: "https://images.unsplash.com/photo-1626074353765-517a681e40be?w=200" },
-  { id: 6, name: "Burgers", image: "https://images.unsplash.com/photo-1571091718767-18b5b1457add?w=200" },
-];
+import { useAuthStore } from "@/contexts/authStore";
+
+const FESTIVALS: { [key: string]: string } = {
+  "01-01": "New Year's Day",
+  "01-14": "Pongal",
+  "01-15": "Makar Sankranti",
+  "01-26": "Republic Day",
+  "03-08": "Holi",
+  "06-05": "World Environment Day",
+  "08-15": "Independence Day",
+  "10-02": "Gandhi Jayanti",
+  "10-24": "Dussehra",
+  "11-12": "Diwali",
+  "12-25": "Christmas",
+};
+
+const getGreeting = (name: string) => {
+  const today = new Date();
+  const month = String(today.getMonth() + 1).padStart(2, "0");
+  const date = String(today.getDate()).padStart(2, "0");
+  const key = `${month}-${date}`;
+  
+  let greetingPrefix = "";
+  if (FESTIVALS[key]) {
+    greetingPrefix = `Happy ${FESTIVALS[key]}`;
+  } else {
+    const days = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+    const dayName = days[today.getDay()];
+    greetingPrefix = `Happy ${dayName}`;
+  }
+  
+  return `${greetingPrefix}, ${name}!`;
+};
+
+interface Dish {
+  id: number;
+  name: string;
+  icon: string;
+  color: string;
+}
+
+const GET_FAMOUS_DISHES = (dayIndex: number): Dish[] => {
+  switch (dayIndex) {
+    case 0: // Sunday
+      return [
+        { id: 1, name: "South Indian Feast", icon: "restaurant", color: "#10B981" },
+        { id: 2, name: "Pancakes", icon: "cafe", color: "#F59E0B" },
+        { id: 3, name: "Mutton Curry", icon: "flame", color: "#EF4444" },
+        { id: 4, name: "Alloo Paratha", icon: "leaf", color: "#8B5CF6" },
+        { id: 5, name: "Chaats", icon: "fast-food", color: "#D97706" },
+      ];
+    case 1: // Monday
+      return [
+        { id: 1, name: "Idli Sambar", icon: "leaf", color: "#16A34A" },
+        { id: 2, name: "Salad Bowl", icon: "nutrition", color: "#22C55E" },
+        { id: 3, name: "Smoothies", icon: "wine", color: "#EC4899" },
+        { id: 4, name: "Oatmeal", icon: "restaurant", color: "#6B7280" },
+        { id: 5, name: "Green Tea", icon: "cafe", color: "#14B8A6" },
+      ];
+    case 2: // Tuesday
+      return [
+        { id: 1, name: "Masala Dosa", icon: "restaurant", color: "#F59E0B" },
+        { id: 2, name: "Chole Bhature", icon: "fast-food", color: "#EF4444" },
+        { id: 3, name: "Paneer Wrap", icon: "leaf", color: "#10B981" },
+        { id: 4, name: "Samosa Chaat", icon: "flame", color: "#D97706" },
+        { id: 5, name: "Lassi", icon: "wine", color: "#3B82F6" },
+      ];
+    case 3: // Wednesday
+      return [
+        { id: 1, name: "Burger", icon: "fast-food", color: "#F59E0B" },
+        { id: 2, name: "Hakka Noodles", icon: "restaurant", color: "#EC4899" },
+        { id: 3, name: "Momos", icon: "leaf", color: "#10B981" },
+        { id: 4, name: "Pasta Carbonara", icon: "pizza", color: "#EF4444" },
+        { id: 5, name: "Cold Coffee", icon: "cafe", color: "#6B7280" },
+      ];
+    case 4: // Thursday
+      return [
+        { id: 1, name: "Poori Curry", icon: "restaurant", color: "#D97706" },
+        { id: 2, name: "Veg Biryani", icon: "leaf", color: "#16A34A" },
+        { id: 3, name: "Sandwich", icon: "cut", color: "#3B82F6" },
+        { id: 4, name: "Vada Pav", icon: "fast-food", color: "#F59E0B" },
+        { id: 5, name: "Lemon Soda", icon: "wine", color: "#000000" },
+      ];
+    case 5: // Friday
+      return [
+        { id: 1, name: "Pizza", icon: "pizza", color: "#EF4444" },
+        { id: 2, name: "Biryani Feast", icon: "restaurant", color: "#D97706" },
+        { id: 3, name: "French Fries", icon: "fast-food", color: "#F59E0B" },
+        { id: 4, name: "Burgers", icon: "fast-food", color: "#10B981" },
+        { id: 5, name: "Waffles", icon: "cafe", color: "#8B5CF6" },
+        { id: 6, name: "Donuts", icon: "egg", color: "#EC4899" },
+      ];
+    case 6: // Saturday
+      return [
+        { id: 1, name: "Barbeque Wings", icon: "flame", color: "#EF4444" },
+        { id: 2, name: "Paneer Butter", icon: "restaurant", color: "#F59E0B" },
+        { id: 3, name: "Haleem", icon: "restaurant", color: "#D97706" },
+        { id: 4, name: "Chocolate Cake", icon: "heart", color: "#EC4899" },
+        { id: 5, name: "Mojitos", icon: "wine", color: "#10B981" },
+      ];
+    default:
+      return [];
+  }
+};
 
 import * as Location from "expo-location";
 import { FlatList } from "react-native";
@@ -47,6 +143,14 @@ export default function HomeScreen() {
   const categoriesScrollRef = useRef<ScrollView>(null);
   const colors = Colors[theme];
   const styles = React.useMemo(() => createStyles(colors), [theme]);
+
+  const user = useAuthStore((s) => s.user);
+  const userName = user?.name ? user.name.split(" ")[0] : "Uttej";
+
+  const famousDishes = React.useMemo(() => {
+    const today = new Date();
+    return GET_FAMOUS_DISHES(today.getDay());
+  }, []);
 
   const [restaurants, setRestaurants] = useState<any[]>([]);
   const [meatCenters, setMeatCenters] = useState<any[]>([]);
@@ -173,44 +277,92 @@ export default function HomeScreen() {
   const renderHeader = () => (
     <>
       {activeService === 'Food' && (
-        <ScrollView 
-          horizontal 
-          showsHorizontalScrollIndicator={false} 
-          contentContainerStyle={styles.foodCategoriesContainer}
-        >
-          {FOOD_CATEGORIES.map((cat) => (
-            <TouchableOpacity key={cat.id} style={styles.categoryCircleWrapper}>
-              <View style={styles.categoryCircle}>
-                <Image source={{ uri: cat.image }} style={styles.categoryImage} />
+        <View style={styles.greetingSection}>
+          <Text style={styles.greetingTitle}>
+            {getGreeting(userName)}
+          </Text>
+          <View style={styles.dishesGrid}>
+            <TouchableOpacity 
+              style={[
+                styles.dishChip, 
+                foodFilter === 'all' && styles.filterAllActive
+              ]} 
+              onPress={() => setFoodFilter('all')}
+              activeOpacity={0.8}
+            >
+              <View style={[
+                styles.dishIconCircle, 
+                { backgroundColor: foodFilter === 'all' ? '#FFFFFF25' : '#64748B15' }
+              ]}>
+                <Ionicons 
+                  name="grid" 
+                  size={14} 
+                  color={foodFilter === 'all' ? '#FFFFFF' : '#64748B'} 
+                />
               </View>
-              <Text style={styles.categoryLabel} numberOfLines={1}>{cat.name}</Text>
+              <Text style={[
+                styles.dishChipText, 
+                foodFilter === 'all' && styles.filterTextActive
+              ]}>All Food</Text>
             </TouchableOpacity>
-          ))}
-        </ScrollView>
-      )}
 
-      {activeService === 'Food' && (
-        <View style={styles.vegFilterRow}>
-          <TouchableOpacity 
-            style={[styles.vegFilterChip, foodFilter === 'all' && styles.vegFilterChipActive]}
-            onPress={() => setFoodFilter('all')}
-          >
-            <Text style={[styles.vegFilterText, foodFilter === 'all' && styles.vegFilterTextActive]}>All</Text>
-          </TouchableOpacity>
-          <TouchableOpacity 
-            style={[styles.vegFilterChip, foodFilter === 'veg' && styles.vegFilterChipVegActive]}
-            onPress={() => setFoodFilter('veg')}
-          >
-            <View style={[styles.vegFilterDot, { backgroundColor: '#16A34A' }]} />
-            <Text style={[styles.vegFilterText, foodFilter === 'veg' && styles.vegFilterTextActive]}>Veg</Text>
-          </TouchableOpacity>
-          <TouchableOpacity 
-            style={[styles.vegFilterChip, foodFilter === 'nonveg' && styles.vegFilterChipNonVegActive]}
-            onPress={() => setFoodFilter('nonveg')}
-          >
-            <View style={[styles.vegFilterDot, { backgroundColor: '#E11D48' }]} />
-            <Text style={[styles.vegFilterText, foodFilter === 'nonveg' && styles.vegFilterTextActive]}>Non-Veg</Text>
-          </TouchableOpacity>
+            <TouchableOpacity 
+              style={[
+                styles.dishChip, 
+                foodFilter === 'veg' && styles.filterVegActive
+              ]} 
+              onPress={() => setFoodFilter('veg')}
+              activeOpacity={0.8}
+            >
+              <View style={[
+                styles.dishIconCircle, 
+                { backgroundColor: foodFilter === 'veg' ? '#FFFFFF25' : '#16A34A15' }
+              ]}>
+                <Ionicons 
+                  name="leaf" 
+                  size={14} 
+                  color={foodFilter === 'veg' ? '#FFFFFF' : '#16A34A'} 
+                />
+              </View>
+              <Text style={[
+                styles.dishChipText, 
+                foodFilter === 'veg' && styles.filterTextActive
+              ]}>Pure Veg</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity 
+              style={[
+                styles.dishChip, 
+                foodFilter === 'nonveg' && styles.filterNonVegActive
+              ]} 
+              onPress={() => setFoodFilter('nonveg')}
+              activeOpacity={0.8}
+            >
+              <View style={[
+                styles.dishIconCircle, 
+                { backgroundColor: foodFilter === 'nonveg' ? '#FFFFFF25' : '#E11D4815' }
+              ]}>
+                <Ionicons 
+                  name="flame" 
+                  size={14} 
+                  color={foodFilter === 'nonveg' ? '#FFFFFF' : '#E11D48'} 
+                />
+              </View>
+              <Text style={[
+                styles.dishChipText, 
+                foodFilter === 'nonveg' && styles.filterTextActive
+              ]}>Non-Veg</Text>
+            </TouchableOpacity>
+
+            {famousDishes.map((dish) => (
+              <TouchableOpacity key={dish.id} style={styles.dishChip} activeOpacity={0.8}>
+                <View style={[styles.dishIconCircle, { backgroundColor: dish.color + '15' }]}>
+                  <Ionicons name={dish.icon as any} size={16} color={dish.color} />
+                </View>
+                <Text style={styles.dishChipText}>{dish.name}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
         </View>
       )}
 
@@ -496,7 +648,7 @@ const createStyles = (colors: typeof Colors.light) => StyleSheet.create({
   },
   categoriesScrollContent: {
     paddingRight: 40,
-    gap: 12,
+    gap: 16,
   },
   scrollButton: {
     position: "absolute",
@@ -518,82 +670,75 @@ const createStyles = (colors: typeof Colors.light) => StyleSheet.create({
   },
   scrollButtonLeft: {
     left: -14,
-    top: 6,
+    top: 10,
   },
   scrollButtonRight: {
     right: -14,
-    top: 6,
+    top: 10,
   },
-  foodCategoriesContainer: {
+  greetingSection: {
     paddingHorizontal: 16,
-    paddingVertical: 20,
-    gap: 16,
+    paddingTop: 16,
+    paddingBottom: 16,
+    marginTop: 15,
+    borderTopWidth: 1,
+    borderTopColor: colors.borderLight,
   },
-  categoryCircleWrapper: {
-    alignItems: "center",
-    gap: 8,
-    width: 65,
-  },
-  categoryCircle: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    overflow: "hidden",
-    backgroundColor: colors.surfaceSecondary,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  categoryImage: {
-    width: "100%",
-    height: "100%",
-  },
-  categoryLabel: {
-    fontSize: 11,
-    fontWeight: "600",
+  greetingTitle: {
+    fontSize: 22,
+    fontWeight: "900",
     color: colors.text,
-    textAlign: "center",
+    letterSpacing: -0.5,
+    marginBottom: 16,
   },
-  vegFilterRow: {
+  dishesGrid: {
     flexDirection: "row",
-    paddingHorizontal: 16,
-    gap: 10,
-    marginBottom: 12,
+    flexWrap: "wrap",
+    gap: 8,
   },
-  vegFilterChip: {
+  dishChip: {
     flexDirection: "row",
     alignItems: "center",
     backgroundColor: colors.surface,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
+    paddingLeft: 6,
+    paddingRight: 12,
+    paddingVertical: 5,
     borderRadius: 20,
     borderWidth: 1.5,
     borderColor: colors.border,
-    gap: 6,
+    shadowColor: colors.shadow,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.04,
+    shadowRadius: 2,
+    elevation: 1.5,
   },
-  vegFilterChipActive: {
-    borderColor: colors.text,
-    backgroundColor: colors.text,
+  dishIconCircle: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    justifyContent: "center",
+    alignItems: "center",
+    marginRight: 6,
   },
-  vegFilterChipVegActive: {
-    borderColor: '#16A34A',
-    backgroundColor: '#16A34A',
-  },
-  vegFilterChipNonVegActive: {
-    borderColor: '#E11D48',
-    backgroundColor: '#E11D48',
-  },
-  vegFilterText: {
-    fontSize: 13,
-    fontWeight: '700',
+  dishChipText: {
+    fontSize: 12,
+    fontWeight: "700",
     color: colors.text,
   },
-  vegFilterTextActive: {
-    color: '#FFFFFF',
+  filterAllActive: {
+    backgroundColor: colors.text,
+    borderColor: colors.text,
   },
-  vegFilterDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
+  filterVegActive: {
+    backgroundColor: '#16A34A',
+    borderColor: '#16A34A',
+  },
+  filterNonVegActive: {
+    backgroundColor: '#E11D48',
+    borderColor: '#E11D48',
+  },
+  filterTextActive: {
+    color: '#FFFFFF',
   },
   filterRow: {
     flexDirection: "row",

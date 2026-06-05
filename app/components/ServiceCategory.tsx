@@ -29,14 +29,15 @@ export function ServiceCategory({
   
   return (
     <TouchableOpacity style={styles.container} onPress={onPress} activeOpacity={0.7}>
-      <View style={[styles.iconBox, active && { backgroundColor: colors.primary + '18' }]}>
+      <View style={styles.iconBox}>
         {image ? (
           <Image source={image} style={styles.iconImage} resizeMode="contain" />
         ) : (
-          <Ionicons name={icon as any} size={24} color={finalColor} />
+          <Ionicons name={icon as any} size={28} color={finalColor} />
         )}
       </View>
       <Text style={[styles.label, active && { color: colors.primary, fontWeight: '700' }]}>{label}</Text>
+      <View style={[styles.bottomLine, { backgroundColor: active ? colors.primary : 'transparent' }]} />
     </TouchableOpacity>
   );
 }
@@ -45,25 +46,31 @@ export function ServiceCategory({
 const createStyles = (colors: typeof Colors.light) => StyleSheet.create({
   container: {
     alignItems: "center",
-    gap: 3,
-    width: 50,
+    gap: 4,
+    width: 60,
   },
   iconBox: {
-    width: 40,
-    height: 40,
-    borderRadius: 12,
+    width: 48,
+    height: 48,
+    borderRadius: 14,
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: 'transparent',
   },
   iconImage: {
-    width: 32,
-    height: 32,
+    width: 38,
+    height: 38,
   },
   label: {
-    fontSize: 12,
-    fontWeight: "500",
+    fontSize: 13,
+    fontWeight: "600",
     color: colors.text,
     textAlign: "center",
+  },
+  bottomLine: {
+    width: 20,
+    height: 3,
+    borderRadius: 1.5,
+    marginTop: 4,
   },
 });

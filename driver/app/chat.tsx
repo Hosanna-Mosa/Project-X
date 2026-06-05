@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { 
   StyleSheet, View, Text, TextInput, TouchableOpacity, 
-  KeyboardAvoidingView, Platform, FlatList, Keyboard
+  KeyboardAvoidingView, Platform, FlatList, Keyboard, Linking
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Feather, Ionicons } from "@expo/vector-icons";
@@ -90,7 +90,10 @@ export default function DriverChatScreen() {
           <Text style={styles.headerTitle}>{currentOrder?.customerName || "Customer"}</Text>
           <Text style={styles.headerSubtitle}>Active Request</Text>
         </View>
-        <TouchableOpacity style={styles.callBtn}>
+        <TouchableOpacity 
+          style={styles.callBtn}
+          onPress={() => Linking.openURL(`tel:${currentOrder?.customerPhone || "1234567890"}`)}
+        >
           <Ionicons name="call" size={22} color={Colors.primary} />
         </TouchableOpacity>
       </View>

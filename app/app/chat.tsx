@@ -8,6 +8,7 @@ import {
   TextInput,
   TouchableOpacity,
   View,
+  Linking,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
@@ -142,7 +143,10 @@ export default function ChatScreen() {
             <Text style={styles.headerStatus}>Your driver · Online</Text>
           </View>
         </View>
-        <TouchableOpacity style={styles.callBtn}>
+        <TouchableOpacity 
+          style={styles.callBtn}
+          onPress={() => Linking.openURL(`tel:${driver?.phone || "1234567890"}`)}
+        >
           <Feather name="phone" size={20} color="#0EA5E9" />
         </TouchableOpacity>
       </View>

@@ -322,7 +322,7 @@ export const MapBackground = forwardRef<MapBackgroundRef, Props>(({
             <Polyline
               coordinates={decodePolyline(polyline)}
               strokeWidth={4}
-              strokeColor="#00B7EB"
+              strokeColor="#000000"
             />
           )}
         </MapView>
