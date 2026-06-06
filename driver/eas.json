@@ -1,0 +1,44 @@
+{
+  "cli": {
+    "version": ">= 16.0.0"
+  },
+  "build": {
+    "development": {
+      "developmentClient": true,
+      "distribution": "internal",
+      "android": {
+        "buildType": "apk"
+      },
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://x-api.triozen.tech",
+        "EXPO_PUBLIC_GOOGLE_MAPS_API_KEY": "AIzaSyD23mZxzw78gBlz6EGEZ6BMgCwc4fygJMA"
+      }
+    },
+    "preview": {
+      "distribution": "internal",
+      "android": {
+        "buildType": "apk"
+      },
+      "ios": {
+        "simulator": true
+      },
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://x-api.triozen.tech",
+        "EXPO_PUBLIC_GOOGLE_MAPS_API_KEY": "AIzaSyD23mZxzw78gBlz6EGEZ6BMgCwc4fygJMA"
+      }
+    },
+    "production": {
+      "android": {
+        "buildType": "app-bundle"
+      },
+      "ios": {},
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://x-api.triozen.tech",
+        "EXPO_PUBLIC_GOOGLE_MAPS_API_KEY": "AIzaSyD23mZxzw78gBlz6EGEZ6BMgCwc4fygJMA"
+      }
+    }
+  },
+  "submit": {
+    "production": {}
+  }
+}
