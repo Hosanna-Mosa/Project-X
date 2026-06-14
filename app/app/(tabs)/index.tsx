@@ -142,7 +142,7 @@ export default function HomeScreen() {
   const [loadingMore, setLoadingMore] = useState(false);
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
-  const { theme, toggleTheme } = useThemeStore();
+  const { theme } = useThemeStore();
   const [scrollOffset, setScrollOffset] = useState(0);
   const categoriesScrollRef = useRef<ScrollView>(null);
   const colors = Colors[theme];
@@ -456,7 +456,7 @@ export default function HomeScreen() {
 
   const categoriesTranslateY = scrollY.interpolate({
     inputRange: [0, 100],
-    outputRange: [0, -40],
+    outputRange: [0, 0],
     extrapolate: 'clamp',
   });
 
@@ -518,7 +518,7 @@ export default function HomeScreen() {
             <View style={styles.locationInfoBox}>
               <View style={styles.deliveryTitleRow}>
                 <Ionicons name="location" size={14} color={colors.primary} style={{marginRight: 6}} />
-                <Text style={styles.deliveryTitle}>Delivery to</Text>
+                <Text style={styles.deliveryTitle}>Delivery</Text>
               </View>
               <TouchableOpacity 
                 style={styles.addressSelector} 
@@ -538,7 +538,7 @@ export default function HomeScreen() {
                   </View>
                 ) : (
                   <Text style={[styles.addressText, { color: colors.primary, fontWeight: "800", fontSize: 14 }]} numberOfLines={1}>
-                    Add address
+                    Address
                   </Text>
                 )}
                 <Ionicons name="chevron-down" size={18} color={colors.textSecondary} style={{marginLeft: 6}} />
@@ -546,10 +546,7 @@ export default function HomeScreen() {
             </View>
             <View style={{flexDirection: 'row', gap: 10, alignItems: 'center'}}>
               <TouchableOpacity style={styles.avatarBtnCircle} onPress={() => setIsDistanceSheetOpen(true)}>
-                  <Ionicons name="options-outline" size={18} color={colors.text} />
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.avatarBtnCircle} onPress={toggleTheme}>
-                  <Ionicons name={theme === 'dark' ? 'sunny' : 'moon'} size={18} color={colors.text} />
+                  <Ionicons name="navigate-circle-outline" size={20} color={colors.text} />
               </TouchableOpacity>
               <TouchableOpacity style={styles.avatarBtnCircle} onPress={() => router.push("/(tabs)/profile")}>
                   <Ionicons name="person-outline" size={18} color={colors.text} />
@@ -579,7 +576,7 @@ export default function HomeScreen() {
               scrollEventThrottle={16}
             >
               <ServiceCategory
-                icon="list"
+                icon="clipboard-outline"
                 label="Task"
                 onPress={() => router.push({ pathname: "/service-selection", params: { label: "Task" } })}
               />
@@ -939,16 +936,16 @@ const createStyles = (colors: typeof Colors.light) => StyleSheet.create({
   dishesGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: 8,
+    gap: 6,
   },
   dishChip: {
     flexDirection: "row",
     alignItems: "center",
     backgroundColor: colors.surface,
-    paddingLeft: 6,
-    paddingRight: 12,
-    paddingVertical: 5,
-    borderRadius: 20,
+    paddingLeft: 5,
+    paddingRight: 10,
+    paddingVertical: 4,
+    borderRadius: 18,
     borderWidth: 1.5,
     borderColor: colors.border,
     shadowColor: colors.shadow,
@@ -958,15 +955,15 @@ const createStyles = (colors: typeof Colors.light) => StyleSheet.create({
     elevation: 1.5,
   },
   dishIconCircle: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
+    width: 21,
+    height: 21,
+    borderRadius: 10.5,
     justifyContent: "center",
     alignItems: "center",
-    marginRight: 6,
+    marginRight: 5,
   },
   dishChipText: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: "700",
     color: colors.text,
   },
