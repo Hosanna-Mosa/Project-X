@@ -430,7 +430,7 @@ export default function ServiceSelectionScreen() {
           >
             <Feather name="arrow-left" size={24} color={colors.text} />
           </TouchableOpacity>
-          <Text style={styles.taskHeaderTitle}>Hours book</Text>
+          <Text style={styles.taskHeaderTitle}>Reservation</Text>
           <View style={{ width: 44 }} />
         </View>
 
@@ -443,7 +443,7 @@ export default function ServiceSelectionScreen() {
           >
             {/* Address Selection Card */}
             <View style={styles.taskSectionCard}>
-              <Text style={styles.taskSectionLabel}>SELECT WORK LOCATION</Text>
+              <Text style={styles.taskSectionLabel}>SELECT LOCATION</Text>
               <TouchableOpacity 
                 style={styles.taskAddressBox} 
                 onPress={() => setIsLocationSheetOpen(true)}

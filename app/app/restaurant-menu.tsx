@@ -34,7 +34,7 @@ export default function RestaurantMenu() {
   const insets = useSafeAreaInsets();
   const { theme } = useThemeStore();
   const { setVendorId } = useDeliveryStore();
-  const { items, addItem, updateQuantity, getTotalPrice, getItemCount } = useCartStore();
+  const { items, addItem, updateQuantity, getItemCount } = useCartStore();
   const colors = Colors[theme];
   const [loading, setLoading] = useState(true);
   const [menu, setMenu] = useState<FoodItem[]>([]);
@@ -42,8 +42,6 @@ export default function RestaurantMenu() {
   const scrollY = React.useRef(new Animated.Value(0)).current;
 
   const itemCount = getItemCount();
-  const totalPrice = getTotalPrice();
-
   useEffect(() => {
     if (id) setVendorId(id as string);
   }, [id]);
@@ -222,7 +220,6 @@ export default function RestaurantMenu() {
         <View style={[styles.cartSummary, { bottom: insets.bottom + 20 }]}>
           <View>
             <Text style={styles.cartItems}>{itemCount} {itemCount === 1 ? 'ITEM' : 'ITEMS'} IN CART</Text>
-            <Text style={styles.cartPrice}>₹{totalPrice} plus taxes</Text>
           </View>
           <TouchableOpacity 
             style={styles.viewCartButton}
@@ -442,12 +439,6 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '800',
     opacity: 0.8,
-  },
-  cartPrice: {
-    color: 'white',
-    fontSize: 16,
-    fontWeight: '700',
-    marginTop: 2,
   },
   viewCartButton: {
     backgroundColor: 'rgba(255,255,255,0.15)',
