@@ -38,6 +38,8 @@ export default function VendorDashboard() {
   const isMeatVendor = vendorData.role === "meat_vendor";
   const [selectedOrder, setSelectedOrder] = useState<any | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [scheduledRequest, setScheduledRequest] = useState<any | null>(null);
+  const [isScheduleModalOpen, setIsScheduleModalOpen] = useState(false);
 
   const { data: orders, isLoading: ordersLoading } = useQuery({
     queryKey: ["vendor-orders", vendorData._id],
@@ -50,6 +52,28 @@ export default function VendorDashboard() {
     queryFn: () => adminFetch<any[]>(isMeatVendor ? `/meat/menu/${vendorData._id}` : `/food/vendor/${vendorData._id}`),
     enabled: !!vendorData._id
   });
+
+  const respondMutation = useMutation({
+    mutationFn: ({ requestId, accepted }: { requestId: string; accepted: boolean }) =>
+      adminFetch(`/orders/scheduled-delivery/${requestId}/respond`, {
+        method: "PATCH",
+        body: JSON.stringify({ vendorId: vendorData._id, accepted }),
+      }),
+    onSuccess: (_, variables) => {
+      toast.success(variables.accepted ? "Scheduled delivery accepted" : "Scheduled delivery rejected");
+      queryClient.invalidateQueries({ queryKey: ["vendor-scheduled-orders", vendorData._id] });
+      setIsScheduleModalOpen(false);
+      setScheduledRequest(null);
+    },
+    onError: (err: any) => {
+      toast.error(err.message || "Failed to respond to scheduled delivery");
+    },
+  });
+
+  const respondToScheduledDelivery = (accepted: boolean) => {
+    if (!scheduledRequest?.requestId) return;
+    respondMutation.mutate({ requestId: scheduledRequest.requestId, accepted });
+  };
 
   useEffect(() => {
     if (!vendorData._id) return;
@@ -83,12 +107,24 @@ export default function VendorDashboard() {
       }
     };
 
+    const handleScheduledDeliveryRequest = (data: any) => {
+      playChime();
+      setScheduledRequest(data);
+      setIsScheduleModalOpen(true);
+      queryClient.invalidateQueries({ queryKey: ["vendor-scheduled-orders", vendorData._id] });
+      toast.info(`New scheduled delivery request for ${new Date(data.scheduledFor).toLocaleString()}`, {
+        duration: 8000,
+      });
+    };
+
     socketService.on("new_order_vendor", handleNewOrder);
     socketService.on("order_status_update_vendor", handleStatusUpdate);
+    socketService.on("scheduled_delivery_request", handleScheduledDeliveryRequest);
 
     return () => {
       socketService.off("new_order_vendor", handleNewOrder);
       socketService.off("order_status_update_vendor", handleStatusUpdate);
+      socketService.off("scheduled_delivery_request", handleScheduledDeliveryRequest);
     };
   }, [vendorData._id, selectedOrder]);
 
@@ -396,6 +432,63 @@ export default function VendorDashboard() {
                   </Button>
                 </div>
               )}
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={isScheduleModalOpen}
+        onOpenChange={(open) => {
+          setIsScheduleModalOpen(open);
+          if (!open) setScheduledRequest(null);
+        }}
+      >
+        <DialogContent className="max-w-md rounded-3xl">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-bold">Scheduled delivery request</DialogTitle>
+          </DialogHeader>
+
+          {scheduledRequest && (
+            <div className="space-y-5 pt-2">
+              <div className="bg-muted/30 border border-border/50 rounded-2xl p-4 space-y-3">
+                <div className="flex items-center gap-2.5 text-sm">
+                  <User className="h-4 w-4 text-muted-foreground shrink-0" />
+                  <span className="font-semibold text-foreground">{scheduledRequest.customerName || "Customer"}</span>
+                </div>
+                <div className="flex items-center gap-2.5 text-sm">
+                  <Phone className="h-4 w-4 text-muted-foreground shrink-0" />
+                  <span className="text-muted-foreground">{scheduledRequest.customerPhone || "N/A"}</span>
+                </div>
+                <div className="flex items-center gap-2.5 text-sm">
+                  <Clock className="h-4 w-4 text-muted-foreground shrink-0" />
+                  <span className="font-medium text-foreground">
+                    {format(new Date(scheduledRequest.scheduledFor), "EEE, MMM d · hh:mm a")}
+                  </span>
+                </div>
+              </div>
+
+              <p className="text-sm text-muted-foreground">
+                Accept only if your kitchen can prepare and hand off the order at the requested time.
+              </p>
+
+              <div className="flex gap-3">
+                <Button
+                  variant="outline"
+                  onClick={() => respondToScheduledDelivery(false)}
+                  disabled={respondMutation.isPending}
+                  className="flex-1 h-11 rounded-2xl font-bold"
+                >
+                  Reject
+                </Button>
+                <Button
+                  onClick={() => respondToScheduledDelivery(true)}
+                  disabled={respondMutation.isPending}
+                  className="flex-1 h-11 rounded-2xl font-bold bg-primary hover:bg-primary/95"
+                >
+                  {respondMutation.isPending ? "Saving..." : "Accept"}
+                </Button>
+              </div>
             </div>
           )}
         </DialogContent>

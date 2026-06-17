@@ -23,6 +23,12 @@ export interface IAddress {
   };
 }
 
+export interface IBookingPreference {
+  type: "myself" | "someone_else";
+  contactNumber?: string;
+  updatedAt?: Date;
+}
+
 export interface IUser extends Document, IUserMethods {
   name: string;
   username?: string;
@@ -35,6 +41,7 @@ export interface IUser extends Document, IUserMethods {
     coordinates: number[];
   };
   addresses: IAddress[];
+  bookingPreference?: IBookingPreference;
   password?: string;
   createdAt: Date;
   updatedAt: Date;
@@ -82,6 +89,15 @@ const UserSchema: Schema = new Schema(
         },
       },
     ],
+    bookingPreference: {
+      type: {
+        type: String,
+        enum: ["myself", "someone_else"],
+        default: "myself",
+      },
+      contactNumber: { type: String },
+      updatedAt: { type: Date },
+    },
   password: { type: String },
   },
   { timestamps: true }

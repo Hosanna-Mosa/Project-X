@@ -16,6 +16,7 @@ interface Props {
   userLocation?: { lat: number; lng: number } | null;
   onLocationUpdate?: (coords: { lat: number, lng: number }) => void;
   markers?: any[];
+  driverMarkers?: any[];
   initialRegion?: Region;
   onMarkerPress?: (marker: any) => void;
   radiusCenter?: { lat: number; lng: number } | null;
@@ -105,6 +106,7 @@ export const MapBackground = forwardRef<MapBackgroundRef, Props>(({
   mapType = 'standard', 
   stops = [],
   markers = [], 
+  driverMarkers = [],
   initialRegion,
   polyline, 
   driverLocation,
@@ -270,6 +272,23 @@ export const MapBackground = forwardRef<MapBackgroundRef, Props>(({
               tracksViewChanges={true}
             />
           ))}
+
+          {driverMarkers.map((driver) => {
+            const vehicleType = driver.vehicleType || driver.vehicle || "car";
+            const iconName = vehicleType === "bike" ? "navigation" : vehicleType === "auto" ? "truck" : "briefcase";
+            return (
+              <Marker
+                key={driver.id || driver._id}
+                coordinate={{ latitude: driver.lat, longitude: driver.lng }}
+                anchor={{ x: 0.5, y: 0.5 }}
+                tracksViewChanges={false}
+              >
+                <View style={styles.vehicleMarker}>
+                  <Feather name={iconName as any} size={12} color="#111827" />
+                </View>
+              </Marker>
+            );
+          })}
 
           {stops.map((stop, index) => (
             stop.lat && stop.lng && (
@@ -472,6 +491,21 @@ const styles = StyleSheet.create({
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.2,
+    shadowRadius: 3,
+  },
+  vehicleMarker: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    backgroundColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: '#111827',
+    elevation: 5,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.18,
     shadowRadius: 3,
   }
 });

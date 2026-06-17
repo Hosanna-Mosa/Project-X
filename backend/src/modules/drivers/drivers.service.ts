@@ -18,8 +18,8 @@ export interface HighDemandArea {
 export class DriverService {
   private paymentService = new PaymentService();
 
-  async getNearbyDrivers(lat: number, lng: number, radiusInMeters: number = 5000) {
-    return Driver.find({
+  async getNearbyDrivers(lat: number, lng: number, radiusInMeters: number = 5000, vehicleType?: string) {
+    const query: any = {
       status: DriverStatus.ONLINE,
       isAvailable: true,
       currentLocation: {
@@ -31,7 +31,13 @@ export class DriverService {
           $maxDistance: radiusInMeters,
         },
       },
-    }).populate("user");
+    };
+
+    if (vehicleType && ["bike", "auto", "car"].includes(vehicleType)) {
+      query.vehicleType = vehicleType;
+    }
+
+    return Driver.find(query).populate("user");
   }
 
   async updateLocation(driverId: string, lat: number, lng: number) {

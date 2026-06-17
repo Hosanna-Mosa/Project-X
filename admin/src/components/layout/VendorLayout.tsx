@@ -7,7 +7,8 @@ import {
   LogOut,
   Bell,
   Search,
-  Drumstick
+  Drumstick,
+  CalendarClock
 } from "lucide-react";
 import { TopBar } from "./TopBar";
 
@@ -18,6 +19,7 @@ interface VendorLayoutProps {
 
 const navItems = [
   { title: "Dashboard", url: "/vendor/dashboard", icon: LayoutDashboard },
+  { title: "Scheduled Orders", url: "/vendor/scheduled-orders", icon: CalendarClock },
   { title: "Menu Items", url: "/vendor/menu", icon: UtensilsCrossed },
   { title: "Settings", url: "/vendor/settings", icon: Settings },
 ];

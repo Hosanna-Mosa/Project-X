@@ -18,6 +18,7 @@ import MeatPricing from "./pages/MeatPricing";
 import VendorLogin from "./pages/VendorLogin";
 
 import VendorDashboard from "./pages/VendorDashboard";
+import VendorScheduledOrders from "./pages/VendorScheduledOrders";
 import VendorMenu from "./pages/VendorMenu";
 import VendorMeatMenu from "./pages/VendorMeatMenu";
 import VendorSettings from "./pages/VendorSettings";
@@ -57,6 +58,7 @@ const App = () => (
           <Route path="/vendor-login" element={<VendorLogin />} />
 
           <Route path="/vendor/dashboard" element={<VendorDashboard />} />
+          <Route path="/vendor/scheduled-orders" element={<VendorScheduledOrders />} />
           <Route path="/vendor/menu" element={<VendorMenu />} />
           <Route path="/vendor/meat-menu" element={<VendorMeatMenu />} />
           <Route path="/vendor/settings" element={<VendorSettings />} />

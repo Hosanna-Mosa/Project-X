@@ -8,6 +8,10 @@ const ordersController = new OrdersController();
 
 // Create order - simplifying route to / for easier frontend integration
 router.post("/", authenticateToken, ordersController.create.bind(ordersController));
+router.post("/scheduled-delivery-request", authenticateToken, ordersController.requestScheduledDelivery.bind(ordersController));
+router.get("/scheduled-delivery/vendor/:vendorId", ordersController.getVendorScheduledDeliveries.bind(ordersController));
+router.get("/scheduled-delivery/:requestId/status", authenticateToken, ordersController.getScheduledDeliveryStatus.bind(ordersController));
+router.patch("/scheduled-delivery/:requestId/respond", ordersController.respondScheduledDelivery.bind(ordersController));
 router.get("/driver/scheduled", authenticateToken, authorizeRole([UserRole.DRIVER]), ordersController.getDriverScheduledOrders.bind(ordersController));
 router.get("/", authenticateToken, ordersController.getUserOrders.bind(ordersController));
 router.get("/estimate-fare", authenticateToken, ordersController.estimateFare.bind(ordersController));
