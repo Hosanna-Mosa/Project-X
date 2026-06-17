@@ -12,7 +12,8 @@ import {
   Animated,
   Easing,
   Alert,
-  Dimensions,
+  Modal,
+  KeyboardAvoidingView,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather, FontAwesome5, Ionicons } from "@expo/vector-icons";
@@ -27,7 +28,7 @@ import { LocationPickerSheet } from "@/components/LocationPickerSheet";
 import { socketService } from "@/utils/socketService";
 import { useDeliveryStore } from "@/contexts/deliveryStore";
 
-const { height: SCREEN_HEIGHT } = Dimensions.get("window");
+const MIN_CUSTOM_PRICE = 50;
 
 export default function ServiceSelectionScreen() {
   const insets = useSafeAreaInsets();
@@ -58,9 +59,12 @@ export default function ServiceSelectionScreen() {
   const [bookingState, setBookingState] = useState<"idle" | "booking" | "success">("idle");
   const [searchingStatus, setSearchingStatus] = useState<string>("Initializing booking...");
   const [driverLocation, setDriverLocation] = useState<{ lat: number; lng: number } | null>(null);
-  const [showFareBreakdown, setShowFareBreakdown] = useState(false);
   const [currentOrderId, setCurrentOrderId] = useState<string | null>(null);
   const [driverInfo, setDriverInfo] = useState<any>(null);
+  const [showPriceSheet, setShowPriceSheet] = useState(false);
+  const [customPrice, setCustomPrice] = useState<number | null>(null);
+  const [priceInputText, setPriceInputText] = useState("");
+  const [nearbyDrivers, setNearbyDrivers] = useState<any[]>([]);
   
   // Staggered animated values for radar pulses
   const pulse1 = useRef(new Animated.Value(0)).current;
@@ -177,6 +181,42 @@ export default function ServiceSelectionScreen() {
     }
   }, [currentOrderId, bookingState]);
 
+  useEffect(() => {
+    if (label !== "Task" || bookingState !== "booking") {
+      setNearbyDrivers([]);
+      return;
+    }
+
+    const coords = getSelectedCoords();
+    if (!coords) return;
+
+    const radius = radiusOption === "custom"
+      ? parseFloat(customRadius) || 2
+      : parseFloat(radiusOption) || 2;
+    const radiusMeters = Math.round(radius * 1000);
+
+    const loadNearbyDrivers = async () => {
+      try {
+        const drivers = await customFetch<any[]>(
+          `/api/v1/drivers/nearby?latitude=${coords.lat}&longitude=${coords.lng}&radius=${radiusMeters}`,
+          { responseType: "json" },
+        );
+        setNearbyDrivers((drivers || []).map((driver) => ({
+          id: driver._id || driver.id,
+          vehicleType: driver.vehicleType || "car",
+          lat: driver.currentLocation?.coordinates?.[1],
+          lng: driver.currentLocation?.coordinates?.[0],
+        })).filter((driver) => Number.isFinite(driver.lat) && Number.isFinite(driver.lng)));
+      } catch (error) {
+        console.warn("Unable to load nearby online drivers for helper search", error);
+      }
+    };
+
+    loadNearbyDrivers();
+    const interval = setInterval(loadNearbyDrivers, 12000);
+    return () => clearInterval(interval);
+  }, [label, bookingState, selectedAddress, radiusOption, customRadius]);
+
   const [secondsRemaining, setSecondsRemaining] = useState<number>(0);
 
   // Initialize countdown when success occurs
@@ -226,14 +266,16 @@ export default function ServiceSelectionScreen() {
         { address: selectedAddress.label || selectedAddress.addressLine || "Location", latitude: selectedCoords?.lat, longitude: selectedCoords?.lng, type: "pickup" }
       ];
       const fare = calculateFareDetails();
+      const selectedPrice = customPrice || fare.total;
       const res = await customFetch<{ _id: string }>("/api/v1/orders", {
         method: "POST",
         body: JSON.stringify({
           stops: orderStops,
           serviceType: "helper",
-          totals: { total: fare.total, subtotal: fare.baseFare },
+          totals: { total: selectedPrice, subtotal: fare.baseFare },
           radius: fare.radius,
           duration: fare.hours,
+          customerPrice: selectedPrice,
         })
       });
       setCurrentOrderId(res._id);
@@ -371,6 +413,23 @@ export default function ServiceSelectionScreen() {
     const finalRadius = radiusOption === "custom" ? customRadius || "Custom" : radiusOption;
     const selectedCoords = getSelectedCoords();
     const fareDetails = calculateFareDetails();
+    const baseFare = fareDetails.total;
+    const activeFare = customPrice ?? baseFare;
+
+    const openPriceSheet = () => {
+      setPriceInputText(String(customPrice ?? baseFare));
+      setShowPriceSheet(true);
+    };
+
+    const applyPriceInput = () => {
+      const parsed = Number.parseInt(priceInputText.replace(/\D/g, ""), 10);
+      if (!Number.isFinite(parsed) || parsed < MIN_CUSTOM_PRICE) {
+        Alert.alert("Invalid price", `Enter a price of at least ₹${MIN_CUSTOM_PRICE}.`);
+        return;
+      }
+      setCustomPrice(parsed);
+      setShowPriceSheet(false);
+    };
 
     return (
       <View style={styles.root}>
@@ -382,6 +441,7 @@ export default function ServiceSelectionScreen() {
               style={StyleSheet.absoluteFill} 
               driverLocation={driverLocation}
               userLocation={selectedCoords}
+              driverMarkers={nearbyDrivers}
               radiusCenter={selectedCoords}
               radiusMeters={fareDetails.radius * 1000}
               initialRegion={selectedCoords ? {
@@ -594,60 +654,30 @@ export default function ServiceSelectionScreen() {
 
             {/* Estimated Fare Card */}
             <View style={styles.taskSectionCard}>
-              <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
-                <View>
-                  <Text style={styles.taskSectionLabel}>ESTIMATED FARE</Text>
-                  <Text style={{ fontSize: 24, fontWeight: "900", color: colors.text }}>₹{fareDetails.total}</Text>
+              <View style={styles.fareHeaderRow}>
+                <View style={styles.fareTextCol}>
+                  <Text style={styles.fareSectionLabel}>ESTIMATED FARE</Text>
+                  <Text style={styles.estimatedFareValue}>₹{activeFare}</Text>
                 </View>
-                <TouchableOpacity 
-                  style={{ 
-                    flexDirection: "row", 
-                    alignItems: "center", 
-                    backgroundColor: colors.surfaceSecondary, 
-                    paddingHorizontal: 12, 
-                    paddingVertical: 6, 
-                    borderRadius: 8 
-                  }}
-                  onPress={() => setShowFareBreakdown(!showFareBreakdown)}
+                <TouchableOpacity
+                  style={styles.inlineBookButton}
+                  onPress={handleBook}
                   activeOpacity={0.8}
                 >
-                  <Text style={{ fontSize: 13, fontWeight: "700", color: colors.primary, marginRight: 4 }}>
-                    {showFareBreakdown ? "Hide Details" : "View Bill"}
-                  </Text>
-                  <Feather name={showFareBreakdown ? "chevron-up" : "chevron-down"} size={16} color={colors.primary} />
+                  <Text style={styles.inlineBookButtonText}>Book Helper</Text>
+                  <Feather name="arrow-right" size={14} color={colors.surface} />
                 </TouchableOpacity>
               </View>
 
-              {showFareBreakdown && (
-                <View style={{ marginTop: 14, borderTopWidth: 1, borderColor: colors.borderLight, paddingTop: 14, gap: 10 }}>
-                  <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
-                    <Text style={{ fontSize: 13, color: colors.textSecondary, fontWeight: "500" }}>Base Reservation Fee</Text>
-                    <Text style={{ fontSize: 13, color: colors.text, fontWeight: "700" }}>₹{fareDetails.baseFare}</Text>
-                  </View>
-                  <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
-                    <Text style={{ fontSize: 13, color: colors.textSecondary, fontWeight: "500" }}>
-                      Duration Charge ({fareDetails.hours} {fareDetails.hours === 1 ? "hr" : "hrs"} @ ₹120/hr)
-                    </Text>
-                    <Text style={{ fontSize: 13, color: colors.text, fontWeight: "700" }}>₹{fareDetails.durationCharge}</Text>
-                  </View>
-                  <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
-                    <Text style={{ fontSize: 13, color: colors.textSecondary, fontWeight: "500" }}>
-                      Travel Radius Allowance ({fareDetails.radius} km)
-                    </Text>
-                    <Text style={{ fontSize: 13, color: colors.text, fontWeight: "700" }}>₹{fareDetails.radiusCharge}</Text>
-                  </View>
-                  <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
-                    <Text style={{ fontSize: 13, color: colors.textSecondary, fontWeight: "500" }}>Platform Fee</Text>
-                    <Text style={{ fontSize: 13, color: colors.text, fontWeight: "700" }}>₹{fareDetails.platformFee}</Text>
-                  </View>
-                  <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
-                    <Text style={{ fontSize: 13, color: colors.textSecondary, fontWeight: "500" }}>Taxes & GST (5%)</Text>
-                    <Text style={{ fontSize: 13, color: colors.text, fontWeight: "700" }}>₹{fareDetails.taxes}</Text>
-                  </View>
-                </View>
-              )}
+              <TouchableOpacity
+                style={styles.changePriceButton}
+                onPress={openPriceSheet}
+                activeOpacity={0.85}
+              >
+                <Feather name="sliders" size={14} color={colors.primary} />
+                <Text style={styles.changePriceText}>Change price</Text>
+              </TouchableOpacity>
             </View>
-
             {/* Information Card */}
             <View style={styles.infoCard}>
               <Ionicons name="information-circle-outline" size={20} color={colors.textSecondary} />
@@ -656,15 +686,6 @@ export default function ServiceSelectionScreen() {
               </Text>
             </View>
 
-            {/* Book Button */}
-            <TouchableOpacity 
-              style={styles.bookButton} 
-              onPress={handleBook}
-              activeOpacity={0.9}
-            >
-              <Text style={styles.bookButtonText}>Book Helper Now</Text>
-              <Feather name="arrow-right" size={20} color={colors.surface} />
-            </TouchableOpacity>
           </ScrollView>
         ) : (
           /* Second & Third Phase: Bottom Sheet overlays map for finding and success states */
@@ -696,7 +717,7 @@ export default function ServiceSelectionScreen() {
 
                 <View style={styles.sheetRadarDetailsCard}>
                   <Text style={styles.sheetRadarDetailsText}>
-                    Requesting work duration of <Text style={{ fontWeight: '700' }}>{finalDuration} {finalDuration === "1" ? "hour" : "hours"}</Text> within a <Text style={{ fontWeight: '700' }}>{finalRadius} km</Text> radius. Est. Fare: <Text style={{ fontWeight: '700', color: colors.primary }}>₹{fareDetails.total}</Text>
+                    Requesting work duration of <Text style={{ fontWeight: '700' }}>{finalDuration} {finalDuration === "1" ? "hour" : "hours"}</Text> within a <Text style={{ fontWeight: '700' }}>{finalRadius} km</Text> radius. Est. Fare: <Text style={{ fontWeight: '700', color: colors.primary }}>Rs.{activeFare}</Text>
                   </Text>
                 </View>
 
@@ -751,7 +772,7 @@ export default function ServiceSelectionScreen() {
                   <View style={styles.metaDivider} />
                   <View style={styles.successMetaItem}>
                     <Text style={styles.metaItemLabel}>TOTAL FARE</Text>
-                    <Text style={styles.metaItemValue}>₹{fareDetails.total}</Text>
+                    <Text style={styles.metaItemValue}>Rs.{activeFare}</Text>
                   </View>
                   <View style={styles.metaDivider} />
                   <View style={styles.successMetaItem}>
@@ -810,6 +831,54 @@ export default function ServiceSelectionScreen() {
           onClose={() => setIsLocationSheetOpen(false)}
           onSelectAddress={(address) => setSelectedAddress(address)}
         />
+        <Modal
+          visible={showPriceSheet}
+          transparent
+          animationType="slide"
+          onRequestClose={() => setShowPriceSheet(false)}
+        >
+          <KeyboardAvoidingView
+            style={styles.priceSheetOverlay}
+            behavior={Platform.OS === "ios" ? "padding" : "height"}
+          >
+            <TouchableOpacity style={styles.priceSheetScrim} activeOpacity={1} onPress={() => setShowPriceSheet(false)} />
+            <View style={[styles.priceSheet, { paddingBottom: insets.bottom + 24 }]}>
+              <View style={styles.sheetHandle} />
+              <Text style={styles.priceSheetTitle}>Set your offer price</Text>
+              <Text style={styles.priceEstimateSubtext}>Estimated fare ₹{baseFare}</Text>
+
+              <View style={styles.priceInputWrap}>
+                <Text style={styles.priceInputPrefix}>₹</Text>
+                <TextInput
+                  style={styles.priceInput}
+                  value={priceInputText}
+                  onChangeText={(text) => setPriceInputText(text.replace(/[^\d]/g, ""))}
+                  keyboardType="number-pad"
+                  placeholder={String(baseFare)}
+                  placeholderTextColor={colors.textMuted}
+                  returnKeyType="done"
+                  onSubmitEditing={applyPriceInput}
+                />
+              </View>
+
+              <TouchableOpacity style={styles.priceSheetBookButton} onPress={applyPriceInput} activeOpacity={0.9}>
+                <Text style={styles.priceSheetBookText}>OK</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.priceSheetRemoveButton}
+                onPress={() => {
+                  setCustomPrice(null);
+                  setPriceInputText(String(baseFare));
+                  setShowPriceSheet(false);
+                }}
+                activeOpacity={0.85}
+              >
+                <Feather name="x" size={14} color={colors.text} />
+                <Text style={styles.priceSheetRemoveText}>Use estimated fare</Text>
+              </TouchableOpacity>
+            </View>
+          </KeyboardAvoidingView>
+        </Modal>
       </View>
     );
   }
@@ -1381,6 +1450,152 @@ const createStyles = (colors: typeof Colors.light) => StyleSheet.create({
     color: colors.textSecondary,
     lineHeight: 16,
     fontWeight: "500",
+  },
+  fareHeaderRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    gap: 12,
+  },
+  fareTextCol: {
+    flex: 1,
+  },
+  fareSectionLabel: {
+    fontSize: 9,
+    fontWeight: "800",
+    color: colors.textSecondary,
+    letterSpacing: 0.7,
+    marginBottom: 4,
+  },
+  estimatedFareValue: {
+    fontSize: 17,
+    fontWeight: "800",
+    color: colors.text,
+  },
+  inlineBookButton: {
+    minWidth: 118,
+    height: 38,
+    borderRadius: 10,
+    backgroundColor: colors.primary,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 5,
+    paddingHorizontal: 10,
+  },
+  inlineBookButtonText: {
+    color: colors.surface,
+    fontSize: 12,
+    fontWeight: "800",
+  },
+  changePriceButton: {
+    marginTop: 12,
+    height: 36,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surfaceSecondary,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+  },
+  changePriceText: {
+    color: colors.primary,
+    fontSize: 13,
+    fontWeight: "800",
+  },
+  priceSheetOverlay: {
+    flex: 1,
+    justifyContent: "flex-end",
+  },
+  priceSheetScrim: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(15, 23, 42, 0.58)",
+  },
+  priceSheet: {
+    backgroundColor: colors.surface,
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    paddingTop: 10,
+    paddingHorizontal: 20,
+    gap: 16,
+  },
+  sheetHandle: {
+    alignSelf: "center",
+    width: 46,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: colors.border,
+    marginBottom: 4,
+  },
+  priceSheetTitle: {
+    color: colors.text,
+    fontSize: 20,
+    lineHeight: 26,
+    fontWeight: "900",
+    textAlign: "center",
+  },
+  priceEstimateSubtext: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: colors.textSecondary,
+    textAlign: "center",
+    marginTop: -8,
+  },
+  priceInputWrap: {
+    flexDirection: "row",
+    alignItems: "center",
+    borderRadius: 14,
+    borderWidth: 1.5,
+    borderColor: colors.border,
+    backgroundColor: colors.surfaceSecondary,
+    paddingHorizontal: 16,
+    height: 56,
+    gap: 6,
+  },
+  priceInputPrefix: {
+    fontSize: 22,
+    fontWeight: "900",
+    color: colors.text,
+  },
+  priceInput: {
+    flex: 1,
+    fontSize: 22,
+    fontWeight: "800",
+    color: colors.text,
+    paddingVertical: 0,
+  },
+  priceSheetBookButton: {
+    height: 52,
+    borderRadius: 14,
+    backgroundColor: colors.primary,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 16,
+  },
+  priceSheetBookText: {
+    color: colors.surface,
+    fontSize: 15,
+    fontWeight: "800",
+  },
+  priceSheetRemoveButton: {
+    alignSelf: "center",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
+    marginBottom: 4,
+  },
+  priceSheetRemoveText: {
+    color: colors.text,
+    fontSize: 13,
+    fontWeight: "700",
   },
   bookButton: {
     backgroundColor: colors.primary,

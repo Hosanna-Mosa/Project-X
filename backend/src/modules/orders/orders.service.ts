@@ -3,6 +3,7 @@ import Order, { OrderStatus, ServiceType, StopType } from "../../database/models
 import User from "../../database/models/User";
 import Driver from "../../database/models/Driver";
 import Vendor from "../../database/models/Vendor";
+import ScheduledDeliveryRequest from "../../database/models/ScheduledDeliveryRequest";
 import { RoutingService } from "../routing/routing.service";
 import { PricingService } from "../pricing/pricing.service";
 import { SocketManager } from "../../sockets/socket.manager";
@@ -11,7 +12,7 @@ export class OrdersService {
   private routingService = new RoutingService();
   private pricingService = new PricingService();
 
-  async createOrder(userId: string, stopsData: any[], serviceType?: ServiceType, vendorId?: string, totals?: any, radius?: number, duration?: number, isReserved?: boolean, reservedAt?: Date | string) {
+  async createOrder(userId: string, stopsData: any[], serviceType?: ServiceType, vendorId?: string, totals?: any, radius?: number, duration?: number, isReserved?: boolean, reservedAt?: Date | string, metadata?: any) {
     if (!mongoose.Types.ObjectId.isValid(userId)) {
       throw new Error("Invalid User ID format");
     }
@@ -46,7 +47,16 @@ export class OrdersService {
     let totalPrice: number;
     let priceBreakdown: any;
 
-    if (isRide) {
+    if (metadata?.customerPrice && Number(metadata.customerPrice) > 0) {
+      totalPrice = Math.round(Number(metadata.customerPrice));
+      priceBreakdown = {
+        baseFare: totalPrice,
+        distanceFare: 0,
+        timeFare: 0,
+        surgeMultiplier: 1,
+        total: totalPrice,
+      };
+    } else if (isRide) {
       priceBreakdown = this.pricingService.calculateFareBreakdown(
         effectiveType,
         optimizationResult.totalDistance,
@@ -123,6 +133,9 @@ export class OrdersService {
       stops: orderStops,
       radius,
       duration,
+      customerPrice: metadata?.customerPrice ? Math.round(Number(metadata.customerPrice)) : undefined,
+      bookingFor: metadata?.bookingFor,
+      scheduledDelivery: metadata?.scheduledDelivery,
       isReserved,
       reservedAt: reservedAt ? new Date(reservedAt) : undefined,
       deliveryOtp,
@@ -164,6 +177,9 @@ export class OrdersService {
         duration: duration ? `${duration} hrs` : `${optimizationResult.estimatedTime} min`,
         radius: radius,
         earnings: Math.round(savedOrder.totalPrice * 0.8),
+        customerPrice: savedOrder.customerPrice,
+        bookingFor: savedOrder.bookingFor,
+        scheduledDelivery: savedOrder.scheduledDelivery,
         customerName: user.name || "Customer",
         customerPhone: user.phone || "N/A",
         vendorName,
@@ -196,6 +212,7 @@ export class OrdersService {
           status: savedOrder.status,
           timestamp: savedOrder.createdAt,
           restaurantPickupCode: savedOrder.restaurantPickupCode,
+          scheduledDelivery: savedOrder.scheduledDelivery,
           stops: savedOrder.stops.map(s => ({
             id: (s as any)._id,
             type: s.type.toLowerCase(),
@@ -210,6 +227,124 @@ export class OrdersService {
     }
 
     return result;
+  }
+
+  async requestScheduledDelivery(userId: string, vendorId: string, scheduledFor: Date | string) {
+    if (!mongoose.Types.ObjectId.isValid(userId)) throw new Error("Invalid User ID format");
+    if (!vendorId) throw new Error("Vendor is required");
+
+    const user = await User.findById(userId);
+    const vendor = await Vendor.findById(vendorId);
+    if (!user) throw new Error("User not found");
+    if (!vendor) throw new Error("Vendor not found");
+
+    const requestedAt = new Date(scheduledFor);
+    if (Number.isNaN(requestedAt.getTime()) || requestedAt.getTime() <= Date.now()) {
+      throw new Error("Choose a valid future delivery time");
+    }
+
+    const requestId = `SCH-${Date.now()}-${Math.floor(1000 + Math.random() * 9000)}`;
+    const customerId = user._id.toString();
+
+    const saved = await ScheduledDeliveryRequest.create({
+      requestId,
+      customer: user._id,
+      vendor: vendor._id,
+      customerName: user.name || "Customer",
+      customerPhone: user.phone || "",
+      scheduledFor: requestedAt,
+      status: "pending",
+    });
+
+    const payload = {
+      requestId,
+      vendorId: vendor._id.toString(),
+      customerId,
+      customerName: saved.customerName,
+      customerPhone: saved.customerPhone,
+      scheduledFor: requestedAt.toISOString(),
+      status: "pending",
+    };
+
+    const socketManager = SocketManager.getInstance();
+    if (socketManager) {
+      socketManager.emitToUser(vendor._id.toString(), "scheduled_delivery_request", payload);
+      socketManager.emitToUser(customerId, "scheduled_delivery_pending", payload);
+    }
+
+    return {
+      requestId,
+      vendorId: vendor._id.toString(),
+      customerId,
+      scheduledFor: requestedAt.toISOString(),
+      status: "pending",
+    };
+  }
+
+  async getVendorScheduledDeliveryRequests(vendorId: string) {
+    if (!mongoose.Types.ObjectId.isValid(vendorId)) throw new Error("Invalid vendor ID");
+    const requests = await ScheduledDeliveryRequest.find({ vendor: vendorId })
+      .sort({ createdAt: -1 })
+      .lean();
+    return requests.map((request) => ({
+      requestId: request.requestId,
+      vendorId: request.vendor.toString(),
+      customerId: request.customer.toString(),
+      customerName: request.customerName,
+      customerPhone: request.customerPhone,
+      scheduledFor: request.scheduledFor,
+      status: request.status,
+      respondedAt: request.respondedAt,
+      createdAt: request.createdAt,
+    }));
+  }
+
+  async getScheduledDeliveryRequestStatus(requestId: string, customerId: string) {
+    const request = await ScheduledDeliveryRequest.findOne({ requestId, customer: customerId }).lean();
+    if (!request) throw new Error("Scheduled delivery request not found");
+    return {
+      requestId: request.requestId,
+      vendorId: request.vendor.toString(),
+      customerId: request.customer.toString(),
+      scheduledFor: request.scheduledFor,
+      status: request.status,
+      respondedAt: request.respondedAt,
+    };
+  }
+
+  async respondToScheduledDelivery(requestId: string, vendorId: string, accepted: boolean) {
+    const request = await ScheduledDeliveryRequest.findOne({ requestId, vendor: vendorId });
+    if (!request) throw new Error("Scheduled delivery request not found");
+    if (request.status !== "pending") {
+      throw new Error(`Request already ${request.status}`);
+    }
+
+    request.status = accepted ? "accepted" : "rejected";
+    request.respondedAt = new Date();
+    await request.save();
+
+    const customerId = request.customer.toString();
+    const payload = {
+      requestId: request.requestId,
+      vendorId: request.vendor.toString(),
+      customerId,
+      customerName: request.customerName,
+      customerPhone: request.customerPhone,
+      scheduledFor: request.scheduledFor.toISOString(),
+      accepted,
+      status: request.status,
+    };
+
+    const socketManager = SocketManager.getInstance();
+    if (socketManager) {
+      socketManager.emitToUser(
+        customerId,
+        accepted ? "scheduled_delivery_accepted" : "scheduled_delivery_rejected",
+        payload,
+      );
+    }
+
+    return payload;
   }
 
   async estimateFare(

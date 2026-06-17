@@ -56,6 +56,8 @@ export default function RideConfirmationScreen() {
     dropLat: string;
     dropLng: string;
     stops?: string;
+    bookingForType?: string;
+    riderContact?: string;
   }>();
 
   const { theme } = useThemeStore();
@@ -338,6 +340,7 @@ export default function RideConfirmationScreen() {
     latitude: number;
     longitude: number;
   } | null>(null);
+  const [nearbyDrivers, setNearbyDrivers] = useState<any[]>([]);
   const [mapReady, setMapReady] = useState(false);
   const mapRef = useRef<MapView>(null);
 
@@ -350,6 +353,31 @@ export default function RideConfirmationScreen() {
       return [];
     }
   }, [params.stops]);
+
+  React.useEffect(() => {
+    const loadNearbyDrivers = async () => {
+      if (!Number.isFinite(pickupCoords.latitude) || !Number.isFinite(pickupCoords.longitude)) return;
+      try {
+        const vehicleType = serviceType === "auto" ? "auto" : serviceType === "bike" ? "bike" : "car";
+        const drivers = await customFetch<any[]>(
+          `/api/v1/drivers/nearby?latitude=${pickupCoords.latitude}&longitude=${pickupCoords.longitude}&radius=5000&vehicleType=${vehicleType}`,
+          { responseType: "json" },
+        );
+        setNearbyDrivers((drivers || []).map((driver) => ({
+          id: driver._id || driver.id,
+          vehicleType: driver.vehicleType || vehicleType,
+          lat: driver.currentLocation?.coordinates?.[1],
+          lng: driver.currentLocation?.coordinates?.[0],
+        })).filter((driver) => Number.isFinite(driver.lat) && Number.isFinite(driver.lng)));
+      } catch (error) {
+        console.warn("Unable to load nearby online drivers", error);
+      }
+    };
+
+    loadNearbyDrivers();
+    const interval = setInterval(loadNearbyDrivers, 12000);
+    return () => clearInterval(interval);
+  }, [pickupCoords.latitude, pickupCoords.longitude, serviceType]);
 
   const getDisplayName = (addr: string) => {
     if (!addr) return "";
@@ -446,10 +474,21 @@ export default function RideConfirmationScreen() {
           )}
 
           {/* Markers */}
-          {(() => {
-            console.log("[DEBUG] Rendering markers:", { pickupCoords, dropCoords, userLocation });
-            return null;
-          })()}
+          {nearbyDrivers.map((driver) => {
+            const iconName = driver.vehicleType === "bike" ? "motorbike" : driver.vehicleType === "auto" ? "rickshaw" : "car";
+            return (
+              <Marker
+                key={driver.id}
+                coordinate={{ latitude: driver.lat, longitude: driver.lng }}
+                anchor={{ x: 0.5, y: 0.5 }}
+                tracksViewChanges={false}
+              >
+                <View style={styles.vehicleMarker}>
+                  <MaterialCommunityIcons name={iconName as any} size={13} color="#111827" />
+                </View>
+              </Marker>
+            );
+          })}
 
           {/* Pickup Marker */}
           <Marker
@@ -660,6 +699,10 @@ export default function RideConfirmationScreen() {
                       serviceType: serviceType,
                       isReserved,
                       reservedAt: isReserved ? selectedDateTime?.toISOString() : undefined,
+                      bookingFor: {
+                        type: params.bookingForType === "someone_else" ? "someone_else" : "myself",
+                        contactNumber: params.bookingForType === "someone_else" ? params.riderContact : undefined,
+                      },
                     })
                   });
 
@@ -1047,7 +1090,7 @@ const createStyles = (colors: typeof Colors.light, insets: any) =>
       fontWeight: "700",
       color: "#000",
     },
-    ridePrice: { fontSize: 16, fontWeight: "800", color: colors.text },
+    ridePrice: { fontSize: 14, fontWeight: "800", color: colors.text },
     footer: {
       paddingHorizontal: 16,
       paddingTop: 8,
@@ -1484,5 +1527,20 @@ const createStyles = (colors: typeof Colors.light, insets: any) =>
       color: colors.text,
       fontSize: 15,
       fontWeight: "700",
+    },
+    vehicleMarker: {
+      width: 24,
+      height: 24,
+      borderRadius: 12,
+      backgroundColor: "#FFFFFF",
+      alignItems: "center",
+      justifyContent: "center",
+      borderWidth: 1.5,
+      borderColor: "#111827",
+      shadowColor: "#000",
+      shadowOffset: { width: 0, height: 1 },
+      shadowOpacity: 0.12,
+      shadowRadius: 2,
+      elevation: 3,
     },
   });

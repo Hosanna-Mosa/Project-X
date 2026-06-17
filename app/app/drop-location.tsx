@@ -9,6 +9,7 @@ import {
   KeyboardAvoidingView,
   ActivityIndicator,
   Modal,
+  TextInput,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
@@ -19,6 +20,7 @@ import { Alert } from "react-native";
 import Colors from "@/constants/colors";
 import { useThemeStore } from "@/contexts/themeStore";
 import { customFetch } from "@/utils/api/custom-fetch";
+import { useAuthStore } from "@/contexts/authStore";
 
 const FAMOUS_PLACES = [
   { id: "1", name: "RTC Complex", address: "RTC Complex Internal Rd, Rajahmundry", icon: "history", lat: 17.0052, lng: 81.7778 },
@@ -48,11 +50,31 @@ export default function LocationSelectionScreen() {
   const { theme } = useThemeStore();
   const colors = Colors[theme];
   const styles = React.useMemo(() => createStyles(colors), [theme]);
+  const { user } = useAuthStore();
 
   const [pickup, setPickup] = useState<any>(null);
   const [drop, setDrop] = useState<any>(null);
   const [stops, setStops] = useState<any[]>([]);
   const [showBookingForSheet, setShowBookingForSheet] = useState(false);
+  const [bookingFor, setBookingFor] = useState<"myself" | "someone_else">("myself");
+  const [someoneContact, setSomeoneContact] = useState("");
+
+  useEffect(() => {
+    if (!user?.id) return;
+    (async () => {
+      try {
+        const profile = await customFetch<any>("/api/v1/users/profile");
+        if (profile?.bookingPreference?.type) {
+          setBookingFor(profile.bookingPreference.type);
+          if (profile.bookingPreference.contactNumber) {
+            setSomeoneContact(profile.bookingPreference.contactNumber);
+          }
+        }
+      } catch {
+        // Profile preference is optional
+      }
+    })();
+  }, [user?.id]);
 
   useEffect(() => {
     // Handle initial state from params
@@ -100,6 +122,8 @@ export default function LocationSelectionScreen() {
           dropLat: params.dropLat,
           dropLng: params.dropLng,
           stops: params.stops,
+          bookingForType: bookingFor,
+          riderContact: someoneContact,
         }
       });
     }
@@ -182,6 +206,8 @@ export default function LocationSelectionScreen() {
                 dropLat: currentDrop.lat.toString(),
                 dropLng: currentDrop.lng.toString(),
                 stops: JSON.stringify(stops),
+                bookingForType: bookingFor,
+                riderContact: someoneContact,
             } 
         });
     }
@@ -241,6 +267,8 @@ export default function LocationSelectionScreen() {
               dropLat: drop.lat.toString(),
               dropLng: drop.lng.toString(),
               stops: JSON.stringify(stops),
+              bookingForType: bookingFor,
+              riderContact: someoneContact,
             }
           });
         }
@@ -266,7 +294,7 @@ export default function LocationSelectionScreen() {
           <Text style={styles.headerTitle}>Drop</Text>
         </View>
         <TouchableOpacity style={styles.forMeSelector} onPress={() => setShowBookingForSheet(true)}>
-          <Text style={styles.forMeText}>For me</Text>
+          <Text style={styles.forMeText}>{bookingFor === "myself" ? "For me" : "Someone else"}</Text>
           <Ionicons name="chevron-down" size={18} color={colors.text} />
         </TouchableOpacity>
       </View>
@@ -473,20 +501,39 @@ export default function LocationSelectionScreen() {
           <View style={styles.sheetHandle} />
           <Text style={styles.sheetTitle}>Booking ride for</Text>
 
-          <View style={styles.bookingOption}>
+            <TouchableOpacity style={styles.bookingOption} onPress={() => setBookingFor("myself")} activeOpacity={0.85}>
+              <View style={styles.optionLeft}>
+                <MaterialCommunityIcons name="account-circle-outline" size={23} color="#0F172A" />
+                <Text style={styles.optionText}>Myself</Text>
+              </View>
+              <View style={styles.radioOuter}>
+                {bookingFor === "myself" && <View style={styles.radioInner} />}
+              </View>
+            </TouchableOpacity>
+
+          <TouchableOpacity style={styles.bookingOption} onPress={() => setBookingFor("someone_else")} activeOpacity={0.85}>
             <View style={styles.optionLeft}>
-              <MaterialCommunityIcons name="account-circle-outline" size={23} color="#0F172A" />
-              <Text style={styles.optionText}>Myself</Text>
+              <MaterialCommunityIcons name="account-plus" size={24} color="#0F172A" />
+              <Text style={styles.optionText}>Someone else</Text>
             </View>
             <View style={styles.radioOuter}>
-              <View style={styles.radioInner} />
+              {bookingFor === "someone_else" && <View style={styles.radioInner} />}
             </View>
-          </View>
-
-          <TouchableOpacity style={styles.addRiderOption} activeOpacity={0.8}>
-            <MaterialCommunityIcons name="account-plus" size={24} color="#0057B8" />
-            <Text style={styles.addRiderText}>Add new rider</Text>
           </TouchableOpacity>
+
+          {bookingFor === "someone_else" && (
+            <View style={styles.contactInputWrap}>
+              <Text style={styles.contactInputLabel}>Contact number</Text>
+              <TextInput
+                style={styles.contactInput}
+                value={someoneContact}
+                onChangeText={(value) => setSomeoneContact(value.replace(/[^0-9+]/g, ""))}
+                keyboardType="phone-pad"
+                placeholder="Enter rider contact number"
+                placeholderTextColor="#94A3B8"
+              />
+            </View>
+          )}
 
           <View style={styles.infoBox}>
             <Ionicons name="information-circle" size={18} color="#64748B" />
@@ -495,7 +542,27 @@ export default function LocationSelectionScreen() {
 
           <TouchableOpacity
             style={styles.doneButton}
-            onPress={() => setShowBookingForSheet(false)}
+            onPress={async () => {
+              if (bookingFor === "someone_else" && someoneContact.trim().length < 10) {
+                Alert.alert("Contact required", "Please enter a valid contact number for the rider.");
+                return;
+              }
+              if (user?.id) {
+                try {
+                  await customFetch("/api/v1/users/booking-preference", {
+                    method: "PATCH",
+                    body: JSON.stringify({
+                      type: bookingFor,
+                      contactNumber: bookingFor === "someone_else" ? someoneContact.trim() : undefined,
+                    }),
+                  });
+                } catch (error: any) {
+                  Alert.alert("Save failed", error.message || "Could not save booking preference.");
+                  return;
+                }
+              }
+              setShowBookingForSheet(false);
+            }}
             activeOpacity={0.9}
           >
             <Text style={styles.doneButtonText}>Done</Text>
@@ -735,7 +802,7 @@ const createStyles = (colors: typeof Colors.light) =>
       borderTopRightRadius: 26,
       paddingTop: 11,
       paddingHorizontal: 19,
-      minHeight: 350,
+      minHeight: 382,
       shadowColor: "#000",
       shadowOffset: { width: 0, height: -4 },
       shadowOpacity: 0.12,
@@ -787,6 +854,26 @@ const createStyles = (colors: typeof Colors.light) =>
       height: 14,
       borderRadius: 7,
       backgroundColor: "#0057A8",
+    },
+    contactInputWrap: {
+      marginBottom: 14,
+      gap: 7,
+    },
+    contactInputLabel: {
+      fontSize: 12,
+      fontWeight: "800",
+      color: "#475569",
+    },
+    contactInput: {
+      height: 46,
+      borderRadius: 12,
+      borderWidth: 1,
+      borderColor: "#CBD5E1",
+      backgroundColor: "#F8FAFC",
+      paddingHorizontal: 12,
+      fontSize: 15,
+      fontWeight: "700",
+      color: "#0F172A",
     },
     addRiderOption: {
       height: 38,

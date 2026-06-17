@@ -45,6 +45,8 @@ export default function PaymentScreen() {
   const taxes = Number(params.taxes || 0);
   const deliveryFee = Number(params.deliveryFee || 0);
   const address = String(params.address || "");
+  const deliveryTiming = String(params.deliveryTiming || "now");
+  const scheduledFor = params.scheduledFor ? String(params.scheduledFor) : "";
   const deliveryAddress = React.useMemo(() => {
     try {
       return params.deliveryAddress ? JSON.parse(String(params.deliveryAddress)) : null;
@@ -124,6 +126,12 @@ export default function PaymentScreen() {
             serviceType: "delivery",
             vendorId,
             totals: { subtotal, taxes, deliveryFee, total },
+            scheduledDelivery: {
+              type: deliveryTiming === "later" ? "later" : "now",
+              requestedAt: deliveryTiming === "later" && scheduledFor ? scheduledFor : undefined,
+              restaurantAccepted: deliveryTiming !== "later" || Boolean(scheduledFor),
+              acceptedAt: deliveryTiming === "later" ? new Date().toISOString() : undefined,
+            },
             stops: [
               {
                 id: "vendor-pickup",

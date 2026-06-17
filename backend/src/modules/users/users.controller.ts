@@ -176,6 +176,41 @@ export class UsersController {
       return res.status(500).json({ message: "Internal server error" });
     }
   }
+
+  async saveBookingPreference(req: AuthRequest, res: Response) {
+    try {
+      const { type, contactNumber } = req.body as {
+        type?: "myself" | "someone_else";
+        contactNumber?: string;
+      };
+
+      if (!type || !["myself", "someone_else"].includes(type)) {
+        return res.status(400).json({ message: "Valid booking type is required." });
+      }
+
+      if (type === "someone_else") {
+        const normalized = String(contactNumber || "").replace(/\D/g, "");
+        if (normalized.length < 10) {
+          return res.status(400).json({ message: "A valid contact number is required for someone else bookings." });
+        }
+      }
+
+      const user = await User.findById(req.user?.userId);
+      if (!user) return res.status(404).json({ message: "User not found" });
+
+      user.bookingPreference = {
+        type,
+        contactNumber: type === "someone_else" ? String(contactNumber || "").replace(/\D/g, "") : undefined,
+        updatedAt: new Date(),
+      };
+      await user.save();
+
+      return res.json({ bookingPreference: user.bookingPreference });
+    } catch (error) {
+      console.error("Save booking preference error:", error);
+      return res.status(500).json({ message: "Internal server error" });
+    }
+  }
 }
 
 

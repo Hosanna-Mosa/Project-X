@@ -49,7 +49,7 @@ router.post("/verify", authenticateToken, async (req: AuthRequest, res: Response
     if (isValid) {
       if (orderData && req.user) {
         // Automatically create order if data provided
-        const { stops, vendorId, serviceType, totals } = orderData;
+        const { stops, vendorId, serviceType, totals, scheduledDelivery } = orderData;
         const effectiveServiceType = Object.values(ServiceType).includes(serviceType)
           ? serviceType
           : ServiceType.DELIVERY;
@@ -59,6 +59,11 @@ router.post("/verify", authenticateToken, async (req: AuthRequest, res: Response
           effectiveServiceType,
           vendorId,
           totals,
+          undefined,
+          undefined,
+          false,
+          undefined,
+          { scheduledDelivery },
         );
         return res.json({ 
           message: "Payment verified and order created", 

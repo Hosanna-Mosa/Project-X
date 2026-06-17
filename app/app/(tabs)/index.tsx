@@ -517,8 +517,8 @@ export default function HomeScreen() {
           <Animated.View style={[styles.headerTopRow, { opacity: topRowOpacity, transform: [{ translateY: headerTopRowTranslateY }] }]}>
             <View style={styles.locationInfoBox}>
               <View style={styles.deliveryTitleRow}>
-                <Ionicons name="location" size={14} color={colors.primary} style={{marginRight: 6}} />
-                <Text style={styles.deliveryTitle}>Delivery</Text>
+                {/* <Ionicons name="location" size={14} color={colors.primary} style={{marginRight: 6}} />
+                <Text style={styles.deliveryTitle}>Delivery</Text> */}
               </View>
               <TouchableOpacity 
                 style={styles.addressSelector} 

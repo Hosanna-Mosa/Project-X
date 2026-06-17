@@ -69,6 +69,17 @@ export interface IOrder extends Omit<Document, "_id"> {
   stops: IStop[];
   radius?: number;
   duration?: number;
+  customerPrice?: number;
+  bookingFor?: {
+    type: "myself" | "someone_else";
+    contactNumber?: string;
+  };
+  scheduledDelivery?: {
+    type: "now" | "later";
+    requestedAt?: Date;
+    restaurantAccepted?: boolean;
+    acceptedAt?: Date;
+  };
   isReserved?: boolean;
   reservedAt?: Date;
   deliveryOtp?: string;
@@ -129,6 +140,24 @@ const OrderSchema: Schema = new Schema(
     stops: [StopSchema],
     radius: { type: Number },
     duration: { type: Number },
+    customerPrice: { type: Number },
+    bookingFor: {
+      type: {
+        type: String,
+        enum: ["myself", "someone_else"],
+        default: "myself",
+      },
+      contactNumber: { type: String },
+    },
+    scheduledDelivery: {
+      type: {
+        type: String,
+        enum: ["now", "later"],
+      },
+      requestedAt: { type: Date },
+      restaurantAccepted: { type: Boolean, default: false },
+      acceptedAt: { type: Date },
+    },
     isReserved: { type: Boolean, default: false },
     reservedAt: { type: Date },
     deliveryOtp: { type: String },

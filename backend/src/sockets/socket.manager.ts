@@ -113,6 +113,21 @@ export class SocketManager {
         }
       });
 
+      socket.on("scheduled_delivery_response", async (data: { requestId: string; customerId: string; vendorId: string; accepted: boolean; scheduledFor?: string }) => {
+        if (!data.customerId || !data.requestId || !data.vendorId) return;
+        try {
+          const { OrdersService } = await import("../modules/orders/orders.service");
+          const ordersService = new OrdersService();
+          await ordersService.respondToScheduledDelivery(data.requestId, data.vendorId, data.accepted);
+        } catch (error) {
+          console.error("[SOCKET] scheduled_delivery_response failed:", error);
+          this.io.to(data.customerId).emit(
+            data.accepted ? "scheduled_delivery_accepted" : "scheduled_delivery_rejected",
+            data,
+          );
+        }
+      });
+
       // CHAT MESSAGES: Forward messages within the order room
       socket.on("send_message", (data: { orderId: string; senderId: string; role: string; text: string; id?: string }) => {
         console.log(`[CHAT] Message in ${data.orderId} from ${data.role}: ${data.text}`);
