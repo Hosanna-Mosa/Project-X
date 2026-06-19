@@ -27,12 +27,14 @@ const OTHER_CITIES = [
 ];
 import { Feather, FontAwesome5 } from "@expo/vector-icons";
 import { useRouter, useLocalSearchParams } from "expo-router";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { customFetch } from "@/utils/api/custom-fetch";
 import { useAuthStore } from "@/contexts/authStore";
 import * as Location from "expo-location";
 import MapView from "react-native-maps";
 
 export default function AddAddressScreen() {
+  const insets = useSafeAreaInsets();
   const router = useRouter();
   const params = useLocalSearchParams();
   const mapRef = useRef<MapView>(null);
@@ -268,7 +270,7 @@ export default function AddAddressScreen() {
       behavior={Platform.OS === "ios" ? "padding" : "height"}
       style={styles.container}
     >
-      <View style={styles.header}>
+      <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
         <TouchableOpacity onPress={() => { step === 2 ? setStep(1) : router.back() }} style={styles.backBtn}>
           <Feather name="arrow-left" size={24} color="#111827" />
         </TouchableOpacity>
@@ -333,7 +335,7 @@ export default function AddAddressScreen() {
               </TouchableOpacity>
             </View>
 
-            <View style={styles.bottomCard}>
+            <View style={[styles.bottomCard, { paddingBottom: insets.bottom + 16 }]}>
               <Text style={styles.cardHeader}>Delivering your order to</Text>
 
               <View style={styles.addressSummaryBox}>
@@ -361,7 +363,7 @@ export default function AddAddressScreen() {
         </View>
       ) : (
         <View style={styles.detailsContainer}>
-          <ScrollView contentContainerStyle={styles.detailsScroll}>
+          <ScrollView contentContainerStyle={[styles.detailsScroll, { paddingBottom: insets.bottom + 110 }]}>
             {/* Address Details Card */}
             <View style={styles.detailsCard}>
               <Text style={styles.cardSectionTitle}>Address details</Text>
@@ -456,7 +458,7 @@ export default function AddAddressScreen() {
           </ScrollView>
 
           {/* Fixed Bottom Next Button */}
-          <View style={styles.fixedBottomBox}>
+          <View style={[styles.fixedBottomBox, { paddingBottom: insets.bottom + 16 }]}>
             <TouchableOpacity 
               style={[styles.nextBtn, loading && { opacity: 0.7 }]} 
               onPress={handleSave}
@@ -488,7 +490,7 @@ export default function AddAddressScreen() {
                 onChangeText={setCitySearchQuery}
               />
             </View>
-            <ScrollView showsVerticalScrollIndicator={false}>
+            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: insets.bottom + 20 }}>
               {citySearchQuery.length === 0 && (
                 <>
                   <Text style={styles.modalSectionTitle}>Top cities</Text>
@@ -533,7 +535,7 @@ export default function AddAddressScreen() {
                 autoFocus
               />
             </View>
-            <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false}>
+            <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: insets.bottom + 20 }}>
               {searchResults.map(item => (
                   <TouchableOpacity key={item.id} style={styles.otherCityRow} onPress={() => handleSelectAreaSearchResultModal(item)}>
                     <View style={{flexDirection:'row', alignItems:'center'}}>

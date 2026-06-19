@@ -82,7 +82,7 @@ export default function SavedAddressesScreen() {
         <Text style={styles.headerTitle}>Saved Addresses</Text>
       </View>
 
-      <ScrollView contentContainerStyle={styles.container}>
+      <ScrollView contentContainerStyle={[styles.container, { paddingBottom: insets.bottom + 20 }]}>
         <TouchableOpacity 
           style={styles.addBtn}
           onPress={() => router.push("/delivery/add-address")}

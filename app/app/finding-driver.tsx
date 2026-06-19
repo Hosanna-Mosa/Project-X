@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { View, Text, StyleSheet, Animated, Alert, TouchableOpacity, Dimensions } from "react-native";
 import { useLocalSearchParams, router } from "expo-router";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Colors from "@/constants/colors";
 import { useThemeStore } from "@/contexts/themeStore";
 import { socketService } from "@/utils/socketService";
@@ -10,6 +11,7 @@ import { customFetch } from "@/utils/api/custom-fetch";
 import { MapBackground } from "@/components/MapBackground";
 
 export default function FindingDriverScreen() {
+  const insets = useSafeAreaInsets();
   const { orderId, isReserved, dateTimeStr } = useLocalSearchParams<{ orderId: string; isReserved?: string; dateTimeStr?: string }>();
   const { theme } = useThemeStore();
   const colors = Colors[theme];
@@ -250,7 +252,7 @@ export default function FindingDriverScreen() {
     }
 
     return (
-      <View style={[styles.container, { backgroundColor: colors.background }]}>
+      <View style={[styles.container, { backgroundColor: colors.background, paddingTop: insets.top, paddingBottom: insets.bottom }]}>
         <Ionicons name="checkmark-circle" size={100} color={colors.primary} style={{ marginBottom: 20 }} />
         <Text style={{ color: colors.text, fontSize: 26, fontWeight: "bold" }}>Booking Confirmed!</Text>
         <Text style={{ color: colors.textSecondary, textAlign: "center", marginHorizontal: 30, marginBottom: 40, marginTop: 15, fontSize: 16, lineHeight: 24 }}>
