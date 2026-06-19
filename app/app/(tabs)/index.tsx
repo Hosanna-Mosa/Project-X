@@ -13,6 +13,8 @@ import {
   Easing,
   Modal,
   KeyboardAvoidingView,
+  PanResponder,
+  Dimensions,
   type ViewStyle,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -27,6 +29,7 @@ import { LocationPickerSheet } from "@/components/LocationPickerSheet";
 import { RestaurantListItem } from "@/components/RestaurantListItem";
 
 import { useAuthStore } from "@/contexts/authStore";
+import { useCartStore } from "@/contexts/cartStore";
 
 const FESTIVALS: { [key: string]: string } = {
   "01-01": "New Year's Day",
@@ -150,6 +153,17 @@ export default function HomeScreen() {
   const searchGlowSpin = useRef(new Animated.Value(0)).current;
   const searchGlowOpacity = useRef(new Animated.Value(0)).current;
   const searchGlowLoop = useRef<Animated.CompositeAnimation | null>(null);
+
+  const isHoveringSearch = useCartStore((s) => s.isHoveringSearch);
+  const searchBarScale = useRef(new Animated.Value(1)).current;
+
+  useEffect(() => {
+    Animated.spring(searchBarScale, {
+      toValue: isHoveringSearch ? 1.06 : 1.0,
+      friction: 5,
+      useNativeDriver: true,
+    }).start();
+  }, [isHoveringSearch]);
 
   const user = useAuthStore((s) => s.user);
   const userName = user?.name ? user.name.split(" ")[0] : "Uttej";
@@ -626,13 +640,23 @@ export default function HomeScreen() {
         </Animated.View>
       </View>
 
-      <View style={[styles.bottomSearchOverlay, { bottom: insets.bottom + 18 }]}>
-        <View style={styles.searchGlowShell}>
+      <View style={[styles.bottomSearchOverlay, { bottom: insets.bottom + 18 }]} pointerEvents="box-none">
+        {/* Search Bar Dropzone */}
+        <Animated.View
+          style={[
+            styles.searchGlowShell,
+            {
+              transform: [{ scale: searchBarScale }],
+              borderColor: isHoveringSearch ? (theme === 'light' ? '#0F172A' : '#FFFFFF') : colors.border,
+              borderWidth: isHoveringSearch ? 2.5 : 2,
+            },
+          ]}
+        >
           <Animated.View
             style={[
               styles.searchGlowLayer,
               {
-                opacity: searchGlowOpacity,
+                opacity: isHoveringSearch ? 1 : searchGlowOpacity,
                 transform: [{ rotate: searchGlowRotate }],
               },
             ]}
@@ -654,7 +678,7 @@ export default function HomeScreen() {
               onChangeText={setSearchText}
             />
           </View>
-        </View>
+        </Animated.View>
       </View>
 
       <LocationPickerSheet 
@@ -1069,6 +1093,7 @@ const createStyles = (colors: typeof Colors.light) => StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 20,
     elevation: 10,
+    zIndex: 10,
   },
   searchGlowLayer: {
     position: "absolute",

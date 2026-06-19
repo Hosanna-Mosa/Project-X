@@ -11,7 +11,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
-import { ActivityIndicator } from "react-native";
+import { ActivityIndicator, Animated, Dimensions } from "react-native";
 import Colors from "@/constants/colors";
 import { useDeliveryStore } from "@/contexts/deliveryStore";
 import { useThemeStore } from "@/contexts/themeStore";
@@ -43,6 +43,54 @@ export default function TrackingScreen() {
   const [driverLocation, setDriverLocation] = useState<{ lat: number, lng: number } | null>(null);
   const [radius, setRadius] = useState<number | null>(null);
   const mapRef = React.useRef<MapBackgroundRef>(null);
+
+  const animatedProgress = React.useRef(new Animated.Value(0)).current;
+  const pulse1 = React.useRef(new Animated.Value(0)).current;
+  const pulse2 = React.useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    if (!driver) {
+      const anim = Animated.loop(
+        Animated.timing(animatedProgress, {
+          toValue: 1,
+          duration: 2000,
+          useNativeDriver: true,
+        })
+      );
+      anim.start();
+
+      const createPulse = (value: Animated.Value, delay: number) => {
+        return Animated.loop(
+          Animated.sequence([
+            Animated.delay(delay),
+            Animated.timing(value, {
+              toValue: 1,
+              duration: 2000,
+              useNativeDriver: true,
+            }),
+          ])
+        );
+      };
+
+      const anim1 = createPulse(pulse1, 0);
+      const anim2 = createPulse(pulse2, 1000);
+
+      anim1.start();
+      anim2.start();
+
+      return () => {
+        anim.stop();
+        anim1.stop();
+        anim2.stop();
+      };
+    }
+  }, [driver]);
+
+  const screenWidth = Dimensions.get("window").width;
+  const translateX = animatedProgress.interpolate({
+    inputRange: [0, 1],
+    outputRange: [-120, screenWidth],
+  });
 
   useEffect(() => {
     if (params.orderId && params.orderId !== currentOrderId) {
@@ -336,16 +384,64 @@ export default function TrackingScreen() {
           {!driver ? (
             <View style={styles.findingDriverContainer}>
               <View style={styles.radarContainer}>
-                <View style={styles.radarCircle} />
-                <Feather name="search" size={30} color={colors.primary} />
+                <Animated.View 
+                  style={[
+                    styles.radarCircle, 
+                    { 
+                      borderColor: colors.primary, 
+                      transform: [{
+                        scale: pulse1.interpolate({
+                          inputRange: [0, 1],
+                          outputRange: [1, 2.2],
+                        })
+                      }], 
+                      opacity: pulse1.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: [0.5, 0],
+                      })
+                    }
+                  ]} 
+                />
+                <Animated.View 
+                  style={[
+                    styles.radarCircle, 
+                    { 
+                      borderColor: colors.primary, 
+                      transform: [{
+                        scale: pulse2.interpolate({
+                          inputRange: [0, 1],
+                          outputRange: [1, 2.2],
+                        })
+                      }], 
+                      opacity: pulse2.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: [0.5, 0],
+                      })
+                    }
+                  ]} 
+                />
+                <View style={[styles.radarCenter, { backgroundColor: colors.primary }]}>
+                  <Feather name="search" size={24} color={colors.background} />
+                </View>
               </View>
+
               <Text style={styles.findingTitle}>
                 {isRide ? "Finding your captain..." : (isHelper ? "Finding your helper..." : "Finding your delivery partner...")}
               </Text>
               <Text style={styles.findingSubtitle}>
-                {isRide ? "We're connecting you with the nearest captain." : (isHelper ? "We're connecting you with the nearest professional helper." : "We're connecting you with the nearest professional driver.")}
+                {isRide ? "Scanning nearby captains within your surroundings..." : (isHelper ? "Connecting with qualified task specialists..." : "Scanning nearby delivery partners in your area...")}
               </Text>
-              <ActivityIndicator color={colors.primary} style={{ marginTop: 24 }} />
+
+              <View style={styles.progressTrack}>
+                <Animated.View
+                  style={[
+                    styles.progressBarActive,
+                    {
+                      transform: [{ translateX }],
+                    },
+                  ]}
+                />
+              </View>
             </View>
           ) : (
             <>
@@ -494,24 +590,54 @@ const createStyles = (colors: typeof Colors.light) => StyleSheet.create({
     paddingVertical: 40,
     alignItems: 'center',
     justifyContent: 'center',
+    width: '100%',
+    paddingHorizontal: 24,
   },
   radarContainer: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: `${colors.primary}15`,
+    width: 120,
+    height: 120,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 20,
+    marginBottom: 24,
+    position: 'relative',
   },
   radarCircle: {
     position: 'absolute',
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    borderWidth: 2,
+  },
+  radarCenter: {
     width: 60,
     height: 60,
     borderRadius: 30,
-    borderWidth: 2,
-    borderColor: colors.primary,
-    opacity: 0.3,
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 10,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  progressTrack: {
+    height: 4,
+    width: '100%',
+    borderRadius: 2,
+    backgroundColor: colors.borderLight,
+    overflow: "hidden",
+    position: "relative",
+    marginTop: 24,
+  },
+  progressBarActive: {
+    position: "absolute",
+    left: 0,
+    top: 0,
+    bottom: 0,
+    width: 120,
+    backgroundColor: colors.primary,
+    borderRadius: 2,
   },
   findingTitle: {
     fontSize: 20,

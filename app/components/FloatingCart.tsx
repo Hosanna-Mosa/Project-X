@@ -12,6 +12,7 @@ import Animated, {
   useAnimatedStyle,
   withSpring,
   withTiming,
+  runOnJS,
 } from 'react-native-reanimated';
 import {
   Gesture,
@@ -32,7 +33,7 @@ export function FloatingCart() {
   const insets = useSafeAreaInsets();
   const { theme } = useThemeStore();
   const colors = Colors[theme];
-  const { getItemCount } = useCartStore();
+  const { getItemCount, setIsHoveringSearch } = useCartStore();
   const { token } = useAuthStore();
   const segments = useSegments();
   const pathname = usePathname();
@@ -64,6 +65,17 @@ export function FloatingCart() {
   const scale = useSharedValue(0);
 
   const context = useSharedValue({ x: initialX, y: restingY });
+  const isHoveringSearchShared = useSharedValue(false);
+
+  const navigateToCart = () => {
+    router.push('/cart');
+    // Reset scale and position for when the user navigates back
+    setTimeout(() => {
+      scale.value = 1;
+      translateX.value = initialX;
+      translateY.value = restingY;
+    }, 400);
+  };
 
   useEffect(() => {
     if (shouldShow) {
@@ -86,16 +98,52 @@ export function FloatingCart() {
     .onUpdate((event) => {
       translateX.value = context.value.x + event.translationX;
       translateY.value = context.value.y + event.translationY;
+
+      // Check if on Home Screen
+      const isHomeScreen = pathname === '/' || pathname === '/index' || ((segments as string[]).includes('(tabs)') && (segments as string[]).includes('index'));
+      if (isHomeScreen) {
+        const currentX = translateX.value + BUTTON_SIZE / 2;
+        const currentY = translateY.value + BUTTON_SIZE / 2;
+        const searchBarX = SCREEN_WIDTH / 2;
+        const searchBarY = SCREEN_HEIGHT - insets.bottom - 46;
+
+        const dx = currentX - searchBarX;
+        const dy = currentY - searchBarY;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+
+        const hovering = dist < 70;
+        if (hovering !== isHoveringSearchShared.value) {
+          isHoveringSearchShared.value = hovering;
+          runOnJS(setIsHoveringSearch)(hovering);
+        }
+      }
     })
     .onEnd(() => {
-      // Keep within bounds
-      if (translateX.value < 10) translateX.value = withSpring(10);
-      if (translateX.value > SCREEN_WIDTH - BUTTON_SIZE - 10) {
-        translateX.value = withSpring(SCREEN_WIDTH - BUTTON_SIZE - 10);
-      }
-      if (translateY.value < insets.top + 10) translateY.value = withSpring(insets.top + 10);
-      if (translateY.value > SCREEN_HEIGHT - insets.bottom - BUTTON_SIZE - 10) {
-        translateY.value = withSpring(SCREEN_HEIGHT - insets.bottom - BUTTON_SIZE - 10);
+      if (isHoveringSearchShared.value) {
+        runOnJS(setIsHoveringSearch)(false);
+        isHoveringSearchShared.value = false;
+
+        // Swallow animation: center the button and scale it to 0
+        const targetX = (SCREEN_WIDTH - BUTTON_SIZE) / 2;
+        const targetY = SCREEN_HEIGHT - insets.bottom - 46 - (BUTTON_SIZE / 2);
+
+        translateX.value = withTiming(targetX, { duration: 200 });
+        translateY.value = withTiming(targetY, { duration: 200 });
+        scale.value = withTiming(0, { duration: 250 }, (finished) => {
+          if (finished) {
+            runOnJS(navigateToCart)();
+          }
+        });
+      } else {
+        // Keep within bounds
+        if (translateX.value < 10) translateX.value = withSpring(10);
+        if (translateX.value > SCREEN_WIDTH - BUTTON_SIZE - 10) {
+          translateX.value = withSpring(SCREEN_WIDTH - BUTTON_SIZE - 10);
+        }
+        if (translateY.value < insets.top + 10) translateY.value = withSpring(insets.top + 10);
+        if (translateY.value > SCREEN_HEIGHT - insets.bottom - BUTTON_SIZE - 10) {
+          translateY.value = withSpring(SCREEN_HEIGHT - insets.bottom - BUTTON_SIZE - 10);
+        }
       }
     });
 
