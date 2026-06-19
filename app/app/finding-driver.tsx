@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { View, Text, StyleSheet, Animated, Alert, TouchableOpacity } from "react-native";
 import { useLocalSearchParams, router } from "expo-router";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Colors from "@/constants/colors";
 import { useThemeStore } from "@/contexts/themeStore";
 import { socketService } from "@/utils/socketService";
@@ -9,6 +10,7 @@ import { useDeliveryStore } from "@/contexts/deliveryStore";
 import { customFetch } from "@/utils/api/custom-fetch";
 
 export default function FindingDriverScreen() {
+  const insets = useSafeAreaInsets();
   const { orderId, isReserved, dateTimeStr } = useLocalSearchParams<{ orderId: string; isReserved?: string; dateTimeStr?: string }>();
   const { theme } = useThemeStore();
   const colors = Colors[theme];
@@ -203,7 +205,7 @@ export default function FindingDriverScreen() {
     }
 
     return (
-      <View style={[styles.container, { backgroundColor: colors.background }]}>
+      <View style={[styles.container, { backgroundColor: colors.background, paddingTop: insets.top, paddingBottom: insets.bottom }]}>
         <Ionicons name="checkmark-circle" size={100} color={colors.primary} style={{ marginBottom: 20 }} />
         <Text style={[styles.text, { color: colors.text, fontSize: 26, fontWeight: "bold" }]}>Booking Confirmed!</Text>
         <Text style={{ color: colors.textSecondary, textAlign: "center", marginHorizontal: 30, marginBottom: 40, marginTop: 15, fontSize: 16, lineHeight: 24 }}>
@@ -228,7 +230,7 @@ export default function FindingDriverScreen() {
   }
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
+    <View style={[styles.container, { backgroundColor: colors.background, paddingTop: insets.top, paddingBottom: insets.bottom }]}>
       <View style={styles.radarContainer}>
         <Animated.View 
           style={[
@@ -248,7 +250,7 @@ export default function FindingDriverScreen() {
         {isReserved === "true" ? "Finding a captain for your reservation..." : "Finding your driver..."}
       </Text>
       
-      <View style={styles.cancelButtonContainer}>
+      <View style={[styles.cancelButtonContainer, { bottom: insets.bottom + 20 }]}>
          <Text style={[styles.cancelText, { color: colors.error }]} onPress={handleCancel}>Cancel Request</Text>
       </View>
     </View>
