@@ -7,6 +7,7 @@ import {
   Text,
   TouchableOpacity,
   View,
+  Animated,
 } from "react-native";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
@@ -57,6 +58,47 @@ export default function RideSearchingScreen() {
   const styles = React.useMemo(() => createStyles(colors, insets), [colors, insets]);
   const { currentOrderId, setOrderId: setCurrentOrderId, setServiceType: setGlobalServiceType, setDriver: setGlobalDriver, setStatus: setGlobalStatus } = useDeliveryStore();
   const mapRef = React.useRef<MapView>(null);
+
+  const animatedProgress = React.useRef(new Animated.Value(0)).current;
+  const dotOpacity = React.useRef(new Animated.Value(1)).current;
+
+  React.useEffect(() => {
+    const anim = Animated.loop(
+      Animated.timing(animatedProgress, {
+        toValue: 1,
+        duration: 2000,
+        useNativeDriver: true,
+      })
+    );
+    anim.start();
+    return () => anim.stop();
+  }, []);
+
+  React.useEffect(() => {
+    const pulse = Animated.loop(
+      Animated.sequence([
+        Animated.timing(dotOpacity, {
+          toValue: 0.3,
+          duration: 800,
+          useNativeDriver: true,
+        }),
+        Animated.timing(dotOpacity, {
+          toValue: 1,
+          duration: 800,
+          useNativeDriver: true,
+        }),
+      ])
+    );
+    pulse.start();
+    return () => pulse.stop();
+  }, []);
+
+  const screenWidth = Dimensions.get("window").width;
+  const translateX = animatedProgress.interpolate({
+    inputRange: [0, 1],
+    outputRange: [-120, screenWidth],
+  });
+
 
   const params = useLocalSearchParams<{
     serviceId: string;
@@ -293,58 +335,59 @@ export default function RideSearchingScreen() {
         </TouchableOpacity>
       </View>
 
-      <View style={styles.panel}>
-        <View style={styles.handle} />
+      <View style={styles.panel} pointerEvents="box-none">
+        <View style={[styles.floatingCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+          <View style={styles.handle} />
 
-        <Text style={styles.title}>
-          <Text style={styles.titleCount}>31 of 32</Text> captains didn't accept your ride
-        </Text>
+          <View style={styles.headerInfo}>
+            <View style={styles.statusDotRow}>
+              <Animated.View style={[styles.pulseDot, { opacity: dotOpacity, backgroundColor: colors.success }]} />
+              <Text style={styles.title}>Finding your captain...</Text>
+            </View>
+            <Text style={styles.subtitle}>Connecting with nearby drivers in your area</Text>
+          </View>
 
-        <View style={styles.progressTrack}>
-          {Array.from({ length: 18 }).map((_, index) => (
-            <View
-              key={index}
+          <View style={styles.progressTrack}>
+            <Animated.View
               style={[
-                styles.progressBlock,
-                index === 0 && styles.progressBlockFirst,
-                index === 17 && styles.progressBlockLast,
+                styles.progressBarActive,
+                {
+                  transform: [{ translateX }],
+                },
               ]}
             />
-          ))}
-          <View style={styles.progressTail} />
-        </View>
-
-        <View style={styles.fareCard}>
-          <View style={styles.bikeBadge}>
-            <MaterialCommunityIcons name="motorbike" size={28} color={colors.text} />
           </View>
-          <View style={styles.fareTextGroup}>
-            <Text style={styles.fareLabel}>Total Fare</Text>
-            <Text style={styles.fareValue}>₹{fare}</Text>
-          </View>
-          <TouchableOpacity style={styles.tripButton} onPress={showTripDetails}>
-            <Text style={styles.tripButtonText}>Trip Details</Text>
-          </TouchableOpacity>
-        </View>
 
-        <View style={styles.dashedLine} />
-
-        <View style={styles.suggestionCard}>
-          <View style={styles.suggestionHeader}>
-            <View style={styles.avatar}>
-              <Ionicons name="person" size={25} color={colors.text} />
+          <View style={[styles.fareCard, { backgroundColor: colors.surfaceSecondary, borderColor: colors.borderLight }]}>
+            <View style={[styles.bikeBadge, { backgroundColor: colors.surface }]}>
+              <MaterialCommunityIcons name="motorbike" size={24} color={colors.text} />
             </View>
-            <Text style={styles.suggestionTitle}>
-              Captains aren't accepting at ₹{fare}.{"\n"}Try adding more
-            </Text>
+            <View style={styles.fareTextGroup}>
+              <Text style={[styles.fareLabel, { color: colors.textSecondary }]}>Total Fare</Text>
+              <Text style={[styles.fareValue, { color: colors.text }]}>₹{fare}</Text>
+            </View>
+            <TouchableOpacity style={[styles.tripButton, { borderColor: colors.border }]} onPress={showTripDetails}>
+              <Text style={[styles.tripButtonText, { color: colors.text }]}>Trip Details</Text>
+            </TouchableOpacity>
           </View>
 
-          <View style={styles.addFareRow}>
-            {["+ ₹10", "+ ₹15", "+ ₹20", "+"].map((label) => (
-              <TouchableOpacity key={label} style={styles.addFarePill}>
-                <Text style={styles.addFareText}>{label}</Text>
-              </TouchableOpacity>
-            ))}
+          <View style={[styles.suggestionCard, { backgroundColor: colors.surfaceSecondary, borderColor: colors.borderLight }]}>
+            <View style={styles.suggestionHeader}>
+              <View style={[styles.avatar, { backgroundColor: colors.surface }]}>
+                <Ionicons name="person" size={20} color={colors.text} />
+              </View>
+              <Text style={[styles.suggestionTitle, { color: colors.text }]}>
+                Captains aren't accepting at ₹{fare}. Try adding more:
+              </Text>
+            </View>
+
+            <View style={styles.addFareRow}>
+              {["+ ₹10", "+ ₹15", "+ ₹20", "+"].map((label) => (
+                <TouchableOpacity key={label} style={[styles.addFarePill, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+                  <Text style={[styles.addFareText, { color: colors.text }]}>{label}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
           </View>
         </View>
       </View>
@@ -534,7 +577,7 @@ const createStyles = (colors: typeof Colors.light, insets: any) =>
       backgroundColor: colors.surface,
     },
     mapArea: {
-      height: height * 0.43,
+      ...StyleSheet.absoluteFillObject,
       backgroundColor: "#eef1f4",
     },
     screenBackButton: {
@@ -606,19 +649,24 @@ const createStyles = (colors: typeof Colors.light, insets: any) =>
       backgroundColor: colors.surface,
     },
     panel: {
-      flex: 1,
-      marginTop: -13,
-      backgroundColor: colors.surface,
-      borderTopLeftRadius: 24,
-      borderTopRightRadius: 24,
+      position: "absolute",
+      left: 0,
+      right: 0,
+      bottom: 0,
       paddingHorizontal: 16,
-      paddingTop: 6,
-      paddingBottom: Platform.OS === "ios" ? insets.bottom + 8 : 12,
+      paddingBottom: Platform.OS === "ios" ? insets.bottom + 12 : 24,
+      justifyContent: "flex-end",
+    },
+    floatingCard: {
+      borderRadius: 24,
+      borderWidth: 1,
+      padding: 24,
       shadowColor: "#000",
-      shadowOffset: { width: 0, height: -6 },
-      shadowOpacity: 0.08,
-      shadowRadius: 14,
-      elevation: 16,
+      shadowOffset: { width: 0, height: 8 },
+      shadowOpacity: 0.15,
+      shadowRadius: 16,
+      elevation: 8,
+      gap: 16,
     },
     handle: {
       width: 42,
@@ -628,42 +676,46 @@ const createStyles = (colors: typeof Colors.light, insets: any) =>
       alignSelf: "center",
       marginBottom: 11,
     },
+    headerInfo: {
+      marginBottom: 16,
+    },
+    statusDotRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      marginBottom: 4,
+    },
+    pulseDot: {
+      width: 8,
+      height: 8,
+      borderRadius: 4,
+      marginRight: 8,
+    },
     title: {
-      fontSize: 16,
-      lineHeight: 22,
+      fontSize: 18,
       fontWeight: "800",
       color: colors.text,
-      marginBottom: 8,
     },
-    titleCount: {
-      color: colors.primary,
-      fontWeight: "900",
+    subtitle: {
+      fontSize: 13,
+      color: colors.textSecondary,
+      marginLeft: 16, // aligns with title text indent
     },
     progressTrack: {
-      height: 18,
-      borderRadius: 9,
-      backgroundColor: colors.surfaceSecondary,
+      height: 4,
+      borderRadius: 2,
+      backgroundColor: colors.borderLight,
       overflow: "hidden",
-      flexDirection: "row",
-      alignItems: "stretch",
-      gap: 3,
-      paddingRight: 3,
-      marginBottom: 10,
+      position: "relative",
+      marginBottom: 20,
     },
-    progressBlock: {
-      width: 13,
+    progressBarActive: {
+      position: "absolute",
+      left: 0,
+      top: 0,
+      bottom: 0,
+      width: 120,
       backgroundColor: colors.primary,
-    },
-    progressBlockFirst: {
-      borderTopLeftRadius: 9,
-      borderBottomLeftRadius: 9,
-    },
-    progressBlockLast: {
-      borderTopRightRadius: 3,
-      borderBottomRightRadius: 3,
-    },
-    progressTail: {
-      flex: 1,
+      borderRadius: 2,
     },
     fareCard: {
       height: 64,

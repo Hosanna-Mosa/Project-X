@@ -1,13 +1,14 @@
 import React, { useEffect, useRef, useState } from "react";
-import { View, Text, StyleSheet, Animated, Alert, TouchableOpacity } from "react-native";
+import { View, Text, StyleSheet, Animated, Alert, TouchableOpacity, Dimensions } from "react-native";
 import { useLocalSearchParams, router } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Colors from "@/constants/colors";
 import { useThemeStore } from "@/contexts/themeStore";
 import { socketService } from "@/utils/socketService";
-import { Ionicons } from "@expo/vector-icons";
+import { Ionicons, Feather } from "@expo/vector-icons";
 import { useDeliveryStore } from "@/contexts/deliveryStore";
 import { customFetch } from "@/utils/api/custom-fetch";
+import { MapBackground } from "@/components/MapBackground";
 
 export default function FindingDriverScreen() {
   const insets = useSafeAreaInsets();
@@ -17,26 +18,59 @@ export default function FindingDriverScreen() {
   
   const [bookingConfirmed, setBookingConfirmed] = useState(false);
   const [confirmedDriver, setConfirmedDriver] = useState<any>(null);
+  const [stops, setStops] = useState<any[]>([]);
 
-  const scale = useRef(new Animated.Value(1)).current;
-  const opacity = useRef(new Animated.Value(1)).current;
+  const pulse1 = useRef(new Animated.Value(0)).current;
+  const pulse2 = useRef(new Animated.Value(0)).current;
+  const pulse3 = useRef(new Animated.Value(0)).current;
+  const animatedProgress = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    Animated.loop(
-      Animated.parallel([
-        Animated.timing(scale, {
-          toValue: 2,
-          duration: 2000,
-          useNativeDriver: true,
-        }),
-        Animated.timing(opacity, {
-          toValue: 0,
-          duration: 2000,
-          useNativeDriver: true,
-        }),
-      ])
-    ).start();
+    const createPulse = (value: Animated.Value, delay: number) => {
+      return Animated.loop(
+        Animated.sequence([
+          Animated.delay(delay),
+          Animated.timing(value, {
+            toValue: 1,
+            duration: 2000,
+            useNativeDriver: true,
+          }),
+        ])
+      );
+    };
 
+    const anim1 = createPulse(pulse1, 0);
+    const anim2 = createPulse(pulse2, 600);
+    const anim3 = createPulse(pulse3, 1200);
+
+    const animProgress = Animated.loop(
+      Animated.timing(animatedProgress, {
+        toValue: 1,
+        duration: 2000,
+        useNativeDriver: true,
+      })
+    );
+
+    anim1.start();
+    anim2.start();
+    anim3.start();
+    animProgress.start();
+
+    return () => {
+      anim1.stop();
+      anim2.stop();
+      anim3.stop();
+      animProgress.stop();
+    };
+  }, []);
+
+  const screenWidth = Dimensions.get("window").width;
+  const translateX = animatedProgress.interpolate({
+    inputRange: [0, 1],
+    outputRange: [-120, screenWidth],
+  });
+
+  useEffect(() => {
     if (!orderId) {
       router.push("/(tabs)");
       return;
@@ -120,9 +154,22 @@ export default function FindingDriverScreen() {
       if (isTransitioned) return;
       try {
         const orderData = await customFetch<any>(`/api/v1/orders/${orderId}`, { responseType: "json" });
-        if (orderData && orderData.status && orderData.status.toUpperCase() === "DRIVER_ASSIGNED") {
-          console.log("Order was accepted:", orderData);
-          handleTransition(orderData.driver, orderData.reservedAt);
+        if (orderData) {
+          if (orderData.stops && orderData.stops.length > 0) {
+            const mappedStops = orderData.stops.map((s: any) => ({
+              id: s._id,
+              address: s.address,
+              lat: s.location.coordinates[1],
+              lng: s.location.coordinates[0],
+              type: s.type,
+              items: s.items?.lines || [],
+            }));
+            setStops(mappedStops);
+          }
+          if (orderData.status && orderData.status.toUpperCase() === "DRIVER_ASSIGNED") {
+            console.log("Order was accepted:", orderData);
+            handleTransition(orderData.driver, orderData.reservedAt);
+          }
         }
       } catch (err) {
         console.error("Error checking order status:", err);
@@ -207,12 +254,12 @@ export default function FindingDriverScreen() {
     return (
       <View style={[styles.container, { backgroundColor: colors.background, paddingTop: insets.top, paddingBottom: insets.bottom }]}>
         <Ionicons name="checkmark-circle" size={100} color={colors.primary} style={{ marginBottom: 20 }} />
-        <Text style={[styles.text, { color: colors.text, fontSize: 26, fontWeight: "bold" }]}>Booking Confirmed!</Text>
+        <Text style={{ color: colors.text, fontSize: 26, fontWeight: "bold" }}>Booking Confirmed!</Text>
         <Text style={{ color: colors.textSecondary, textAlign: "center", marginHorizontal: 30, marginBottom: 40, marginTop: 15, fontSize: 16, lineHeight: 24 }}>
           Driver has accepted your reserved ride request for {formattedDate}! We will notify you 15 minutes before the ride time.
         </Text>
         
-        <View style={{ backgroundColor: colors.card, padding: 25, borderRadius: 16, width: '85%', alignItems: 'center', elevation: 3, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4 }}>
+        <View style={{ backgroundColor: colors.surface, padding: 25, borderRadius: 16, width: '85%', alignItems: 'center', elevation: 3, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4 }}>
           <Text style={{ color: colors.text, fontSize: 22, fontWeight: "bold", marginBottom: 15 }}>Driver Details</Text>
           <Text style={{ color: colors.text, fontSize: 18, marginBottom: 8 }}>Name: {confirmedDriver.name}</Text>
           <Text style={{ color: colors.text, fontSize: 18, marginBottom: 8 }}>Vehicle: {confirmedDriver.vehicle}</Text>
@@ -230,63 +277,154 @@ export default function FindingDriverScreen() {
   }
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.background, paddingTop: insets.top, paddingBottom: insets.bottom }]}>
-      <View style={styles.radarContainer}>
-        <Animated.View 
-          style={[
-            styles.radar, 
-            { 
-              borderColor: colors.primary, 
-              transform: [{ scale }], 
-              opacity 
-            }
-          ]} 
-        />
-        <View style={[styles.radarCenter, { backgroundColor: colors.primary }]}>
-            <Ionicons name="search" size={32} color="#fff" />
+    <View style={styles.root}>
+      <MapBackground 
+        stops={stops}
+        style={StyleSheet.absoluteFill}
+      />
+
+      <View style={styles.floatingPanelContainer} pointerEvents="box-none">
+        <View style={[styles.floatingCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+          <View style={styles.headerInfo}>
+            <View style={styles.statusDotRow}>
+              <Animated.View style={[styles.pulseDot, { opacity: pulse1.interpolate({ inputRange: [0, 1], outputRange: [1, 0.3] }), backgroundColor: colors.success }]} />
+              <Text style={[styles.title, { color: colors.text }]}>
+                {isReserved === "true" ? "Booking Reservation..." : "Finding your driver..."}
+              </Text>
+            </View>
+            <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
+              Scanning nearby partners in your surroundings
+            </Text>
+          </View>
+
+          {/* Glowing Continuous Progress Bar */}
+          <View style={styles.progressTrack}>
+            <Animated.View
+              style={[
+                styles.progressBarActive,
+                {
+                  transform: [{ translateX }],
+                  backgroundColor: colors.primary,
+                },
+              ]}
+            />
+          </View>
+
+          {/* Simple Info Row showing Proximity/Fare */}
+          <View style={[styles.infoRow, { backgroundColor: colors.surfaceSecondary }]}>
+            <View style={styles.infoBadge}>
+              <Feather name="truck" size={18} color={colors.text} />
+            </View>
+            <Text style={[styles.infoText, { color: colors.textSecondary }]}>
+              Connecting you with the best available delivery partner
+            </Text>
+          </View>
+
+          <TouchableOpacity 
+            style={[styles.cancelBtn, { borderColor: colors.border }]} 
+            onPress={handleCancel}
+            activeOpacity={0.8}
+          >
+            <Text style={[styles.cancelText, { color: colors.error }]}>Cancel Request</Text>
+          </TouchableOpacity>
         </View>
-      </View>
-      <Text style={[styles.text, { color: colors.text }]}>
-        {isReserved === "true" ? "Finding a captain for your reservation..." : "Finding your driver..."}
-      </Text>
-      
-      <View style={[styles.cancelButtonContainer, { bottom: insets.bottom + 20 }]}>
-         <Text style={[styles.cancelText, { color: colors.error }]} onPress={handleCancel}>Cancel Request</Text>
       </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, alignItems: "center", justifyContent: "center" },
-  radarContainer: {
-    alignItems: "center",
-    justifyContent: "center",
-    height: 200,
+  root: {
+    flex: 1,
   },
-  radarCenter: {
-    width: 70,
-    height: 70,
-    borderRadius: 35,
-    alignItems: "center",
-    justifyContent: "center",
-    zIndex: 10,
-  },
-  radar: { 
-    width: 80, 
-    height: 80, 
-    borderRadius: 40, 
-    borderWidth: 4, 
-    position: "absolute" 
-  },
-  text: { fontSize: 20, fontWeight: "700", marginTop: 40 },
-  cancelButtonContainer: {
+  container: { flex: 1, alignItems: "center", justifyContent: "center", paddingHorizontal: 24 },
+  floatingPanelContainer: {
     position: "absolute",
-    bottom: 50,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    paddingHorizontal: 16,
+    paddingBottom: 34,
+    justifyContent: "flex-end",
+  },
+  floatingCard: {
+    borderRadius: 24,
+    borderWidth: 1,
+    padding: 24,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.15,
+    shadowRadius: 16,
+    elevation: 8,
+    gap: 16,
+  },
+  headerInfo: {
+    marginBottom: 4,
+  },
+  statusDotRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 4,
+  },
+  pulseDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    marginRight: 8,
+  },
+  title: {
+    fontSize: 18,
+    fontWeight: "800",
+  },
+  subtitle: {
+    fontSize: 13,
+    marginLeft: 16, // aligns with title text indent
+  },
+  progressTrack: {
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: "rgba(0, 0, 0, 0.05)",
+    overflow: "hidden",
+    position: "relative",
+    marginBottom: 4,
+  },
+  progressBarActive: {
+    position: "absolute",
+    left: 0,
+    top: 0,
+    bottom: 0,
+    width: 120,
+    borderRadius: 2,
+  },
+  infoRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    padding: 14,
+    borderRadius: 14,
+    gap: 12,
+  },
+  infoBadge: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: "rgba(0, 0, 0, 0.03)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  infoText: {
+    fontSize: 13,
+    flex: 1,
+    lineHeight: 18,
+  },
+  cancelBtn: {
+    borderWidth: 1,
+    paddingVertical: 14,
+    borderRadius: 24,
+    alignItems: "center",
+    justifyContent: "center",
   },
   cancelText: {
-    fontSize: 16,
-    fontWeight: "600",
-    padding: 10,
+    fontSize: 15,
+    fontWeight: "700",
   }
 });

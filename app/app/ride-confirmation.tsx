@@ -354,18 +354,27 @@ export default function RideConfirmationScreen() {
     }
   }, [params.stops]);
 
+  const selectedVehicleType = React.useMemo(() => {
+    if (!selectedRideId) {
+      return serviceType === "auto" ? "auto" : serviceType === "bike" ? "bike" : "car";
+    }
+    const idLower = selectedRideId.toLowerCase();
+    if (idLower.includes("bike")) return "bike";
+    if (idLower.includes("auto")) return "auto";
+    return "car";
+  }, [selectedRideId, serviceType]);
+
   React.useEffect(() => {
     const loadNearbyDrivers = async () => {
       if (!Number.isFinite(pickupCoords.latitude) || !Number.isFinite(pickupCoords.longitude)) return;
       try {
-        const vehicleType = serviceType === "auto" ? "auto" : serviceType === "bike" ? "bike" : "car";
         const drivers = await customFetch<any[]>(
-          `/api/v1/drivers/nearby?latitude=${pickupCoords.latitude}&longitude=${pickupCoords.longitude}&radius=5000&vehicleType=${vehicleType}`,
+          `/api/v1/drivers/nearby?latitude=${pickupCoords.latitude}&longitude=${pickupCoords.longitude}&radius=5000&vehicleType=${selectedVehicleType}`,
           { responseType: "json" },
         );
         setNearbyDrivers((drivers || []).map((driver) => ({
           id: driver._id || driver.id,
-          vehicleType: driver.vehicleType || vehicleType,
+          vehicleType: driver.vehicleType || selectedVehicleType,
           lat: driver.currentLocation?.coordinates?.[1],
           lng: driver.currentLocation?.coordinates?.[0],
         })).filter((driver) => Number.isFinite(driver.lat) && Number.isFinite(driver.lng)));
@@ -377,7 +386,7 @@ export default function RideConfirmationScreen() {
     loadNearbyDrivers();
     const interval = setInterval(loadNearbyDrivers, 12000);
     return () => clearInterval(interval);
-  }, [pickupCoords.latitude, pickupCoords.longitude, serviceType]);
+  }, [pickupCoords.latitude, pickupCoords.longitude, selectedVehicleType]);
 
   const getDisplayName = (addr: string) => {
     if (!addr) return "";
@@ -484,7 +493,7 @@ export default function RideConfirmationScreen() {
                 tracksViewChanges={false}
               >
                 <View style={styles.vehicleMarker}>
-                  <MaterialCommunityIcons name={iconName as any} size={13} color="#111827" />
+                  <MaterialCommunityIcons name={iconName as any} size={18} color={colors.text} />
                 </View>
               </Marker>
             );
@@ -1529,18 +1538,18 @@ const createStyles = (colors: typeof Colors.light, insets: any) =>
       fontWeight: "700",
     },
     vehicleMarker: {
-      width: 24,
-      height: 24,
-      borderRadius: 12,
-      backgroundColor: "#FFFFFF",
+      width: 32,
+      height: 32,
+      borderRadius: 16,
+      backgroundColor: colors.surface,
       alignItems: "center",
       justifyContent: "center",
-      borderWidth: 1.5,
-      borderColor: "#111827",
-      shadowColor: "#000",
-      shadowOffset: { width: 0, height: 1 },
-      shadowOpacity: 0.12,
-      shadowRadius: 2,
-      elevation: 3,
+      borderWidth: 2,
+      borderColor: colors.primary,
+      shadowColor: colors.shadow || "#000",
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.15,
+      shadowRadius: 3,
+      elevation: 4,
     },
   });

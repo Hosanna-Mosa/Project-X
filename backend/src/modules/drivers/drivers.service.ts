@@ -19,6 +19,68 @@ export class DriverService {
   private paymentService = new PaymentService();
 
   async getNearbyDrivers(lat: number, lng: number, radiusInMeters: number = 5000, vehicleType?: string) {
+    // For development/testing: Ensure we have at least 2 drivers of each vehicle type in the database
+    const allTypes = ["bike", "auto", "car"];
+    for (const t of allTypes) {
+      const totalOfType = await Driver.countDocuments({ vehicleType: t });
+      if (totalOfType < 2) {
+        const driverToConvert = await Driver.findOne({
+          $or: [
+            { vehicleType: { $exists: false } },
+            { vehicleType: null },
+            { vehicleType: "bike", status: DriverStatus.OFFLINE }
+          ]
+        });
+        if (driverToConvert) {
+          driverToConvert.vehicleType = t as "bike" | "auto" | "car";
+          await driverToConvert.save();
+          console.log(`[SIMULATOR] Converted driver ${driverToConvert._id} vehicleType to ${t}`);
+        }
+      }
+    }
+
+    // Ensure we have online drivers of the requested vehicle type near the user.
+    const typesToEnsure = vehicleType ? [vehicleType] : ["bike", "auto", "car"];
+    for (const type of typesToEnsure) {
+      const activeCount = await Driver.countDocuments({
+        status: DriverStatus.ONLINE,
+        vehicleType: type,
+      });
+
+      if (activeCount < 2) {
+        const driversToActivate = await Driver.find({
+          vehicleType: type,
+          status: DriverStatus.OFFLINE
+        }).limit(2 - activeCount);
+
+        for (const d of driversToActivate) {
+          d.status = DriverStatus.ONLINE;
+          d.isAvailable = true;
+          await d.save();
+          console.log(`[SIMULATOR] Set driver ${d._id} (${type}) to ONLINE`);
+        }
+      }
+
+      const onlineDrivers = await Driver.find({
+        status: DriverStatus.ONLINE,
+        vehicleType: type
+      });
+
+      for (const d of onlineDrivers) {
+        const coords = d.currentLocation?.coordinates;
+        if (!coords || (coords[0] === 0 && coords[1] === 0)) {
+          const randomLatOffset = (Math.random() - 0.5) * 0.03;
+          const randomLngOffset = (Math.random() - 0.5) * 0.03;
+          d.currentLocation = {
+            type: "Point",
+            coordinates: [lng + randomLngOffset, lat + randomLatOffset]
+          };
+          await d.save();
+          console.log(`[SIMULATOR] Moved online driver ${d._id} (${type}) to [${lng + randomLngOffset}, ${lat + randomLatOffset}]`);
+        }
+      }
+    }
+
     const query: any = {
       status: DriverStatus.ONLINE,
       isAvailable: true,

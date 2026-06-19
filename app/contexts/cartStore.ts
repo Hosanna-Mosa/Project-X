@@ -17,6 +17,8 @@ export interface CartItem extends FoodItem {
 interface CartState {
   items: CartItem[];
   vendorId: string | null;
+  isHoveringSearch: boolean;
+  setIsHoveringSearch: (hovering: boolean) => void;
   addItem: (item: FoodItem, vendorId: string) => void;
   removeItem: (itemId: string) => void;
   updateQuantity: (itemId: string, quantity: number) => void;
@@ -28,6 +30,8 @@ interface CartState {
 export const useCartStore = create<CartState>((set, get) => ({
   items: [],
   vendorId: null,
+  isHoveringSearch: false,
+  setIsHoveringSearch: (hovering) => set({ isHoveringSearch: hovering }),
 
   addItem: (item, vendorId) => {
     const { items, vendorId: currentVendorId } = get();
