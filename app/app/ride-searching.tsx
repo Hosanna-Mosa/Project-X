@@ -654,7 +654,7 @@ const createStyles = (colors: typeof Colors.light, insets: any) =>
       right: 0,
       bottom: 0,
       paddingHorizontal: 16,
-      paddingBottom: Platform.OS === "ios" ? insets.bottom + 12 : 24,
+      paddingBottom: insets.bottom > 0 ? insets.bottom + 12 : 24,
       justifyContent: "flex-end",
     },
     floatingCard: {
@@ -855,7 +855,7 @@ const createStyles = (colors: typeof Colors.light, insets: any) =>
       borderTopRightRadius: 24,
       paddingHorizontal: 18,
       paddingTop: 32,
-      paddingBottom: Platform.OS === "ios" ? insets.bottom + 34 : 58,
+      paddingBottom: insets.bottom > 0 ? insets.bottom + 34 : 58,
     },
     bookAgainTitle: {
       fontSize: 16,
@@ -1055,7 +1055,7 @@ const createStyles = (colors: typeof Colors.light, insets: any) =>
       borderTopRightRadius: 24,
       paddingHorizontal: 14,
       paddingTop: 10,
-      paddingBottom: Platform.OS === "ios" ? insets.bottom + 22 : 28,
+      paddingBottom: insets.bottom > 0 ? insets.bottom + 22 : 28,
       minHeight: 520,
     },
     cancelSheetHandle: {
@@ -1125,7 +1125,7 @@ const createStyles = (colors: typeof Colors.light, insets: any) =>
       borderTopRightRadius: 24,
       paddingHorizontal: 14,
       paddingTop: 10,
-      paddingBottom: Platform.OS === "ios" ? insets.bottom + 22 : 34,
+      paddingBottom: insets.bottom > 0 ? insets.bottom + 22 : 34,
       minHeight: 462,
     },
     cancelConfirmTitle: {
