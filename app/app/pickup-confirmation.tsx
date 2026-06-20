@@ -389,7 +389,7 @@ const createStyles = (colors: typeof Colors.light, insets: any) =>
       borderTopRightRadius: 24,
       paddingHorizontal: 14,
       paddingTop: 10,
-      paddingBottom: Platform.OS === "ios" ? insets.bottom + 22 : 34,
+      paddingBottom: insets.bottom > 0 ? insets.bottom + 22 : 34,
       shadowColor: "#000",
       shadowOffset: { width: 0, height: -6 },
       shadowOpacity: 0.08,

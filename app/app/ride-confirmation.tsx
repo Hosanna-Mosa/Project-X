@@ -1103,7 +1103,7 @@ const createStyles = (colors: typeof Colors.light, insets: any) =>
     footer: {
       paddingHorizontal: 16,
       paddingTop: 8,
-      paddingBottom: Platform.OS === "ios" ? insets.bottom + 8 : 16,
+      paddingBottom: insets.bottom > 0 ? insets.bottom + 8 : 16,
       backgroundColor: colors.surface,
       borderTopWidth: 1,
       borderTopColor: colors.borderLight,
@@ -1278,7 +1278,7 @@ const createStyles = (colors: typeof Colors.light, insets: any) =>
       borderTopRightRadius: 26,
       paddingTop: 16,
       paddingHorizontal: 20,
-      paddingBottom: Platform.OS === "ios" ? 34 : 24,
+      paddingBottom: insets.bottom > 0 ? insets.bottom + 16 : 24,
       shadowColor: "#000",
       shadowOffset: { width: 0, height: -4 },
       shadowOpacity: 0.12,
