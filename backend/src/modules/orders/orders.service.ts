@@ -7,6 +7,7 @@ import ScheduledDeliveryRequest from "../../database/models/ScheduledDeliveryReq
 import { RoutingService } from "../routing/routing.service";
 import { PricingService } from "../pricing/pricing.service";
 import { SocketManager } from "../../sockets/socket.manager";
+import { QueueManager } from "../../services/queue.service";
 
 export class OrdersService {
   private routingService = new RoutingService();
@@ -117,8 +118,8 @@ export class OrdersService {
       const year = date.getFullYear();
       const month = String(date.getMonth() + 1).padStart(2, '0');
       const day = String(date.getDate()).padStart(2, '0');
-      const random = Math.floor(1000 + Math.random() * 9000); // 4-digit random number
-      return `ORD-${year}${month}${day}-${random}`;
+      const randomSuffix = Math.random().toString(36).substring(2, 8).toUpperCase();
+      return `ORD-${year}${month}${day}-${randomSuffix}`;
     };
 
     const order = new Order({
@@ -144,6 +145,13 @@ export class OrdersService {
     });
 
     const savedOrder = await order.save();
+
+    // Schedule reservation notification if this is a reserved ride/delivery
+    if (savedOrder.isReserved && savedOrder.reservedAt) {
+      const fifteenMinutesBefore = savedOrder.reservedAt.getTime() - 15 * 60 * 1000;
+      const delay = fifteenMinutesBefore - Date.now();
+      await QueueManager.getInstance().scheduleReservedRideNotification(savedOrder._id, delay);
+    }
 
     const result = {
       ...savedOrder.toObject(),
@@ -411,8 +419,39 @@ export class OrdersService {
     const order = await Order.findOne(this.getOrderQuery(orderId));
     if (!order) throw new Error("Order not found");
     
-    order.status = status;
-    const savedOrder = await order.save();
+    const session = await mongoose.startSession();
+    session.startTransaction();
+    try {
+      order.status = status;
+      await order.save({ session });
+
+      const isFinishedStatus = [
+        OrderStatus.COMPLETED,
+        OrderStatus.DELIVERED,
+        OrderStatus.DELIVERED_LC,
+        OrderStatus.CANCELLED
+      ].includes(status) || 
+      status.toLowerCase() === "completed" || 
+      status.toLowerCase() === "delivered" || 
+      status.toLowerCase() === "cancelled";
+
+      if (isFinishedStatus && order.driver) {
+        await Driver.findByIdAndUpdate(
+          order.driver,
+          { isAvailable: true },
+          { session }
+        );
+      }
+
+      await session.commitTransaction();
+    } catch (error) {
+      await session.abortTransaction();
+      throw error;
+    } finally {
+      session.endSession();
+    }
+
+    const savedOrder = await Order.findOne(this.getOrderQuery(orderId));
 
     // Broadcast status change via Socket
     const socketManager = SocketManager.getInstance();
@@ -439,7 +478,7 @@ export class OrdersService {
     }
 
     const populated = await Order.findOne(this.getOrderQuery(orderId)).populate("user").populate("driver").populate("vendor");
-    return populated || savedOrder;
+    return populated || savedOrder || order;
   }
 
   async getUserOrders(userId: string) {
@@ -467,9 +506,25 @@ export class OrdersService {
       throw new Error("Order is no longer available");
     }
 
-    order.driver = driver._id;
-    order.status = OrderStatus.DRIVER_ASSIGNED;
-    const savedOrder = await order.save();
+    const session = await mongoose.startSession();
+    session.startTransaction();
+    try {
+      order.driver = driver._id;
+      order.status = OrderStatus.DRIVER_ASSIGNED;
+      await order.save({ session });
+
+      driver.isAvailable = false;
+      await driver.save({ session });
+
+      await session.commitTransaction();
+    } catch (error) {
+      await session.abortTransaction();
+      throw error;
+    } finally {
+      session.endSession();
+    }
+
+    const savedOrder = await Order.findOne(this.getOrderQuery(orderId));
 
     // Broadcast to the customer that order is accepted
     const socketManager = SocketManager.getInstance();
@@ -499,6 +554,6 @@ export class OrdersService {
     }
 
     const populated = await Order.findOne(this.getOrderQuery(orderId)).populate("user").populate("driver").populate("vendor");
-    return populated || savedOrder;
+    return populated || savedOrder || order;
   }
 }

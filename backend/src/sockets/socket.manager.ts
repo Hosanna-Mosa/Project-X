@@ -1,6 +1,10 @@
 import { Server, Socket } from "socket.io";
 import { createClient } from "redis";
+import { createAdapter } from "@socket.io/redis-adapter";
 import http from "http";
+import jwt from "jsonwebtoken";
+import { UserRole } from "../database/models/User";
+import Order from "../database/models/Order";
 
 export class SocketManager {
   private static instance: SocketManager;
@@ -14,6 +18,7 @@ export class SocketManager {
     });
 
     this.setupRedis();
+    this.setupAuthentication();
     this.initializeHandlers();
   }
 
@@ -25,15 +30,17 @@ export class SocketManager {
   }
 
   private async setupRedis() {
+    const redisUrl = process.env.REDIS_URL || "redis://localhost:6379";
+
+    // Primary redisClient for location tracking
     this.redisClient = createClient({
-      url: process.env.REDIS_URL || "redis://localhost:6379",
+      url: redisUrl,
       socket: {
-        reconnectStrategy: false
+        reconnectStrategy: (retries) => Math.min(retries * 50, 1000)
       }
     });
 
     this.redisClient.on("error", (err: any) => {
-      // Only log if we expect redis to be active
       if (this.redisClient) {
         console.log("Redis Client Error:", err.message);
       }
@@ -42,41 +49,102 @@ export class SocketManager {
     try {
       await this.redisClient.connect();
       console.log("Redis connected for socket tracking");
-    } catch (err) {
-      console.warn("⚠️  Redis server not found. Socket tracking (location updates) will be disabled. App will continue to run.");
-      this.redisClient = null; // Mark as null so handlers can check
+
+      // Setup Redis Pub/Sub Adapter for Socket.io Horizontal Clustering
+      const pubClient = createClient({ url: redisUrl });
+      const subClient = pubClient.duplicate();
+      
+      await Promise.all([pubClient.connect(), subClient.connect()]);
+      this.io.adapter(createAdapter(pubClient, subClient));
+      console.log("Redis Socket Adapter initialized successfully");
+    } catch (err: any) {
+      console.warn("⚠️  Redis server not found or connection failed. Socket tracking (location updates) and clustering will be disabled.");
+      this.redisClient = null; 
     }
+  }
+
+  private setupAuthentication() {
+    this.io.use((socket: Socket, next) => {
+      const token = socket.handshake.auth?.token || 
+                    socket.handshake.headers["authorization"]?.split(" ")[1];
+      if (!token) {
+        console.warn(`[SOCKET SECURITY] Handshake rejected: No token provided (Socket ID: ${socket.id})`);
+        return next(new Error("Authentication error: No token provided"));
+      }
+
+      jwt.verify(token, process.env.JWT_SECRET || "supersecret123", (err: any, decoded: any) => {
+        if (err) {
+          console.warn(`[SOCKET SECURITY] Handshake rejected: Invalid token (Socket ID: ${socket.id})`);
+          return next(new Error("Authentication error: Invalid token"));
+        }
+        
+        // Normalize userId from id parameter if needed
+        if (decoded && decoded.id && !decoded.userId) {
+          decoded.userId = decoded.id;
+        }
+        
+        socket.data.user = decoded;
+        next();
+      });
+    });
   }
 
   private initializeHandlers() {
     this.io.on("connection", (socket: Socket) => {
-      console.log(`Socket connected: ${socket.id}`);
+      const authUser = socket.data.user;
+      console.log(`Socket connected: ${socket.id} (User: ${authUser?.userId}, Role: ${authUser?.role})`);
 
-      // Authenticated joining
+      // Automatically join the user to their own personal room
+      if (authUser?.userId) {
+        socket.join(authUser.userId);
+      }
+
+      // Authenticated joining for drivers and vendors
       socket.on("join", (data: { userId: string; role: string }) => {
+        if (!authUser || authUser.userId !== data.userId) {
+          console.warn(`[SOCKET SECURITY] User ${authUser?.userId} unauthorized to join user room ${data.userId}`);
+          return;
+        }
+
         socket.join(data.userId);
-        if (data.role === "DRIVER") {
+
+        if (data.role === "DRIVER" && authUser.role === "DRIVER") {
           socket.join("drivers");
+          console.log(`Driver ${data.userId} joined drivers room`);
         }
-        if (data.role === "VENDOR") {
+
+        const isVendorRole = ["VENDOR", "meat_vendor", "restaurant_vendor", "ADMIN"].includes(authUser.role);
+        if (data.role === "VENDOR" && isVendorRole) {
           socket.join("vendors");
+          console.log(`Vendor ${data.userId} joined vendors room`);
         }
-        console.log(`${data.role} ${data.userId} joined their rooms`);
       });
 
-      // DRIVER LOCATION UPDATE: Store in Redis & Emit to User
+      // DRIVER LOCATION UPDATE: Store in Redis Geospatial & Emit to Order Room
       socket.on("driver_location_update", async (data: { driverId: string; orderId?: string; lat: number; lng: number }) => {
-        console.log(`[SOCKET] Driver Location Update received: ID=${data.driverId}, OrderID=${data.orderId || "none"}, Lat=${data.lat}, Lng=${data.lng}`);
+        if (!authUser || (authUser.userId !== data.driverId && authUser.role !== "DRIVER")) {
+          console.warn(`[SOCKET SECURITY] Unauthorized driver location update from user ${authUser?.userId}`);
+          return;
+        }
+
+        console.log(`[SOCKET] Driver Location Update: ID=${data.driverId}, OrderID=${data.orderId || "none"}, Lat=${data.lat}, Lng=${data.lng}`);
         
         if (this.redisClient) {
-          const key = `driver_loc:${data.driverId}`;
-          await this.redisClient.set(key, JSON.stringify({ lat: data.lat, lng: data.lng }), {
-            EX: 30, // Expiry 30 seconds
-          });
+          try {
+            await this.redisClient.geoAdd("drivers:locations", {
+              longitude: Number(data.lng),
+              latitude: Number(data.lat),
+              member: data.driverId
+            });
+            await this.redisClient.set(`driver_status:${data.driverId}`, "online", {
+              EX: 30, // Status expiry 30 seconds
+            });
+          } catch (err: any) {
+            console.error(`[REDIS] Geospatial write failed:`, err.message);
+          }
         }
 
         if (data.orderId) {
-          console.log(`[SOCKET] Forwarding update to room: ${data.orderId}`);
           // Emit to user tracking the order
           this.io.to(data.orderId).emit("driver_location_update", {
             driverId: data.driverId,
@@ -86,18 +154,42 @@ export class SocketManager {
         }
       });
 
-      // Join order room for tracking
-      socket.on("track_order", (orderId: string) => {
-        socket.join(orderId);
+      // Join order room for tracking - Security: verify user belongs to the order
+      socket.on("track_order", async (orderId: string) => {
+        if (!authUser) return;
+
+        try {
+          const order = await Order.findOne({ _id: orderId });
+          if (!order) {
+            console.warn(`[SOCKET] Order ${orderId} not found for tracking`);
+            return;
+          }
+
+          const isAuthorized = 
+            order.user.toString() === authUser.userId ||
+            (order.driver && order.driver.toString() === authUser.userId) ||
+            (order.vendor && order.vendor.toString() === authUser.userId) ||
+            authUser.role === "ADMIN";
+
+          if (!isAuthorized) {
+            console.warn(`[SOCKET SECURITY] User ${authUser.userId} unauthorized to track order ${orderId}`);
+            return;
+          }
+
+          socket.join(orderId);
+          console.log(`Authorized user ${authUser.userId} tracking order room: ${orderId}`);
+        } catch (error) {
+          console.error(`[SOCKET] track_order error:`, error);
+        }
       });
 
       // DRIVER ORDER ACCEPTANCE: Forward driver info to the customer
       socket.on("driver_accepted_order", (data: { orderId: string; driverInfo: any }) => {
+        if (!authUser || authUser.role !== "DRIVER") return;
+        
         console.log(`[SOCKET] Driver accepted order: ${data.orderId}`, data.driverInfo);
         if (data.orderId) {
-          // Join the order room as well
           socket.join(data.orderId);
-          // Emit 'order_accepted' to the customer in the order room
           this.io.to(data.orderId).emit("order_accepted", {
             orderId: data.orderId,
             driver: data.driverInfo,
@@ -107,7 +199,6 @@ export class SocketManager {
 
       // ORDER STATUS UPDATE: Broadcast to all in the order room
       socket.on("order_status_update", (data: { orderId: string; status: string }) => {
-        console.log(`[SOCKET] Order Status Update: ${data.orderId} -> ${data.status}`);
         if (data.orderId) {
           this.io.to(data.orderId).emit("order_status_update", data);
         }
@@ -130,6 +221,8 @@ export class SocketManager {
 
       // CHAT MESSAGES: Forward messages within the order room
       socket.on("send_message", (data: { orderId: string; senderId: string; role: string; text: string; id?: string }) => {
+        if (!authUser) return;
+        
         console.log(`[CHAT] Message in ${data.orderId} from ${data.role}: ${data.text}`);
         if (data.orderId) {
           this.io.to(data.orderId).emit("receive_message", {
@@ -143,7 +236,7 @@ export class SocketManager {
       });
 
       socket.on("disconnect", () => {
-        console.log(`Socket disconnected: ${socket.id}`);
+        console.log(`Socket disconnected: ${socket.id} (User: ${authUser?.userId})`);
       });
     });
   }
