@@ -1,5 +1,6 @@
 import jwt from "jsonwebtoken";
 import User, { UserRole } from "../../database/models/User";
+import { ValidationError, UnauthorizedError, NotFoundError, ForbiddenError } from "../../utils/errors";
 
 export class AuthService {
   async requestOTP(phone: string) {
@@ -19,7 +20,7 @@ export class AuthService {
         return { isNewUser: true };
       }
       if (!password) {
-        throw new Error("Password is required for new user registration");
+        throw new ValidationError("Password is required for new user registration");
       }
       // Create new user with password
       user = new User({
@@ -42,20 +43,20 @@ export class AuthService {
     const user = await User.findOne({ phone });
 
     if (!user) {
-      throw new Error("User not found. Please sign up first.");
+      throw new NotFoundError("User not found. Please sign up first.");
     }
 
     if (!user.password) {
-      throw new Error("No password set on this account. Please use OTP login.");
+      throw new ValidationError("No password set on this account. Please use OTP login.");
     }
 
     const isMatch = await user.matchPassword(password);
     if (!isMatch) {
-      throw new Error("Invalid password");
+      throw new UnauthorizedError("Invalid password");
     }
 
     if (user.role !== role) {
-      throw new Error("Unauthorized role");
+      throw new ForbiddenError("Unauthorized role");
     }
 
     const token = this.generateToken((user._id as any).toString(), user.role);
@@ -66,7 +67,7 @@ export class AuthService {
     return jwt.sign(
       { userId, role },
       process.env.JWT_SECRET || "default_secret",
-      { expiresIn: "30d" } // 2 weeks
+      { expiresIn: "30d" } // 30 days
     );
   }
 }
