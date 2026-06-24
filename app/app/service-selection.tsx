@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from "react";
+import React, { useEffect, useState, useRef, useCallback } from "react";
 import {
   Platform,
   StyleSheet,
@@ -17,7 +17,8 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather, FontAwesome5, Ionicons } from "@expo/vector-icons";
-import { router, useLocalSearchParams } from "expo-router";
+import { router, useLocalSearchParams, useFocusEffect } from "expo-router";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as Location from "expo-location";
 import { useThemeStore } from "@/contexts/themeStore";
 import Colors from "@/constants/colors";
@@ -29,6 +30,15 @@ import { socketService } from "@/utils/socketService";
 import { useDeliveryStore } from "@/contexts/deliveryStore";
 
 const MIN_CUSTOM_PRICE = 50;
+
+const PRICE_SLIDER_STEPS = [
+  { label: "-10", offset: -10 },
+  { label: "◆", offset: 0 },
+  { label: "+10", offset: 10 },
+  { label: "+20", offset: 20 },
+  { label: "+30", offset: 30 },
+  { label: "+40", offset: 40 },
+];
 
 export default function ServiceSelectionScreen() {
   const insets = useSafeAreaInsets();
@@ -64,6 +74,7 @@ export default function ServiceSelectionScreen() {
   const [showPriceSheet, setShowPriceSheet] = useState(false);
   const [customPrice, setCustomPrice] = useState<number | null>(null);
   const [priceInputText, setPriceInputText] = useState("");
+  const [sliderIndex, setSliderIndex] = useState(1);
   const [nearbyDrivers, setNearbyDrivers] = useState<any[]>([]);
   
   // Staggered animated values for radar pulses
@@ -100,6 +111,21 @@ export default function ServiceSelectionScreen() {
       })();
     }
   }, [label]);
+
+  useFocusEffect(
+    useCallback(() => {
+      (async () => {
+        try {
+          const activeStr = await AsyncStorage.getItem("active_address");
+          if (activeStr) {
+            setSelectedAddress(JSON.parse(activeStr));
+          }
+        } catch (e) {
+          console.error("Failed to load active address:", e);
+        }
+      })();
+    }, [])
+  );
 
   // Handle booking status updates and pulse animations
   useEffect(() => {
@@ -417,8 +443,37 @@ export default function ServiceSelectionScreen() {
     const activeFare = customPrice ?? baseFare;
 
     const openPriceSheet = () => {
-      setPriceInputText(String(customPrice ?? baseFare));
+      const currentVal = customPrice ?? baseFare;
+      setPriceInputText(String(currentVal));
+      
+      const diff = currentVal - baseFare;
+      const foundIdx = PRICE_SLIDER_STEPS.findIndex(s => s.offset === diff);
+      if (foundIdx !== -1) {
+        setSliderIndex(foundIdx);
+      } else {
+        let closestIdx = 1;
+        let minDiff = Infinity;
+        PRICE_SLIDER_STEPS.forEach((step, idx) => {
+          const stepVal = Math.max(MIN_CUSTOM_PRICE, baseFare + step.offset);
+          const d = Math.abs(currentVal - stepVal);
+          if (d < minDiff) {
+            minDiff = d;
+            closestIdx = idx;
+          }
+        });
+        setSliderIndex(closestIdx);
+      }
       setShowPriceSheet(true);
+    };
+
+    const getPriceAtStep = (stepOffset: number) => {
+      return Math.max(MIN_CUSTOM_PRICE, baseFare + stepOffset);
+    };
+
+    const selectStep = (index: number) => {
+      setSliderIndex(index);
+      const stepVal = getPriceAtStep(PRICE_SLIDER_STEPS[index].offset);
+      setPriceInputText(String(stepVal));
     };
 
     const applyPriceInput = () => {
@@ -456,7 +511,7 @@ export default function ServiceSelectionScreen() {
 
         {/* Clean Background when map is hidden (idle state) */}
         {bookingState === "idle" && (
-          <View style={[StyleSheet.absoluteFill, { backgroundColor: colors.background }]} />
+          <View style={[StyleSheet.absoluteFill, { backgroundColor: '#fbf8ff' }]} />
         )}
 
         {/* Top Header */}
@@ -466,15 +521,12 @@ export default function ServiceSelectionScreen() {
           left: 0,
           right: 0,
           zIndex: 10,
-          paddingTop: insets.top + (Platform.OS === 'web' ? 20 : 12),
-          borderBottomWidth: bookingState === "idle" ? 1 : 0,
-          borderColor: colors.border,
-          backgroundColor: bookingState === "idle" ? colors.surface : (theme === 'dark' ? 'rgba(15, 23, 42, 0.85)' : 'rgba(255, 255, 255, 0.85)'),
-          shadowColor: '#000',
-          shadowOffset: { width: 0, height: 2 },
-          shadowOpacity: bookingState === "idle" ? 0 : 0.05,
-          shadowRadius: 10,
-          elevation: bookingState === "idle" ? 0 : 4
+          paddingTop: insets.top + (Platform.OS === 'web' ? 20 : 16),
+          borderBottomWidth: 1,
+          borderColor: '#E4E4E7',
+          backgroundColor: '#ffffff',
+          flexDirection: 'row',
+          alignItems: 'center',
         }]}>
           <TouchableOpacity 
             style={styles.backBtn} 
@@ -488,205 +540,171 @@ export default function ServiceSelectionScreen() {
               }
             }}
           >
-            <Feather name="arrow-left" size={24} color={colors.text} />
+            <Feather name="arrow-left" size={24} color={'#000000'} />
           </TouchableOpacity>
-          <Text style={styles.taskHeaderTitle}>Reservation</Text>
-          <View style={{ width: 44 }} />
+          <View style={styles.headerTitleContainer}>
+            <Text style={styles.headerTitle}>RESERVATION</Text>
+          </View>
+          <View style={styles.headerSpacer} />
         </View>
 
-        {/* First Phase: Idle Configuration Form (No BottomSheet, normal ScrollView directly below header) */}
+        {/* First Phase: Idle Configuration Form */}
         {bookingState === "idle" ? (
-          <ScrollView 
-            style={{ marginTop: insets.top + (Platform.OS === 'web' ? 20 : 12) + 59, flex: 1 }}
-            contentContainerStyle={[styles.taskScrollContent, { paddingBottom: insets.bottom + 20 }]} 
-            showsVerticalScrollIndicator={false}
-          >
-            {/* Address Selection Card */}
-            <View style={styles.taskSectionCard}>
-              <Text style={styles.taskSectionLabel}>SELECT LOCATION</Text>
-              <TouchableOpacity 
-                style={styles.taskAddressBox} 
-                onPress={() => setIsLocationSheetOpen(true)}
-                activeOpacity={0.8}
-              >
-                <View style={styles.taskAddressIconWrap}>
-                  <Ionicons name="location" size={22} color={colors.text} />
-                </View>
-                <View style={styles.taskAddressTextWrap}>
-                  <Text style={styles.taskAddressTitle}>
-                    {selectedAddress?.label || "Select Address"}
-                  </Text>
-                  <Text style={styles.taskAddressSub} numberOfLines={2}>
-                    {selectedAddress?.addressLine || "Tap here to search and select the address where you need the work done"}
-                  </Text>
-                </View>
-                <Feather name="edit-2" size={16} color={colors.textSecondary} />
-              </TouchableOpacity>
-            </View>
-
-            {/* Time Duration Section */}
-            <View style={styles.taskSectionCard}>
-              <View style={styles.sectionHeaderRow}>
-                <Text style={styles.taskSectionLabel}>WORK TIME DURATION</Text>
-                {durationOption !== "custom" && (
-                  <Text style={styles.selectionIndicator}>{durationOption} {durationOption === "1" ? "Hour" : "Hours"}</Text>
-                )}
-              </View>
-              <View style={styles.presetGrid}>
-                {["1", "2", "3", "4"].map((opt) => (
-                  <TouchableOpacity
-                    key={opt}
-                    style={[
-                      styles.presetPill,
-                      durationOption === opt && styles.presetPillActive
-                    ]}
-                    onPress={() => {
-                      setDurationOption(opt);
-                      setCustomDuration("");
-                    }}
-                  >
-                    <Text style={[
-                      styles.presetPillText,
-                      durationOption === opt && styles.presetPillTextActive
-                    ]}>
-                      {opt} {opt === "1" ? "Hr" : "Hrs"}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-                <TouchableOpacity
-                  style={[
-                    styles.presetPill,
-                    durationOption === "custom" && styles.presetPillActive
-                  ]}
-                  onPress={() => setDurationOption("custom")}
+          <View style={{ flex: 1, backgroundColor: '#fbf8ff' }}>
+            <ScrollView 
+              style={{ marginTop: insets.top + 72, flex: 1 }}
+              contentContainerStyle={[styles.taskScrollContent, { paddingBottom: 20 }]} 
+              showsVerticalScrollIndicator={false}
+            >
+              {/* Collection Point Section */}
+              <View style={styles.collectionPointCard}>
+                <Text style={styles.sectionHeading}>COLLECTION POINT</Text>
+                <TouchableOpacity 
+                  style={styles.collectionInputBox} 
+                  onPress={() => router.push("/delivery/saved-addresses")}
+                  activeOpacity={0.8}
                 >
-                  <Text style={[
-                    styles.presetPillText,
-                    durationOption === "custom" && styles.presetPillTextActive
-                  ]}>
-                    Custom
+                  <Text 
+                    style={[
+                      styles.collectionInputText, 
+                      !selectedAddress && styles.collectionInputPlaceholder
+                    ]}
+                    numberOfLines={1}
+                  >
+                    {selectedAddress?.addressLine || "Enter delivery address"}
                   </Text>
                 </TouchableOpacity>
               </View>
 
-              {durationOption === "custom" && (
-                <View style={styles.customInputWrapper}>
-                  <Text style={styles.customInputLabel}>Specify Hours</Text>
-                  <View style={styles.customInputContainer}>
-                    <Feather name="clock" size={18} color={colors.textSecondary} style={{ marginRight: 8 }} />
+              {/* Time Duration Section */}
+              <View style={styles.collectionPointCard}>
+                <Text style={styles.sectionHeading}>DURATION</Text>
+                <View style={styles.presetRow}>
+                  {[
+                    { label: "1 HOUR", value: "1" },
+                    { label: "2 HOURS", value: "2" },
+                    { label: "CUSTOM", value: "custom" },
+                  ].map((opt) => {
+                    const isActive = durationOption === opt.value;
+                    return (
+                      <TouchableOpacity
+                        key={opt.value}
+                        style={[
+                          styles.presetButton,
+                          isActive && styles.presetButtonActive
+                        ]}
+                        onPress={() => {
+                          setDurationOption(opt.value);
+                          if (opt.value !== "custom") {
+                            setCustomDuration("");
+                          }
+                        }}
+                      >
+                        <Text style={[
+                          styles.presetButtonText,
+                          isActive && styles.presetButtonTextActive
+                        ]}>
+                          {opt.label}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+
+                {durationOption === "custom" && (
+                  <View style={styles.customTextInputWrapper}>
                     <TextInput
-                      style={styles.customTextInput}
-                      placeholder="Enter custom duration (e.g., 6)"
-                      placeholderTextColor={colors.textMuted}
+                      style={styles.customUnderlineInput}
+                      placeholder="Enter custom duration in hours (e.g., 6)"
+                      placeholderTextColor="#A1A1AA"
                       keyboardType="numeric"
                       value={customDuration}
                       onChangeText={setCustomDuration}
                     />
-                    <Text style={styles.inputUnit}>hours</Text>
                   </View>
-                </View>
-              )}
-            </View>
-
-            {/* Distance Radius Section */}
-            <View style={styles.taskSectionCard}>
-              <View style={styles.sectionHeaderRow}>
-                <Text style={styles.taskSectionLabel}>WORKER DISTANCE RADIUS</Text>
-                {radiusOption !== "custom" && (
-                  <Text style={styles.selectionIndicator}>Within {radiusOption} km</Text>
                 )}
               </View>
-              <View style={styles.presetGrid}>
-                {["2", "5", "10", "15"].map((opt) => (
-                  <TouchableOpacity
-                    key={opt}
-                    style={[
-                      styles.presetPill,
-                      radiusOption === opt && styles.presetPillActive
-                    ]}
-                    onPress={() => {
-                      setRadiusOption(opt);
-                      setCustomRadius("");
-                    }}
-                  >
-                    <Text style={[
-                      styles.presetPillText,
-                      radiusOption === opt && styles.presetPillTextActive
-                    ]}>
-                      {opt} km
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-                <TouchableOpacity
-                  style={[
-                    styles.presetPill,
-                    radiusOption === "custom" && styles.presetPillActive
-                  ]}
-                  onPress={() => setRadiusOption("custom")}
-                >
-                  <Text style={[
-                    styles.presetPillText,
-                    radiusOption === "custom" && styles.presetPillTextActive
-                  ]}>
-                    Custom
-                  </Text>
-                </TouchableOpacity>
-              </View>
 
-              {radiusOption === "custom" && (
-                <View style={styles.customInputWrapper}>
-                  <Text style={styles.customInputLabel}>Specify Distance</Text>
-                  <View style={styles.customInputContainer}>
-                    <Feather name="navigation" size={18} color={colors.textSecondary} style={{ marginRight: 8 }} />
+              {/* Distance Radius Section */}
+              <View style={styles.collectionPointCard}>
+                <Text style={styles.sectionHeading}>RADIUS PREFERENCE</Text>
+                <View style={styles.presetRow}>
+                  {[
+                    { label: "2 KM", value: "2" },
+                    { label: "5 KM", value: "5" },
+                    { label: "CUSTOM", value: "custom" },
+                  ].map((opt) => {
+                    const isActive = radiusOption === opt.value;
+                    return (
+                      <TouchableOpacity
+                        key={opt.value}
+                        style={[
+                          styles.presetButton,
+                          isActive && styles.presetButtonActive
+                        ]}
+                        onPress={() => {
+                          setRadiusOption(opt.value);
+                          if (opt.value !== "custom") {
+                            setCustomRadius("");
+                          }
+                        }}
+                      >
+                        <Text style={[
+                          styles.presetButtonText,
+                          isActive && styles.presetButtonTextActive
+                        ]}>
+                          {opt.label}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+
+                {radiusOption === "custom" && (
+                  <View style={styles.customTextInputWrapper}>
                     <TextInput
-                      style={styles.customTextInput}
-                      placeholder="Enter custom distance (e.g., 25)"
-                      placeholderTextColor={colors.textMuted}
+                      style={styles.customUnderlineInput}
+                      placeholder="Enter custom distance in km (e.g., 25)"
+                      placeholderTextColor="#A1A1AA"
                       keyboardType="numeric"
                       value={customRadius}
                       onChangeText={setCustomRadius}
                     />
-                    <Text style={styles.inputUnit}>km</Text>
                   </View>
-                </View>
-              )}
-            </View>
+                )}
+              </View>
+            </ScrollView>
 
-            {/* Estimated Fare Card */}
-            <View style={styles.taskSectionCard}>
-              <View style={styles.fareHeaderRow}>
-                <View style={styles.fareTextCol}>
-                  <Text style={styles.fareSectionLabel}>ESTIMATED FARE</Text>
-                  <Text style={styles.estimatedFareValue}>₹{activeFare}</Text>
+            {/* Sticky Bottom Price & Confirm Reservation Panel */}
+            <View style={[styles.bottomPanel, { paddingBottom: insets.bottom + 16 }]}>
+              <View style={styles.bottomPriceRow}>
+                <View style={styles.priceCol}>
+                  <Text style={styles.priceHeading}>TOTAL PRICE</Text>
+                  <TouchableOpacity 
+                    style={styles.priceOutlineBox} 
+                    onPress={openPriceSheet}
+                    activeOpacity={0.85}
+                  >
+                    <Text style={styles.priceValueText}>₹{activeFare}</Text>
+                    <Feather name="edit-2" size={14} color="#000000" style={{ marginLeft: 8 }} />
+                  </TouchableOpacity>
                 </View>
-                <TouchableOpacity
-                  style={styles.inlineBookButton}
-                  onPress={handleBook}
-                  activeOpacity={0.8}
-                >
-                  <Text style={styles.inlineBookButtonText}>Book Helper</Text>
-                  <Feather name="arrow-right" size={14} color={colors.surface} />
-                </TouchableOpacity>
+                <View style={styles.taxesCol}>
+                  <Text style={styles.taxesText}>INCLUSIVE</Text>
+                  <Text style={styles.taxesText}>OF ALL TAXES & FEES</Text>
+                </View>
               </View>
 
               <TouchableOpacity
-                style={styles.changePriceButton}
-                onPress={openPriceSheet}
-                activeOpacity={0.85}
+                style={styles.confirmButton}
+                onPress={handleBook}
+                activeOpacity={0.8}
               >
-                <Feather name="sliders" size={14} color={colors.primary} />
-                <Text style={styles.changePriceText}>Change price</Text>
+                <Text style={styles.confirmButtonText}>CONFIRM RESERVATION</Text>
+                <Feather name="arrow-right" size={18} color="#ffffff" style={{ marginLeft: 8 }} />
               </TouchableOpacity>
             </View>
-            {/* Information Card */}
-            <View style={styles.infoCard}>
-              <Ionicons name="information-circle-outline" size={20} color={colors.textSecondary} />
-              <Text style={styles.infoText}>
-                This will request available helpers within your specified radius to book them for the hours selected. You'll be matched with a captain instantly.
-              </Text>
-            </View>
-
-          </ScrollView>
+          </View>
         ) : (
           /* Second & Third Phase: Bottom Sheet overlays map for finding and success states */
           <BottomSheet 
@@ -844,26 +862,94 @@ export default function ServiceSelectionScreen() {
             <TouchableOpacity style={styles.priceSheetScrim} activeOpacity={1} onPress={() => setShowPriceSheet(false)} />
             <View style={[styles.priceSheet, { paddingBottom: insets.bottom + 24 }]}>
               <View style={styles.sheetHandle} />
-              <Text style={styles.priceSheetTitle}>Set your offer price</Text>
-              <Text style={styles.priceEstimateSubtext}>Estimated fare ₹{baseFare}</Text>
+              
+              <Text style={styles.priceSheetTitle}>Now you can set a price that works for you</Text>
 
-              <View style={styles.priceInputWrap}>
-                <Text style={styles.priceInputPrefix}>₹</Text>
-                <TextInput
-                  style={styles.priceInput}
-                  value={priceInputText}
-                  onChangeText={(text) => setPriceInputText(text.replace(/[^\d]/g, ""))}
-                  keyboardType="number-pad"
-                  placeholder={String(baseFare)}
-                  placeholderTextColor={colors.textMuted}
-                  returnKeyType="done"
-                  onSubmitEditing={applyPriceInput}
-                />
+              <View style={styles.largePriceBox}>
+                <Text style={styles.largePriceText}>₹{priceInputText}</Text>
+              </View>
+
+              <View style={styles.priceTipRow}>
+                <Ionicons name="bulb-outline" size={16} color="#7e7576" style={{ marginRight: 8 }} />
+                <Text style={styles.priceTipText}>Higher the price, higher the chance of getting a ride</Text>
+              </View>
+
+              <View style={styles.sliderContainer}>
+                {/* Horizontal centered step labels */}
+                <View style={styles.sliderLabelsContainer}>
+                  {PRICE_SLIDER_STEPS.map((step, idx) => {
+                    const isActive = sliderIndex === idx;
+                    return (
+                      <TouchableOpacity 
+                        key={idx} 
+                        style={[
+                          styles.sliderLabelWrapper,
+                          { left: `${(idx / (PRICE_SLIDER_STEPS.length - 1)) * 100}%` }
+                        ]} 
+                        onPress={() => selectStep(idx)}
+                        activeOpacity={0.7}
+                      >
+                        <Text style={[
+                          styles.sliderLabelText,
+                          isActive && styles.sliderLabelTextActive
+                        ]}>
+                          {step.label}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+
+                {/* Custom slider track */}
+                <View style={styles.sliderTrackContainer}>
+                  {/* Underlay track background */}
+                  <View style={styles.sliderTrackLineBackground} />
+                  
+                  {/* Underlay active track progress */}
+                  <View style={[
+                    styles.sliderTrackLineActive,
+                    { width: `${(sliderIndex / (PRICE_SLIDER_STEPS.length - 1)) * 100}%` }
+                  ]} />
+
+                  {/* Underlay step dots */}
+                  <View style={styles.sliderDotsContainer}>
+                    {PRICE_SLIDER_STEPS.map((_, idx) => (
+                      <View
+                        key={idx}
+                        style={[
+                          styles.sliderDot,
+                          idx <= sliderIndex ? styles.sliderDotActive : styles.sliderDotInactive
+                        ]}
+                      />
+                    ))}
+                  </View>
+
+                  {/* Underlay slider thumb */}
+                  <View 
+                    style={[
+                      styles.sliderThumb,
+                      { left: `${(sliderIndex / (PRICE_SLIDER_STEPS.length - 1)) * 100}%` }
+                    ]}
+                  />
+
+                  {/* Overlay interactive segments to capture touches across the entire track width */}
+                  <View style={styles.sliderTouchOverlay}>
+                    {PRICE_SLIDER_STEPS.map((_, idx) => (
+                      <TouchableOpacity
+                        key={idx}
+                        style={styles.sliderTouchSegment}
+                        onPress={() => selectStep(idx)}
+                        activeOpacity={1}
+                      />
+                    ))}
+                  </View>
+                </View>
               </View>
 
               <TouchableOpacity style={styles.priceSheetBookButton} onPress={applyPriceInput} activeOpacity={0.9}>
-                <Text style={styles.priceSheetBookText}>OK</Text>
+                <Text style={styles.priceSheetBookText}>Set price to ₹{priceInputText}</Text>
               </TouchableOpacity>
+              
               <TouchableOpacity
                 style={styles.priceSheetRemoveButton}
                 onPress={() => {
@@ -873,8 +959,7 @@ export default function ServiceSelectionScreen() {
                 }}
                 activeOpacity={0.85}
               >
-                <Feather name="x" size={14} color={colors.text} />
-                <Text style={styles.priceSheetRemoveText}>Use estimated fare</Text>
+                <Text style={styles.priceSheetRemoveText}>✕ Remove</Text>
               </TouchableOpacity>
             </View>
           </KeyboardAvoidingView>
@@ -1568,34 +1653,37 @@ const createStyles = (colors: typeof Colors.light) => StyleSheet.create({
   },
   priceSheetBookButton: {
     height: 52,
-    borderRadius: 14,
-    backgroundColor: colors.primary,
+    borderRadius: 4,
+    backgroundColor: "#000000",
     alignItems: "center",
     justifyContent: "center",
     paddingHorizontal: 16,
+    width: "100%",
   },
   priceSheetBookText: {
-    color: colors.surface,
+    color: "#ffffff",
     fontSize: 15,
-    fontWeight: "800",
+    fontWeight: "700",
+    letterSpacing: 0.8,
   },
   priceSheetRemoveButton: {
     alignSelf: "center",
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 20,
+    height: 48,
+    borderRadius: 4,
     borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.surface,
-    marginBottom: 4,
+    borderColor: "#E4E4E7",
+    backgroundColor: "transparent",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 24,
+    width: "100%",
+    marginTop: 4,
   },
   priceSheetRemoveText: {
-    color: colors.text,
-    fontSize: 13,
+    color: "#000000",
+    fontSize: 15,
     fontWeight: "700",
+    letterSpacing: 0.8,
   },
   bookButton: {
     backgroundColor: colors.primary,
@@ -1960,5 +2048,272 @@ const createStyles = (colors: typeof Colors.light) => StyleSheet.create({
     flexDirection: "row",
     gap: 10,
     width: "100%",
+  },
+  headerTitleContainer: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  headerSpacer: {
+    width: 32,
+  },
+  headerTitle: {
+    fontSize: 20,
+    fontWeight: "700",
+    color: "#000000",
+    textAlign: "center",
+    letterSpacing: 1.2,
+  },
+  collectionPointCard: {
+    marginBottom: 24,
+    paddingHorizontal: 4,
+  },
+  sectionHeading: {
+    fontFamily: 'System',
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#7e7576',
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
+    marginBottom: 10,
+  },
+  collectionInputBox: {
+    height: 52,
+    borderWidth: 1,
+    borderColor: '#E4E4E7',
+    borderRadius: 4,
+    backgroundColor: '#ffffff',
+    justifyContent: 'center',
+    paddingHorizontal: 16,
+  },
+  collectionInputText: {
+    fontSize: 15,
+    color: '#1a1b22',
+    fontWeight: '500',
+  },
+  collectionInputPlaceholder: {
+    color: '#A1A1AA',
+  },
+  presetRow: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  presetButton: {
+    flex: 1,
+    height: 48,
+    borderWidth: 1,
+    borderColor: '#cfc4c5',
+    borderRadius: 4,
+    backgroundColor: '#ffffff',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  presetButtonActive: {
+    backgroundColor: '#000000',
+    borderColor: '#000000',
+  },
+  presetButtonText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#1a1b22',
+    letterSpacing: 0.5,
+  },
+  presetButtonTextActive: {
+    color: '#ffffff',
+  },
+  customTextInputWrapper: {
+    marginTop: 12,
+  },
+  customUnderlineInput: {
+    borderBottomWidth: 1,
+    borderBottomColor: '#E4E4E7',
+    paddingVertical: 8,
+    fontSize: 16,
+    color: '#000000',
+  },
+  bottomPanel: {
+    backgroundColor: '#ffffff',
+    borderTopWidth: 1,
+    borderColor: '#E4E4E7',
+    paddingHorizontal: 20,
+    paddingTop: 16,
+  },
+  bottomPriceRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  priceCol: {
+    flexDirection: 'column',
+  },
+  priceHeading: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#7e7576',
+    letterSpacing: 0.8,
+    marginBottom: 6,
+  },
+  priceOutlineBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1.5,
+    borderColor: '#E4E4E7',
+    borderRadius: 4,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    backgroundColor: '#ffffff',
+  },
+  priceValueText: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#000000',
+  },
+  taxesCol: {
+    alignItems: 'flex-end',
+  },
+  taxesText: {
+    fontSize: 9,
+    fontWeight: '700',
+    color: '#7e7576',
+    letterSpacing: 0.5,
+    lineHeight: 13,
+  },
+  confirmButton: {
+    backgroundColor: '#000000',
+    height: 52,
+    borderRadius: 4,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  confirmButtonText: {
+    color: '#ffffff',
+    fontSize: 15,
+    fontWeight: '700',
+    letterSpacing: 0.8,
+  },
+  largePriceBox: {
+    backgroundColor: "#F4F4F5",
+    borderRadius: 8,
+    paddingVertical: 18,
+    width: "100%",
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: "#E4E4E7",
+    marginBottom: 8,
+  },
+  largePriceText: {
+    fontSize: 38,
+    fontWeight: "800",
+    color: "#000000",
+    fontFamily: "Inter",
+  },
+  priceTipRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    marginVertical: 4,
+    paddingHorizontal: 8,
+    width: "100%",
+  },
+  priceTipText: {
+    fontSize: 13,
+    fontWeight: "500",
+    color: "#7e7576",
+    textAlign: "center",
+    lineHeight: 18,
+  },
+  sliderContainer: {
+    marginVertical: 16,
+    width: "100%",
+    paddingHorizontal: 8,
+  },
+  sliderLabelsContainer: {
+    height: 24,
+    position: "relative",
+    width: "100%",
+    marginBottom: 8,
+  },
+  sliderLabelWrapper: {
+    position: "absolute",
+    width: 40,
+    marginLeft: -20,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  sliderLabelText: {
+    fontFamily: "System",
+    fontSize: 13,
+    fontWeight: "600",
+    color: "#7e7576",
+  },
+  sliderLabelTextActive: {
+    color: "#000000",
+    fontWeight: "800",
+  },
+  sliderTrackContainer: {
+    height: 30,
+    justifyContent: "center",
+    position: "relative",
+    width: "100%",
+  },
+  sliderTrackLineBackground: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    height: 6,
+    backgroundColor: "#EEEDF7",
+    borderRadius: 3,
+  },
+  sliderTrackLineActive: {
+    position: "absolute",
+    left: 0,
+    height: 6,
+    backgroundColor: "#000000",
+    borderRadius: 3,
+  },
+  sliderDotsContainer: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  sliderDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: "#ffffff",
+  },
+  sliderDotInactive: {
+    backgroundColor: "#ffffff",
+  },
+  sliderDotActive: {
+    backgroundColor: "#ffffff",
+  },
+  sliderThumb: {
+    position: "absolute",
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: "#ffffff",
+    borderWidth: 3,
+    borderColor: "#000000",
+    marginLeft: -12,
+  },
+  sliderTouchOverlay: {
+    position: "absolute",
+    left: -10,
+    right: -10,
+    top: 0,
+    bottom: 0,
+    flexDirection: "row",
+  },
+  sliderTouchSegment: {
+    flex: 1,
+    height: "100%",
   },
 });

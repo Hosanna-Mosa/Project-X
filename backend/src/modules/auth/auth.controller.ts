@@ -21,7 +21,7 @@ export class AuthController {
 
   async verifyOTP(req: Request, res: Response) {
     try {
-      const { phone, code, role, name, password } = req.body;
+      const { phone, code, role, name, password, email } = req.body;
 
       if (!phone || !code || !role) {
         return res.status(400).json({ message: "Phone, code and role are required" });
@@ -31,7 +31,7 @@ export class AuthController {
         return res.status(400).json({ message: "Invalid role" });
       }
 
-      const result = await authService.verifyOTP(phone, code, role as UserRole, name, password);
+      const result = await authService.verifyOTP(phone, code, role as UserRole, name, password, email);
 
       return res.json(result);
     } catch (error: any) {

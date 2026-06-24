@@ -8,7 +8,7 @@ export class AuthService {
     return { success: true, message: "OTP sent successfully" };
   }
 
-  async verifyOTP(phone: string, _code: string, role: UserRole, name?: string, password?: string) {
+  async verifyOTP(phone: string, _code: string, role: UserRole, name?: string, password?: string, email?: string) {
     // Dummy mode — ANY code is accepted. No DB lookup needed.
     console.log(`[DUMMY AUTH] Verifying OTP for ${phone}. Code: ${_code} — accepted.`);
 
@@ -27,19 +27,25 @@ export class AuthService {
         phone,
         role,
         password,
+        email,
       });
       await user.save();
 
       // Driver record will be created on first onboarding save (getOrCreateDriver)
-      console.log(`[DUMMY AUTH] New user created: ${name} (${phone}) with password`);
+      console.log(`[DUMMY AUTH] New user created: ${name} (${phone}) with password and email ${email || ""}`);
     }
 
     const token = this.generateToken((user._id as any).toString(), user.role);
     return { user, token, isNewUser: false };
   }
 
-  async loginWithPassword(phone: string, password: string, role: UserRole) {
-    const user = await User.findOne({ phone });
+  async loginWithPassword(phoneOrEmail: string, password: string, role: UserRole) {
+    const user = await User.findOne({
+      $or: [
+        { phone: phoneOrEmail },
+        { email: phoneOrEmail }
+      ]
+    });
 
     if (!user) {
       throw new Error("User not found. Please sign up first.");

@@ -3,7 +3,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import Constants from "expo-constants";
 
 // The API URL should be retrieved from app.json/Constants
-const apiUrl = process.env.EXPO_PUBLIC_API_URL;
+const apiUrl = process.env.EXPO_PUBLIC_API_URL || Constants.expoConfig?.extra?.apiUrl;
 
 interface AuthState {
   user: any | null;
@@ -14,7 +14,7 @@ interface AuthState {
   setToken: (token: string) => void;
   logout: () => Promise<void>;
   requestOTP: (phone: string) => Promise<{ success: boolean; message: string }>;
-  verifyOTP: (phone: string, code: string, role: string, name?: string) => Promise<{ success: boolean; isNewUser?: boolean }>;
+  verifyOTP: (phone: string, code: string, role: string, name?: string, email?: string, password?: string) => Promise<{ success: boolean; isNewUser?: boolean }>;
   loginWithPassword: (phone: string, password: string, role: string) => Promise<{ success: boolean }>;
   initializeAuth: () => Promise<void>;
 }
@@ -72,13 +72,13 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     }
   },
 
-  verifyOTP: async (phone: string, code: string, role: string, name?: string) => {
+  verifyOTP: async (phone: string, code: string, role: string, name?: string, email?: string, password?: string) => {
     set({ loading: true, error: null });
     try {
       const response = await fetch(`${apiUrl}/api/v1/auth/verify-otp`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ phone, code, role, name }),
+        body: JSON.stringify({ phone, code, role, name, email, password }),
       });
       const data = await response.json();
       set({ loading: false });

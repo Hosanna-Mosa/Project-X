@@ -19,7 +19,7 @@ import { Colors } from "@/constants/colors";
 import { useDriverStore } from "@/store/driverStore";
 import Constants from "expo-constants";
 
-const apiUrl = process.env.EXPO_PUBLIC_API_URL;
+const apiUrl = process.env.EXPO_PUBLIC_API_URL || Constants.expoConfig?.extra?.apiUrl;
 const MOCK_OTP = "123456";
 
 type AuthMode = "signin" | "signup";
