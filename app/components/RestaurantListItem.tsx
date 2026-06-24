@@ -79,12 +79,7 @@ export function RestaurantListItem({
           <Text style={styles.statsText}>{time.replace(' mins', ' min').replace(' min', ' min')}</Text>
         </View>
 
-        {offer && (
-          <View style={styles.offerRow}>
-            <MaterialIcons name="local-offer" size={14} color="#E11D48" />
-            <Text style={styles.offerText}>{offer}</Text>
-          </View>
-        )}
+
       </View>
     </TouchableOpacity>
   );
@@ -92,7 +87,7 @@ export function RestaurantListItem({
 
 const createStyles = (colors: typeof Colors.light) => StyleSheet.create({
   container: {
-    marginBottom: 32,
+    marginBottom: 8,
     marginHorizontal: 16,
   },
   imageWrapper: {
@@ -148,7 +143,8 @@ const createStyles = (colors: typeof Colors.light) => StyleSheet.create({
     fontWeight: "900",
   },
   details: {
-    paddingVertical: 12,
+    paddingTop: 12,
+    paddingBottom: 0,
   },
   nameRow: {
     flexDirection: "row",
@@ -183,19 +179,5 @@ const createStyles = (colors: typeof Colors.light) => StyleSheet.create({
     backgroundColor: colors.textMuted,
     marginHorizontal: 8,
   },
-  offerRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-  },
-  originalPrice: {
-    fontSize: 15,
-    color: colors.textMuted,
-    textDecorationLine: "line-through",
-  },
-  offerText: {
-    fontSize: 15,
-    color: "#E11D48",
-    fontWeight: "600",
-  },
+
 });

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import {
   Image,
   Platform,
@@ -12,7 +12,8 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
-import { router } from "expo-router";
+import { router, useFocusEffect } from "expo-router";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import Colors from "@/constants/colors";
 import { useThemeStore } from "@/contexts/themeStore";
 import { LocationPickerSheet } from "@/components/LocationPickerSheet";
@@ -90,6 +91,21 @@ export default function MeatCentersScreen() {
       setLoadingMore(false);
     }
   };
+
+  useFocusEffect(
+    useCallback(() => {
+      (async () => {
+        try {
+          const activeStr = await AsyncStorage.getItem("active_address");
+          if (activeStr) {
+            setSelectedAddress(JSON.parse(activeStr));
+          }
+        } catch (e) {
+          console.error("Failed to load active address:", e);
+        }
+      })();
+    }, [])
+  );
 
   useEffect(() => {
     (async () => {
@@ -183,10 +199,14 @@ export default function MeatCentersScreen() {
               </View>
               <TouchableOpacity 
                 style={styles.addressSelector} 
-                onPress={() => setIsLocationSheetOpen(true)}
+                onPress={() => router.push("/delivery/saved-addresses")}
               >
                 <Text style={styles.addressText} numberOfLines={1}>
-                  {selectedAddress ? selectedAddress.addressLine : "Select Location"}
+                  {selectedAddress 
+                    ? (selectedAddress.label === "Home" || selectedAddress.label === "Work"
+                        ? selectedAddress.label.toUpperCase()
+                        : (selectedAddress.label && selectedAddress.label !== "Other" ? selectedAddress.label.toUpperCase() : "ADDRESS"))
+                    : "SELECT LOCATION"}
                 </Text>
                 <Ionicons name="chevron-down" size={18} color={colors.textSecondary} />
               </TouchableOpacity>

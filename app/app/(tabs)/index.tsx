@@ -18,7 +18,7 @@ import {
   type ViewStyle,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Ionicons } from "@expo/vector-icons";
+import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { router, useFocusEffect } from "expo-router";
 import Colors from "@/constants/colors";
@@ -27,6 +27,7 @@ import { useDeliveryStore } from "@/contexts/deliveryStore";
 import { ServiceCategory } from "@/components/ServiceCategory";
 import { LocationPickerSheet } from "@/components/LocationPickerSheet";
 import { RestaurantListItem } from "@/components/RestaurantListItem";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 import { useAuthStore } from "@/contexts/authStore";
 import { useCartStore } from "@/contexts/cartStore";
@@ -209,6 +210,20 @@ export default function HomeScreen() {
   useFocusEffect(
     useCallback(() => {
       startSearchGlow();
+      
+      // Load selected address from AsyncStorage on screen focus
+      (async () => {
+        try {
+          const activeStr = await AsyncStorage.getItem("active_address");
+          if (activeStr) {
+            const parsed = JSON.parse(activeStr);
+            setSelectedAddress(parsed);
+          }
+        } catch (e) {
+          console.error("Failed to load active address:", e);
+        }
+      })();
+
       return () => searchGlowLoop.current?.stop();
     }, [startSearchGlow])
   );
@@ -359,78 +374,6 @@ export default function HomeScreen() {
             {getGreeting(userName)}
           </Text>
           <View style={styles.dishesGrid}>
-            <TouchableOpacity 
-              style={[
-                styles.dishChip, 
-                foodFilter === 'all' && styles.filterAllActive
-              ]} 
-              onPress={() => setFoodFilter('all')}
-              activeOpacity={0.8}
-            >
-              <View style={[
-                styles.dishIconCircle, 
-                { backgroundColor: foodFilter === 'all' ? '#FFFFFF25' : '#64748B15' }
-              ]}>
-                <Ionicons 
-                  name="grid" 
-                  size={14} 
-                  color={foodFilter === 'all' ? '#FFFFFF' : '#64748B'} 
-                />
-              </View>
-              <Text style={[
-                styles.dishChipText, 
-                foodFilter === 'all' && styles.filterTextActive
-              ]}>All Food</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity 
-              style={[
-                styles.dishChip, 
-                foodFilter === 'veg' && styles.filterVegActive
-              ]} 
-              onPress={() => setFoodFilter('veg')}
-              activeOpacity={0.8}
-            >
-              <View style={[
-                styles.dishIconCircle, 
-                { backgroundColor: foodFilter === 'veg' ? '#FFFFFF25' : '#16A34A15' }
-              ]}>
-                <Ionicons 
-                  name="leaf" 
-                  size={14} 
-                  color={foodFilter === 'veg' ? '#FFFFFF' : '#16A34A'} 
-                />
-              </View>
-              <Text style={[
-                styles.dishChipText, 
-                foodFilter === 'veg' && styles.filterTextActive
-              ]}>Pure Veg</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity 
-              style={[
-                styles.dishChip, 
-                foodFilter === 'nonveg' && styles.filterNonVegActive
-              ]} 
-              onPress={() => setFoodFilter('nonveg')}
-              activeOpacity={0.8}
-            >
-              <View style={[
-                styles.dishIconCircle, 
-                { backgroundColor: foodFilter === 'nonveg' ? '#FFFFFF25' : '#E11D4815' }
-              ]}>
-                <Ionicons 
-                  name="flame" 
-                  size={14} 
-                  color={foodFilter === 'nonveg' ? '#FFFFFF' : '#E11D48'} 
-                />
-              </View>
-              <Text style={[
-                styles.dishChipText, 
-                foodFilter === 'nonveg' && styles.filterTextActive
-              ]}>Non-Veg</Text>
-            </TouchableOpacity>
-
             {famousDishes.map((dish) => (
               <TouchableOpacity key={dish.id} style={styles.dishChip} activeOpacity={0.8}>
                 <View style={[styles.dishIconCircle, { backgroundColor: dish.color + '15' }]}>
@@ -503,7 +446,7 @@ export default function HomeScreen() {
         )}
         onEndReached={loadMore}
         onEndReachedThreshold={0.5}
-        contentContainerStyle={[styles.mainScrollContent, { paddingTop: topPadding + 160 }]}
+        contentContainerStyle={[styles.mainScrollContent, { paddingTop: topPadding + 175 }]}
         showsVerticalScrollIndicator={false}
         refreshing={false}
         onRefresh={async () => {
@@ -530,41 +473,70 @@ export default function HomeScreen() {
         ]}>
           <Animated.View style={[styles.headerTopRow, { opacity: topRowOpacity, transform: [{ translateY: headerTopRowTranslateY }] }]}>
             <View style={styles.locationInfoBox}>
-              <View style={styles.deliveryTitleRow}>
-                {/* <Ionicons name="location" size={14} color={colors.primary} style={{marginRight: 6}} />
-                <Text style={styles.deliveryTitle}>Delivery</Text> */}
-              </View>
               <TouchableOpacity 
                 style={styles.addressSelector} 
                 activeOpacity={0.7}
-                onPress={() => setIsLocationSheetOpen(true)}
+                onPress={() => router.push("/delivery/saved-addresses")}
               >
-                {selectedAddress ? (
-                  <View style={{flexDirection: 'row', alignItems: 'center', flexShrink: 1}}>
-                    <Text style={{fontWeight: '800', color: colors.text, marginRight: 6, fontSize: 14}}>
-                      {selectedAddress.label === "Home" || selectedAddress.label === "Work" 
-                        ? selectedAddress.label 
-                        : (selectedAddress.receiverName || (selectedAddress.label !== "Other" ? selectedAddress.label : "Other"))}
-                    </Text>
-                    <Text style={[styles.addressText, {flexShrink: 1}]} numberOfLines={1}>
-                      {selectedAddress.addressLine}
-                    </Text>
-                  </View>
-                ) : (
-                  <Text style={[styles.addressText, { color: colors.primary, fontWeight: "800", fontSize: 14 }]} numberOfLines={1}>
-                    Address
+                <View style={{ flexDirection: "row", alignItems: "center", flexShrink: 1 }}>
+                  <Text style={styles.addressHeaderText}>
+                    {selectedAddress 
+                      ? (selectedAddress.label === "Home" || selectedAddress.label === "Work"
+                          ? selectedAddress.label.toUpperCase()
+                          : (selectedAddress.label && selectedAddress.label !== "Other" ? selectedAddress.label.toUpperCase() : "ADDRESS"))
+                      : "ADDRESS"}
                   </Text>
-                )}
-                <Ionicons name="chevron-down" size={18} color={colors.textSecondary} style={{marginLeft: 6}} />
+                  <Ionicons name="chevron-down" size={14} color={colors.textMuted} style={{ marginLeft: 4 }} />
+                </View>
               </TouchableOpacity>
             </View>
-            <View style={{flexDirection: 'row', gap: 10, alignItems: 'center'}}>
-              <TouchableOpacity style={styles.avatarBtnCircle} onPress={() => setIsDistanceSheetOpen(true)}>
-                  <Ionicons name="navigate-circle-outline" size={20} color={colors.text} />
+            <View style={{flexDirection: 'row', gap: 12, alignItems: 'center'}}>
+              <TouchableOpacity style={styles.iconBtn} onPress={() => setIsDistanceSheetOpen(true)}>
+                  <MaterialCommunityIcons name="radius-outline" size={24} color={colors.primary} />
               </TouchableOpacity>
-              <TouchableOpacity style={styles.avatarBtnCircle} onPress={() => router.push("/(tabs)/profile")}>
-                  <Ionicons name="person-outline" size={18} color={colors.text} />
+              <TouchableOpacity style={styles.iconBtn} onPress={() => router.push("/(tabs)/profile")}>
+                  <Ionicons name="person-outline" size={24} color={colors.primary} />
               </TouchableOpacity>
+              {activeService === 'Food' && (
+                <View style={styles.topVegNonVegToggle}>
+                  <TouchableOpacity
+                    style={[
+                      styles.topToggleOption,
+                      foodFilter === 'veg' && styles.topToggleOptionVegActive
+                    ]}
+                    onPress={() => setFoodFilter(foodFilter === 'veg' ? 'all' : 'veg')}
+                    activeOpacity={0.8}
+                  >
+                    <Ionicons 
+                      name="leaf" 
+                      size={11} 
+                      color={foodFilter === 'veg' ? "#ffffff" : "#16A34A"} 
+                    />
+                    <Text style={[
+                      styles.topToggleText,
+                      foodFilter === 'veg' && styles.topToggleTextActive
+                    ]}>Veg</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[
+                      styles.topToggleOption,
+                      foodFilter === 'nonveg' && styles.topToggleOptionNonVegActive
+                    ]}
+                    onPress={() => setFoodFilter(foodFilter === 'nonveg' ? 'all' : 'nonveg')}
+                    activeOpacity={0.8}
+                  >
+                    <Ionicons 
+                      name="flame" 
+                      size={11} 
+                      color={foodFilter === 'nonveg' ? "#ffffff" : "#E11D48"} 
+                    />
+                    <Text style={[
+                      styles.topToggleText,
+                      foodFilter === 'nonveg' && styles.topToggleTextActive
+                    ]}>Non</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
             </View>
           </Animated.View>
 
@@ -572,41 +544,32 @@ export default function HomeScreen() {
             styles.categoriesContainer,
             { transform: [{ translateY: categoriesTranslateY }] }
           ]}>
-            {scrollOffset > 0 && (
-              <TouchableOpacity 
-                style={[styles.scrollButton, styles.scrollButtonLeft]} 
-                onPress={() => categoriesScrollRef.current?.scrollTo({ x: scrollOffset - 200, animated: true })}
-              >
-                <Ionicons name="chevron-back" size={16} color={colors.text} />
-              </TouchableOpacity>
-            )}
-            
             <ScrollView
               ref={categoriesScrollRef}
               horizontal
               showsHorizontalScrollIndicator={false}
               contentContainerStyle={styles.categoriesScrollContent}
-              onScroll={(e) => setScrollOffset(e.nativeEvent.contentOffset.x)}
               scrollEventThrottle={16}
             >
               <ServiceCategory
-                icon="clipboard-outline"
+                icon="bag-outline"
                 label="Task"
                 onPress={() => router.push({ pathname: "/service-selection", params: { label: "Task" } })}
               />
               <ServiceCategory
-                icon="car"
+                icon="car-outline"
                 label="Rides"
                 onPress={() => router.push({ pathname: "/all-services" })}
               />
               <ServiceCategory
-                icon="fast-food"
+                icon="fast-food-outline"
                 label="Food"
                 active={activeService === 'Food'}
                 onPress={() => handleServiceSwitch('Food')}
               />
               <ServiceCategory
-                icon="fitness"
+                icon="heart-pulse"
+                iconFamily="MaterialCommunityIcons"
                 label="Health"
                 onPress={() => router.push({
                   pathname: "/service-selection",
@@ -614,28 +577,21 @@ export default function HomeScreen() {
                 })}
               />
               <ServiceCategory
-                icon="restaurant"
+                icon="food-steak"
+                iconFamily="MaterialCommunityIcons"
                 label="Meat"
                 active={activeService === 'Meat'}
                 onPress={() => handleServiceSwitch('Meat')}
               />
               <ServiceCategory
-                icon="paw"
-                label="pets"
+                icon="paw-outline"
+                label="Pets"
                 onPress={() => router.push({
                   pathname: "/service-selection",
                   params: appliedDistanceKm ? { label: "pets", radiusKm: String(appliedDistanceKm) } : { label: "pets" },
                 })}
               />
-            
             </ScrollView>
-
-            <TouchableOpacity 
-              style={[styles.scrollButton, styles.scrollButtonRight]} 
-              onPress={() => categoriesScrollRef.current?.scrollTo({ x: scrollOffset + 200, animated: true })}
-            >
-              <Ionicons name="chevron-forward" size={16} color={colors.text} />
-            </TouchableOpacity>
           </Animated.View>
         </Animated.View>
       </View>
@@ -686,6 +642,8 @@ export default function HomeScreen() {
         onClose={() => setIsLocationSheetOpen(false)} 
         onSelectAddress={(address) => setSelectedAddress(address)}
       />
+
+
 
       <Modal
         visible={isDistanceSheetOpen}
@@ -856,99 +814,88 @@ const createStyles = (colors: typeof Colors.light) => StyleSheet.create({
     paddingBottom: 100,
   },
   flushHeader: {
-    backgroundColor: colors.surface,
-    paddingBottom: 15,
-    paddingHorizontal: 16,
-    borderBottomLeftRadius: 24,
-    borderBottomRightRadius: 24,
+    backgroundColor: colors.background,
+    paddingBottom: 16,
+    paddingHorizontal: 20,
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: colors.surface === "#FFFFFF" ? 0.05 : 0.3,
-    shadowRadius: 10,
-    elevation: 6,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.02,
+    shadowRadius: 4,
+    elevation: 2,
   },
   headerTopRow: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    marginBottom: 10,
+    marginBottom: 18,
   },
   locationInfoBox: {
     flex: 1,
-    marginRight: 12,
-  },
-  deliveryTitleRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginBottom: 2,
-  },
-  deliveryTitle: {
-    fontSize: 11,
-    fontWeight: "800",
-    color: colors.textSecondary,
-    letterSpacing: 0.1,
   },
   addressSelector: {
     flexDirection: "row",
     alignItems: "center",
   },
-  addressText: {
-    fontSize: 11,
-    fontWeight: "500",
+  addressHeaderText: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: colors.primary,
+    letterSpacing: 0.5,
+  },
+  addressSubText: {
+    fontSize: 12,
     color: colors.textSecondary,
-    maxWidth: "85%",
+    marginTop: 2,
+    flexShrink: 1,
   },
-  avatarBtnCircle: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    backgroundColor: colors.surfaceSecondary,
-    alignItems: "center",
-    justifyContent: "center",
+  iconBtn: {
+    padding: 4,
   },
-  categoriesContainer: {
+  topVegNonVegToggle: {
     flexDirection: "row",
     alignItems: "center",
-    marginTop: 15,
-    paddingBottom: 5,
+    backgroundColor: colors.surfaceSecondary,
+    borderWidth: 1.5,
+    borderColor: colors.border,
+    borderRadius: 18,
+    padding: 2,
+    gap: 2,
+  },
+  topToggleOption: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 14,
+    gap: 3,
+  },
+  topToggleOptionVegActive: {
+    backgroundColor: "#16A34A",
+  },
+  topToggleOptionNonVegActive: {
+    backgroundColor: "#E11D48",
+  },
+  topToggleText: {
+    fontSize: 10,
+    fontWeight: "700",
+    color: colors.textSecondary,
+  },
+  topToggleTextActive: {
+    color: "#ffffff",
+  },
+  categoriesContainer: {
+    marginTop: 8,
+    paddingBottom: 4,
   },
   categoriesScrollContent: {
-    paddingRight: 40,
+    flexDirection: "row",
     gap: 16,
-  },
-  scrollButton: {
-    position: "absolute",
-    backgroundColor: colors.surface,
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    justifyContent: "center",
-    alignItems: "center",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 8,
-    elevation: 5,
-    borderWidth: 1,
-    borderColor: colors.border,
-    zIndex: 20,
-    opacity: 0.9,
-  },
-  scrollButtonLeft: {
-    left: -14,
-    top: 10,
-  },
-  scrollButtonRight: {
-    right: -14,
-    top: 10,
   },
   greetingSection: {
     paddingHorizontal: 16,
     paddingTop: 16,
     paddingBottom: 16,
     marginTop: 15,
-    borderTopWidth: 1,
-    borderTopColor: colors.borderLight,
   },
   greetingTitle: {
     fontSize: 22,

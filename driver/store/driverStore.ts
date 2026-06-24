@@ -6,7 +6,7 @@ import { Alert } from "react-native";
 import { router } from "expo-router";
 import { socketService } from "../utils/socketService";
 
-const apiUrl = process.env.EXPO_PUBLIC_API_URL;
+const apiUrl = process.env.EXPO_PUBLIC_API_URL || Constants.expoConfig?.extra?.apiUrl;
 
 export type StopType = "pickup" | "delivery" | "drop" | "stop";
 

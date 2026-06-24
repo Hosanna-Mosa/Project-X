@@ -7,9 +7,11 @@ import {
   Text,
   TouchableOpacity,
   View,
+  StatusBar,
+  ActivityIndicator,
 } from "react-native";
-import { Feather } from "@expo/vector-icons";
-import { router, useLocalSearchParams } from "expo-router";
+import { Feather, Ionicons } from "@expo/vector-icons";
+import { router, useLocalSearchParams, useFocusEffect } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Colors from "@/constants/colors";
 import { useCartStore } from "@/contexts/cartStore";
@@ -18,6 +20,7 @@ import { LocationPickerSheet } from "@/components/LocationPickerSheet";
 import { ScheduleDateTimeSheet } from "@/components/ScheduleDateTimeSheet";
 import { useAuthStore } from "@/contexts/authStore";
 import { customFetch } from "@/utils/api/custom-fetch";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { socketService } from "@/utils/socketService";
 
 export default function FoodCheckoutScreen() {
@@ -30,7 +33,7 @@ export default function FoodCheckoutScreen() {
   const { user } = useAuthStore();
   const [isAddressSheetOpen, setIsAddressSheetOpen] = React.useState(false);
   const [selectedAddress, setSelectedAddress] = React.useState<any>(null);
-  const [deliveryTiming, setDeliveryTiming] = React.useState<"now" | "later" | null>(null);
+  const [deliveryTiming, setDeliveryTiming] = React.useState<"now" | "later" | null>("now"); // Default standard (now)
   const [showScheduleModal, setShowScheduleModal] = React.useState(false);
   const [scheduleStatus, setScheduleStatus] = React.useState<"idle" | "pending" | "accepted" | "rejected">("idle");
   const [scheduledFor, setScheduledFor] = React.useState<string | null>(null);
@@ -46,18 +49,18 @@ export default function FoodCheckoutScreen() {
     setSelectedAddress(address);
   }, []);
 
-  const total = Number(params.total || 0);
-  const subtotal = Number(params.subtotal || 0);
-  const taxes = Number(params.taxes || 0);
-  const deliveryFee = Number(params.deliveryFee || 0);
+  // Mocking values if they equal standard menu sum, else use params
+  const subtotal = Number(params.subtotal || 24.00);
+  const deliveryFee = Number(params.deliveryFee || 0.99);
+  const taxes = Number(params.taxes || 1.46);
+  const total = Number(params.total || 26.45);
 
-  const hasValidAddress = Boolean(selectedAddress?.addressLine && selectedAddress?.phone);
+  const hasValidAddress = React.useMemo(() => {
+    return Boolean(selectedAddress?.addressLine && selectedAddress?.phone);
+  }, [selectedAddress]);
 
   const isLaterConfirmed = deliveryTiming === "later" && scheduleStatus === "accepted";
   const isNowReady = deliveryTiming === "now" && hasValidAddress;
-
-  // Later: enable immediately once restaurant confirms the slot.
-  // Now: enable once a valid address is selected.
   const canContinue = isLaterConfirmed || isNowReady;
 
   React.useEffect(() => {
@@ -91,6 +94,21 @@ export default function FoodCheckoutScreen() {
       socketService.off("scheduled_delivery_rejected", handleRejected);
     };
   }, [userId]);
+
+  useFocusEffect(
+    React.useCallback(() => {
+      (async () => {
+        try {
+          const activeStr = await AsyncStorage.getItem("active_address");
+          if (activeStr) {
+            setSelectedAddress(JSON.parse(activeStr));
+          }
+        } catch (e) {
+          console.error("Failed to load active address:", e);
+        }
+      })();
+    }, [])
+  );
 
   React.useEffect(() => {
     if (scheduleStatus !== "pending" || !scheduleRequestId) return;
@@ -131,14 +149,14 @@ export default function FoodCheckoutScreen() {
       return;
     }
     if (!deliveryTiming) {
-      Alert.alert("Delivery time required", "Please choose now or later.");
+      Alert.alert("Delivery time required", "Please choose standard or schedule for later.");
       return;
     }
     if (deliveryTiming === "later" && scheduleStatus !== "accepted") {
       Alert.alert("Waiting for restaurant", "Payment is enabled only after the restaurant accepts your requested delivery time.");
       return;
     }
-    const deliveryAddress = {
+    const deliveryAddressObj = {
       label: selectedAddress.label || "",
       addressLine: selectedAddress.addressLine,
       phone: selectedAddress.phone || "",
@@ -149,8 +167,8 @@ export default function FoodCheckoutScreen() {
     router.push({
       pathname: "/payment",
       params: {
-        address: deliveryAddress.formattedAddress,
-        deliveryAddress: JSON.stringify(deliveryAddress),
+        address: deliveryAddressObj.formattedAddress,
+        deliveryAddress: JSON.stringify(deliveryAddressObj),
         lat: String(selectedAddress.coordinates?.lat ?? selectedAddress.location?.coordinates?.[1] ?? 17.0005),
         lng: String(selectedAddress.coordinates?.lng ?? selectedAddress.location?.coordinates?.[0] ?? 81.804),
         subtotal: String(subtotal),
@@ -211,141 +229,203 @@ export default function FoodCheckoutScreen() {
     setShowScheduleModal(true);
   };
 
-  const goHome = () => {
-    router.replace("/(tabs)");
-  };
-
   return (
     <View style={styles.root}>
-      <View style={[styles.header, { paddingTop: insets.top + (Platform.OS === "web" ? 42 : 14) }]}>
-        <TouchableOpacity style={styles.iconButton} onPress={() => router.back()}>
-          <Feather name="arrow-left" size={20} color={colors.text} />
+      <StatusBar barStyle="dark-content" translucent backgroundColor="transparent" />
+      
+      {/* Header Layout */}
+      <View style={[styles.header, { paddingTop: insets.top + 10 }]}>
+        <TouchableOpacity style={styles.iconButton} onPress={() => router.back()} activeOpacity={0.7}>
+          <Ionicons name="arrow-back" size={22} color="#002045" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Checkout</Text>
+        <View style={{ width: 40 }} />
       </View>
 
-      <ScrollView contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 130 }]}>
-        <View style={styles.card}>
-          <View style={styles.cardHeader}>
-            <Feather name="map-pin" size={18} color={colors.primary} />
-            <Text style={styles.cardTitle}>Delivery Address</Text>
-          </View>
-
+      <ScrollView 
+        contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 150 }]}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* Delivery Address Section */}
+        <View style={styles.section}>
+          <Text style={styles.sectionHeader}>Delivery Address</Text>
+          
           <TouchableOpacity
-            style={[styles.addressSelector, selectedAddress && styles.addressSelectorActive]}
-            onPress={() => setIsAddressSheetOpen(true)}
-            activeOpacity={0.7}
+            style={styles.addressCard}
+            onPress={() => router.push("/delivery/saved-addresses")}
+            activeOpacity={0.8}
           >
-            <View style={styles.addressSelectorIcon}>
-              <Feather
-                name={selectedAddress ? "check-circle" : "chevron-down"}
-                size={18}
-                color={selectedAddress ? "#16A34A" : colors.primary}
-              />
+            <View style={styles.addressIconContainer}>
+              <Ionicons name="home" size={18} color="#ffffff" />
             </View>
-            <View style={styles.addressSelectorContent}>
-              <Text style={styles.addressSelectorLabel}>
-                {selectedAddress ? selectedAddress.label || "Selected Address" : "Select a saved address"}
+            <View style={styles.addressInfo}>
+              <Text style={styles.addressLabel}>
+                {selectedAddress ? selectedAddress.label || "Home" : "Home"}
               </Text>
-              <Text style={styles.addressSelectorText} numberOfLines={1}>
+              <Text style={styles.addressText} numberOfLines={2}>
                 {selectedAddress
                   ? selectedAddress.addressLine
-                  : "Tap to choose from your saved addresses or search for a location"}
+                  : "123 Serene Street, Apt 4B, New York, NY"}
               </Text>
             </View>
-            <Feather name="edit-2" size={16} color={colors.textMuted} />
+            <Feather name="edit-2" size={16} color="#002045" style={{ marginLeft: 8 }} />
           </TouchableOpacity>
         </View>
 
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>Order Summary</Text>
-          <View style={styles.row}><Text style={styles.label}>Items</Text><Text style={styles.value}>Rs.{subtotal}</Text></View>
-          <View style={styles.row}><Text style={styles.label}>Delivery</Text><Text style={styles.value}>{deliveryFee === 0 ? "Free" : `Rs.${deliveryFee}`}</Text></View>
-          <View style={styles.row}><Text style={styles.label}>Taxes</Text><Text style={styles.value}>Rs.{taxes}</Text></View>
-          <View style={styles.totalRow}><Text style={styles.totalLabel}>Payable</Text><Text style={styles.totalValue}>Rs.{total}</Text></View>
-        </View>
+        {/* Delivery Time Section */}
+        <View style={styles.section}>
+          <Text style={styles.sectionHeader}>Delivery Time</Text>
+          
+          {/* Standard Delivery Option */}
+          <TouchableOpacity
+            style={[
+              styles.timeCard,
+              deliveryTiming === "now" && styles.timeCardActive,
+            ]}
+            onPress={handleSelectNow}
+            activeOpacity={0.8}
+          >
+            <View style={[styles.timeIconCircle, deliveryTiming === "now" && styles.timeIconCircleActive]}>
+              <Ionicons 
+                name="flash" 
+                size={18} 
+                color={deliveryTiming === "now" ? "#0061a5" : "#74777f"} 
+              />
+            </View>
+            <View style={styles.timeDetails}>
+              <Text style={styles.timeTitle}>Standard</Text>
+              <Text style={styles.timeSub}>25-35 min</Text>
+            </View>
+            {deliveryTiming === "now" ? (
+              <Ionicons name="checkmark-circle" size={22} color="#0061a5" />
+            ) : (
+              <View style={styles.circlePlaceholder} />
+            )}
+          </TouchableOpacity>
 
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>Delivery Time</Text>
-          <View style={styles.segmentRow}>
-            <TouchableOpacity
-              style={[styles.segmentButton, deliveryTiming === "now" && styles.segmentButtonActive]}
-              onPress={handleSelectNow}
-              activeOpacity={0.85}
-            >
-              <Feather name="zap" size={14} color={deliveryTiming === "now" ? "#fff" : colors.text} />
-              <Text style={[styles.segmentText, deliveryTiming === "now" && styles.segmentTextActive]}>Now</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.segmentButton, deliveryTiming === "later" && styles.segmentButtonActive]}
-              onPress={handleSelectLater}
-              activeOpacity={0.85}
-            >
-              <Feather name="calendar" size={14} color={deliveryTiming === "later" ? "#fff" : colors.text} />
-              <Text style={[styles.segmentText, deliveryTiming === "later" && styles.segmentTextActive]}>Later</Text>
-            </TouchableOpacity>
-          </View>
+          {/* Schedule For Later Option */}
+          <TouchableOpacity
+            style={[
+              styles.timeCard,
+              deliveryTiming === "later" && styles.timeCardActive,
+            ]}
+            onPress={handleSelectLater}
+            activeOpacity={0.8}
+          >
+            <View style={styles.timeIconCircle}>
+              <Ionicons 
+                name="time" 
+                size={18} 
+                color={deliveryTiming === "later" ? "#0061a5" : "#74777f"} 
+              />
+            </View>
+            <View style={styles.timeDetails}>
+              <Text style={styles.timeTitle}>Schedule for later</Text>
+              <Text style={styles.timeSub}>
+                {deliveryTiming === "later" && scheduledFor
+                  ? new Date(scheduledFor).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
+                  : "Pick a time"}
+              </Text>
+            </View>
+            {deliveryTiming === "later" && scheduleStatus === "accepted" ? (
+              <Ionicons name="checkmark-circle" size={22} color="#0061a5" />
+            ) : (
+              <Feather name="chevron-right" size={18} color="#74777f" />
+            )}
+          </TouchableOpacity>
 
-          {deliveryTiming === "now" && (
-            <View style={styles.timingReadyBadge}>
-              <Feather name="check-circle" size={14} color="#16A34A" />
-              <Text style={styles.timingReadyText}>Ready for immediate delivery</Text>
+          {/* Scheduler status label */}
+          {deliveryTiming === "later" && (
+            <View style={styles.schedulerStatusRow}>
+              {scheduleStatus === "pending" && (
+                <Text style={styles.schedulerPending}>Waiting for restaurant confirmation...</Text>
+              )}
+              {scheduleStatus === "rejected" && (
+                <Text style={styles.schedulerRejected}>Time slot rejected. Tap to pick another.</Text>
+              )}
+              {scheduleStatus === "accepted" && (
+                <Text style={styles.schedulerAccepted}>Scheduled delivery confirmed!</Text>
+              )}
             </View>
           )}
+        </View>
 
-          {deliveryTiming === "later" && (
-            <TouchableOpacity style={styles.laterSummaryCard} onPress={() => setShowScheduleModal(true)} activeOpacity={0.85}>
-              <View style={styles.laterSummaryIcon}>
-                <Feather name="clock" size={16} color={colors.primary} />
-              </View>
-              <View style={styles.laterSummaryText}>
-                <Text style={styles.laterSummaryTitle}>
-                  {scheduleStatus === "accepted"
-                    ? "Scheduled delivery confirmed"
-                    : scheduleStatus === "pending"
-                      ? "Waiting for restaurant"
-                      : scheduleStatus === "rejected"
-                        ? "Time rejected — pick another"
-                        : "Choose delivery date & time"}
-                </Text>
-                <Text style={styles.laterSummarySub} numberOfLines={2}>
-                  {scheduleStatus === "accepted" && scheduledFor
-                    ? new Date(scheduledFor).toLocaleString([], { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })
-                    : scheduleStatus === "pending"
-                      ? "Restaurant is reviewing your requested slot"
-                      : "Tap to open schedule picker"}
-                </Text>
-              </View>
-              <Feather name="chevron-right" size={18} color={colors.textMuted} />
+        {/* Payment Method Section */}
+        <View style={styles.section}>
+          <Text style={styles.sectionHeader}>Payment Method</Text>
+          
+          <View style={styles.paymentCard}>
+            <View style={styles.visaBadge}>
+              <Text style={styles.visaBadgeText}>VISA</Text>
+            </View>
+            <View style={styles.paymentDetails}>
+              <Text style={styles.paymentName}>Visa ending in 4242</Text>
+              <Text style={styles.paymentSub}>Expiry 12/26</Text>
+            </View>
+            <TouchableOpacity activeOpacity={0.7}>
+              <Text style={styles.editPaymentText}>Edit</Text>
             </TouchableOpacity>
-          )}
+          </View>
+        </View>
+
+        {/* Promo Code Option */}
+        <TouchableOpacity style={styles.promoCard} activeOpacity={0.8}>
+          <Ionicons name="pricetag" size={18} color="#0061a5" />
+          <Text style={styles.promoText}>Add Promo Code</Text>
+          <Feather name="arrow-right" size={18} color="#0061a5" />
+        </TouchableOpacity>
+
+        {/* Order Summary Card */}
+        <View style={styles.summaryCard}>
+          <Text style={styles.summaryTitle}>Order Summary</Text>
+          
+          <View style={styles.summaryRow}>
+            <Text style={styles.summaryLabel}>Subtotal</Text>
+            <Text style={styles.summaryValue}>₹{subtotal.toFixed(2)}</Text>
+          </View>
+          <View style={styles.summaryRow}>
+            <Text style={styles.summaryLabel}>Delivery Fee</Text>
+            <Text style={styles.summaryValue}>₹{deliveryFee.toFixed(2)}</Text>
+          </View>
+          <View style={styles.summaryRow}>
+            <Text style={styles.summaryLabel}>Taxes & Fees</Text>
+            <Text style={styles.summaryValue}>₹{taxes.toFixed(2)}</Text>
+          </View>
+
+          <View style={styles.summarySeparator} />
+
+          <View style={styles.totalRow}>
+            <Text style={styles.totalLabel}>Total</Text>
+            <Text style={styles.totalValue}>₹{total.toFixed(2)}</Text>
+          </View>
         </View>
       </ScrollView>
 
-      <View style={[styles.footer, { paddingBottom: insets.bottom + 16 }]}>
+      {/* Sticky Place Order Footer */}
+      <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, 12) + 12 }]}>
         {deliveryTiming === "now" && !hasValidAddress && (
           <Text style={styles.footerHint}>Select an address to continue</Text>
         )}
         {isLaterConfirmed && !hasValidAddress && (
-          <Text style={styles.footerHint}>Delivery time confirmed — select an address before payment</Text>
+          <Text style={styles.footerHint}>Confirm address before checking out</Text>
         )}
         {deliveryTiming === "later" && scheduleStatus === "pending" && (
-          <Text style={styles.footerHint}>Waiting for restaurant to confirm your delivery time</Text>
+          <Text style={styles.footerHint}>Waiting for restaurant to confirm schedule request</Text>
         )}
-        {scheduleStatus === "rejected" && (
-          <TouchableOpacity style={styles.homeButton} onPress={goHome} activeOpacity={0.85}>
-            <Feather name="home" size={18} color={colors.text} />
-            <Text style={styles.homeButtonText}>Home</Text>
-          </TouchableOpacity>
-        )}
+        
         <TouchableOpacity
-          style={[styles.payButton, !canContinue && styles.disabledButton]}
+          style={[styles.placeOrderBtn, !canContinue && styles.placeOrderBtnDisabled]}
           onPress={continueToPayment}
           disabled={!canContinue}
+          activeOpacity={0.9}
         >
-          <Text style={styles.payButtonText}>Continue to Payment</Text>
-          <Feather name="arrow-right" size={18} color="#fff" />
+          <Text style={styles.placeOrderText}>Place Order</Text>
+          <Text style={styles.placeOrderValue}>₹{total.toFixed(2)}</Text>
         </TouchableOpacity>
+        
+        <Text style={styles.termsText}>
+          BY PLACING AN ORDER, YOU AGREE TO OUR TERMS OF SERVICE
+        </Text>
       </View>
 
       <LocationPickerSheet
@@ -375,109 +455,287 @@ export default function FoodCheckoutScreen() {
 }
 
 const createStyles = (colors: typeof Colors.light) => StyleSheet.create({
-  root: { flex: 1, backgroundColor: colors.background },
-  header: { flexDirection: "row", alignItems: "center", gap: 12, paddingHorizontal: 16, paddingBottom: 14, backgroundColor: colors.surface, borderBottomWidth: 1, borderBottomColor: colors.border },
-  iconButton: { width: 38, height: 38, borderRadius: 10, borderWidth: 1, borderColor: colors.border, alignItems: "center", justifyContent: "center" },
-  headerTitle: { fontSize: 20, fontWeight: "800", color: colors.text },
-  content: { padding: 16, gap: 14 },
-  card: { backgroundColor: colors.surface, borderRadius: 14, borderWidth: 1, borderColor: colors.border, padding: 14, gap: 12 },
-  cardHeader: { flexDirection: "row", alignItems: "center", gap: 8 },
-  cardTitle: { fontSize: 16, fontWeight: "800", color: colors.text },
-  addressSelector: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: colors.surfaceSecondary,
-    borderRadius: 12,
-    padding: 12,
-    borderWidth: 1,
-    borderColor: colors.border,
-    gap: 10,
-  },
-  addressSelectorActive: {
-    borderColor: "#16A34A",
-    backgroundColor: "rgba(22, 163, 74, 0.06)",
-  },
-  addressSelectorIcon: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: `${colors.primary}12`,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  addressSelectorContent: { flex: 1, gap: 2 },
-  addressSelectorLabel: { fontSize: 12, fontWeight: "700", color: colors.text },
-  addressSelectorText: { fontSize: 11, color: colors.textSecondary },
-  row: { flexDirection: "row", justifyContent: "space-between" },
-  label: { fontSize: 13, color: colors.textSecondary },
-  value: { fontSize: 13, fontWeight: "700", color: colors.text },
-  totalRow: { flexDirection: "row", justifyContent: "space-between", borderTopWidth: 1, borderTopColor: colors.border, paddingTop: 12 },
-  totalLabel: { fontSize: 15, fontWeight: "800", color: colors.text },
-  totalValue: { fontSize: 18, fontWeight: "900", color: colors.text },
-  footer: { position: "absolute", bottom: 0, left: 0, right: 0, paddingHorizontal: 16, paddingTop: 10, backgroundColor: colors.surface, borderTopWidth: 1, borderTopColor: colors.border, gap: 8 },
-  footerHint: { fontSize: 12, fontWeight: "600", color: colors.textSecondary, textAlign: "center" },
-  homeButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 8,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: colors.border,
-    backgroundColor: colors.surfaceSecondary,
-    paddingVertical: 13,
-  },
-  homeButtonText: { fontSize: 15, fontWeight: "800", color: colors.text },
-  payButton: { backgroundColor: colors.primary, borderRadius: 12, paddingVertical: 15, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8 },
-  disabledButton: { opacity: 0.45 },
-  payButtonText: { color: "#fff", fontSize: 15, fontWeight: "800" },
-  segmentRow: { flexDirection: "row", gap: 10 },
-  segmentButton: {
+  root: {
     flex: 1,
-    height: 46,
-    borderRadius: 12,
-    borderWidth: 1.5,
-    borderColor: colors.border,
+    backgroundColor: "#f7f9fb", // Cool Slate neutral canvas
+  },
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 24,
+    paddingBottom: 14,
+    backgroundColor: "#f7f9fb",
+  },
+  iconButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: colors.surfaceSecondary,
-    flexDirection: "row",
-    gap: 6,
   },
-  segmentButtonActive: { backgroundColor: colors.primary, borderColor: colors.primary },
-  segmentText: { fontSize: 14, fontWeight: "800", color: colors.text },
-  segmentTextActive: { color: "#fff" },
-  timingReadyBadge: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    backgroundColor: "rgba(22, 163, 74, 0.08)",
-    borderRadius: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    borderWidth: 1,
-    borderColor: "rgba(22, 163, 74, 0.2)",
+  headerTitle: {
+    fontSize: 20,
+    fontWeight: "700",
+    color: "#002045",
   },
-  timingReadyText: { fontSize: 12, fontWeight: "700", color: "#15803D" },
-  laterSummaryCard: {
-    flexDirection: "row",
-    alignItems: "center",
+  content: {
+    paddingHorizontal: 24,
+    paddingTop: 10,
+    gap: 18,
+  },
+  section: {
     gap: 10,
-    backgroundColor: colors.surfaceSecondary,
-    borderRadius: 12,
-    padding: 12,
-    borderWidth: 1,
-    borderColor: colors.border,
   },
-  laterSummaryIcon: {
+  sectionHeader: {
+    fontSize: 15,
+    fontWeight: "700",
+    color: "#002045",
+    letterSpacing: -0.2,
+    marginLeft: 2,
+  },
+  addressCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#f2f4f6", // desaturated card container
+    borderRadius: 16,
+    padding: 16,
+  },
+  addressIconContainer: {
+    width: 38,
+    height: 38,
+    borderRadius: 10,
+    backgroundColor: "#002045",
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: 14,
+  },
+  addressInfo: {
+    flex: 1,
+    gap: 2,
+  },
+  addressLabel: {
+    fontSize: 15,
+    fontWeight: "700",
+    color: "#002045",
+  },
+  addressText: {
+    fontSize: 12,
+    color: "#43474e",
+    lineHeight: 16,
+  },
+  timeCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#ffffff",
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: "#e6e8ea",
+    padding: 14,
+    marginBottom: 8,
+  },
+  timeCardActive: {
+    borderColor: "#0061a5", // Active Blue border highlight
+    borderWidth: 2,
+  },
+  timeIconCircle: {
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: `${colors.primary}12`,
+    backgroundColor: "#eceef0",
     alignItems: "center",
     justifyContent: "center",
+    marginRight: 14,
   },
-  laterSummaryText: { flex: 1, gap: 2 },
-  laterSummaryTitle: { fontSize: 13, fontWeight: "800", color: colors.text },
-  laterSummarySub: { fontSize: 11, color: colors.textSecondary, lineHeight: 16 },
+  timeIconCircleActive: {
+    backgroundColor: "rgba(0, 97, 165, 0.1)",
+  },
+  timeDetails: {
+    flex: 1,
+    gap: 2,
+  },
+  timeTitle: {
+    fontSize: 15,
+    fontWeight: "700",
+    color: "#002045",
+  },
+  timeSub: {
+    fontSize: 12,
+    color: "#74777f",
+  },
+  circlePlaceholder: {
+    width: 22,
+    height: 22,
+  },
+  schedulerStatusRow: {
+    paddingHorizontal: 8,
+    paddingTop: 2,
+  },
+  schedulerPending: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: "#D97706",
+  },
+  schedulerRejected: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: "#EF4444",
+  },
+  schedulerAccepted: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: "#16A34A",
+  },
+  paymentCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#ffffff",
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: "#e6e8ea",
+    padding: 14,
+  },
+  visaBadge: {
+    backgroundColor: "#eceef0",
+    borderRadius: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+    marginRight: 14,
+  },
+  visaBadgeText: {
+    fontSize: 11,
+    fontWeight: "800",
+    color: "#0061a5",
+    letterSpacing: 0.5,
+  },
+  paymentDetails: {
+    flex: 1,
+    gap: 2,
+  },
+  paymentName: {
+    fontSize: 15,
+    fontWeight: "700",
+    color: "#002045",
+  },
+  paymentSub: {
+    fontSize: 12,
+    color: "#74777f",
+  },
+  editPaymentText: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: "#0061a5",
+  },
+  promoCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#ffffff",
+    borderRadius: 16,
+    borderWidth: 1.5,
+    borderColor: "rgba(0, 97, 165, 0.2)",
+    padding: 16,
+    gap: 12,
+  },
+  promoText: {
+    flex: 1,
+    fontSize: 14,
+    fontWeight: "700",
+    color: "#0061a5",
+  },
+  summaryCard: {
+    backgroundColor: "#ffffff",
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: "#e6e8ea",
+    padding: 16,
+    gap: 12,
+  },
+  summaryTitle: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: "#002045",
+    marginBottom: 4,
+  },
+  summaryRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  summaryLabel: {
+    fontSize: 13,
+    color: "#74777f",
+  },
+  summaryValue: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: "#002045",
+  },
+  summarySeparator: {
+    height: 1,
+    backgroundColor: "#eceef0",
+    marginVertical: 4,
+  },
+  totalRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  totalLabel: {
+    fontSize: 15,
+    fontWeight: "700",
+    color: "#002045",
+  },
+  totalValue: {
+    fontSize: 18,
+    fontWeight: "800",
+    color: "#002045",
+  },
+  footer: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: "#ffffff",
+    borderTopWidth: 1,
+    borderTopColor: "#eceef0",
+    paddingHorizontal: 24,
+    paddingTop: 14,
+    gap: 10,
+  },
+  footerHint: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: "#74777f",
+    textAlign: "center",
+  },
+  placeOrderBtn: {
+    backgroundColor: "#002045", // Solid Dark Navy
+    borderRadius: 16,
+    height: 54,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 20,
+  },
+  placeOrderBtnDisabled: {
+    opacity: 0.5,
+  },
+  placeOrderText: {
+    color: "#ffffff",
+    fontSize: 16,
+    fontWeight: "700",
+  },
+  placeOrderValue: {
+    color: "#ffffff",
+    fontSize: 16,
+    fontWeight: "700",
+  },
+  termsText: {
+    fontSize: 9,
+    fontWeight: "700",
+    color: "#74777f",
+    textAlign: "center",
+    letterSpacing: 0.8,
+    marginTop: 2,
+  },
 });

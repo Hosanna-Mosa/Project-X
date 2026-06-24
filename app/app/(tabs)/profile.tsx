@@ -295,10 +295,21 @@ export default function ProfileScreen() {
       
         </View>
 
-        <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout}>
-          <Feather name="log-out" size={20} color="#EF4444" />
-          <Text style={styles.logoutText}>Sign Out</Text>
-        </TouchableOpacity>
+        {!user ? (
+          <TouchableOpacity 
+            style={[styles.logoutBtn, { borderColor: colors.primary }]} 
+            onPress={() => router.replace("/")}
+            activeOpacity={0.8}
+          >
+            <Feather name="log-in" size={20} color={colors.primary} />
+            <Text style={[styles.logoutText, { color: colors.primary }]}>Sign In / Register</Text>
+          </TouchableOpacity>
+        ) : (
+          <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout} activeOpacity={0.8}>
+            <Feather name="log-out" size={20} color="#EF4444" />
+            <Text style={styles.logoutText}>Sign Out</Text>
+          </TouchableOpacity>
+        )}
         
         <Text style={styles.version}>App Version 1.2.0 • Build 240405</Text>
       </ScrollView>

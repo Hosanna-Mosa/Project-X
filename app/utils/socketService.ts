@@ -1,6 +1,7 @@
 import { io, Socket } from "socket.io-client";
+import Constants from "expo-constants";
 
-const SOCKET_URL = process.env.EXPO_PUBLIC_API_URL || "";
+const SOCKET_URL = process.env.EXPO_PUBLIC_API_URL || Constants.expoConfig?.extra?.apiUrl || "";
 
 class SocketService {
   private socket: Socket | null = null;
