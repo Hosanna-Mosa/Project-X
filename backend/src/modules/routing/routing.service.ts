@@ -1,4 +1,5 @@
 import { getDistance } from "geolib";
+import { performance } from "perf_hooks";
 
 const GOOGLE_MAPS_APIKEY = process.env.GOOGLE_MAPS_API_KEY || "AIzaSyD23mZxzw78gBlz6EGEZ6BMgCwc4fygJMA";
 
@@ -20,32 +21,24 @@ export class RoutingService {
   async optimizeAndGetRoute(origin: Coordinate, stops: StopInput[]) {
     if (stops.length === 0) return null;
 
-    // 1. Greedy TSP to find optimized sequence
-    let currentPos = origin;
-    const remainingStops = [...stops];
-    const optimizedSequence: StopInput[] = [];
-    let totalDirectDistance = 0;
+    const startTime = performance.now();
+    // Choose the best algorithm based on input size
+    let optimizedSequence: StopInput[];
+    let algoName = "";
+    if (stops.length <= 12) {
+      algoName = "Held-Karp DP";
+      optimizedSequence = solveHeldKarp(origin, stops);
+    } else {
+      algoName = "2-Opt Local Search";
+      optimizedSequence = solve2Opt(origin, stops);
+    }
+    const endTime = performance.now();
+    console.log(`Routing Service: ${algoName} optimized ${stops.length} stops in ${(endTime - startTime).toFixed(4)}ms.`);
 
-    while (remainingStops.length > 0) {
-      let nearestIndex = 0;
-      let minDistance = Infinity;
-
-      for (let i = 0; i < remainingStops.length; i++) {
-        const dist = getDistance(
-          { latitude: currentPos.latitude, longitude: currentPos.longitude },
-          { latitude: remainingStops[i].latitude, longitude: remainingStops[i].longitude }
-        );
-
-        if (dist < minDistance) {
-          minDistance = dist;
-          nearestIndex = i;
-        }
-      }
-
-      totalDirectDistance += minDistance;
-      const nearestStop = remainingStops.splice(nearestIndex, 1)[0];
-      optimizedSequence.push(nearestStop);
-      currentPos = nearestStop;
+    // Calculate total direct straight-line distance
+    let totalDirectDistance = getDistanceBetween(origin, optimizedSequence[0]);
+    for (let i = 0; i < optimizedSequence.length - 1; i++) {
+      totalDirectDistance += getDistanceBetween(optimizedSequence[i], optimizedSequence[i + 1]);
     }
 
     // 2. Fetch Polyline from Google Directions API
@@ -94,6 +87,167 @@ export class RoutingService {
     };
   }
 }
+
+// Helper to compute geographic distance between two coordinates
+function getDistanceBetween(c1: Coordinate, c2: Coordinate): number {
+  return getDistance(
+    { latitude: c1.latitude, longitude: c1.longitude },
+    { latitude: c2.latitude, longitude: c2.longitude }
+  );
+}
+
+// Held-Karp Dynamic Programming Solver for exact open-loop TSP (N <= 12)
+function solveHeldKarp(origin: Coordinate, stops: StopInput[]): StopInput[] {
+  const n = stops.length;
+  if (n === 0) return [];
+  if (n === 1) return [stops[0]];
+
+  // 1. Precompute distance matrix
+  const distMatrix = Array.from({ length: n }, () => new Float64Array(n));
+  for (let i = 0; i < n; i++) {
+    for (let j = 0; j < n; j++) {
+      if (i === j) {
+        distMatrix[i][j] = 0;
+      } else {
+        distMatrix[i][j] = getDistanceBetween(stops[i], stops[j]);
+      }
+    }
+  }
+
+  // distToOrigin[i] is distance from origin to stops[i]
+  const distToOrigin = new Float64Array(n);
+  for (let i = 0; i < n; i++) {
+    distToOrigin[i] = getDistanceBetween(origin, stops[i]);
+  }
+
+  const numStates = 1 << n;
+  // memo[mask][i] stores the min distance to visit subset 'mask' of stops, ending at stop i.
+  const memo: number[][] = Array.from({ length: numStates }, () => new Array(n).fill(Infinity));
+  // parent[mask][i] stores the index of the stop visited immediately before stop i.
+  const parent: number[][] = Array.from({ length: numStates }, () => new Array(n).fill(-1));
+
+  // Base cases: paths starting from origin to stop i
+  for (let i = 0; i < n; i++) {
+    memo[1 << i][i] = distToOrigin[i];
+  }
+
+  // DP transitions
+  for (let mask = 1; mask < numStates; mask++) {
+    for (let u = 0; u < n; u++) {
+      if ((mask & (1 << u)) === 0) continue;
+      const currentDist = memo[mask][u];
+      if (currentDist === Infinity) continue;
+
+      for (let v = 0; v < n; v++) {
+        if ((mask & (1 << v)) !== 0) continue; // v is already visited in mask
+
+        const nextMask = mask | (1 << v);
+        const newDist = currentDist + distMatrix[u][v];
+        if (newDist < memo[nextMask][v]) {
+          memo[nextMask][v] = newDist;
+          parent[nextMask][v] = u;
+        }
+      }
+    }
+  }
+
+  // Find the end stop that minimizes the total distance
+  let minCost = Infinity;
+  let lastIndex = -1;
+  const fullMask = numStates - 1;
+  for (let i = 0; i < n; i++) {
+    if (memo[fullMask][i] < minCost) {
+      minCost = memo[fullMask][i];
+      lastIndex = i;
+    }
+  }
+
+  // Reconstruct optimal path backwards
+  const path: StopInput[] = [];
+  let currMask = fullMask;
+  let currIndex = lastIndex;
+
+  while (currIndex !== -1) {
+    path.push(stops[currIndex]);
+    const prev = parent[currMask][currIndex];
+    currMask ^= (1 << currIndex);
+    currIndex = prev;
+  }
+
+  return path.reverse();
+}
+
+// 2-Opt Local Search Solver for open-loop TSP (N > 12)
+function solve2Opt(origin: Coordinate, stops: StopInput[]): StopInput[] {
+  const n = stops.length;
+  if (n === 0) return [];
+  if (n === 1) return [stops[0]];
+
+  // Start with a Greedy Nearest Neighbor route
+  let currentPos = origin;
+  const remainingStops = [...stops];
+  let route: StopInput[] = [];
+
+  while (remainingStops.length > 0) {
+    let nearestIndex = 0;
+    let minDistance = Infinity;
+
+    for (let i = 0; i < remainingStops.length; i++) {
+      const dist = getDistanceBetween(currentPos, remainingStops[i]);
+      if (dist < minDistance) {
+        minDistance = dist;
+        nearestIndex = i;
+      }
+    }
+
+    const nearestStop = remainingStops.splice(nearestIndex, 1)[0];
+    route.push(nearestStop);
+    currentPos = nearestStop;
+  }
+
+  // Iteratively improve using 2-Opt swaps
+  let improved = true;
+  let iterations = 0;
+  const maxIterations = 1000;
+
+  while (improved && iterations < maxIterations) {
+    improved = false;
+    iterations++;
+
+    for (let i = 0; i < n - 1; i++) {
+      for (let j = i + 1; j < n; j++) {
+        let delta = 0;
+
+        // Connection before/at the start of reversed segment
+        if (i > 0) {
+          delta += getDistanceBetween(route[i - 1], route[j]) - getDistanceBetween(route[i - 1], route[i]);
+        } else {
+          delta += getDistanceBetween(origin, route[j]) - getDistanceBetween(origin, route[0]);
+        }
+
+        // Connection after/at the end of reversed segment
+        if (j < n - 1) {
+          delta += getDistanceBetween(route[i], route[j + 1]) - getDistanceBetween(route[j], route[j + 1]);
+        }
+
+        // If total distance is reduced, perform the swap
+        if (delta < -1e-5) {
+          route = [
+            ...route.slice(0, i),
+            ...route.slice(i, j + 1).reverse(),
+            ...route.slice(j + 1)
+          ];
+          improved = true;
+          break; // restart outer loops immediately (First Improvement)
+        }
+      }
+      if (improved) break;
+    }
+  }
+
+  return route;
+}
+
 
 // Simple internal encoder for fallback routes
 function encodePolyline(points: Coordinate[]) {

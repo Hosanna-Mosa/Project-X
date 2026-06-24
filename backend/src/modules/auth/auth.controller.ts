@@ -1,69 +1,45 @@
-import { Request, Response } from "express";
+import { Request, Response, NextFunction } from "express";
 import { AuthService } from "./auth.service";
 import { UserRole } from "../../database/models/User";
 
 const authService = new AuthService();
 
 export class AuthController {
-  async requestOTP(req: Request, res: Response) {
+  async requestOTP(req: Request, res: Response, next: NextFunction) {
     try {
       const { phone } = req.body;
-      if (!phone) {
-        return res.status(400).json({ message: "Phone is required" });
-      }
       const result = await authService.requestOTP(phone);
       return res.json(result);
     } catch (error: any) {
-      console.error(error);
-      return res.status(500).json({ message: error.message || "Internal server error" });
+      next(error);
     }
   }
 
-  async verifyOTP(req: Request, res: Response) {
+  async verifyOTP(req: Request, res: Response, next: NextFunction) {
     try {
-      const { phone, code, role, name, password, email } = req.body;
-
-      if (!phone || !code || !role) {
-        return res.status(400).json({ message: "Phone, code and role are required" });
-      }
-
-      if (!Object.values(UserRole).includes(role as UserRole)) {
-        return res.status(400).json({ message: "Invalid role" });
-      }
-
-      const result = await authService.verifyOTP(phone, code, role as UserRole, name, password, email);
-
+      const { phone, code, role, name, password } = req.body;
+      const result = await authService.verifyOTP(phone, code, role as UserRole, name, password);
       return res.json(result);
     } catch (error: any) {
-      console.error(error);
-      return res.status(401).json({ message: error.message || "Invalid or expired OTP" });
+      next(error);
     }
   }
 
-  async loginWithPassword(req: Request, res: Response) {
+  async loginWithPassword(req: Request, res: Response, next: NextFunction) {
     try {
       const { phone, password, role } = req.body;
-
-      if (!phone || !password || !role) {
-        return res.status(400).json({ message: "Phone, password and role are required" });
-      }
-
-      if (!Object.values(UserRole).includes(role as UserRole)) {
-        return res.status(400).json({ message: "Invalid role" });
-      }
-
       const result = await authService.loginWithPassword(phone, password, role as UserRole);
-
       return res.json(result);
     } catch (error: any) {
-      console.error(error);
-      return res.status(401).json({ message: error.message || "Login failed" });
+      next(error);
     }
   }
 
-  async logout(req: Request, res: Response) {
-    // For JWT, logout is usually handled on the client by removing the token.
-    // However, if we want server-side invalidation (blacklist), we'd do it here.
-    return res.json({ message: "Logged out successfully" });
+  async logout(req: Request, res: Response, next: NextFunction) {
+    try {
+      return res.json({ message: "Logged out successfully" });
+    } catch (error) {
+      next(error);
+    }
   }
 }

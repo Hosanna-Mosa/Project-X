@@ -1,8 +1,10 @@
+import mongoose from "mongoose";
 import Driver, { DriverStatus } from "../../database/models/Driver";
 import Order, { OrderStatus, StopType } from "../../database/models/Order";
 import DriverPayout, { DriverPayoutStatus } from "../../database/models/DriverPayout";
 import User from "../../database/models/User";
 import { PaymentService } from "../payments/payment.service";
+import { SocketManager } from "../../sockets/socket.manager";
 
 export interface HighDemandArea {
   id: string;
@@ -19,6 +21,9 @@ export class DriverService {
   private paymentService = new PaymentService();
 
   async getNearbyDrivers(lat: number, lng: number, radiusInMeters: number = 5000, vehicleType?: string) {
+    const socketManager = SocketManager.getInstance();
+    const redisClient = socketManager ? (socketManager as any).redisClient : null;
+
     // For development/testing: Ensure we have at least 2 drivers of each vehicle type in the database
     const allTypes = ["bike", "auto", "car"];
     for (const t of allTypes) {
@@ -71,16 +76,67 @@ export class DriverService {
         if (!coords || (coords[0] === 0 && coords[1] === 0)) {
           const randomLatOffset = (Math.random() - 0.5) * 0.03;
           const randomLngOffset = (Math.random() - 0.5) * 0.03;
+          const finalLng = lng + randomLngOffset;
+          const finalLat = lat + randomLatOffset;
           d.currentLocation = {
             type: "Point",
-            coordinates: [lng + randomLngOffset, lat + randomLatOffset]
+            coordinates: [finalLng, finalLat]
           };
           await d.save();
-          console.log(`[SIMULATOR] Moved online driver ${d._id} (${type}) to [${lng + randomLngOffset}, ${lat + randomLatOffset}]`);
+          console.log(`[SIMULATOR] Moved online driver ${d._id} (${type}) to [${finalLng}, ${finalLat}]`);
+
+          // Sync simulator locations to Redis geospatial store
+          if (redisClient) {
+            try {
+              await redisClient.geoAdd("drivers:locations", {
+                longitude: finalLng,
+                latitude: finalLat,
+                member: d._id.toString()
+              });
+              await redisClient.set(`driver_status:${d._id}`, "online", { EX: 30 });
+            } catch (err: any) {
+              console.error(`[SIMULATOR REDIS] geoAdd failed:`, err.message);
+            }
+          }
         }
       }
     }
 
+    // Attempt Geospatial lookup in Redis first
+    if (redisClient) {
+      try {
+        console.log(`[REDIS] Querying nearby drivers within ${radiusInMeters}m of [${lng}, ${lat}]`);
+        const nearbyDriverIds = await redisClient.geoSearch("drivers:locations",
+          { longitude: lng, latitude: lat },
+          { radius: radiusInMeters, unit: "m" }
+        );
+
+        if (nearbyDriverIds && nearbyDriverIds.length > 0) {
+          const query: any = {
+            _id: { $in: nearbyDriverIds },
+            status: DriverStatus.ONLINE,
+            isAvailable: true,
+          };
+          if (vehicleType && ["bike", "auto", "car"].includes(vehicleType)) {
+            query.vehicleType = vehicleType;
+          }
+          const drivers = await Driver.find(query).populate("user");
+
+          // Keep distance order as returned by Redis geoSearch
+          const driverMap = new Map(drivers.map((d: any) => [d._id.toString(), d]));
+          const sortedDrivers = nearbyDriverIds
+            .map((id: any) => driverMap.get(id))
+            .filter(Boolean);
+
+          console.log(`[REDIS] Found ${sortedDrivers.length} matching drivers near coordinates`);
+          return sortedDrivers;
+        }
+      } catch (err: any) {
+        console.warn(`[REDIS] geoSearch lookup failed, falling back to MongoDB:`, err.message);
+      }
+    }
+
+    // MongoDB Fallback Proximity Query
     const query: any = {
       status: DriverStatus.ONLINE,
       isAvailable: true,
@@ -375,14 +431,19 @@ export class DriverService {
       throw new Error("Cash out amount exceeds available balance");
     }
 
-    const payoutRecord = await DriverPayout.create({
-      driver: driver._id,
-      user: user._id,
-      amount: payoutAmount,
-      status: DriverPayoutStatus.PENDING,
-    });
+    const session = await mongoose.startSession();
+    session.startTransaction();
 
+    let payoutRecord;
     try {
+      payoutRecord = new DriverPayout({
+        driver: driver._id,
+        user: user._id,
+        amount: payoutAmount,
+        status: DriverPayoutStatus.PENDING,
+      });
+      await payoutRecord.save({ session });
+
       const result = await this.paymentService.createDriverPayout({
         name: user.name,
         phone: user.phone,
@@ -400,7 +461,9 @@ export class DriverService {
       payoutRecord.razorpayContactId = result.contact.id;
       payoutRecord.razorpayFundAccountId = result.fundAccount.id;
       payoutRecord.razorpayPayoutId = result.payout.id;
-      await payoutRecord.save();
+      await payoutRecord.save({ session });
+
+      await session.commitTransaction();
 
       return {
         message: "Cash out initiated",
@@ -412,10 +475,22 @@ export class DriverService {
         },
       };
     } catch (error: any) {
-      payoutRecord.status = DriverPayoutStatus.FAILED;
-      payoutRecord.failureReason = error.message;
-      await payoutRecord.save();
+      await session.abortTransaction();
+      
+      // If we failed after creating payoutRecord, write failure status to DB outside of transaction
+      if (payoutRecord) {
+        try {
+          await DriverPayout.findByIdAndUpdate(payoutRecord._id, {
+            status: DriverPayoutStatus.FAILED,
+            failureReason: error.message
+          });
+        } catch (dbErr) {
+          console.error("Failed to write payout failure status:", dbErr);
+        }
+      }
       throw error;
+    } finally {
+      session.endSession();
     }
   }
 
