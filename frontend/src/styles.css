@@ -133,14 +133,16 @@
 }
 
 @theme {
-  --color-brand-kinetic: #00B7EB;
-  --color-on-surface: #0b1c30;
-  --color-secondary-app: #545f73;
-  --color-surface-container: #e5eeff;
-  --color-surface-container-low: #eff4ff;
-  --color-secondary-fixed-dim: #bcc7de;
-  --font-display: "Plus Jakarta Sans", ui-sans-serif, system-ui, sans-serif;
-  --font-body: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --color-brand-kinetic: #c5a47e;
+  --color-on-surface: #0a1128;
+  --color-secondary-app: #4a5568;
+  --color-surface-container: #edeeef;
+  --color-surface-container-low: #f3f4f5;
+  --color-secondary-fixed-dim: #e1e3e4;
+  --color-primary: #002045;
+  --color-accent: #c5a47e;
+  --font-display: "Hanken Grotesk", ui-sans-serif, system-ui, sans-serif;
+  --font-body: "Hanken Grotesk", ui-sans-serif, system-ui, sans-serif;
 }
 
 @layer base {
