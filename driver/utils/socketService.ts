@@ -21,12 +21,21 @@ class SocketService {
   public connect() {
     if (this.socket) return;
 
+    let token = "";
+    try {
+      const store = require("../store/driverStore");
+      token = store.useDriverStore.getState().token || "";
+    } catch (e) {
+      console.warn("[SocketService] Failed to load token from driverStore:", e);
+    }
+
     console.log(`[Driver Socket] Connecting to ${SOCKET_URL || "not configured"}/ws/v1/socket.io`);
 
     this.socket = io(SOCKET_URL, {
       transports: ["websocket"],
       autoConnect: true,
       path: "/ws/v1/socket.io",
+      auth: token ? { token } : undefined,
     });
 
     this.socket.on("connect", () => {
