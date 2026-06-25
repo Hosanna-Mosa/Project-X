@@ -161,7 +161,7 @@ export default function AuthScreen() {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       // Set authentication using the driver store
       const { setAuthenticated } = useDriverStore.getState();
-      setAuthenticated(data.user.name, data.user.phone, data.token);
+      setAuthenticated(data.user.name, data.user.phone, data.token, data.user.id || data.user._id);
       router.replace("/onboarding");
     } catch (err: any) {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
@@ -388,7 +388,8 @@ export default function AuthScreen() {
     <KeyboardAvoidingView
       style={styles.container}
       behavior={Platform.OS === "ios" ? "padding" : "height"}
-    >        <View
+    >
+      <View
         style={[
           styles.inner,
           {

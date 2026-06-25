@@ -20,10 +20,19 @@ class SocketService {
   public connect() {
     if (this.socket) return;
 
+    let token = "";
+    try {
+      const store = require("../contexts/authStore");
+      token = store.useAuthStore.getState().token || "";
+    } catch (e) {
+      console.warn("[SocketService] Failed to load token from authStore:", e);
+    }
+
     this.socket = io(SOCKET_URL, {
       transports: ["websocket"],
       autoConnect: true,
       path: "/ws/v1/socket.io",
+      auth: token ? { token } : undefined,
     });
 
     this.socket.on("connect", () => {

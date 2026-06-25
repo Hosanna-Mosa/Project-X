@@ -114,7 +114,7 @@ interface DriverState {
   completeOrder: () => void;
   setIncomingOrder: (order: Order | null) => void;
   updateDriverLocation: (lat: number, lng: number) => void;
-  setAuthenticated: (name: string, phone: string, token: string) => void;
+  setAuthenticated: (name: string, phone: string, token: string, userId: string) => void;
   setOnboardingCompleted: () => void;
   setIdentityVerified: (verified: boolean) => void;
   resetOnboarding: () => void;
@@ -261,13 +261,55 @@ export const useDriverStore = create<DriverState>()(
           }
         }
         
+        let finalDriverId = driverUserId;
+        if (!finalDriverId && token) {
+          try {
+            const base64Url = token.split(".")[1];
+            const base64 = base64Url.replace(/-/g, "+").replace(/_/g, "/");
+            const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+            let buffer = "";
+            const cleaned = base64.replace(/=+$/, "");
+            for (let i = 0, len = cleaned.length; i < len; i += 4) {
+              const chunk = (chars.indexOf(cleaned[i]) << 18) |
+                            (chars.indexOf(cleaned[i + 1]) << 12) |
+                            ((i + 2 < len ? chars.indexOf(cleaned[i + 2]) : 0) << 6) |
+                            (i + 3 < len ? chars.indexOf(cleaned[i + 3]) : 0);
+              buffer += String.fromCharCode((chunk >> 16) & 255);
+              if (i + 2 < len) buffer += String.fromCharCode((chunk >> 8) & 255);
+              if (i + 3 < len) buffer += String.fromCharCode(chunk & 255);
+            }
+            const decoded = JSON.parse(buffer);
+            if (decoded && (decoded.userId || decoded.id)) {
+              finalDriverId = decoded.userId || decoded.id;
+              set({ driverUserId: finalDriverId }); // Self-heal store
+            }
+          } catch (e) {
+            console.warn("Failed to decode token on goOnline:", e);
+          }
+        }
+
         // Connect to real-time order broadcasts regardless of token
         import("../utils/socketService").then(({ socketService }) => {
           socketService.connect();
-          socketService.join(driverUserId || "mock_driver_123", "DRIVER");
+          socketService.join(finalDriverId || "mock_driver_123", "DRIVER");
           socketService.on("new_order", (data: any) => {
             console.log("New order received:", data);
-            get().setIncomingOrder(data as Order);
+            
+            const serviceType = data.serviceType?.toLowerCase();
+            const activeServices = get().activeServices || [];
+
+            const isRide = ["bike", "auto", "cab", "cab_prime"].includes(serviceType);
+            const isFood = ["delivery", "helper"].includes(serviceType);
+
+            const matchesActiveServices = 
+              (isRide && activeServices.includes("ride")) ||
+              (isFood && activeServices.includes("food"));
+
+            if (matchesActiveServices) {
+              get().setIncomingOrder(data as Order);
+            } else {
+              console.log(`Filtering out incoming order ${data.id || data._id} of type ${serviceType}. Active services:`, activeServices);
+            }
           });
           socketService.on("order_cancelled", (data: any) => {
             console.log("Order cancelled received:", data);
@@ -599,8 +641,8 @@ export const useDriverStore = create<DriverState>()(
       updateDriverLocation: (lat, lng) =>
         set({ driverLocation: { lat, lng } }),
   
-      setAuthenticated: (name: string, phone: string, token: string) =>
-        set({ isAuthenticated: true, driverName: name, driverPhone: phone, token, hasCompletedOnboarding: false }),
+      setAuthenticated: (name: string, phone: string, token: string, userId: string) =>
+        set({ isAuthenticated: true, driverName: name, driverPhone: phone, token, driverUserId: userId, hasCompletedOnboarding: false }),
   
       setOnboardingCompleted: () => set({ hasCompletedOnboarding: true }),
       setIdentityVerified: (verified) => set({ identityVerified: verified }),
@@ -648,7 +690,7 @@ export const useDriverStore = create<DriverState>()(
             hasCompletedOnboarding: false,
             driverName: data.user.name,
             driverPhone: data.user.phone,
-            driverUserId: data.user.id,
+            driverUserId: data.user.id || data.user._id,
             token: data.token,
           });
         } catch (err: any) {

@@ -54,6 +54,24 @@ export default function IncomingOrderModal() {
   const isRide = ["bike", "auto", "cab", "cab_prime"].includes(incomingOrder.serviceType?.toLowerCase() || "");
   const maxSeconds = incomingOrder.isReserved ? 60 : 15;
 
+  const getFoodItems = () => {
+    if (!incomingOrder?.stops) return [];
+    for (const stop of incomingOrder.stops) {
+      const items = stop.items;
+      if (!items) continue;
+      
+      if (Array.isArray(items) && items.length > 0) {
+        return items;
+      }
+      if (items && typeof items === "object" && (items as any).lines && Array.isArray((items as any).lines) && (items as any).lines.length > 0) {
+        return (items as any).lines;
+      }
+    }
+    return [];
+  };
+
+  const foodItems = getFoodItems();
+
   let modalTitle = "New Request!";
   if (incomingOrder.isReserved) {
     modalTitle = "New Reserved Ride!";
@@ -154,21 +172,19 @@ export default function IncomingOrderModal() {
             </View>
 
             {/* Items Checklist Display */}
-            {!isHelper && (
+            {!isHelper && !isRide && foodItems.length > 0 && (
               <View style={styles.infoSection}>
                 <Text style={styles.sectionTitle}>ITEMS TO PICK UP</Text>
-                {incomingOrder.stops
-                  ?.filter((stop) => stop.type === "pickup" && stop.items && stop.items.length > 0)
-                  .map((stop, sIdx) => (
-                    <View key={stop.id || sIdx} style={styles.itemsRestaurantBlock}>
-                      <Text style={styles.itemsRestaurantName}>{stop.locationName}</Text>
-                      {stop.items?.map((item: any, idx: number) => (
-                        <Text key={idx} style={styles.itemRowText}>
-                          • {item.quantity}x {item.name}
-                        </Text>
-                      ))}
-                    </View>
+                <View style={styles.itemsRestaurantBlock}>
+                  <Text style={styles.itemsRestaurantName}>
+                    {incomingOrder.vendorName || "Restaurant"}
+                  </Text>
+                  {foodItems.map((item: any, idx: number) => (
+                    <Text key={idx} style={styles.itemRowText}>
+                      • {item.quantity}x {item.name}
+                    </Text>
                   ))}
+                </View>
               </View>
             )}
 
