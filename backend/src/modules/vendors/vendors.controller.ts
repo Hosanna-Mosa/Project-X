@@ -95,7 +95,7 @@ export const getNearbyVendors = async (req: Request, res: Response) => {
 
     const userLat = parseFloat(lat as string);
     const userLng = parseFloat(lng as string);
-    const radiusInMeters = radius ? Math.max(1000, Number(radius) || 0) : null;
+    const radiusInMeters = radius ? Math.max(1000, Number(radius) || 0) : 25000;
     const skip = (Number(page) - 1) * Number(limit);
 
     console.log(`[API] Fetching nearby vendors - Lat: ${userLat}, Lng: ${userLng}, Page: ${page}`);

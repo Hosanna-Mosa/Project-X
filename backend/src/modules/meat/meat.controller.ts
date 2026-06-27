@@ -162,7 +162,7 @@ export const getNearbyMeatCenters = async (req: Request, res: Response) => {
     const fetchAll = all === "true";
     const skip = fetchAll ? 0 : (pageNumber - 1) * requestedLimit;
     const pageLimit = requestedLimit;
-    const radiusInMeters = radius ? Math.max(1000, Number(radius) || 0) : null;
+    const radiusInMeters = radius ? Math.max(1000, Number(radius) || 0) : 25000;
 
     const matchStage: any = {};
     if (category) {

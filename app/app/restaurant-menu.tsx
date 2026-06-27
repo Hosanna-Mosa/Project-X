@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import {
   View,
   Text,
@@ -9,6 +9,7 @@ import {
   ActivityIndicator,
   Animated,
   StatusBar,
+  TextInput,
 } from "react-native";
 import { useLocalSearchParams, router } from "expo-router";
 import { Ionicons, Feather, MaterialIcons } from "@expo/vector-icons";
@@ -30,7 +31,7 @@ interface FoodItem {
 }
 
 export default function RestaurantMenu() {
-  const { id, name, image, rating, reviews, isMeat } = useLocalSearchParams();
+  const { id, name, image, rating, reviews, isMeat, highlightDishId } = useLocalSearchParams();
 
   const insets = useSafeAreaInsets();
   const { theme } = useThemeStore();
@@ -40,8 +41,23 @@ export default function RestaurantMenu() {
   const [loading, setLoading] = useState(true);
   const [menu, setMenu] = useState<FoodItem[]>([]);
   const [activeCategory, setActiveCategory] = useState("");
+  const [scrolledPast, setScrolledPast] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [showSearchBar, setShowSearchBar] = useState(false);
+  const [highlightedItemId, setHighlightedItemId] = useState("");
+  const scrollViewRef = useRef<ScrollView>(null);
 
   const itemCount = getItemCount();
+
+  const handleScroll = (event: any) => {
+    const y = event.nativeEvent.contentOffset.y;
+    // Trigger when scrolled past the hero image (hero image height is 220px)
+    if (y > 180) {
+      setScrolledPast(true);
+    } else {
+      setScrolledPast(false);
+    }
+  };
 
   useEffect(() => {
     if (id) setVendorId(id as string);
@@ -72,7 +88,23 @@ export default function RestaurantMenu() {
 
         setMenu(normalizedData);
         if (normalizedData.length > 0) {
-          setActiveCategory(normalizedData[0].category);
+          let categoryToSelect = normalizedData[0].category;
+          if (highlightDishId) {
+            const targetItem = normalizedData.find((item: any) => item._id === highlightDishId);
+            if (targetItem) {
+              categoryToSelect = targetItem.category;
+              setHighlightedItemId(highlightDishId as string);
+              // Clear highlight after 2.5 seconds
+              setTimeout(() => {
+                setHighlightedItemId("");
+              }, 2500);
+              // Scroll to the categories/items section after layout renders
+              setTimeout(() => {
+                scrollViewRef.current?.scrollTo({ y: 340, animated: true });
+              }, 600);
+            }
+          }
+          setActiveCategory(categoryToSelect);
         }
       } catch (error) {
         console.error("Error fetching menu:", error);
@@ -83,7 +115,15 @@ export default function RestaurantMenu() {
     fetchMenu();
   }, [id, isMeat]);
 
-  const groupedMenu = menu.reduce((acc, item) => {
+  const filteredMenu = menu.filter((item) => {
+    if (!searchQuery) return true;
+    const nameMatch = item.name.toLowerCase().includes(searchQuery.toLowerCase());
+    const descMatch = item.description && item.description.toLowerCase().includes(searchQuery.toLowerCase());
+    const catMatch = item.category.toLowerCase().includes(searchQuery.toLowerCase());
+    return nameMatch || descMatch || catMatch;
+  });
+
+  const groupedMenu = filteredMenu.reduce((acc, item) => {
     if (!acc[item.category]) acc[item.category] = [];
     acc[item.category].push(item);
     return acc;
@@ -91,32 +131,154 @@ export default function RestaurantMenu() {
 
   const categories = Object.keys(groupedMenu);
 
+  // Auto-select category if search renders current category empty
+  useEffect(() => {
+    if (searchQuery && categories.length > 0 && !categories.includes(activeCategory)) {
+      setActiveCategory(categories[0]);
+    }
+  }, [searchQuery, categories]);
+
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <StatusBar barStyle="dark-content" translucent backgroundColor="transparent" />
+
+      {/* Solid Search Header Overlay - Matches DESIGN.md */}
+      {showSearchBar && (
+        <View style={[
+          styles.searchHeader, 
+          { 
+            paddingTop: insets.top, 
+            height: insets.top + 56, 
+            backgroundColor: colors.background, 
+            borderBottomColor: colors.borderLight 
+          }
+        ]}>
+          <TouchableOpacity 
+            onPress={() => {
+              setShowSearchBar(false);
+              setSearchQuery("");
+            }} 
+            style={styles.searchHeaderBtn} 
+            activeOpacity={0.7}
+          >
+            <Ionicons name="arrow-back" size={22} color={colors.text} />
+          </TouchableOpacity>
+          <TextInput
+            style={[styles.searchInput, { color: colors.text, backgroundColor: colors.surfaceSecondary, borderColor: colors.borderLight }]}
+            placeholder="Search for dishes..."
+            placeholderTextColor={colors.textMuted}
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            autoFocus
+            clearButtonMode="while-editing"
+          />
+          {searchQuery.length > 0 && (
+            <TouchableOpacity 
+              onPress={() => setSearchQuery("")} 
+              style={styles.searchHeaderBtn} 
+              activeOpacity={0.7}
+            >
+              <Ionicons name="close" size={22} color={colors.text} />
+            </TouchableOpacity>
+          )}
+        </View>
+      )}
       
-      {/* Absolute Overlays (Back and Search) */}
-      <View style={[styles.absoluteHeader, { top: insets.top + 10 }]}>
-        <TouchableOpacity 
-          onPress={() => router.back()} 
-          style={styles.circularButton} 
-          activeOpacity={0.8}
-        >
-          <Ionicons name="arrow-back" size={20} color="#191c1e" />
-        </TouchableOpacity>
-        
-        <TouchableOpacity 
-          style={styles.circularButton} 
-          activeOpacity={0.8}
-        >
-          <Ionicons name="search-outline" size={20} color="#191c1e" />
-        </TouchableOpacity>
-      </View>
+      {/* Absolute Overlays (Back and Search) - Only visible when not scrolled past hero */}
+      {!scrolledPast && !showSearchBar && (
+        <View style={[styles.absoluteHeader, { top: insets.top + 10 }]}>
+          <TouchableOpacity 
+            onPress={() => router.back()} 
+            style={styles.circularButton} 
+            activeOpacity={0.8}
+          >
+            <Ionicons name="arrow-back" size={20} color="#191c1e" />
+          </TouchableOpacity>
+          
+          <TouchableOpacity 
+            style={styles.circularButton} 
+            activeOpacity={0.8}
+            onPress={() => setShowSearchBar(true)}
+          >
+            <Ionicons name="search-outline" size={20} color="#191c1e" />
+          </TouchableOpacity>
+        </View>
+      )}
+
+      {/* Solid Header at the top when scrolled past hero */}
+      {scrolledPast && !showSearchBar && (
+        <View style={[
+          styles.solidHeader, 
+          { 
+            paddingTop: insets.top, 
+            height: insets.top + 56, 
+            backgroundColor: colors.background, 
+            borderBottomColor: colors.borderLight 
+          }
+        ]}>
+          <TouchableOpacity 
+            onPress={() => router.back()} 
+            style={styles.solidHeaderBtn} 
+            activeOpacity={0.7}
+          >
+            <Ionicons name="arrow-back" size={22} color={colors.text} />
+          </TouchableOpacity>
+          <Text style={[styles.solidHeaderTitle, { color: colors.text }]} numberOfLines={1}>
+            {name}
+          </Text>
+          <TouchableOpacity 
+            style={styles.solidHeaderBtn} 
+            activeOpacity={0.7}
+            onPress={() => setShowSearchBar(true)}
+          >
+            <Ionicons name="search-outline" size={22} color={colors.text} />
+          </TouchableOpacity>
+        </View>
+      )}
+
+      {/* Fixed Sticky Tabs Container below the Solid Header */}
+      {scrolledPast && (
+        <View style={[
+          styles.fixedTabsContainer, 
+          { 
+            top: insets.top + 56, 
+            backgroundColor: colors.background, 
+            borderBottomColor: colors.borderLight 
+          }
+        ]}>
+          <ScrollView 
+            horizontal 
+            showsHorizontalScrollIndicator={false} 
+            contentContainerStyle={styles.tabsScrollContent}
+          >
+            {categories.map((cat) => (
+              <TouchableOpacity 
+                key={cat} 
+                onPress={() => setActiveCategory(cat)}
+                style={[
+                  styles.tabItem, 
+                  activeCategory === cat && styles.tabItemActive
+                ]}
+                activeOpacity={0.8}
+              >
+                <Text style={[
+                  styles.tabText, 
+                  activeCategory === cat && styles.tabTextActive
+                ]}>
+                  {cat}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        </View>
+      )}
 
       <ScrollView 
+        ref={scrollViewRef}
         contentContainerStyle={{ paddingBottom: 150 }} 
         showsVerticalScrollIndicator={false}
-        stickyHeaderIndices={[1]}
+        onScroll={handleScroll}
+        scrollEventThrottle={16}
       >
         {/* Banner Image & Overlapping Floating Info Card */}
         <View style={styles.heroSection}>
@@ -134,7 +296,13 @@ export default function RestaurantMenu() {
               <Text style={styles.ratingValue}>{rating || "4.8"}</Text>
               <Text style={styles.ratingCount}>({reviews || "2k+"} ratings)</Text>
               <Text style={styles.dot}>•</Text>
-              <TouchableOpacity activeOpacity={0.7}>
+              <TouchableOpacity 
+                activeOpacity={0.7}
+                onPress={() => router.push({
+                  pathname: "/restaurant-details",
+                  params: { id: id as string, name: name as string, image: image as string, rating: rating as string, reviews: reviews as string, isMeat: isMeat as string }
+                })}
+              >
                 <Text style={styles.aboutLink}>About</Text>
               </TouchableOpacity>
             </View>
@@ -190,12 +358,16 @@ export default function RestaurantMenu() {
           <ActivityIndicator size="large" color={colors.primary} style={{ marginTop: 50 }} />
         ) : categories.length === 0 ? (
           <View style={styles.emptyMenu}>
-            <Ionicons name="restaurant-outline" size={64} color={colors.border} />
-            <Text style={[styles.emptyText, { color: colors.textSecondary }]}>Menu not available yet</Text>
+            <Ionicons name="search-outline" size={64} color={colors.border} />
+            <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
+              {searchQuery ? "No dishes match your search" : "Menu not available yet"}
+            </Text>
           </View>
         ) : (
-          categories.map((category) => (
-            <View key={category} style={styles.categorySection}>
+          categories
+            .filter((category) => !activeCategory || category === activeCategory)
+            .map((category) => (
+              <View key={category} style={styles.categorySection}>
               {/* Category Header with separator line */}
               <View style={styles.categoryHeader}>
                 <Text style={styles.categoryTitle}>{category}</Text>
@@ -205,7 +377,18 @@ export default function RestaurantMenu() {
               {groupedMenu[category].map((item) => {
                 const cartItem = items.find(i => i._id === item._id);
                 return (
-                  <View key={item._id} style={styles.menuItem}>
+                  <View 
+                    key={item._id} 
+                    style={[
+                      styles.menuItem,
+                      highlightedItemId === item._id && {
+                        backgroundColor: "#FEF08A",
+                        borderColor: "#CA8A04",
+                        borderWidth: 1,
+                        borderRadius: 12,
+                      }
+                    ]}
+                  >
                     {/* Left details */}
                     <View style={styles.itemInfo}>
                       <View style={styles.itemTitleRow}>
@@ -595,5 +778,64 @@ const styles = StyleSheet.create({
     color: "white",
     fontSize: 14,
     fontWeight: "700",
+  },
+  solidHeader: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    zIndex: 1000,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 16,
+    borderBottomWidth: 1,
+  },
+  solidHeaderTitle: {
+    fontSize: 16,
+    fontFamily: "Inter_700Bold",
+    textAlign: "center",
+    flex: 1,
+    paddingHorizontal: 8,
+  },
+  solidHeaderBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  fixedTabsContainer: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    zIndex: 999,
+    borderBottomWidth: 1,
+  },
+  searchHeader: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    zIndex: 1001,
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 16,
+    borderBottomWidth: 1,
+    gap: 12,
+  },
+  searchHeaderBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  searchInput: {
+    flex: 1,
+    height: 40,
+    borderRadius: 8,
+    borderWidth: 1,
+    paddingHorizontal: 12,
+    fontSize: 14,
+    fontFamily: "Inter_500Medium",
   },
 });

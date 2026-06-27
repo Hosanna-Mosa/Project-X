@@ -75,3 +75,25 @@ export const uploadImages = async (req: Request, res: Response) => {
     res.status(500).json({ message: "Upload failed" });
   }
 };
+
+export const searchFoodItems = async (req: Request, res: Response) => {
+  try {
+    const { query } = req.query;
+    if (!query) {
+      return res.status(400).json({ message: "Search query is required" });
+    }
+    
+    const dishes = await FoodItem.find({
+      $or: [
+        { name: { $regex: query as string, $options: "i" } },
+        { description: { $regex: query as string, $options: "i" } },
+        { category: { $regex: query as string, $options: "i" } }
+      ]
+    }).populate("vendorId");
+    
+    res.json(dishes);
+  } catch (error) {
+    console.error("Error searching food items:", error);
+    res.status(500).json({ message: "Internal server error" });
+  }
+};
