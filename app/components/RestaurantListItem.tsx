@@ -19,6 +19,7 @@ interface Props {
   isPureVeg?: boolean;
   bestIn?: string;
   isMeat?: boolean;
+  deliveryFee?: number;
 }
 
 export function RestaurantListItem({
@@ -32,10 +33,20 @@ export function RestaurantListItem({
   offer,
   isPureVeg,
   isMeat,
+  deliveryFee,
 }: Props) {
   const { theme } = useThemeStore();
   const colors = Colors[theme];
   const styles = React.useMemo(() => createStyles(colors), [theme]);
+
+  // Generate a stable sponsored state based on restaurant ID hash
+  const isSponsored = React.useMemo(() => {
+    let hash = 0;
+    for (let i = 0; i < _id.length; i++) {
+      hash = _id.charCodeAt(i) + ((hash << 5) - hash);
+    }
+    return Math.abs(hash) % 5 === 0; // Mark roughly 20% of restaurants as Sponsored
+  }, [_id]);
 
   const handlePress = () => {
     router.push({
@@ -69,17 +80,32 @@ export function RestaurantListItem({
           </TouchableOpacity>
         </View>
 
+        {/* Rating, Distance, and Delivery Time Metadata Row */}
         <View style={styles.statsRow}>
           <Text style={styles.statsText}>{rating}</Text>
           <MaterialIcons name="star" size={14} color={colors.textSecondary} style={styles.starIcon} />
           <Text style={styles.statsText}>({reviews})</Text>
-          <View style={styles.dot} />
-          <Text style={styles.statsText}>{distance.replace(' metres', ' metres').replace(' km', ' km')}</Text>
-          <View style={styles.dot} />
-          <Text style={styles.statsText}>{time.replace(' mins', ' min').replace(' min', ' min')}</Text>
+          <Text style={styles.bullet}>•</Text>
+          <Text style={styles.statsText}>
+            {distance.replace(" metres", " m").replace(" km", " km")}
+          </Text>
+          <Text style={styles.bullet}>•</Text>
+          <Text style={styles.statsText}>
+            {time.replace(" mins", " min").replace(" min", " min")}
+          </Text>
         </View>
 
+        {/* Delivery Fee Row */}
+        <View style={styles.feeRow}>
+          <Text style={styles.feeText}>₹{deliveryFee || 25} delivery fee</Text>
+        </View>
 
+        {/* Sponsored tag if applicable */}
+        {isSponsored && (
+          <View style={styles.sponsoredRow}>
+            <Text style={styles.sponsoredText}>Sponsored</Text>
+          </View>
+        )}
       </View>
     </TouchableOpacity>
   );
@@ -87,7 +113,7 @@ export function RestaurantListItem({
 
 const createStyles = (colors: typeof Colors.light) => StyleSheet.create({
   container: {
-    marginBottom: 8,
+    marginBottom: 20,
     marginHorizontal: 16,
   },
   imageWrapper: {
@@ -98,7 +124,7 @@ const createStyles = (colors: typeof Colors.light) => StyleSheet.create({
   image: {
     width: "100%",
     height: "100%",
-    borderRadius:17
+    borderRadius: 17,
   },
   paginationRow: {
     position: "absolute",
@@ -150,7 +176,7 @@ const createStyles = (colors: typeof Colors.light) => StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: 2,
+    marginBottom: 4,
   },
   name: {
     fontSize: 20,
@@ -161,23 +187,36 @@ const createStyles = (colors: typeof Colors.light) => StyleSheet.create({
   statsRow: {
     flexDirection: "row",
     alignItems: "center",
-    marginBottom: 4,
+    marginBottom: 2,
   },
   starIcon: {
     marginHorizontal: 2,
     marginTop: -1,
   },
   statsText: {
-    fontSize: 15,
+    fontSize: 14,
     color: colors.textSecondary,
     fontWeight: "500",
   },
-  dot: {
-    width: 3,
-    height: 3,
-    borderRadius: 1.5,
-    backgroundColor: colors.textMuted,
-    marginHorizontal: 8,
+  bullet: {
+    fontSize: 14,
+    color: colors.textMuted,
+    marginHorizontal: 6,
   },
-
+  feeRow: {
+    marginTop: 2,
+  },
+  feeText: {
+    fontSize: 13,
+    color: colors.textSecondary,
+    fontWeight: "500",
+  },
+  sponsoredRow: {
+    marginTop: 3,
+  },
+  sponsoredText: {
+    fontSize: 12,
+    color: colors.textMuted,
+    fontWeight: "500",
+  },
 });

@@ -16,11 +16,13 @@ import {
   PanResponder,
   Dimensions,
   type ViewStyle,
+  Keyboard,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
+import { Ionicons, MaterialCommunityIcons, Feather } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { router, useFocusEffect } from "expo-router";
+import Constants from "expo-constants";
 import Colors from "@/constants/colors";
 import { useThemeStore } from "@/contexts/themeStore";
 import { useDeliveryStore } from "@/contexts/deliveryStore";
@@ -157,6 +159,7 @@ export default function HomeScreen() {
 
   const isHoveringSearch = useCartStore((s) => s.isHoveringSearch);
   const searchBarScale = useRef(new Animated.Value(1)).current;
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
 
   useEffect(() => {
     Animated.spring(searchBarScale, {
@@ -165,6 +168,22 @@ export default function HomeScreen() {
       useNativeDriver: true,
     }).start();
   }, [isHoveringSearch]);
+
+  useEffect(() => {
+    const showSubscription = Keyboard.addListener(
+      Platform.OS === "ios" ? "keyboardWillShow" : "keyboardDidShow",
+      (e) => setKeyboardHeight(e.endCoordinates.height)
+    );
+    const hideSubscription = Keyboard.addListener(
+      Platform.OS === "ios" ? "keyboardWillHide" : "keyboardDidHide",
+      () => setKeyboardHeight(0)
+    );
+
+    return () => {
+      showSubscription.remove();
+      hideSubscription.remove();
+    };
+  }, []);
 
   const user = useAuthStore((s) => s.user);
   const userName = user?.name ? user.name.split(" ")[0] : "Uttej";
@@ -185,6 +204,34 @@ export default function HomeScreen() {
   const [customDistance, setCustomDistance] = useState("");
   const [appliedDistanceKm, setAppliedDistanceKm] = useState<number | null>(null);
   const [distanceRefreshKey, setDistanceRefreshKey] = useState(0);
+
+  const [searchedDishes, setSearchedDishes] = useState<any[]>([]);
+  const [isSearchingDishes, setIsSearchingDishes] = useState(false);
+
+  useEffect(() => {
+    if (!searchText) {
+      setSearchedDishes([]);
+      return;
+    }
+
+    const delayDebounceFn = setTimeout(async () => {
+      try {
+        setIsSearchingDishes(true);
+        const baseUrl = process.env.EXPO_PUBLIC_API_URL || Constants.expoConfig?.extra?.apiUrl;
+        const response = await fetch(`${baseUrl}/api/v1/food/search?query=${encodeURIComponent(searchText)}`);
+        if (response.ok) {
+          const data = await response.json();
+          setSearchedDishes(data);
+        }
+      } catch (error) {
+        console.error("Error searching dishes:", error);
+      } finally {
+        setIsSearchingDishes(false);
+      }
+    }, 400);
+
+    return () => clearTimeout(delayDebounceFn);
+  }, [searchText]);
 
   const startSearchGlow = useCallback(() => {
     searchGlowLoop.current?.stop();
@@ -229,15 +276,19 @@ export default function HomeScreen() {
   );
 
   const getCoords = async () => {
-    if (selectedAddress?.location?.coordinates) {
-      const [lng, lat] = selectedAddress.location.coordinates;
-      useDeliveryStore.getState().setCurrentCoords({ lat, lng });
-      if (selectedAddress.addressLine) {
-        useDeliveryStore.getState().setCurrentLocation(selectedAddress.addressLine);
-      } else if (selectedAddress.label) {
-        useDeliveryStore.getState().setCurrentLocation(selectedAddress.label);
+    if (selectedAddress) {
+      const lat = selectedAddress.coordinates?.lat ?? selectedAddress.location?.coordinates?.[1];
+      const lng = selectedAddress.coordinates?.lng ?? selectedAddress.location?.coordinates?.[0];
+      
+      if (lat != null && lng != null) {
+        useDeliveryStore.getState().setCurrentCoords({ lat, lng });
+        if (selectedAddress.addressLine) {
+          useDeliveryStore.getState().setCurrentLocation(selectedAddress.addressLine);
+        } else if (selectedAddress.label) {
+          useDeliveryStore.getState().setCurrentLocation(selectedAddress.label);
+        }
+        return { lat, lng };
       }
-      return { lat, lng };
     }
     let { status } = await Location.requestForegroundPermissionsAsync();
     if (status !== 'granted') {
@@ -427,26 +478,89 @@ export default function HomeScreen() {
     inputRange: [0, 1],
     outputRange: ["0deg", "360deg"],
   });
+  const filteredItems = (activeService === 'Meat' ? meatCenters : restaurants)
+    .filter((item) => {
+      if (!searchText) return true;
+      const query = searchText.toLowerCase();
+      const nameMatch = item.name.toLowerCase().includes(query);
+      const categoryMatch = item.categories && item.categories.some((cat: string) => cat.toLowerCase().includes(query));
+      const addressMatch = item.address && item.address.toLowerCase().includes(query);
+      return nameMatch || categoryMatch || addressMatch;
+    });
+
   const visibleItems = activeService === 'Meat'
-    ? meatCenters
+    ? filteredItems
     : foodFilter === 'all'
-      ? restaurants
-      : restaurants.filter(r => foodFilter === 'veg' ? r.isPureVeg : !r.isPureVeg);
+      ? filteredItems
+      : filteredItems.filter(r => foodFilter === 'veg' ? r.isPureVeg : !r.isPureVeg);
   const showHomeSkeleton = loading && !loadingMore;
+
+  const listData = React.useMemo(() => {
+    if (showHomeSkeleton) {
+      return HOME_SKELETON_ITEMS.map((item) => ({ ...item, isSkeleton: true }));
+    }
+    if (!searchText) {
+      return visibleItems.map((item) => ({ ...item, isRestaurant: true }));
+    }
+
+    const items: any[] = [];
+    // Restaurants Section
+    if (visibleItems.length > 0) {
+      items.push({ _id: "header-restaurants", isHeader: true, title: "RESTAURANTS" });
+      visibleItems.forEach((r) => items.push({ ...r, isRestaurant: true }));
+    }
+    // Dishes Section
+    if (searchedDishes.length > 0) {
+      items.push({ _id: "header-dishes", isHeader: true, title: "DISHES & FOOD ITEMS" });
+      searchedDishes.forEach((d) => items.push({ ...d, isDish: true }));
+    }
+    return items;
+  }, [showHomeSkeleton, searchText, visibleItems, searchedDishes]);
 
   return (
     <View style={styles.root}>
       <Animated.FlatList
-        data={showHomeSkeleton ? HOME_SKELETON_ITEMS : visibleItems}
+        data={listData}
         keyExtractor={(item) => item._id}
-        renderItem={({ item }) => showHomeSkeleton ? <HomeSkeletonCard colors={colors} /> : <RestaurantListItem {...item} isMeat={activeService === 'Meat'} />}
+        renderItem={({ item }) => {
+          if (item.isSkeleton) {
+            return <HomeSkeletonCard colors={colors} />;
+          }
+          if (item.isHeader) {
+            return <Text style={styles.listSectionHeader}>{item.title}</Text>;
+          }
+          if (item.isRestaurant) {
+            return <RestaurantListItem {...item} isMeat={activeService === 'Meat'} />;
+          }
+          if (item.isDish) {
+            return <DishSearchResultItem item={item} colors={colors} styles={styles} />;
+          }
+          return null;
+        }}
         ListHeaderComponent={renderHeader}
+        ListEmptyComponent={() => (
+          !showHomeSkeleton && searchText ? (
+            <View style={styles.emptySearchContainer}>
+              <Ionicons name="search-outline" size={60} color={colors.textMuted} />
+              <Text style={[styles.emptySearchTitle, { color: colors.text }]}>No results found</Text>
+              <Text style={[styles.emptySearchSubtitle, { color: colors.textSecondary }]}>
+                We couldn't find any outlets matching "{searchText}"
+              </Text>
+            </View>
+          ) : null
+        )}
         ListFooterComponent={() => (
           loadingMore ? <ActivityIndicator size="small" color={colors.primary} style={{ marginVertical: 20 }} /> : <View style={{ height: 120 }} />
         )}
         onEndReached={loadMore}
         onEndReachedThreshold={0.5}
-        contentContainerStyle={[styles.mainScrollContent, { paddingTop: topPadding + 175 }]}
+        contentContainerStyle={[
+          styles.mainScrollContent, 
+          { 
+            paddingTop: topPadding + 175,
+            paddingBottom: keyboardHeight > 0 ? keyboardHeight + 100 : 120
+          }
+        ]}
         showsVerticalScrollIndicator={false}
         refreshing={false}
         onRefresh={async () => {
@@ -596,7 +710,17 @@ export default function HomeScreen() {
         </Animated.View>
       </View>
 
-      <View style={[styles.bottomSearchOverlay, { bottom: insets.bottom + 18 }]} pointerEvents="box-none">
+      <View
+        style={[
+          styles.bottomSearchOverlay,
+          { 
+            bottom: keyboardHeight > 0 
+              ? keyboardHeight + (Platform.OS === "ios" ? 10 : 12) 
+              : insets.bottom + 18
+          }
+        ]}
+        pointerEvents="box-none"
+      >
         {/* Search Bar Dropzone */}
         <Animated.View
           style={[
@@ -791,6 +915,112 @@ function HomeSkeletonCard({ colors }: { colors: typeof Colors.light }) {
         <SkeletonBlock style={styles.skeletonLineSmall} shimmer={shimmer} shimmerHighlight={shimmerHighlight} />
       </View>
       <SkeletonBlock style={styles.skeletonOffer} shimmer={shimmer} shimmerHighlight={shimmerHighlight} />
+    </View>
+  );
+}
+
+interface DishSearchResultItemProps {
+  item: any;
+  colors: any;
+  styles: any;
+}
+
+function DishSearchResultItem({ item, colors, styles }: DishSearchResultItemProps) {
+  const { items, addItem, updateQuantity } = useCartStore();
+  const cartItem = items.find((i) => i._id === item._id);
+  const vendor = item.vendorId;
+
+  const handleAdd = () => {
+    if (vendor?._id) {
+      addItem(item, vendor._id);
+    }
+  };
+
+  const handleNavigateToMenu = () => {
+    if (vendor?._id) {
+      router.push({
+        pathname: "/restaurant-menu",
+        params: {
+          id: vendor._id,
+          name: vendor.name,
+          image: vendor.image || "",
+          rating: String(vendor.rating || "4.8"),
+          reviews: vendor.reviews || "2k+",
+          isMeat: "false",
+          highlightDishId: item._id,
+        },
+      });
+    }
+  };
+
+  return (
+    <View style={styles.dishMenuItem}>
+      {/* Clickable details section */}
+      <TouchableOpacity 
+        style={styles.dishItemInfo} 
+        activeOpacity={0.7} 
+        onPress={handleNavigateToMenu}
+      >
+        <View style={styles.dishItemTitleRow}>
+          <View style={[styles.dishVegIndicator, { borderColor: item.isVeg ? "#16A34A" : "#E11D48" }]}>
+            <View style={[styles.dishVegDot, { backgroundColor: item.isVeg ? "#16A34A" : "#E11D48" }]} />
+          </View>
+          <Text style={styles.dishItemName} numberOfLines={1}>
+            {item.name}
+          </Text>
+        </View>
+        <Text style={styles.dishItemPrice}>₹{item.price}</Text>
+        <Text style={styles.dishItemDesc} numberOfLines={2}>
+          {item.description}
+        </Text>
+        {vendor && (
+          <View style={styles.dishVendorRow}>
+            <Ionicons name="storefront-outline" size={13} color={colors.textSecondary} />
+            <Text style={[styles.dishVendorText, { color: colors.textSecondary }]} numberOfLines={1}>
+              from <Text style={{ fontFamily: "Inter_700Bold", textDecorationLine: "underline" }}>{vendor.name}</Text>
+            </Text>
+          </View>
+        )}
+      </TouchableOpacity>
+
+      {/* Clickable image container */}
+      <View style={styles.dishItemImageContainer}>
+        <TouchableOpacity activeOpacity={0.8} onPress={handleNavigateToMenu}>
+          <Image 
+            source={{ uri: item.images && item.images.length > 0 ? item.images[0] : "https://images.unsplash.com/photo-1587593810167-a84920ea0781?w=400" }} 
+            style={styles.dishItemImage} 
+          />
+        </TouchableOpacity>
+        <View style={styles.dishAddButtonOverlay}>
+          {cartItem ? (
+            <View style={styles.dishQuantityPill}>
+              <TouchableOpacity 
+                onPress={() => updateQuantity(item._id, cartItem.quantity - 1)}
+                style={styles.dishQtyActionBtn}
+                activeOpacity={0.7}
+              >
+                <Feather name="minus" size={12} color="#002045" />
+              </TouchableOpacity>
+              <Text style={styles.dishQtyText}>{cartItem.quantity}</Text>
+              <TouchableOpacity 
+                onPress={handleAdd}
+                style={styles.dishQtyActionBtn}
+                activeOpacity={0.7}
+              >
+                <Feather name="plus" size={12} color="#002045" />
+              </TouchableOpacity>
+            </View>
+          ) : (
+            <TouchableOpacity 
+              onPress={handleAdd}
+              style={styles.dishAddPill}
+              activeOpacity={0.85}
+            >
+              <Text style={styles.dishAddPillText}>ADD</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+      </View>
     </View>
   );
 }
@@ -1081,6 +1311,155 @@ const createStyles = (colors: typeof Colors.light) => StyleSheet.create({
     color: colors.textSecondary,
     fontWeight: '500',
     marginTop: 3,
+  },
+  emptySearchContainer: {
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 50,
+    paddingHorizontal: 24,
+  },
+  emptySearchTitle: {
+    fontSize: 16,
+    fontWeight: "800",
+    marginTop: 12,
+  },
+  emptySearchSubtitle: {
+    fontSize: 13,
+    fontWeight: "500",
+    textAlign: "center",
+    marginTop: 6,
+  },
+  listSectionHeader: {
+    fontSize: 12,
+    fontFamily: "Inter_700Bold",
+    color: colors.textSecondary,
+    letterSpacing: 1.2,
+    paddingHorizontal: 16,
+    paddingTop: 24,
+    paddingBottom: 8,
+  },
+  dishMenuItem: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    backgroundColor: colors.surface,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.borderLight,
+  },
+  dishItemInfo: {
+    flex: 1,
+    paddingRight: 16,
+  },
+  dishItemTitleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  dishVegIndicator: {
+    borderWidth: 1,
+    width: 14,
+    height: 14,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 2,
+  },
+  dishVegDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+  },
+  dishItemName: {
+    fontSize: 14,
+    fontFamily: "Inter_700Bold",
+    color: colors.text,
+    flex: 1,
+  },
+  dishItemPrice: {
+    fontSize: 13,
+    fontFamily: "Inter_600SemiBold",
+    color: colors.text,
+    marginTop: 4,
+  },
+  dishItemDesc: {
+    fontSize: 11,
+    fontFamily: "Inter_500Medium",
+    color: colors.textSecondary,
+    marginTop: 4,
+    lineHeight: 16,
+  },
+  dishVendorRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginTop: 8,
+    gap: 4,
+  },
+  dishVendorText: {
+    fontSize: 11,
+    fontFamily: "Inter_500Medium",
+  },
+  dishItemImageContainer: {
+    width: 90,
+    height: 90,
+    position: "relative",
+  },
+  dishItemImage: {
+    width: 90,
+    height: 90,
+    borderRadius: 12,
+    backgroundColor: colors.surfaceSecondary,
+  },
+  dishAddButtonOverlay: {
+    position: "absolute",
+    bottom: -8,
+    left: 8,
+    right: 8,
+    alignItems: "center",
+  },
+  dishAddPill: {
+    backgroundColor: "#ffffff",
+    borderWidth: 1,
+    borderColor: colors.border,
+    paddingHorizontal: 16,
+    paddingVertical: 5,
+    borderRadius: 8,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
+    elevation: 3,
+    minWidth: 70,
+    alignItems: "center",
+  },
+  dishAddPillText: {
+    fontSize: 11,
+    fontFamily: "Inter_700Bold",
+    color: "#16A34A",
+  },
+  dishQuantityPill: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#ffffff",
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 8,
+    paddingHorizontal: 4,
+    paddingVertical: 4,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
+    elevation: 3,
+    gap: 8,
+  },
+  dishQtyActionBtn: {
+    paddingHorizontal: 4,
+    paddingVertical: 2,
+  },
+  dishQtyText: {
+    fontSize: 11,
+    fontFamily: "Inter_700Bold",
+    color: colors.text,
   },
   distanceModalOverlay: {
     flex: 1,

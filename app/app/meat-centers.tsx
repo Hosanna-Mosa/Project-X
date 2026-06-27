@@ -45,9 +45,13 @@ export default function MeatCentersScreen() {
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
 
   const getCoords = async () => {
-    if (selectedAddress?.location?.coordinates) {
-      const [lng, lat] = selectedAddress.location.coordinates;
-      return { lat, lng };
+    if (selectedAddress) {
+      const lat = selectedAddress.coordinates?.lat ?? selectedAddress.location?.coordinates?.[1];
+      const lng = selectedAddress.coordinates?.lng ?? selectedAddress.location?.coordinates?.[0];
+      
+      if (lat != null && lng != null) {
+        return { lat, lng };
+      }
     }
 
     const { status } = await Location.requestForegroundPermissionsAsync();

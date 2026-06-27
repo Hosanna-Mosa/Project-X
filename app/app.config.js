@@ -25,6 +25,10 @@ export default {
     },
     "android": {
       "package": "com.hosanna.triozen.x",
+      "navigationBar": {
+        "backgroundColor": "#FFFFFF",
+        "buttonStyle": "dark"
+      },
       "config": {
         "googleMaps": {
           "apiKey": process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY
