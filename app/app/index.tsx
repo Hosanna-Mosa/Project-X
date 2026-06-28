@@ -132,11 +132,12 @@ export default function AuthScreen() {
                   <Ionicons name="phone-portrait-outline" size={18} color="#43474e" style={styles.inputIcon} />
                   <TextInput
                     style={styles.input}
-                    placeholder="+1 (555) 000-0000"
+                    placeholder="e.g. 9876543210"
                     placeholderTextColor="#74777f"
                     value={phone}
                     onChangeText={setPhone}
                     keyboardType="phone-pad"
+                    autoComplete="tel"
                   />
                 </View>
               </View>

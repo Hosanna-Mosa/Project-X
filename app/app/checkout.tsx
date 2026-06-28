@@ -15,6 +15,7 @@ import { router, useLocalSearchParams, useFocusEffect } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Colors from "@/constants/colors";
 import { useCartStore } from "@/contexts/cartStore";
+import { useDeliveryStore } from "@/contexts/deliveryStore";
 import { useThemeStore } from "@/contexts/themeStore";
 import { LocationPickerSheet } from "@/components/LocationPickerSheet";
 import { ScheduleDateTimeSheet } from "@/components/ScheduleDateTimeSheet";
@@ -29,8 +30,10 @@ export default function FoodCheckoutScreen() {
   const { theme } = useThemeStore();
   const colors = Colors[theme];
   const styles = React.useMemo(() => createStyles(colors), [colors]);
-  const { getItemCount, vendorId } = useCartStore();
-  const { user } = useAuthStore();
+  const { getItemCount, vendorId, items, clearCart } = useCartStore();
+  const { user, token } = useAuthStore();
+  const { setOrderId, setStatus, setServiceType } = useDeliveryStore();
+  const [isPlacingOrder, setIsPlacingOrder] = React.useState(false);
   const [isAddressSheetOpen, setIsAddressSheetOpen] = React.useState(false);
   const [selectedAddress, setSelectedAddress] = React.useState<any>(null);
   const [deliveryTiming, setDeliveryTiming] = React.useState<"now" | "later" | null>("now"); // Default standard (now)
@@ -139,9 +142,14 @@ export default function FoodCheckoutScreen() {
     return () => clearInterval(interval);
   }, [scheduleStatus, scheduleRequestId]);
 
-  const continueToPayment = () => {
+  const placeOrder = async () => {
     if (getItemCount() === 0) {
       Alert.alert("Cart is empty", "Please add at least one item.");
+      return;
+    }
+    if (!user || !token) {
+      Alert.alert("Login required", "Please log in before placing your order.");
+      router.push("/");
       return;
     }
     if (!selectedAddress || !selectedAddress.addressLine || !selectedAddress.phone) {
@@ -153,9 +161,14 @@ export default function FoodCheckoutScreen() {
       return;
     }
     if (deliveryTiming === "later" && scheduleStatus !== "accepted") {
-      Alert.alert("Waiting for restaurant", "Payment is enabled only after the restaurant accepts your requested delivery time.");
+      Alert.alert("Waiting for restaurant", "You can place the order only after the restaurant accepts your requested delivery time.");
       return;
     }
+    if (!vendorId) {
+      Alert.alert("Restaurant missing", "Please choose a restaurant again.");
+      return;
+    }
+
     const deliveryAddressObj = {
       label: selectedAddress.label || "",
       addressLine: selectedAddress.addressLine,
@@ -163,22 +176,82 @@ export default function FoodCheckoutScreen() {
       receiverName: selectedAddress.receiverName || "",
       formattedAddress: selectedAddress.addressLine,
     };
+    const dropLat = Number(selectedAddress.coordinates?.lat ?? selectedAddress.location?.coordinates?.[1] ?? 17.0005);
+    const dropLng = Number(selectedAddress.coordinates?.lng ?? selectedAddress.location?.coordinates?.[0] ?? 81.804);
 
-    router.push({
-      pathname: "/payment",
-      params: {
-        address: deliveryAddressObj.formattedAddress,
-        deliveryAddress: JSON.stringify(deliveryAddressObj),
-        lat: String(selectedAddress.coordinates?.lat ?? selectedAddress.location?.coordinates?.[1] ?? 17.0005),
-        lng: String(selectedAddress.coordinates?.lng ?? selectedAddress.location?.coordinates?.[0] ?? 81.804),
-        subtotal: String(subtotal),
-        taxes: String(taxes),
-        deliveryFee: String(deliveryFee),
-        total: String(total),
-        deliveryTiming,
-        scheduledFor: deliveryTiming === "later" ? scheduledFor || "" : "",
-      },
-    });
+    setIsPlacingOrder(true);
+    try {
+      let vendor: { name?: string; address?: string; location?: { coordinates?: number[] } } | null = null;
+      try {
+        vendor = await customFetch<any>(`/api/v1/vendors/${vendorId}`);
+      } catch {
+        // Fall back to default pickup coordinates if vendor details are unavailable
+      }
+
+      const vendorCoords = vendor?.location?.coordinates;
+      const pickupLng = Number(vendorCoords?.[0] ?? dropLng + 0.004);
+      const pickupLat = Number(vendorCoords?.[1] ?? dropLat + 0.004);
+      const orderItems = items.map((item) => ({
+        id: item._id,
+        name: item.name,
+        quantity: item.quantity,
+        price: item.price,
+        total: item.price * item.quantity,
+      }));
+
+      const order = await customFetch<{ _id?: string; id?: string }>("/api/v1/orders", {
+        method: "POST",
+        body: JSON.stringify({
+          serviceType: "delivery",
+          vendorId,
+          totals: { subtotal, taxes, deliveryFee, total },
+          scheduledDelivery: {
+            type: deliveryTiming === "later" ? "later" : "now",
+            requestedAt: deliveryTiming === "later" && scheduledFor ? scheduledFor : undefined,
+          },
+          stops: [
+            {
+              id: "vendor-pickup",
+              address: vendor?.address || "Restaurant pickup",
+              storeName: vendor?.name || "Restaurant",
+              latitude: pickupLat,
+              longitude: pickupLng,
+              type: "pickup",
+              items: [],
+            },
+            {
+              id: "customer-drop",
+              address: deliveryAddressObj.formattedAddress,
+              deliveryAddress: deliveryAddressObj,
+              latitude: dropLat,
+              longitude: dropLng,
+              type: "drop",
+              items: orderItems,
+            },
+          ],
+        }),
+      });
+
+      const finalOrderId = order._id || order.id;
+      if (!finalOrderId) {
+        throw new Error("Order was created but no order ID was returned.");
+      }
+
+      setOrderId(finalOrderId);
+      setServiceType("delivery");
+      setStatus("pending");
+      clearCart();
+
+      router.replace({
+        pathname: "/finding-driver",
+        params: { orderId: finalOrderId },
+      });
+    } catch (error: any) {
+      console.error("Place order failed", error);
+      Alert.alert("Order failed", error.message || "Unable to place your order. Please try again.");
+    } finally {
+      setIsPlacingOrder(false);
+    }
   };
 
   const requestScheduleApproval = async (requested: Date) => {
@@ -414,13 +487,19 @@ export default function FoodCheckoutScreen() {
         )}
         
         <TouchableOpacity
-          style={[styles.placeOrderBtn, !canContinue && styles.placeOrderBtnDisabled]}
-          onPress={continueToPayment}
-          disabled={!canContinue}
+          style={[styles.placeOrderBtn, (!canContinue || isPlacingOrder) && styles.placeOrderBtnDisabled]}
+          onPress={placeOrder}
+          disabled={!canContinue || isPlacingOrder}
           activeOpacity={0.9}
         >
-          <Text style={styles.placeOrderText}>Place Order</Text>
-          <Text style={styles.placeOrderValue}>₹{total.toFixed(2)}</Text>
+          {isPlacingOrder ? (
+            <ActivityIndicator color="#fff" />
+          ) : (
+            <>
+              <Text style={styles.placeOrderText}>Place Order</Text>
+              <Text style={styles.placeOrderValue}>₹{total.toFixed(2)}</Text>
+            </>
+          )}
         </TouchableOpacity>
         
         <Text style={styles.termsText}>

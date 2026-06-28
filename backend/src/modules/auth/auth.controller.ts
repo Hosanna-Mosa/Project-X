@@ -17,8 +17,8 @@ export class AuthController {
 
   async verifyOTP(req: Request, res: Response, next: NextFunction) {
     try {
-      const { phone, code, role, name, password } = req.body;
-      const result = await authService.verifyOTP(phone, code, role as UserRole, name, password);
+      const { phone, code, role, name, password, email } = req.body;
+      const result = await authService.verifyOTP(phone, code, role as UserRole, name, password, email);
       return res.json(result);
     } catch (error: any) {
       next(error);
@@ -43,3 +43,4 @@ export class AuthController {
     }
   }
 }
+

@@ -21,16 +21,27 @@ import Colors from "@/constants/colors";
 import { useThemeStore } from "@/contexts/themeStore";
 import { customFetch } from "@/utils/api/custom-fetch";
 import { useAuthStore } from "@/contexts/authStore";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
-const FAMOUS_PLACES = [
-  { id: "1", name: "RTC Complex", address: "RTC Complex Internal Rd, Rajahmundry", icon: "history", lat: 17.0052, lng: 81.7778 },
-  { id: "2", name: "Navabharat Nagar", address: "Rajamahendravaram, Andhra Pradesh", icon: "history", lat: 17.0200, lng: 81.7900 },
-  { id: "3", name: "Seshayya Metta", address: "Gokavaram, Rajamahendravaram", icon: "history", lat: 17.0150, lng: 81.7850 },
-  { id: "4", name: "Lalacheruvu", address: "Rajamahendravaram, Andhra Pradesh", icon: "history", lat: 17.0300, lng: 81.8000 },
-  { id: "5", name: "Aditya Nagar", address: "Rajamahendravaram, Andhra Pradesh", icon: "history", lat: 17.0250, lng: 81.7950 },
-  { id: "6", name: "Luthergiri", address: "Rajamahendravaram, Andhra Pradesh", icon: "history", lat: 17.0100, lng: 81.7800 },
-];
+type RecentPlace = {
+  id: string;
+  name: string;
+  address: string;
+  lat: number;
+  lng: number;
+};
 
+const RECENT_LOCATIONS_KEY = "recent_locations";
+const recentLocationsKeyFor = (userId?: string | number | null) =>
+  userId ? `${RECENT_LOCATIONS_KEY}:${userId}` : `${RECENT_LOCATIONS_KEY}:guest`;
+
+const toRecentPlace = (place: Partial<RecentPlace> & { description?: string }) => ({
+  id: String(place.id || place.address || place.description || Date.now()),
+  name: place.name || place.description?.split(",")[0]?.trim() || place.address?.split(",")[0]?.trim() || "Recent place",
+  address: place.address || place.description || place.name || "",
+  lat: Number(place.lat),
+  lng: Number(place.lng),
+});
 export default function LocationSelectionScreen() {
   const insets = useSafeAreaInsets();
   const params = useLocalSearchParams<{ 
@@ -58,6 +69,7 @@ export default function LocationSelectionScreen() {
   const [showBookingForSheet, setShowBookingForSheet] = useState(false);
   const [bookingFor, setBookingFor] = useState<"myself" | "someone_else">("myself");
   const [someoneContact, setSomeoneContact] = useState("");
+  const [recentPlaces, setRecentPlaces] = useState<RecentPlace[]>([]);
 
   useEffect(() => {
     if (!user?.id) return;
@@ -76,6 +88,35 @@ export default function LocationSelectionScreen() {
     })();
   }, [user?.id]);
 
+  useEffect(() => {
+    let mounted = true;
+
+    const loadRecentPlaces = async () => {
+      try {
+        const accountKey = recentLocationsKeyFor(user?.id);
+        const stored = await AsyncStorage.getItem(accountKey);
+        const legacyStored = user?.id && !stored ? await AsyncStorage.getItem(RECENT_LOCATIONS_KEY) : null;
+        const parsed = JSON.parse(stored || legacyStored || "[]");
+
+        if (mounted && Array.isArray(parsed)) {
+          setRecentPlaces(
+            parsed
+              .map(toRecentPlace)
+              .filter((place) => Number.isFinite(place.lat) && Number.isFinite(place.lng))
+              .slice(0, 8)
+          );
+        }
+      } catch (error) {
+        console.error("Failed to load recent places:", error);
+      }
+    };
+
+    loadRecentPlaces();
+
+    return () => {
+      mounted = false;
+    };
+  }, [user?.id]);
   useEffect(() => {
     // Handle initial state from params
     if (params.pickupName && params.pickupLat) {
@@ -137,6 +178,24 @@ export default function LocationSelectionScreen() {
   const pickupRef = useRef<any>(null);
   const dropRef = useRef<any>(null);
 
+  const saveRecentPlace = async (placeInput: Partial<RecentPlace> & { description?: string }) => {
+    const place = toRecentPlace(placeInput);
+    if (!Number.isFinite(place.lat) || !Number.isFinite(place.lng) || !place.address) return;
+
+    setRecentPlaces((current) => {
+      const updated = [
+        place,
+        ...current.filter((item) => item.address !== place.address && item.id !== place.id),
+      ].slice(0, 8);
+
+      AsyncStorage.setItem(recentLocationsKeyFor(user?.id), JSON.stringify(updated)).catch((error) => {
+        console.error("Failed to save recent place:", error);
+      });
+
+      return updated;
+    });
+  };
+
   const handleSearch = async (text: string, type: 'pickup' | 'drop' | 'stop', id?: string) => {
     setFocusedInput({ type, id });
     if (!text || text.length < 2) {
@@ -184,6 +243,16 @@ export default function LocationSelectionScreen() {
     const lat = details?.geometry?.location?.lat || data.lat;
     const lng = details?.geometry?.location?.lng || data.lng;
     const addrName = data.description || data.name;
+    const placeId = data.place_id || data.id || details?.place_id;
+    const placeName = data.structured_formatting?.main_text || data.name || addrName?.split(",")?.[0]?.trim();
+
+    saveRecentPlace({
+      id: placeId || addrName,
+      name: placeName,
+      address: addrName,
+      lat,
+      lng,
+    });
 
     if (type === 'pickup') {
       setPickup({ name: addrName, lat, lng });
@@ -225,6 +294,16 @@ export default function LocationSelectionScreen() {
     const lat = details?.geometry?.location?.lat || data.lat;
     const lng = details?.geometry?.location?.lng || data.lng;
     const addrName = data.description || data.name;
+    const placeId = data.place_id || data.id || details?.place_id;
+    const placeName = data.structured_formatting?.main_text || data.name || addrName?.split(",")?.[0]?.trim();
+
+    saveRecentPlace({
+      id: placeId || addrName,
+      name: placeName,
+      address: addrName,
+      lat,
+      lng,
+    });
 
     setStops(prev => prev.map(s => s.id === id ? { ...s, name: addrName, lat, lng } : s));
   };
@@ -443,7 +522,11 @@ export default function LocationSelectionScreen() {
           {isSearching ? "Search Results" : "Recent Places"}
         </Text>
         
-        {(isSearching ? searchResults : FAMOUS_PLACES).map((place) => (
+        {!isSearching && recentPlaces.length === 0 ? (
+          <View style={styles.emptyRecents}>
+            <Text style={styles.emptyRecentsText}>Your searched places will appear here.</Text>
+          </View>
+        ) : (isSearching ? searchResults : recentPlaces).map((place) => (
           <TouchableOpacity 
             key={place.id} 
             style={styles.placeItem}
@@ -452,11 +535,11 @@ export default function LocationSelectionScreen() {
                 selectResult(place);
               } else {
                 if (!pickup) {
-                  pickupRef.current?.setAddressText(place.name);
-                  handleSelection('pickup', { name: place.name, lat: place.lat, lng: place.lng }, null);
+                  pickupRef.current?.setAddressText(place.address || place.name);
+                  handleSelection('pickup', { id: place.id, name: place.name, description: place.address || place.name, lat: place.lat, lng: place.lng }, null);
                 } else {
-                  dropRef.current?.setAddressText(place.name);
-                  handleSelection('drop', { name: place.name, lat: place.lat, lng: place.lng }, null);
+                  dropRef.current?.setAddressText(place.address || place.name);
+                  handleSelection('drop', { id: place.id, name: place.name, description: place.address || place.name, lat: place.lat, lng: place.lng }, null);
                 }
               }
             }}
@@ -772,6 +855,15 @@ const createStyles = (colors: typeof Colors.light) =>
       fontWeight: "500",
       marginTop: 2,
     },
+    emptyRecents: {
+      paddingHorizontal: 20,
+      paddingVertical: 18,
+    },
+    emptyRecentsText: {
+      fontSize: 14,
+      fontWeight: "600",
+      color: colors.textSecondary,
+    },
     sheetOverlay: {
       flex: 1,
       justifyContent: "flex-end",
@@ -783,7 +875,7 @@ const createStyles = (colors: typeof Colors.light) =>
     sheetBackButton: {
       position: "absolute",
       left: 18,
-      bottom: 358,
+      bottom: 410,
       width: 38,
       height: 38,
       borderRadius: 19,
@@ -909,13 +1001,22 @@ const createStyles = (colors: typeof Colors.light) =>
     doneButton: {
       height: 45,
       borderRadius: 23,
-      backgroundColor: "#FFCB1E",
+      backgroundColor: "#000000",
       alignItems: "center",
       justifyContent: "center",
     },
     doneButtonText: {
       fontSize: 16,
       fontWeight: "700",
-      color: "#000000",
+      color: "#FFFFFF",
     },
   });
+
+
+
+
+
+
+
+
+

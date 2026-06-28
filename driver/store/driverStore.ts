@@ -125,6 +125,7 @@ interface DriverState {
   incrementUnreadCount: () => void;
   setIsChatActive: (active: boolean) => void;
   loginWithPassword: (phone: string, password: string) => Promise<void>;
+  refreshSession: () => Promise<boolean>;
   startReservedRide: (orderId: string) => Promise<void>;
 }
 
@@ -642,11 +643,48 @@ export const useDriverStore = create<DriverState>()(
         set({ driverLocation: { lat, lng } }),
   
       setAuthenticated: (name: string, phone: string, token: string, userId: string) =>
-        set({ isAuthenticated: true, driverName: name, driverPhone: phone, token, driverUserId: userId, hasCompletedOnboarding: false }),
+        set({
+          isAuthenticated: true,
+          driverName: name,
+          driverPhone: phone,
+          token,
+          driverUserId: userId,
+        }),
   
       setOnboardingCompleted: () => set({ hasCompletedOnboarding: true }),
       setIdentityVerified: (verified) => set({ identityVerified: verified }),
       resetOnboarding: () => set({ hasCompletedOnboarding: false }),
+
+      refreshSession: async () => {
+        const { token, isAuthenticated } = get();
+        if (!token) {
+          if (isAuthenticated) get().logout();
+          return false;
+        }
+
+        try {
+          const res = await fetch(`${apiUrl}/api/v1/onboarding`, {
+            headers: { Authorization: `Bearer ${token}` },
+          });
+
+          if (res.status === 401 || res.status === 403) {
+            get().logout();
+            return false;
+          }
+
+          if (res.ok) {
+            const result = await res.json();
+            set({
+              hasCompletedOnboarding: result.onboardingStatus === "completed",
+            });
+          }
+
+          return true;
+        } catch (error) {
+          console.warn("Failed to refresh driver session:", error);
+          return Boolean(get().token);
+        }
+      },
   
       logout: () => {
         AsyncStorage.removeItem("driver-store"); // Clear persistence on logout
@@ -687,12 +725,13 @@ export const useDriverStore = create<DriverState>()(
 
           set({
             isAuthenticated: true,
-            hasCompletedOnboarding: false,
             driverName: data.user.name,
             driverPhone: data.user.phone,
             driverUserId: data.user.id || data.user._id,
             token: data.token,
           });
+
+          await get().refreshSession();
         } catch (err: any) {
           throw err;
         }

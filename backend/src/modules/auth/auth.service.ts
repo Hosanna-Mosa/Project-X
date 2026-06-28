@@ -2,6 +2,42 @@ import jwt from "jsonwebtoken";
 import User, { UserRole } from "../../database/models/User";
 import { ValidationError, UnauthorizedError, NotFoundError, ForbiddenError } from "../../utils/errors";
 
+function buildLoginIdentifierQuery(identifier: string) {
+  const trimmed = identifier.trim();
+  const lower = trimmed.toLowerCase();
+
+  if (lower.includes("@")) {
+    return { email: lower };
+  }
+
+  const digits = trimmed.replace(/\D/g, "");
+  const candidates = new Set<string>([trimmed]);
+
+  if (digits) {
+    candidates.add(digits);
+    candidates.add(`+${digits}`);
+
+    if (digits.length === 10) {
+      candidates.add(`+91${digits}`);
+      candidates.add(`91${digits}`);
+    }
+
+    if (digits.length > 10) {
+      const lastTen = digits.slice(-10);
+      candidates.add(lastTen);
+      candidates.add(`+91${lastTen}`);
+      candidates.add(`91${lastTen}`);
+    }
+  }
+
+  return {
+    $or: [
+      { phone: { $in: Array.from(candidates) } },
+      { email: lower },
+    ],
+  };
+}
+
 export class AuthService {
   async requestOTP(phone: string) {
     // Dummy mode — log and return success (no SMS sent)
@@ -41,12 +77,7 @@ export class AuthService {
   }
 
   async loginWithPassword(phoneOrEmail: string, password: string, role: UserRole) {
-    const user = await User.findOne({
-      $or: [
-        { phone: phoneOrEmail },
-        { email: phoneOrEmail }
-      ]
-    });
+    const user = await User.findOne(buildLoginIdentifierQuery(phoneOrEmail));
 
     if (!user) {
       throw new NotFoundError("User not found. Please sign up first.");
@@ -77,3 +108,4 @@ export class AuthService {
     );
   }
 }
+
