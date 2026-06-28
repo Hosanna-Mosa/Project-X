@@ -6,9 +6,10 @@ import {
   useFonts,
 } from "@expo-google-fonts/inter";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { Stack, router } from "expo-router";
+import { Stack, router, useSegments } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
-import React, { useEffect } from "react";
+import React, { useEffect, useRef, useState } from "react";
+import { Alert } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { KeyboardProvider } from "react-native-keyboard-controller";
 import { SafeAreaProvider } from "react-native-safe-area-context";
@@ -24,22 +25,82 @@ SplashScreen.preventAutoHideAsync();
 const queryClient = new QueryClient();
 
 function RootLayoutNav() {
+  const segments = useSegments();
+  const token = useDriverStore((s) => s.token);
   const isAuthenticated = useDriverStore((s) => s.isAuthenticated);
   const hasCompletedOnboarding = useDriverStore((s) => s.hasCompletedOnboarding);
+  const refreshSession = useDriverStore((s) => s.refreshSession);
+  const loginPromptShown = useRef(false);
+  const [hydrated, setHydrated] = useState(
+    () => useDriverStore.persist.hasHydrated?.() ?? false,
+  );
+  const [needsLoginPrompt, setNeedsLoginPrompt] = useState(false);
 
   useEffect(() => {
-    if (!isAuthenticated) {
-      router.replace("/auth");
+    const finishHydration = async () => {
+      const state = useDriverStore.getState();
+      if (state.isAuthenticated && state.token) {
+        await state.refreshSession();
+      } else if (state.isAuthenticated && !state.token) {
+        state.logout();
+        setNeedsLoginPrompt(true);
+      }
+      setHydrated(true);
+    };
+
+    if (useDriverStore.persist.hasHydrated?.()) {
+      finishHydration();
+      return;
     }
-  }, [isAuthenticated]);
+
+    const unsub = useDriverStore.persist.onFinishHydration(() => {
+      finishHydration();
+    });
+
+    return unsub;
+  }, []);
 
   useEffect(() => {
-    if (isAuthenticated && hasCompletedOnboarding) {
-      router.replace("/(tabs)");
-    } else if (isAuthenticated && !hasCompletedOnboarding) {
+    if (!hydrated) return;
+
+    const isLoggedIn = Boolean(isAuthenticated && token);
+    const inAuth = segments[0] === "auth";
+    const inOnboarding = segments[0] === "onboarding";
+
+    if (!isLoggedIn) {
+      if (!inAuth) {
+        router.replace("/auth");
+      }
+      if (needsLoginPrompt && !loginPromptShown.current) {
+        loginPromptShown.current = true;
+        Alert.alert("Login required", "Please sign in again to continue as a driver.");
+        setNeedsLoginPrompt(false);
+      }
+      return;
+    }
+
+    if (hasCompletedOnboarding) {
+      if (inAuth || inOnboarding) {
+        router.replace("/(tabs)");
+      }
+      return;
+    }
+
+    if (!inOnboarding) {
       router.replace("/onboarding");
     }
-  }, [isAuthenticated, hasCompletedOnboarding]);
+  }, [hydrated, isAuthenticated, token, hasCompletedOnboarding, needsLoginPrompt, segments]);
+
+  useEffect(() => {
+    if (!hydrated || !token) return;
+
+    refreshSession().then((valid) => {
+      if (!valid) {
+        setNeedsLoginPrompt(true);
+        router.replace("/auth");
+      }
+    });
+  }, [hydrated, token, refreshSession]);
 
   return (
     <Stack screenOptions={{ headerShown: false }}>

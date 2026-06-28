@@ -19,8 +19,9 @@ export const verifyOtpSchema = z.object({
 
 export const loginWithPasswordSchema = z.object({
   body: z.object({
-    phone: z.string().min(10, "Phone number must be at least 10 digits"),
+    phone: z.string().trim().min(3, "Phone or email is required"),
     password: z.string().min(1, "Password is required"),
     role: z.nativeEnum(UserRole),
   }),
 });
+

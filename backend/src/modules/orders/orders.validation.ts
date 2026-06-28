@@ -16,7 +16,7 @@ const stopInputSchema = z.object({
   type: z.string().optional(),
   items: z.any().optional(),
   instructions: z.string().optional(),
-  deliveryAddress: z.string().optional(),
+  deliveryAddress: z.union([z.string(), z.record(z.string(), z.any())]).optional(),
   lat: z.number().optional(),
   lng: z.number().optional(),
   latitude: z.number().optional(),

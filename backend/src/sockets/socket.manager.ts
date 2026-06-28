@@ -5,6 +5,7 @@ import http from "http";
 import jwt from "jsonwebtoken";
 import { UserRole } from "../database/models/User";
 import Order from "../database/models/Order";
+import Driver from "../database/models/Driver";
 
 export class SocketManager {
   private static instance: SocketManager;
@@ -89,10 +90,14 @@ export class SocketManager {
     });
   }
 
+  private getRoomSize(roomId: string) {
+    return this.io.sockets.adapter.rooms.get(roomId)?.size || 0;
+  }
+
   private initializeHandlers() {
     this.io.on("connection", (socket: Socket) => {
       const authUser = socket.data.user;
-      console.log(`Socket connected: ${socket.id} (User: ${authUser?.userId}, Role: ${authUser?.role})`);
+      console.log(`[SOCKET][CONNECT] socket=${socket.id} user=${authUser?.userId} role=${authUser?.role}`);
 
       // Automatically join the user to their own personal room
       if (authUser?.userId) {
@@ -165,19 +170,28 @@ export class SocketManager {
             return;
           }
 
+          let driverUserId: string | null = null;
+          if (order.driver) {
+            const driver = await Driver.findById(order.driver).select("user");
+            driverUserId = driver?.user?.toString() || null;
+          }
+
           const isAuthorized = 
             order.user.toString() === authUser.userId ||
-            (order.driver && order.driver.toString() === authUser.userId) ||
+            driverUserId === authUser.userId ||
             (order.vendor && order.vendor.toString() === authUser.userId) ||
             authUser.role === "ADMIN";
 
           if (!isAuthorized) {
-            console.warn(`[SOCKET SECURITY] User ${authUser.userId} unauthorized to track order ${orderId}`);
+            console.warn(
+              `[SOCKET][TRACK][REJECTED] socket=${socket.id} user=${authUser.userId} role=${authUser.role} order=${orderId} ` +
+              `orderUser=${order.user.toString()} orderDriver=${order.driver?.toString() || "none"} driverUser=${driverUserId || "none"}`
+            );
             return;
           }
 
           socket.join(orderId);
-          console.log(`Authorized user ${authUser.userId} tracking order room: ${orderId}`);
+          console.log(`[SOCKET][TRACK][JOINED] socket=${socket.id} user=${authUser.userId} role=${authUser.role} order=${orderId} roomSize=${this.getRoomSize(orderId)}`);
         } catch (error) {
           console.error(`[SOCKET] track_order error:`, error);
         }
@@ -187,9 +201,10 @@ export class SocketManager {
       socket.on("driver_accepted_order", (data: { orderId: string; driverInfo: any }) => {
         if (!authUser || authUser.role !== "DRIVER") return;
         
-        console.log(`[SOCKET] Driver accepted order: ${data.orderId}`, data.driverInfo);
+        console.log(`[SOCKET][ORDER_ACCEPTED] driverUser=${authUser.userId} order=${data.orderId}`, data.driverInfo);
         if (data.orderId) {
           socket.join(data.orderId);
+          console.log(`[SOCKET][ORDER_ACCEPTED][JOINED] socket=${socket.id} order=${data.orderId} roomSize=${this.getRoomSize(data.orderId)}`);
           this.io.to(data.orderId).emit("order_accepted", {
             orderId: data.orderId,
             driver: data.driverInfo,
@@ -223,20 +238,31 @@ export class SocketManager {
       socket.on("send_message", (data: { orderId: string; senderId: string; role: string; text: string; id?: string }) => {
         if (!authUser) return;
         
-        console.log(`[CHAT] Message in ${data.orderId} from ${data.role}: ${data.text}`);
-        if (data.orderId) {
-          this.io.to(data.orderId).emit("receive_message", {
-            id: data.id || Date.now().toString(),
-            text: data.text,
-            from: data.role.toLowerCase(), // 'user' or 'driver'
-            time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-            senderId: data.senderId
-          });
+        const from = data.role?.toLowerCase();
+        const payload = {
+          id: data.id || Date.now().toString(),
+          text: data.text,
+          from,
+          time: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+          senderId: data.senderId,
+        };
+
+        console.log(
+          `[CHAT][SEND] socket=${socket.id} authUser=${authUser.userId} authRole=${authUser.role} ` +
+          `order=${data.orderId || "missing"} senderId=${data.senderId} role=${data.role} roomSize=${data.orderId ? this.getRoomSize(data.orderId) : 0} text="${data.text}"`
+        );
+
+        if (!data.orderId) {
+          console.warn(`[CHAT][DROP] Missing orderId for message id=${payload.id}`);
+          return;
         }
+
+        this.io.to(data.orderId).emit("receive_message", payload);
+        console.log(`[CHAT][EMIT] order=${data.orderId} from=${from} id=${payload.id} recipients=${this.getRoomSize(data.orderId)}`);
       });
 
       socket.on("disconnect", () => {
-        console.log(`Socket disconnected: ${socket.id} (User: ${authUser?.userId})`);
+        console.log(`[SOCKET][DISCONNECT] socket=${socket.id} user=${authUser?.userId} role=${authUser?.role}`);
       });
     });
   }
@@ -259,3 +285,4 @@ export class SocketManager {
     this.io.to(orderId).emit(event, data);
   }
 }
+

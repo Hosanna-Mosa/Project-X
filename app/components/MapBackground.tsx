@@ -6,6 +6,8 @@ import { Feather } from '@expo/vector-icons';
 import { DeliveryStop } from '@/contexts/deliveryStore';
 import Colors from '@/constants/colors';
 
+const DRIVER_MARKER_IMAGE = require('@/assets/images/driver-marker.png');
+
 interface Props {
   children?: React.ReactNode;
   style?: ViewStyle | any;
@@ -100,6 +102,13 @@ const mapStyle: MapStyleElement[] = [
   }
 ];
 
+const FALLBACK_REGION: Region = {
+  latitude: 16.9891,
+  longitude: 82.2475,
+  latitudeDelta: 0.05,
+  longitudeDelta: 0.05,
+};
+
 export const MapBackground = forwardRef<MapBackgroundRef, Props>(({ 
   children, 
   style, 
@@ -116,7 +125,7 @@ export const MapBackground = forwardRef<MapBackgroundRef, Props>(({
   radiusCenter,
   radiusMeters
 }, ref) => {
-  const [region, setRegion] = useState<Region | undefined>(initialRegion);
+  const [region, setRegion] = useState<Region>(initialRegion || FALLBACK_REGION);
   const internalMapRef = useRef<MapView>(null);
   const locationRef = useRef<{lat: number, lng: number} | null>(null);
 
@@ -203,16 +212,17 @@ export const MapBackground = forwardRef<MapBackgroundRef, Props>(({
       try {
         let { status } = await Location.requestForegroundPermissionsAsync();
         if (status !== 'granted') {
-          setRegion({
-            latitude: 28.6139,
-            longitude: 77.2090,
-            latitudeDelta: 0.05,
-            longitudeDelta: 0.05,
-          });
           return;
         }
 
-        let location = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
+        const lastKnown = await Location.getLastKnownPositionAsync();
+        if (lastKnown) {
+          locationRef.current = { lat: lastKnown.coords.latitude, lng: lastKnown.coords.longitude };
+          setRegion(getRegionForLocation(lastKnown.coords.latitude, lastKnown.coords.longitude));
+          onLocationUpdate?.({ lat: lastKnown.coords.latitude, lng: lastKnown.coords.longitude });
+        }
+
+        let location = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
         locationRef.current = { lat: location.coords.latitude, lng: location.coords.longitude };
         setRegion(getRegionForLocation(location.coords.latitude, location.coords.longitude));
         if (onLocationUpdate) {
@@ -221,27 +231,50 @@ export const MapBackground = forwardRef<MapBackgroundRef, Props>(({
       } catch (error) {
         // Graceful fallback if device GPS is fully disabled
         console.warn("Location services unavailable:", error);
-        setRegion({
-          latitude: 28.6139,
-          longitude: 77.2090,
-          latitudeDelta: 0.05,
-          longitudeDelta: 0.05,
-        });
+
       }
     })();
   }, [initialRegion]);
+  useEffect(() => {
+    if (!internalMapRef.current || userLocation || driverLocation) return;
+
+    const coords: { latitude: number, longitude: number }[] = [];
+
+    stops.forEach((stop) => {
+      if (stop.lat && stop.lng) {
+        coords.push({ latitude: stop.lat, longitude: stop.lng });
+      }
+    });
+
+    driverMarkers.forEach((driver) => {
+      if (driver.lat && driver.lng) {
+        coords.push({ latitude: driver.lat, longitude: driver.lng });
+      }
+    });
+
+    if (coords.length > 1) {
+      internalMapRef.current.fitToCoordinates(coords, {
+        edgePadding: { top: 110, right: 60, bottom: 340, left: 60 },
+        animated: true,
+      });
+    } else if (coords.length === 1) {
+      internalMapRef.current.animateToRegion(
+        getRegionForLocation(coords[0].latitude, coords[0].longitude, 0.018, 0.018),
+        600,
+      );
+    }
+  }, [stops, driverMarkers, userLocation, driverLocation]);
 
   return (
     <View style={[styles.container, style]} pointerEvents="box-none">
-      {region && (
-        <MapView
+      <MapView
           ref={internalMapRef}
           provider={PROVIDER_GOOGLE}
           style={StyleSheet.absoluteFill}
           initialRegion={region}
           mapType={mapType}
           customMapStyle={Platform.OS === 'web' || mapType === 'satellite' ? undefined : mapStyle}
-          showsUserLocation={true}
+          showsUserLocation={!userLocation}
           showsPointsOfInterest={false}
           showsCompass={false}
           showsMyLocationButton={false}
@@ -314,27 +347,14 @@ export const MapBackground = forwardRef<MapBackgroundRef, Props>(({
           )}
 
           {driverLocation && (
-            Platform.OS === 'web' ? (
-              <Marker
-                coordinate={{ latitude: driverLocation.lat, longitude: driverLocation.lng }}
-                title="Sarah Jenkins (Helper)"
-                pinColor="#000000"
-              />
-            ) : (
-              <Marker
-                coordinate={{ latitude: driverLocation.lat, longitude: driverLocation.lng }}
-                anchor={{ x: 0.5, y: 0.5 }}
-                flat={true}
-                tracksViewChanges={true}
-              >
-                <View style={styles.driverMarker}>
-                  <View style={styles.driverBadge}>
-                    <Feather name="user" size={14} color="#fff" />
-                  </View>
-                  <View style={styles.driverPulse} />
-                </View>
-              </Marker>
-            )
+            <Marker
+              key="driver-location-pin"
+              coordinate={{ latitude: Number(driverLocation.lat), longitude: Number(driverLocation.lng) }}
+              title="Driver"
+              image={DRIVER_MARKER_IMAGE}
+              anchor={{ x: 0.5, y: 1 }}
+              tracksViewChanges={false}
+            />
           )}
 
           {polyline && (
@@ -345,7 +365,6 @@ export const MapBackground = forwardRef<MapBackgroundRef, Props>(({
             />
           )}
         </MapView>
-      )}
       {children}
     </View>
 
@@ -427,32 +446,6 @@ const styles = StyleSheet.create({
     height: 4,
     backgroundColor: Colors.light.primary,
   },
-  driverMarker: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    width: 50,
-    height: 50,
-  },
-  driverBadge: {
-    backgroundColor: Colors.light.primary,
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 2,
-    borderColor: '#fff',
-    zIndex: 2,
-    elevation: 8,
-  },
-  driverPulse: {
-    position: 'absolute',
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: `${Colors.light.primary}30`,
-    zIndex: 1,
-  },
   redMarkerContainer: {
     alignItems: 'center',
     justifyContent: 'center',
@@ -509,3 +502,5 @@ const styles = StyleSheet.create({
     shadowRadius: 3,
   }
 });
+
+

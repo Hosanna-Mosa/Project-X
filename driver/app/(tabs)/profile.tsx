@@ -153,6 +153,11 @@ export default function ProfileScreen() {
       const response = await fetch(`${apiUrl}/api/v1/drivers/profile`, {
         headers: { Authorization: `Bearer ${token}` },
       });
+      if (response.status === 401 || response.status === 403) {
+        logout();
+        router.replace("/auth");
+        return;
+      }
       const data = await response.json();
       if (!response.ok) throw new Error(data.message || "Failed to load profile");
       setProfile(data);

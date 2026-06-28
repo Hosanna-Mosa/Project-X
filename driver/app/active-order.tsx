@@ -408,6 +408,18 @@ export default function ActiveOrderScreen() {
     );
   };
 
+  const openRideNavigation = () => {
+    const pickupAddress = pickupStop?.address || (pickupStop ? `${pickupStop.lat},${pickupStop.lng}` : "");
+    const destinationAddress = deliveryStop?.address || (deliveryStop ? `${deliveryStop.lat},${deliveryStop.lng}` : "");
+
+    if (!pickupAddress || !destinationAddress) {
+      Alert.alert("Navigation unavailable", "Pickup or destination address is missing for this ride.");
+      return;
+    }
+
+    const url = `https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(pickupAddress)}&destination=${encodeURIComponent(destinationAddress)}&travelmode=driving`;
+    Linking.openURL(url);
+  };
   // Calculations for step 12
   const distanceVal = parseFloat(currentOrder.distance || "4.2") || 4.2;
   const distanceFare = Math.round(distanceVal * 6);
@@ -676,12 +688,29 @@ export default function ActiveOrderScreen() {
                     <Text style={styles.infoText}>{currentOrder.customerName || "Rider"}</Text>
                     <Text style={styles.subText}>{pickupStop?.address}</Text>
                   </View>
-                  <View style={{ flexDirection: "row", gap: 12, alignItems: "center" }}>
+                  <View style={styles.rideContactActions}>
+                    <TouchableOpacity
+                      style={styles.roundCommBtn}
+                      onPress={() => router.push({ pathname: "/chat", params: { orderId: currentOrder.id } })}
+                    >
+                      <Ionicons name="chatbubble-ellipses" size={18} color="#00B7EB" />
+                      {unreadCount > 0 && (
+                        <View style={styles.commBadge}>
+                          <Text style={styles.commBadgeText}>{unreadCount}</Text>
+                        </View>
+                      )}
+                    </TouchableOpacity>
                     <TouchableOpacity
                       style={styles.roundCommBtn}
                       onPress={() => Linking.openURL(`tel:${currentOrder.customerPhone || "1234567890"}`)}
                     >
                       <Ionicons name="call" size={18} color="#00B7EB" />
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={styles.roundCommBtn}
+                      onPress={openRideNavigation}
+                    >
+                      <Ionicons name="navigate" size={18} color="#00B7EB" />
                     </TouchableOpacity>
                   </View>
                 </View>
@@ -936,7 +965,39 @@ export default function ActiveOrderScreen() {
     if (status === "accepted" || status === "driver_assigned") {
       return (
         <View style={styles.stepContainer}>
-          <Text style={styles.stepTitle}>Order Accepted</Text>
+          <View style={styles.stepTitleRow}>
+            <Text style={[styles.stepTitle, styles.stepTitleInRow]}>Order Accepted</Text>
+            <View style={styles.rideContactActions}>
+              <TouchableOpacity
+                style={styles.roundCommBtn}
+                onPress={() => router.push({ pathname: "/chat", params: { orderId: currentOrder.id } })}
+              >
+                <Ionicons name="chatbubble-ellipses" size={18} color="#00B7EB" />
+                {unreadCount > 0 && (
+                  <View style={styles.commBadge}>
+                    <Text style={styles.commBadgeText}>{unreadCount}</Text>
+                  </View>
+                )}
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.roundCommBtn}
+                onPress={() => Linking.openURL(`tel:${currentOrder.vendorPhone || "1234567890"}`)}
+              >
+                <Ionicons name="call" size={18} color="#00B7EB" />
+              </TouchableOpacity>
+              {pickupStop?.lat && pickupStop?.lng && (
+                <TouchableOpacity
+                  style={styles.roundCommBtn}
+                  onPress={() => {
+                    const url = `https://www.google.com/maps/dir/?api=1&destination=${pickupStop.lat},${pickupStop.lng}`;
+                    Linking.openURL(url);
+                  }}
+                >
+                  <Ionicons name="navigate" size={18} color="#00B7EB" />
+                </TouchableOpacity>
+              )}
+            </View>
+          </View>
           <View style={styles.infoBox}>
             <View style={styles.infoItem}>
               <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
@@ -945,25 +1006,7 @@ export default function ActiveOrderScreen() {
                   <Text style={styles.infoText}>{currentOrder.vendorName || pickupStop?.locationName || "Restaurant"}</Text>
                   <Text style={styles.subText}>{pickupStop?.address}</Text>
                 </View>
-                <View style={{ flexDirection: "row", gap: 12, alignItems: "center" }}>
-                  <TouchableOpacity
-                    style={styles.roundCommBtn}
-                    onPress={() => Linking.openURL(`tel:${currentOrder.vendorPhone || "1234567890"}`)}
-                  >
-                    <Ionicons name="call" size={18} color="#00B7EB" />
-                  </TouchableOpacity>
-                  {pickupStop?.lat && pickupStop?.lng && (
-                    <TouchableOpacity
-                      style={styles.roundCommBtn}
-                      onPress={() => {
-                        const url = `https://www.google.com/maps/dir/?api=1&destination=${pickupStop.lat},${pickupStop.lng}`;
-                        Linking.openURL(url);
-                      }}
-                    >
-                      <Ionicons name="navigate" size={18} color="#00B7EB" />
-                    </TouchableOpacity>
-                  )}
-                </View>
+
               </View>
             </View>
             <View style={styles.divider} />
@@ -1423,17 +1466,7 @@ export default function ActiveOrderScreen() {
           <Feather name="arrow-left" size={24} color={Colors.text} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>{isRide ? "Ride Active Task" : (isHelper ? "Helper Active Task" : "Delivery Active Task")}</Text>
-        <TouchableOpacity
-          style={styles.chatBtnTop}
-          onPress={() => router.push({ pathname: "/chat", params: { orderId: currentOrder.id } })}
-        >
-          <Ionicons name="chatbubble-ellipses" size={24} color={Colors.primary} />
-          {unreadCount > 0 && (
-            <View style={styles.badgeTop}>
-              <Text style={styles.badgeText}>{unreadCount}</Text>
-            </View>
-          )}
-        </TouchableOpacity>
+        <View style={styles.headerRightSpacer} />
       </View>
 
       <View style={styles.mapContainer}>
@@ -1570,7 +1603,7 @@ const styles = StyleSheet.create({
   },
   backBtn: { padding: 4 },
   headerTitle: { fontSize: 17, fontWeight: "700", color: Colors.text },
-  chatBtnTop: { padding: 4 },
+  headerRightSpacer: { width: 32, height: 32 },
   mapContainer: { flex: 1 },
   userMarker: {
     width: 32,
@@ -1669,6 +1702,17 @@ const styles = StyleSheet.create({
     fontWeight: "800",
     color: "#1F2937",
     marginBottom: 12,
+  },
+  stepTitleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 12,
+    marginBottom: 12,
+  },
+  stepTitleInRow: {
+    flex: 1,
+    marginBottom: 0,
   },
   stepHeaderRow: {
     flexDirection: "row",
@@ -1973,6 +2017,11 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     gap: 8,
   },
+  rideContactActions: {
+    flexDirection: "row",
+    gap: 8,
+    alignItems: "center",
+  },
   roundCommBtn: {
     width: 36,
     height: 36,
@@ -1980,6 +2029,23 @@ const styles = StyleSheet.create({
     backgroundColor: "#E0F7FF",
     alignItems: "center",
     justifyContent: "center",
+  },
+  commBadge: {
+    position: "absolute",
+    top: -4,
+    right: -4,
+    minWidth: 16,
+    height: 16,
+    borderRadius: 8,
+    backgroundColor: Colors.error,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 4,
+  },
+  commBadgeText: {
+    color: "#fff",
+    fontSize: 9,
+    fontWeight: "800",
   },
   optionsBlock: {
     marginBottom: 14,
@@ -2122,3 +2188,9 @@ const styles = StyleSheet.create({
     color: "#374151",
   },
 });
+
+
+
+
+
+

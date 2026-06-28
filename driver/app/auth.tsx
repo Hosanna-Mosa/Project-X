@@ -37,7 +37,18 @@ export default function AuthScreen() {
   const [loading, setLoading] = useState(false);
   const otpRefs = useRef<(TextInput | null)[]>([]);
   const slideAnim = useRef(new Animated.Value(0)).current;
-  const { loginWithPassword } = useDriverStore();
+  const { loginWithPassword, refreshSession } = useDriverStore();
+
+  const routeAfterAuth = async () => {
+    const sessionValid = await refreshSession();
+    if (!sessionValid) {
+      Alert.alert("Session expired", "Please sign in again.");
+      return;
+    }
+
+    const { hasCompletedOnboarding } = useDriverStore.getState();
+    router.replace(hasCompletedOnboarding ? "/(tabs)" : "/onboarding");
+  };
 
   // ── Sign In ──────────────────────────────────────────────────
 
@@ -55,7 +66,7 @@ export default function AuthScreen() {
     try {
       await loginWithPassword(`+91${phone}`, password);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      router.replace("/onboarding");
+      await routeAfterAuth();
     } catch (err: any) {
       const msg = err?.message || "Login failed";
       if (msg.toLowerCase().includes("not found") || msg.toLowerCase().includes("sign up")) {
@@ -159,10 +170,9 @@ export default function AuthScreen() {
       if (!response.ok) throw new Error(data.message || "Verification failed");
 
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      // Set authentication using the driver store
       const { setAuthenticated } = useDriverStore.getState();
       setAuthenticated(data.user.name, data.user.phone, data.token, data.user.id || data.user._id);
-      router.replace("/onboarding");
+      await routeAfterAuth();
     } catch (err: any) {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       Alert.alert("Invalid OTP", err.message);
