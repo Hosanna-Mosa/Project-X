@@ -342,6 +342,16 @@ export default function TrackingScreen() {
     );
   }
 
+  const showOtp = !!(
+    (isRide && startOtp && ["confirmed", "driver_assigned", "en_route_pickup", "arrived_pickup"].includes(status)) ||
+    (isRide && deliveryOtp && ["en_route_delivery", "arrived_delivery"].includes(status)) ||
+    (!isRide && deliveryOtp)
+  );
+
+  const bottomSheetHeight = !driver 
+    ? 330 
+    : (showOtp ? 290 : 205);
+
   return (
     <View style={styles.root}>
       <MapBackground 
@@ -379,8 +389,8 @@ export default function TrackingScreen() {
         <View style={styles.backBtn} />
       </View>
 
-      <BottomSheet style={styles.bottomSheet}>
-        <ScrollView showsVerticalScrollIndicator={false}>
+      <BottomSheet style={styles.bottomSheet} defaultHeight={bottomSheetHeight} disableExpand={true}>
+        <ScrollView showsVerticalScrollIndicator={false} scrollEnabled={false}>
           {!driver ? (
             <View style={styles.findingDriverContainer}>
               <View style={styles.radarContainer}>
