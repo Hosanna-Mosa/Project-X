@@ -15,7 +15,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons, Feather, MaterialCommunityIcons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
-import MapView, { Marker, Callout, PROVIDER_GOOGLE } from "react-native-maps";
+import MapView, { Marker, Callout, PROVIDER_GOOGLE, Polyline } from "react-native-maps";
 import MapViewDirections from "react-native-maps-directions";
 import * as Location from "expo-location";
 import Colors from "@/constants/colors";
@@ -25,12 +25,23 @@ import { customFetch } from "@/utils/api/custom-fetch";
 const { width, height } = Dimensions.get("window");
 const GOOGLE_MAPS_APIKEY = process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY;
 
+const isValidCoordinate = (coordinate: { latitude: number; longitude: number }) =>
+  Number.isFinite(coordinate.latitude) &&
+  Number.isFinite(coordinate.longitude) &&
+  Math.abs(coordinate.latitude) <= 90 &&
+  Math.abs(coordinate.longitude) <= 180 &&
+  !(coordinate.latitude === 0 && coordinate.longitude === 0);
+
 type FareEstimate = {
   distanceInKm: number;
   estimatedMinutes: number;
   fareBreakdown: {
     total: number;
   };
+};
+
+type RouteOptimizeResponse = {
+  polyline?: string;
 };
 
 const normalizeServiceType = (serviceId?: string) => {
@@ -342,6 +353,8 @@ export default function RideConfirmationScreen() {
   } | null>(null);
   const [nearbyDrivers, setNearbyDrivers] = useState<any[]>([]);
   const [mapReady, setMapReady] = useState(false);
+  const [directionsFailed, setDirectionsFailed] = useState(false);
+  const [routeCoordinates, setRouteCoordinates] = useState<Array<{ latitude: number; longitude: number }>>([]);
   const mapRef = useRef<MapView>(null);
 
   const stops = React.useMemo(() => {
@@ -353,6 +366,117 @@ export default function RideConfirmationScreen() {
       return [];
     }
   }, [params.stops]);
+
+  const validStops = React.useMemo(
+    () =>
+      stops
+        .map((stop: any) => ({
+          ...stop,
+          latitude: Number(stop.lat),
+          longitude: Number(stop.lng),
+        }))
+        .filter((stop: any) => isValidCoordinate({ latitude: stop.latitude, longitude: stop.longitude })),
+    [stops],
+  );
+
+  const pickupIsValid = isValidCoordinate(pickupCoords);
+  const dropIsValid = isValidCoordinate(dropCoords);
+  const tripCoordinates = React.useMemo(() => {
+    if (!pickupIsValid || !dropIsValid) return [];
+
+    return [
+      pickupCoords,
+      ...validStops.map((stop: any) => ({ latitude: stop.latitude, longitude: stop.longitude })),
+      dropCoords,
+    ];
+  }, [
+    pickupIsValid,
+    dropIsValid,
+    pickupCoords.latitude,
+    pickupCoords.longitude,
+    dropCoords.latitude,
+    dropCoords.longitude,
+    validStops,
+  ]);
+
+  const fitTripToMap = React.useCallback(() => {
+    if (tripCoordinates.length < 2) return;
+
+    mapRef.current?.fitToCoordinates(tripCoordinates, {
+      edgePadding: { right: 80, bottom: 420, left: 80, top: 160 },
+      animated: true,
+    });
+  }, [tripCoordinates]);
+
+  React.useEffect(() => {
+    if (!mapReady) return;
+
+    const timer = setTimeout(fitTripToMap, 250);
+    return () => clearTimeout(timer);
+  }, [fitTripToMap, mapReady]);
+
+  React.useEffect(() => {
+    if (!pickupIsValid || !dropIsValid) {
+      setRouteCoordinates([]);
+      return;
+    }
+
+    let cancelled = false;
+
+    const loadBackendRoute = async () => {
+      try {
+        const route = await customFetch<RouteOptimizeResponse>("/api/v1/routing/optimize", {
+          method: "POST",
+          body: JSON.stringify({
+            origin: {
+              latitude: pickupCoords.latitude,
+              longitude: pickupCoords.longitude,
+            },
+            stops: [
+              ...validStops.map((stop: any) => ({
+                id: stop.id,
+                address: stop.name || stop.address || "Stop",
+                latitude: stop.latitude,
+                longitude: stop.longitude,
+                type: "stop",
+              })),
+              {
+                id: "drop",
+                address: params.dropName || "Drop",
+                latitude: dropCoords.latitude,
+                longitude: dropCoords.longitude,
+                type: "drop",
+              },
+            ],
+          }),
+          responseType: "json",
+        });
+
+        const decoded = route?.polyline ? decodePolyline(route.polyline) : [];
+        if (!cancelled && decoded.length > 1) {
+          setRouteCoordinates(decoded);
+        }
+      } catch (error) {
+        console.warn("Backend route fetch failed:", error);
+        if (!cancelled) setRouteCoordinates([]);
+      }
+    };
+
+    loadBackendRoute();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    pickupIsValid,
+    dropIsValid,
+    pickupCoords.latitude,
+    pickupCoords.longitude,
+    dropCoords.latitude,
+    dropCoords.longitude,
+    params.dropName,
+    validStops,
+  ]);
 
   const selectedVehicleType = React.useMemo(() => {
     if (!selectedRideId) {
@@ -465,19 +589,33 @@ export default function RideConfirmationScreen() {
           onMapReady={() => setMapReady(true)}
         >
           {/* Route */}
-          {GOOGLE_MAPS_APIKEY && (
+          {routeCoordinates.length >= 2 && (!GOOGLE_MAPS_APIKEY || directionsFailed) && (
+            <Polyline
+              coordinates={routeCoordinates}
+              strokeWidth={4}
+              strokeColor="#111827"
+            />
+          )}
+
+          {GOOGLE_MAPS_APIKEY && pickupIsValid && dropIsValid && (
             <MapViewDirections
               origin={pickupCoords}
               destination={dropCoords}
-              waypoints={stops.map((s: any) => ({ latitude: s.lat, longitude: s.lng }))}
+              waypoints={validStops.map((s: any) => ({ latitude: s.latitude, longitude: s.longitude }))}
               apikey={GOOGLE_MAPS_APIKEY}
               strokeWidth={4}
               strokeColor="#111827"
               optimizeWaypoints
               onReady={(result) => {
+                setDirectionsFailed(false);
                 mapRef.current?.fitToCoordinates(result.coordinates, {
                   edgePadding: { right: 80, bottom: 420, left: 80, top: 160 },
                 });
+              }}
+              onError={(errorMessage) => {
+                console.warn("Map directions failed:", errorMessage);
+                setDirectionsFailed(true);
+                fitTripToMap();
               }}
             />
           )}
@@ -500,30 +638,32 @@ export default function RideConfirmationScreen() {
           })}
 
           {/* Pickup Marker */}
-          <Marker
-            coordinate={pickupCoords}
-            anchor={{ x: 0.5, y: 0.5 }}
-            tracksViewChanges={true}
-          >
-            <View collapsable={false} style={styles.pickupPin}>
-              <View collapsable={false} style={styles.pinInnerDot} />
-            </View>
-            <Callout tooltip onPress={() => router.back()}>
-              <View style={styles.locationBubble}>
-                <Text style={styles.locationBubbleText} numberOfLines={1}>
-                  {getDisplayName(params.pickupName)}
-                </Text>
-                <View style={styles.editBubbleBtn}>
-                  <Feather name="edit-2" size={10} color="#111827" />
-                </View>
+          {pickupIsValid && (
+            <Marker
+              coordinate={pickupCoords}
+              anchor={{ x: 0.5, y: 0.5 }}
+              tracksViewChanges={true}
+            >
+              <View collapsable={false} style={styles.pickupPin}>
+                <View collapsable={false} style={styles.pinInnerDot} />
               </View>
-            </Callout>
-          </Marker>
+              <Callout tooltip onPress={() => router.back()}>
+                <View style={styles.locationBubble}>
+                  <Text style={styles.locationBubbleText} numberOfLines={1}>
+                    {getDisplayName(params.pickupName)}
+                  </Text>
+                  <View style={styles.editBubbleBtn}>
+                    <Feather name="edit-2" size={10} color="#111827" />
+                  </View>
+                </View>
+              </Callout>
+            </Marker>
+          )}
           {/* Stop Markers */}
-          {stops.map((stop: any, index: number) => (
+          {validStops.map((stop: any, index: number) => (
             <Marker
               key={stop.id}
-              coordinate={{ latitude: stop.lat, longitude: stop.lng }}
+              coordinate={{ latitude: stop.latitude, longitude: stop.longitude }}
               anchor={{ x: 0.5, y: 0.5 }}
               tracksViewChanges={true}
             >
@@ -541,25 +681,27 @@ export default function RideConfirmationScreen() {
           ))}
 
           {/* Drop Marker */}
-          <Marker
-            coordinate={dropCoords}
-            anchor={{ x: 0.5, y: 0.5 }}
-            tracksViewChanges={true}
-          >
-            <View collapsable={false} style={styles.dropPin}>
-              <View collapsable={false} style={styles.pinInnerDot} />
-            </View>
-            <Callout tooltip onPress={() => router.back()}>
-              <View style={styles.locationBubble}>
-                <Text style={styles.locationBubbleText} numberOfLines={1}>
-                  {getDisplayName(params.dropName)}
-                </Text>
-                <View style={styles.editBubbleBtn}>
-                  <Feather name="edit-2" size={10} color="#111827" />
-                </View>
+          {dropIsValid && (
+            <Marker
+              coordinate={dropCoords}
+              anchor={{ x: 0.5, y: 0.5 }}
+              tracksViewChanges={true}
+            >
+              <View collapsable={false} style={styles.dropPin}>
+                <View collapsable={false} style={styles.pinInnerDot} />
               </View>
-            </Callout>
-          </Marker>
+              <Callout tooltip onPress={() => router.back()}>
+                <View style={styles.locationBubble}>
+                  <Text style={styles.locationBubbleText} numberOfLines={1}>
+                    {getDisplayName(params.dropName)}
+                  </Text>
+                  <View style={styles.editBubbleBtn}>
+                    <Feather name="edit-2" size={10} color="#111827" />
+                  </View>
+                </View>
+              </Callout>
+            </Marker>
+          )}
 
           {/* User Location Marker */}
           {userLocation && (
@@ -966,6 +1108,40 @@ export default function RideConfirmationScreen() {
 }
 
 // ─── Screen styles ─────────────────────────────────────────────────────────
+function decodePolyline(encoded: string) {
+  const points: Array<{ latitude: number; longitude: number }> = [];
+  let index = 0;
+  let lat = 0;
+  let lng = 0;
+
+  while (index < encoded.length) {
+    let shift = 0;
+    let result = 0;
+    let byte = 0;
+
+    do {
+      byte = encoded.charCodeAt(index++) - 63;
+      result |= (byte & 0x1f) << shift;
+      shift += 5;
+    } while (byte >= 0x20 && index < encoded.length);
+
+    lat += result & 1 ? ~(result >> 1) : result >> 1;
+    shift = 0;
+    result = 0;
+
+    do {
+      byte = encoded.charCodeAt(index++) - 63;
+      result |= (byte & 0x1f) << shift;
+      shift += 5;
+    } while (byte >= 0x20 && index < encoded.length);
+
+    lng += result & 1 ? ~(result >> 1) : result >> 1;
+    points.push({ latitude: lat / 1e5, longitude: lng / 1e5 });
+  }
+
+  return points;
+}
+
 const createStyles = (colors: typeof Colors.light, insets: any) =>
   StyleSheet.create({
     root: { flex: 1, backgroundColor: colors.background },

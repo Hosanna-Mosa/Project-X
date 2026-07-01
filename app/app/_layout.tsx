@@ -6,7 +6,7 @@ import {
   useFonts,
 } from "@expo-google-fonts/inter";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { Stack } from "expo-router";
+import { Stack, router, useSegments } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import React, { useEffect } from "react";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
@@ -43,10 +43,17 @@ const queryClient = new QueryClient();
 
 function RootLayoutNav() {
   const insets = useSafeAreaInsets();
+  const isInitialized = useAuthStore((s) => s.isInitialized);
+
+  if (!isInitialized) {
+    return null; // Or a custom Loading/Splash view
+  }
+
   return (
     <View style={{ flex: 1, backgroundColor: "#FFFFFF" }}>
       <Stack screenOptions={{ headerShown: false }}>
         <Stack.Screen name="index" options={{ headerShown: false }} />
+        <Stack.Screen name="login" options={{ headerShown: false }} />
         <Stack.Screen name="otp" options={{ headerShown: false }} />
         <Stack.Screen name="signup" options={{ headerShown: false }} />
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
@@ -86,14 +93,40 @@ export default function RootLayout() {
   });
 
   const initializeAuth = useAuthStore((s) => s.initializeAuth);
+  const token = useAuthStore((s) => s.token);
+  const isInitialized = useAuthStore((s) => s.isInitialized);
+  const segments = useSegments();
 
   useEffect(() => {
     if (fontsLoaded || fontError) {
+      // Initialize auth (reads token from AsyncStorage), then hide splash
       initializeAuth().then(() => {
         SplashScreen.hideAsync();
       });
     }
   }, [fontsLoaded, fontError]);
+
+  // Once auth is initialized and fonts are ready, redirect based on token
+  useEffect(() => {
+    if (!(fontsLoaded || fontError) || !isInitialized) return;
+
+    const firstSegment = segments[0];
+    const isAuthScreen = !firstSegment || firstSegment === "login" || firstSegment === "signup" || firstSegment === "otp";
+
+    if (!token && !isAuthScreen) {
+      router.replace("/login");
+      return;
+    }
+
+    if (token && isAuthScreen) {
+        // Token exists → go straight to the main app
+        router.replace("/(tabs)");
+      }
+      if (token && false) {
+        // No token → show login screen
+        router.replace("/login");
+      }
+  }, [isInitialized, token, fontsLoaded, fontError, segments]);
 
   if (!fontsLoaded && !fontError) return null;
 

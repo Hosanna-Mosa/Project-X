@@ -17,7 +17,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { customFetch } from "@/utils/api/custom-fetch";
 import { useAuthStore } from "@/contexts/authStore";
 import * as Location from "expo-location";
-import MapView, { PROVIDER_GOOGLE, PROVIDER_DEFAULT, MapStyleElement } from "react-native-maps";
+import MapView, { PROVIDER_GOOGLE, PROVIDER_DEFAULT } from "react-native-maps";
 
 // Brand Colors matching DESIGN.md
 const COLORS = {
@@ -45,26 +45,6 @@ const COLORS = {
   error: "#ba1a1a",
   background: "#f7f9fb",
 };
-
-// Desaturated minimalist map style from MapBackground
-const MAP_STYLE: MapStyleElement[] = [
-  { featureType: "all", elementType: "labels.text.fill", stylers: [{ color: "#7c93a3" }] },
-  {
-    featureType: "all",
-    elementType: "labels.text.stroke",
-    stylers: [{ visibility: "on" }, { color: "#ffffff" }, { weight: 2 }, { gamma: 0.84 }],
-  },
-  { featureType: "all", elementType: "labels.icon", stylers: [{ visibility: "off" }] },
-  { featureType: "landscape", elementType: "geometry", stylers: [{ color: "#f1f5f9" }] },
-  { featureType: "poi", elementType: "geometry", stylers: [{ color: "#e2e8f0" }] },
-  { featureType: "road.highway", elementType: "geometry.fill", stylers: [{ color: "#ffffff" }] },
-  { featureType: "road.highway", elementType: "geometry.stroke", stylers: [{ visibility: "off" }] },
-  { featureType: "road.arterial", elementType: "geometry.fill", stylers: [{ color: "#ffffff" }] },
-  { featureType: "road.arterial", elementType: "geometry.stroke", stylers: [{ color: "#e2e8f0" }] },
-  { featureType: "road.local", elementType: "geometry.fill", stylers: [{ color: "#ffffff" }] },
-  { featureType: "transit", elementType: "geometry", stylers: [{ color: "#e2e8f0" }] },
-  { featureType: "water", elementType: "geometry", stylers: [{ color: "#cbd5e1" }] },
-];
 
 export default function AddAddressScreen() {
   const insets = useSafeAreaInsets();
@@ -383,7 +363,6 @@ export default function AddAddressScreen() {
             onRegionChangeComplete={onRegionChangeComplete}
             showsUserLocation={true}
             showsMyLocationButton={false}
-            customMapStyle={MAP_STYLE}
           />
 
           <View style={styles.searchOverlayWrapper}>
@@ -482,7 +461,6 @@ export default function AddAddressScreen() {
                 zoomEnabled={false}
                 pitchEnabled={false}
                 rotateEnabled={false}
-                customMapStyle={MAP_STYLE}
               />
               <View style={styles.mapCardPinContainer}>
                 <View style={styles.mapCardPin}>

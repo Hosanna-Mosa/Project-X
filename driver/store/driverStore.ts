@@ -127,6 +127,7 @@ interface DriverState {
   loginWithPassword: (phone: string, password: string) => Promise<void>;
   refreshSession: () => Promise<boolean>;
   startReservedRide: (orderId: string) => Promise<void>;
+  fetchEarnings: () => Promise<void>;
 }
 
 export const useMockIncomingOrder = (): Order => ({
@@ -197,53 +198,20 @@ export const useDriverStore = create<DriverState>()(
       unreadCount: 0,
       isChatActive: false,
       earnings: {
-        today: 342,
-        week: 2180,
-        totalDeliveries: 847,
+        today: 0,
+        week: 0,
+        totalDeliveries: 0,
         weeklyBreakdown: [
-          { day: "Mon", amount: 280 },
-          { day: "Tue", amount: 340 },
-          { day: "Wed", amount: 410 },
-          { day: "Thu", amount: 295 },
-          { day: "Fri", amount: 385 },
-          { day: "Sat", amount: 470 },
-          { day: "Sun", amount: 342 },
+          { day: "Mon", amount: 0 },
+          { day: "Tue", amount: 0 },
+          { day: "Wed", amount: 0 },
+          { day: "Thu", amount: 0 },
+          { day: "Fri", amount: 0 },
+          { day: "Sat", amount: 0 },
+          { day: "Sun", amount: 0 },
         ],
       },
-      orderHistory: [
-        {
-          id: "ORD-001",
-          earnings: 95,
-          distance: "5.2 km",
-          customerName: "Priya Mehta",
-          stops: 3,
-          completedAt: new Date(Date.now() - 2 * 60 * 60 * 1000),
-        },
-        {
-          id: "ORD-002",
-          earnings: 75,
-          distance: "3.8 km",
-          customerName: "Arjun Singh",
-          stops: 2,
-          completedAt: new Date(Date.now() - 4 * 60 * 60 * 1000),
-        },
-        {
-          id: "ORD-003",
-          earnings: 110,
-          distance: "6.5 km",
-          customerName: "Sneha Patel",
-          stops: 3,
-          completedAt: new Date(Date.now() - 6 * 60 * 60 * 1000),
-        },
-        {
-          id: "ORD-004",
-          earnings: 62,
-          distance: "2.9 km",
-          customerName: "Vikram Nair",
-          stops: 2,
-          completedAt: new Date(Date.now() - 24 * 60 * 60 * 1000),
-        },
-      ],
+      orderHistory: [],
 
       goOnline: async (services) => {
         const { token, driverUserId } = get();
@@ -663,11 +631,11 @@ export const useDriverStore = create<DriverState>()(
         }
 
         try {
-          const res = await fetch(`${apiUrl}/api/v1/onboarding`, {
+          const res = await fetch(`${apiUrl}/api/v1/drivers/profile`, {
             headers: { Authorization: `Bearer ${token}` },
           });
 
-          if (res.status === 401 || res.status === 403) {
+          if (res.status === 401 || res.status === 403 || res.status === 404) {
             get().logout();
             return false;
           }
@@ -675,7 +643,11 @@ export const useDriverStore = create<DriverState>()(
           if (res.ok) {
             const result = await res.json();
             set({
-              hasCompletedOnboarding: result.onboardingStatus === "completed",
+              driverName: result.account?.name || "",
+              driverPhone: result.account?.phone || "",
+              driverUserId: result.account?.id || null,
+              hasCompletedOnboarding: result.driver?.onboardingStatus === "completed",
+              identityVerified: result.verification?.identity ?? false,
             });
           }
 
@@ -736,6 +708,46 @@ export const useDriverStore = create<DriverState>()(
           throw err;
         }
       },
+
+      /**
+       * Fetches real earnings data from the backend and updates the store.
+       * Called from the home screen on mount and on pull-to-refresh.
+       */
+      fetchEarnings: async () => {
+        const { token } = get();
+        if (!token || !apiUrl) return;
+        try {
+          const res = await fetch(`${apiUrl}/api/v1/drivers/earnings`, {
+            headers: { Authorization: `Bearer ${token}` },
+          });
+          if (!res.ok) return; // silently ignore — keep whatever is in store
+          const data = await res.json();
+          // Backend returns:
+          //   { availableBalance, weekBalance, trendPercent, weeklyBreakdown, stats: { completedTrips, onlineHours, totalDistance } }
+          const weeklyBreakdown: { day: string; amount: number }[] =
+            Array.isArray(data.weeklyBreakdown) && data.weeklyBreakdown.length > 0
+              ? data.weeklyBreakdown
+              : [
+                  { day: "Mon", amount: 0 },
+                  { day: "Tue", amount: 0 },
+                  { day: "Wed", amount: 0 },
+                  { day: "Thu", amount: 0 },
+                  { day: "Fri", amount: 0 },
+                  { day: "Sat", amount: 0 },
+                  { day: "Sun", amount: 0 },
+                ];
+          set({
+            earnings: {
+              today: data.availableBalance ?? 0,   // available balance as "today's earnings"
+              week: data.weekBalance ?? 0,
+              totalDeliveries: data.stats?.completedTrips ?? 0,
+              weeklyBreakdown,
+            },
+          });
+        } catch (err) {
+          console.warn("fetchEarnings failed:", err);
+        }
+      },
     }),
     {
       name: "driver-store",
@@ -748,8 +760,8 @@ export const useDriverStore = create<DriverState>()(
         driverPhone: state.driverPhone,
         driverUserId: state.driverUserId,
         token: state.token,
-        earnings: state.earnings,
-        orderHistory: state.orderHistory,
+        // Note: earnings and orderHistory are NOT persisted so fresh data
+        // is always fetched from the API on each session start.
         activeChat: state.activeChat,
       }),
     }

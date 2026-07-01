@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   KeyboardAvoidingView,
   Platform,
@@ -9,9 +9,10 @@ import {
   TouchableOpacity,
   View,
   Alert,
+  ActivityIndicator,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Feather, Ionicons } from "@expo/vector-icons";
+import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import Colors from "@/constants/colors";
 import { useAuthStore } from "@/contexts/authStore";
@@ -25,10 +26,18 @@ export default function AuthScreen() {
   const [password, setPassword] = useState("");
   const [isPasswordVisible, setIsPasswordVisible] = useState(false);
 
-  const { loginWithPassword, loading } = useAuthStore();
+  const { loginWithPassword, loading, token, isInitialized } = useAuthStore();
   const { theme } = useThemeStore();
   const colors = Colors[theme];
   const styles = React.useMemo(() => createStyles(colors), [theme]);
+
+  // Guard: if a token already exists, skip straight to the app.
+  // This handles the edge case where the user navigates back to "/" while still logged in.
+  useEffect(() => {
+    if (isInitialized && token) {
+      router.replace("/(tabs)");
+    }
+  }, [isInitialized, token]);
 
   const handleSignIn = async () => {
     const identifier = activeTab === "Phone" ? phone.trim() : email.trim();
@@ -54,6 +63,7 @@ export default function AuthScreen() {
 
     try {
       await loginWithPassword(identifier, password, "USER");
+      // Token is now saved in AsyncStorage & store → navigate in
       router.replace("/(tabs)");
     } catch (error: any) {
       Alert.alert("Login Failed", error.message || "Failed to sign in. Please check your credentials.");
@@ -64,30 +74,24 @@ export default function AuthScreen() {
     Alert.alert("Forgot Password", "Password recovery instructions will be sent to your account.");
   };
 
+  // Show a loading indicator while auth state is being restored
+  if (!isInitialized) {
+    return (
+      <View style={[styles.root, { justifyContent: "center", alignItems: "center" }]}>
+        <ActivityIndicator size="large" color="#002045" />
+      </View>
+    );
+  }
+
   return (
     <KeyboardAvoidingView
       style={styles.root}
       behavior={Platform.OS === "ios" ? "padding" : "height"}
     >
-      {/* Top Header Row */}
-      <View style={[styles.headerRow, { paddingTop: insets.top + 12 }]}>
-        <TouchableOpacity 
-          style={styles.brandTitleContainer} 
-          onPress={() => router.back()}
-          activeOpacity={0.7}
-        >
-          <Ionicons name="arrow-back" size={24} color="#002045" style={styles.backArrow} />
-          <Text style={styles.brandTitle}>Flavor</Text>
-        </TouchableOpacity>
-        
-        <TouchableOpacity 
-          style={styles.skipBtn} 
-          onPress={() => router.replace("/(tabs)")}
-          activeOpacity={0.85}
-        >
-          <Text style={styles.skipText}>Skip</Text>
-          <Feather name="chevron-right" size={16} color="#43474e" />
-        </TouchableOpacity>
+      {/* Top Header */}
+      <View style={[styles.headerRow, { paddingTop: insets.top + 20 }]}>
+        <Text style={styles.brandTitle}>Flavor</Text>
+        <Text style={styles.brandTagline}>Your city, delivered.</Text>
       </View>
 
       <ScrollView
@@ -180,15 +184,15 @@ export default function AuthScreen() {
                   autoCapitalize="none"
                   autoCorrect={false}
                 />
-                <TouchableOpacity 
+                <TouchableOpacity
                   onPress={() => setIsPasswordVisible(!isPasswordVisible)}
                   style={styles.eyeBtn}
                   activeOpacity={0.7}
                 >
-                  <Ionicons 
-                    name={isPasswordVisible ? "eye-off-outline" : "eye-outline"} 
-                    size={20} 
-                    color="#43474e" 
+                  <Ionicons
+                    name={isPasswordVisible ? "eye-off-outline" : "eye-outline"}
+                    size={20}
+                    color="#43474e"
                   />
                 </TouchableOpacity>
               </View>
@@ -204,18 +208,20 @@ export default function AuthScreen() {
               disabled={(!password || (activeTab === "Phone" ? !phone : !email) || loading)}
               activeOpacity={0.85}
             >
-              <Text style={styles.signInBtnText}>
-                {loading ? "Signing in..." : "Sign In"}
-              </Text>
-              {!loading && (
-                <Ionicons name="arrow-forward" size={18} color="#002045" style={{ marginLeft: 6 }} />
+              {loading ? (
+                <ActivityIndicator size="small" color="#002045" />
+              ) : (
+                <>
+                  <Text style={styles.signInBtnText}>Sign In</Text>
+                  <Ionicons name="arrow-forward" size={18} color="#002045" style={{ marginLeft: 6 }} />
+                </>
               )}
             </TouchableOpacity>
           </View>
 
           {/* Don't have account row */}
-          <TouchableOpacity 
-            style={styles.signUpLinkRow} 
+          <TouchableOpacity
+            style={styles.signUpLinkRow}
             onPress={() => router.replace("/signup")}
             activeOpacity={0.7}
           >
@@ -232,48 +238,44 @@ export default function AuthScreen() {
 const createStyles = (colors: typeof Colors.light) => StyleSheet.create({
   root: {
     flex: 1,
-    backgroundColor: "#f7f9fb", // Neutral background
-  },
-  headerRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    paddingHorizontal: 24,
-    paddingBottom: 12,
     backgroundColor: "#f7f9fb",
   },
-  brandTitleContainer: {
-    flexDirection: "row",
+  headerRow: {
+    paddingHorizontal: 24,
+    paddingBottom: 20,
+    backgroundColor: "#f7f9fb",
     alignItems: "center",
-    gap: 8,
-  },
-  backArrow: {
-    marginRight: 4,
   },
   brandTitle: {
-    fontSize: 22,
-    fontWeight: "700",
-    color: "#002045", // Primary brand color
-    letterSpacing: -0.5,
+    fontSize: 32,
+    fontWeight: "800",
+    color: "#002045",
+    letterSpacing: -1,
+    marginBottom: 4,
+  },
+  brandTagline: {
+    fontSize: 14,
+    color: "#43474e",
+    fontWeight: "500",
   },
   scrollContainer: {
     flexGrow: 1,
     justifyContent: "center",
     paddingHorizontal: 24,
-    paddingTop: 16,
+    paddingTop: 8,
     paddingBottom: 40,
   },
   card: {
-    backgroundColor: "#ffffff", // white container card
-    borderRadius: 16,
+    backgroundColor: "#ffffff",
+    borderRadius: 20,
     borderWidth: 1,
     borderColor: "#e6e8ea",
-    padding: 24,
+    padding: 28,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.04,
-    shadowRadius: 10,
-    elevation: 3,
+    shadowOpacity: 0.06,
+    shadowRadius: 12,
+    elevation: 4,
     width: "100%",
   },
   cardTitle: {
@@ -288,11 +290,11 @@ const createStyles = (colors: typeof Colors.light) => StyleSheet.create({
     color: "#43474e",
     textAlign: "center",
     lineHeight: 20,
-    marginBottom: 20,
+    marginBottom: 24,
   },
   tabContainer: {
     flexDirection: "row",
-    backgroundColor: "#eceef0", // surface-container
+    backgroundColor: "#eceef0",
     borderRadius: 10,
     padding: 4,
     height: 46,
@@ -305,7 +307,7 @@ const createStyles = (colors: typeof Colors.light) => StyleSheet.create({
     borderRadius: 8,
   },
   tabActive: {
-    backgroundColor: "#ffffff", // active tab white card
+    backgroundColor: "#ffffff",
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,
@@ -340,15 +342,15 @@ const createStyles = (colors: typeof Colors.light) => StyleSheet.create({
   forgotText: {
     fontSize: 12,
     fontWeight: "600",
-    color: "#0061a5", // secondary action blue
+    color: "#0061a5",
   },
   inputContainer: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#f2f4f6", // container low background
-    borderRadius: 8,
-    height: 48,
-    paddingHorizontal: 12,
+    backgroundColor: "#f2f4f6",
+    borderRadius: 10,
+    height: 50,
+    paddingHorizontal: 14,
   },
   inputIcon: {
     marginRight: 10,
@@ -367,7 +369,7 @@ const createStyles = (colors: typeof Colors.light) => StyleSheet.create({
     borderRadius: 12,
     backgroundColor: "#ffffff",
     borderWidth: 2,
-    borderColor: "#002045", // brand primary deep blue outline
+    borderColor: "#002045",
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
@@ -391,23 +393,7 @@ const createStyles = (colors: typeof Colors.light) => StyleSheet.create({
     color: "#43474e",
   },
   signUpLinkHighlight: {
-    color: "#0061a5", // secondary action blue
+    color: "#0061a5",
     fontWeight: "700",
-  },
-  skipBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#ffffff",
-    borderWidth: 1,
-    borderColor: "#c4c6cf",
-    borderRadius: 20,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-  },
-  skipText: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: "#43474e",
-    marginRight: 2,
   },
 });

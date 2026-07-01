@@ -6,7 +6,6 @@ import {
   TouchableOpacity,
   View,
   Alert,
-  Platform,
   ActivityIndicator,
   TextInput,
   Modal,
@@ -31,6 +30,7 @@ export default function ProfileScreen() {
 
   const [loading, setLoading] = useState(false);
   const [editing, setEditing] = useState(false);
+  const [ordersCount, setOrdersCount] = useState(0);
   
   // Edit States
   const [formData, setFormData] = useState({
@@ -57,8 +57,23 @@ export default function ProfileScreen() {
           phone: data.phone || "",
         });
       }
-    } catch (err) {
+
+      // Fetch the real user orders to display the exact orders count
+      try {
+        const ordersData = await customFetch<any[]>("/api/v1/orders");
+        if (ordersData && Array.isArray(ordersData)) {
+          setOrdersCount(ordersData.length);
+        }
+      } catch (orderErr) {
+        console.warn("Failed to fetch user orders count:", orderErr);
+      }
+    } catch (err: any) {
       console.error("Fetch profile error:", err);
+      // If unauthorized, forbidden, or user not found, log out
+      if (err.status === 401 || err.status === 403 || err.status === 404) {
+        await logout();
+        router.replace("/login");
+      }
     } finally {
       setLoading(false);
     }
@@ -125,13 +140,13 @@ export default function ProfileScreen() {
   };
 
   const handleLogout = async () => {
-    Alert.alert("Logout", "Are you sure you want to logout?", [
-      { text: "Cancel", style: "cancel" },
-      { text: "Logout", style: "destructive", onPress: async () => {
-          await logout();
-          router.replace("/");
-      }},
-    ]);
+    try {
+      setLoading(true);
+      await logout();
+      router.replace("/login");
+    } finally {
+      setLoading(false);
+    }
   };
 
   // Name formatting helper for the split asymmetrical header layout
@@ -141,28 +156,26 @@ export default function ProfileScreen() {
 
   return (
     <View style={[styles.root, { backgroundColor: colors.background }]}>
-      {/* Top App Bar - Matching code.html */}
-      <View style={[styles.appBar, { paddingTop: insets.top, borderBottomColor: colors.borderLight }]}>
-        <TouchableOpacity
-          style={styles.barButton}
-          onPress={() => {
-            if (router.canGoBack()) router.back();
-            else router.replace("/(tabs)");
-          }}
-        >
-          <Feather name="arrow-left" size={22} color={colors.primary} />
-        </TouchableOpacity>
-        <Text style={[styles.appBarTitle, { color: colors.primary }]}>Account</Text>
-        <TouchableOpacity
-          style={styles.barButton}
-          onPress={() => Alert.alert("Settings", "Settings screen coming soon!")}
-        >
-          <Feather name="settings" size={20} color={colors.primary} />
-        </TouchableOpacity>
-      </View>
+      <TouchableOpacity
+        style={[
+          styles.backButton,
+          {
+            top: insets.top + 12,
+            backgroundColor: colors.surface,
+            borderColor: colors.borderLight,
+          },
+        ]}
+        onPress={() => {
+          if (router.canGoBack()) router.back();
+          else router.replace("/(tabs)");
+        }}
+        activeOpacity={0.85}
+      >
+        <Feather name="arrow-left" size={22} color={colors.primary} />
+      </TouchableOpacity>
 
       <ScrollView 
-        contentContainerStyle={[styles.scrollContainer, { paddingBottom: insets.bottom + 40 }]}
+        contentContainerStyle={[styles.scrollContainer, { paddingTop: insets.top + 72, paddingBottom: insets.bottom + 40 }]}
         showsVerticalScrollIndicator={false}
       >
         {/* Asymmetrical Header - Profile Info Section */}
@@ -200,11 +213,11 @@ export default function ProfileScreen() {
             <TouchableOpacity 
               style={[styles.neoCard, { shadowColor: colors.text }]} 
               activeOpacity={0.9}
-              onPress={() => router.push("/(tabs)/orders")}
+              onPress={() => router.replace("/(tabs)/orders")}
             >
               <Feather name="folder" size={24} color={colors.teal} style={styles.neoCardIcon} />
               <View>
-                <Text style={[styles.neoCardValue, { color: colors.primary }]}>24</Text>
+                <Text style={[styles.neoCardValue, { color: colors.primary }]}>{ordersCount}</Text>
                 <Text style={[styles.neoCardLabel, { color: colors.textSecondary }]}>TOTAL ORDERS</Text>
               </View>
             </TouchableOpacity>
@@ -213,11 +226,11 @@ export default function ProfileScreen() {
             <TouchableOpacity 
               style={[styles.neoCard, { shadowColor: colors.text }]} 
               activeOpacity={0.9}
-              onPress={() => router.push("/delivery/wallet" as any)}
+              onPress={() => Alert.alert("Wallet", "Wallet balance is $0.00")}
             >
               <MaterialCommunityIcons name="wallet-outline" size={26} color={colors.teal} style={styles.neoCardIcon} />
               <View>
-                <Text style={[styles.neoCardValue, { color: colors.primary }]}>$45.00</Text>
+                <Text style={[styles.neoCardValue, { color: colors.primary }]}>$0.00</Text>
                 <Text style={[styles.neoCardLabel, { color: colors.textSecondary }]}>WALLET BALANCE</Text>
               </View>
             </TouchableOpacity>
@@ -232,7 +245,7 @@ export default function ProfileScreen() {
             >
               <Ionicons name="heart-outline" size={26} color={colors.teal} style={styles.neoCardIcon} />
               <View>
-                <Text style={[styles.neoCardValue, { color: colors.primary }]}>8 Items</Text>
+                <Text style={[styles.neoCardValue, { color: colors.primary }]}>0 Items</Text>
                 <Text style={[styles.neoCardLabel, { color: colors.textSecondary }]}>FAVOURITES</Text>
               </View>
             </TouchableOpacity>
@@ -246,7 +259,7 @@ export default function ProfileScreen() {
               <Ionicons name="location-outline" size={26} color={colors.teal} style={styles.neoCardIcon} />
               <View>
                 <Text style={[styles.neoCardValue, { color: colors.primary }]}>
-                  {user?.addresses?.length || 3} Places
+                  {user?.addresses?.length || 0} Places
                 </Text>
                 <Text style={[styles.neoCardLabel, { color: colors.textSecondary }]}>SAVED PLACES</Text>
               </View>
@@ -335,7 +348,7 @@ export default function ProfileScreen() {
           {!user ? (
             <TouchableOpacity 
               style={[styles.actionButtonSolid, { backgroundColor: colors.primary }]} 
-              onPress={() => router.replace("/")}
+              onPress={() => router.replace("/login")}
               activeOpacity={0.8}
             >
               <Feather name="log-in" size={16} color="#fff" />
@@ -435,29 +448,24 @@ const styles = StyleSheet.create({
   root: { 
     flex: 1, 
   },
-  appBar: {
-    height: Platform.OS === 'ios' ? 96 : 56,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    borderBottomWidth: 1,
-    backgroundColor: '#ffffff',
-  },
-  appBarTitle: {
-    fontSize: 20,
-    fontFamily: 'Inter_700Bold',
-  },
-  barButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+  backButton: {
+    position: 'absolute',
+    left: 20,
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
+    zIndex: 20,
+    elevation: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 6,
   },
   scrollContainer: { 
     paddingHorizontal: 24,
-    paddingTop: 24,
   },
   asymmetricHeader: {
     flexDirection: 'row',
