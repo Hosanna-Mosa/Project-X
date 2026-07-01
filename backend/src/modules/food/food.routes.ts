@@ -6,13 +6,15 @@ import {
   updateFoodItem, 
   deleteFoodItem,
   uploadImages,
-  searchFoodItems
+  searchFoodItems,
+  getStore149Items
 } from "./food.controller";
 
 const router = Router();
 const upload = multer({ storage: multer.memoryStorage() });
 
 router.get("/search", searchFoodItems);
+router.get("/store-149", getStore149Items);
 router.get("/vendor/:vendorId", getVendorMenu);
 router.post("/", addFoodItem);
 router.post("/upload", upload.array("images", 5), uploadImages);
