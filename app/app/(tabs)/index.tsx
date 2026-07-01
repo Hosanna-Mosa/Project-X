@@ -208,6 +208,14 @@ export default function HomeScreen() {
   const [searchedDishes, setSearchedDishes] = useState<any[]>([]);
   const [isSearchingDishes, setIsSearchingDishes] = useState(false);
 
+  const [store149Items, setStore149Items] = useState<any[]>([]);
+  const [loading149, setLoading149] = useState(false);
+
+  const cartStore = useCartStore();
+  const cartItems = cartStore.items;
+  const addCartItem = cartStore.addItem;
+  const updateCartQuantity = cartStore.updateQuantity;
+
   useEffect(() => {
     if (!searchText) {
       setSearchedDishes([]);
@@ -371,14 +379,34 @@ export default function HomeScreen() {
     }
   };
 
+  const fetch149StoreItems = async (lat: number, lng: number) => {
+    try {
+      setLoading149(true);
+      const baseUrl = process.env.EXPO_PUBLIC_API_URL || Constants.expoConfig?.extra?.apiUrl;
+      const response = await fetch(`${baseUrl}/api/v1/food/store-149?lat=${lat}&lng=${lng}`);
+      if (response.ok) {
+        const data = await response.json();
+        setStore149Items(data);
+      }
+    } catch (error) {
+      console.error("Error fetching 149 store items:", error);
+    } finally {
+      setLoading149(false);
+    }
+  };
+
   useEffect(() => {
     (async () => {
       setPage(1);
       setHasMore(true);
       setLoading(true);
       const { lat, lng } = await getCoords();
-      if (activeService === 'Meat') fetchMeatCenters(lat, lng, 1);
-      else fetchVendors(lat, lng, 1);
+      if (activeService === 'Meat') {
+        fetchMeatCenters(lat, lng, 1);
+      } else {
+        fetchVendors(lat, lng, 1);
+        fetch149StoreItems(lat, lng);
+      }
     })();
   }, [selectedAddress, activeService, appliedDistanceKm, distanceRefreshKey]);
 
@@ -420,21 +448,147 @@ export default function HomeScreen() {
   const renderHeader = () => (
     <>
       {activeService === 'Food' && (
-        <View style={styles.greetingSection}>
-          <Text style={styles.greetingTitle}>
-            {getGreeting(userName)}
-          </Text>
-          <View style={styles.dishesGrid}>
-            {famousDishes.map((dish) => (
-              <TouchableOpacity key={dish.id} style={styles.dishChip} activeOpacity={0.8}>
-                <View style={[styles.dishIconCircle, { backgroundColor: dish.color + '15' }]}>
-                  <Ionicons name={dish.icon as any} size={16} color={dish.color} />
-                </View>
-                <Text style={styles.dishChipText}>{dish.name}</Text>
-              </TouchableOpacity>
-            ))}
+        <>
+          <View style={styles.greetingSection}>
+            <Text style={styles.greetingTitle}>
+              {getGreeting(userName)}
+            </Text>
+            <View style={styles.dishesGrid}>
+              {famousDishes.map((dish) => (
+                <TouchableOpacity key={dish.id} style={styles.dishChip} activeOpacity={0.8}>
+                  <View style={[styles.dishIconCircle, { backgroundColor: dish.color + '15' }]}>
+                    <Ionicons name={dish.icon as any} size={16} color={dish.color} />
+                  </View>
+                  <Text style={styles.dishChipText}>{dish.name}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
           </View>
-        </View>
+
+          {store149Items.length > 0 && (
+            <LinearGradient
+              colors={theme === 'light' ? ['#F5F3FF', '#EDE9FE', '#F5F3FF'] : ['#2E1065', '#4C1D95', '#2E1065']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.store149Container}
+            >
+              <View style={styles.store149Header}>
+                <View style={{ flex: 1 }}>
+                  <View style={styles.store149LogoContainer}>
+                    <View style={styles.store149LogoCircle}>
+                      <Text style={styles.store149LogoText}>149</Text>
+                    </View>
+                    <Text style={styles.store149BrandText}>store</Text>
+                  </View>
+                  <View style={styles.store149Subheader}>
+                    <Ionicons name="checkmark-circle" size={14} color={theme === 'light' ? '#7C3AED' : '#C4B5FD'} />
+                    <Text style={[styles.store149SubText, { color: theme === 'light' ? '#6D28D9' : '#C4B5FD' }]}>Meals at ₹149 + Free Delivery</Text>
+                  </View>
+                </View>
+                <TouchableOpacity style={styles.store149ViewAllBtn} activeOpacity={0.7}>
+                  <Text style={styles.store149ViewAllText}>View All</Text>
+                  <Ionicons name="chevron-forward" size={12} color="#0284C7" />
+                </TouchableOpacity>
+              </View>
+
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.store149ScrollContent}
+              >
+                {store149Items.map((item) => {
+                  const cartItem = cartItems.find((i) => i._id === item._id);
+                  
+                  const handleAdd = () => {
+                    const foodItem = {
+                      _id: item._id,
+                      name: item.name,
+                      description: item.description || "",
+                      price: item.price,
+                      category: item.category || "149 Store",
+                      isVeg: item.isVeg,
+                      images: item.images && item.images.length > 0 ? item.images : ["https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=400"]
+                    };
+                    addCartItem(foodItem, item.vendorId);
+                  };
+
+                  return (
+                    <View key={item._id} style={styles.store149Card}>
+                      <View style={styles.store149ImageContainer}>
+                        <Image
+                          source={{ uri: item.images && item.images.length > 0 ? item.images[0] : "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=400" }}
+                          style={styles.store149Image}
+                        />
+                        
+                        {/* Diet overlay (top-left) */}
+                        <View style={styles.store149DietOverlay}>
+                          <View style={[styles.store149DietIcon, { borderColor: item.isVeg ? "#16A34A" : "#E11D48" }]}>
+                            <View style={[styles.store149DietDot, { backgroundColor: item.isVeg ? "#16A34A" : "#E11D48" }]} />
+                          </View>
+                        </View>
+
+                        {/* Rating overlay (top-right) */}
+                        <View style={styles.store149RatingOverlay}>
+                          <Ionicons name="star" size={9} color="#F59E0B" />
+                          <Text style={styles.store149RatingOverlayText}>{item.rating || "4.2"}</Text>
+                        </View>
+
+                        {/* Add button overlay */}
+                        <View style={styles.store149AddButtonOverlay}>
+                          {cartItem ? (
+                            <View style={styles.store149QtyPill}>
+                              <TouchableOpacity
+                                onPress={() => updateCartQuantity(item._id, cartItem.quantity - 1)}
+                                style={styles.store149QtyBtn}
+                                activeOpacity={0.7}
+                              >
+                                <Feather name="minus" size={11} color="#002045" />
+                              </TouchableOpacity>
+                              <Text style={styles.store149QtyText}>{cartItem.quantity}</Text>
+                              <TouchableOpacity
+                                onPress={handleAdd}
+                                style={styles.store149QtyBtn}
+                                activeOpacity={0.7}
+                              >
+                                <Feather name="plus" size={11} color="#002045" />
+                              </TouchableOpacity>
+                            </View>
+                          ) : (
+                            <TouchableOpacity
+                              onPress={handleAdd}
+                              style={styles.store149AddPill}
+                              activeOpacity={0.85}
+                            >
+                              <Text style={styles.store149AddText}>ADD</Text>
+                              <Feather name="plus" size={10} color="#16A34A" style={{ marginLeft: 2 }} />
+                            </TouchableOpacity>
+                          )}
+                        </View>
+                      </View>
+
+                      <View style={styles.store149Details}>
+                        <Text style={styles.store149Name} numberOfLines={1}>
+                          {item.name}
+                        </Text>
+
+                        <View style={styles.store149PriceRow}>
+                          <Text style={styles.store149OriginalPrice}>₹{item.originalPrice}</Text>
+                          <View style={styles.store149PriceHighlight}>
+                            <Text style={styles.store149DealPrice}>₹{item.price}</Text>
+                          </View>
+                        </View>
+
+                        <Text style={styles.store149Brand} numberOfLines={1}>
+                          {item.brand || "KFC"}
+                        </Text>
+                      </View>
+                    </View>
+                  );
+                })}
+              </ScrollView>
+            </LinearGradient>
+          )}
+        </>
       )}
 
       {activeService === 'Meat' && (
@@ -568,8 +722,12 @@ export default function HomeScreen() {
           setPage(1);
           setHasMore(true);
           const { lat, lng } = await getCoords();
-          if (activeService === 'Meat') fetchMeatCenters(lat, lng, 1);
-          else fetchVendors(lat, lng, 1);
+          if (activeService === 'Meat') {
+            fetchMeatCenters(lat, lng, 1);
+          } else {
+            fetchVendors(lat, lng, 1);
+            fetch149StoreItems(lat, lng);
+          }
         }}
         onScroll={Animated.event(
           [{ nativeEvent: { contentOffset: { y: scrollY } } }],
@@ -1167,6 +1325,249 @@ const createStyles = (colors: typeof Colors.light) => StyleSheet.create({
     fontSize: 11,
     fontWeight: "700",
     color: colors.text,
+  },
+  store149Container: {
+    borderRadius: 22,
+    marginHorizontal: 16,
+    marginVertical: 12,
+    padding: 16,
+    borderWidth: 1.5,
+    borderColor: colors.border,
+    shadowColor: colors.shadow,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.05,
+    shadowRadius: 12,
+    elevation: 3,
+  },
+  store149Header: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 12,
+  },
+  store149LogoContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    marginBottom: 4,
+  },
+  store149LogoCircle: {
+    backgroundColor: "#7C3AED",
+    width: 40,
+    height: 28,
+    borderRadius: 8,
+    justifyContent: "center",
+    alignItems: "center",
+    shadowColor: "#7C3AED",
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 4,
+    transform: [{ rotate: "-6deg" }],
+  },
+  store149LogoText: {
+    fontSize: 13,
+    fontWeight: "900",
+    color: "#FFFFFF",
+  },
+  store149BrandText: {
+    fontSize: 19,
+    fontWeight: "900",
+    color: colors.text,
+    letterSpacing: -0.5,
+  },
+  store149Subheader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    marginTop: 2,
+  },
+  store149SubText: {
+    fontSize: 12,
+    fontWeight: "700",
+  },
+  store149ViewAllBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 2,
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+  },
+  store149ViewAllText: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: "#0284C7",
+  },
+  store149ScrollContent: {
+    gap: 12,
+    paddingVertical: 8,
+    paddingRight: 16,
+  },
+  store149Card: {
+    width: 140,
+    backgroundColor: colors.surface,
+    borderRadius: 20,
+    paddingBottom: 10,
+    borderWidth: 1,
+    borderColor: colors.borderLight,
+    overflow: "visible",
+  },
+  store149ImageContainer: {
+    position: "relative",
+    width: 140,
+    height: 120,
+    borderRadius: 18,
+  },
+  store149Image: {
+    width: 140,
+    height: 120,
+    borderRadius: 18,
+    backgroundColor: colors.surfaceSecondary,
+  },
+  store149DietOverlay: {
+    position: "absolute",
+    top: 8,
+    left: 8,
+    backgroundColor: "rgba(255, 255, 255, 0.9)",
+    padding: 3,
+    borderRadius: 4,
+    zIndex: 4,
+  },
+  store149RatingOverlay: {
+    position: "absolute",
+    top: 8,
+    right: 8,
+    backgroundColor: "rgba(255, 255, 255, 0.95)",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 2,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 10,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 1,
+    zIndex: 4,
+  },
+  store149RatingOverlayText: {
+    fontSize: 9,
+    fontWeight: "800",
+    color: "#0F172A",
+  },
+  store149AddButtonOverlay: {
+    position: "absolute",
+    bottom: -12,
+    left: 0,
+    right: 0,
+    alignItems: "center",
+    justifyContent: "center",
+    zIndex: 5,
+  },
+  store149AddPill: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#ffffff",
+    borderWidth: 1.5,
+    borderColor: "#16A34A",
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
+    elevation: 3,
+    minWidth: 55,
+    justifyContent: "center",
+  },
+  store149AddText: {
+    fontSize: 10,
+    fontWeight: "900",
+    color: "#16A34A",
+  },
+  store149QtyPill: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    backgroundColor: "#ffffff",
+    borderWidth: 1.5,
+    borderColor: "#002045",
+    borderRadius: 10,
+    paddingHorizontal: 6,
+    paddingVertical: 3,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
+    elevation: 3,
+    width: 65,
+  },
+  store149QtyBtn: {
+    width: 16,
+    height: 16,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  store149QtyText: {
+    fontSize: 10,
+    fontWeight: "900",
+    color: "#002045",
+  },
+  store149Details: {
+    paddingHorizontal: 10,
+    paddingTop: 16,
+    gap: 4,
+  },
+  store149DietIcon: {
+    borderWidth: 1,
+    width: 12,
+    height: 12,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 2,
+  },
+  store149DietDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+  },
+  store149Name: {
+    fontSize: 12,
+    fontWeight: "900",
+    color: colors.text,
+  },
+  store149PriceRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    marginTop: 2,
+  },
+  store149OriginalPrice: {
+    fontSize: 10,
+    color: colors.textSecondary,
+    textDecorationLine: "line-through",
+    fontWeight: "600",
+  },
+  store149PriceHighlight: {
+    backgroundColor: "#FEF08A",
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+    borderWidth: 0.5,
+    borderColor: "#EAB308",
+  },
+  store149DealPrice: {
+    fontSize: 10,
+    fontWeight: "900",
+    color: "#B45309",
+  },
+  store149Brand: {
+    fontSize: 10,
+    fontWeight: "600",
+    color: colors.textSecondary,
+    marginTop: 2,
   },
   filterAllActive: {
     backgroundColor: colors.text,
