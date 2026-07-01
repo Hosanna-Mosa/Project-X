@@ -149,7 +149,7 @@ export default function FoodCheckoutScreen() {
     }
     if (!user || !token) {
       Alert.alert("Login required", "Please log in before placing your order.");
-      router.push("/");
+      router.push("/login");
       return;
     }
     if (!selectedAddress || !selectedAddress.addressLine || !selectedAddress.phone) {

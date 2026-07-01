@@ -58,6 +58,9 @@ export default function HomeScreen() {
   const toggleHomeMode = useDriverStore((s) => s.toggleHomeMode);
   const currentOrder = useDriverStore((s) => s.currentOrder);
   const token = useDriverStore((s) => s.token);
+  const driverName = useDriverStore((s) => s.driverName);
+  const earnings = useDriverStore((s) => s.earnings);
+  const fetchEarnings = useDriverStore((s) => s.fetchEarnings);
 
   const [scheduledRides, setScheduledRides] = useState<any[]>([]);
   const [loadingScheduled, setLoadingScheduled] = useState(false);
@@ -87,6 +90,13 @@ export default function HomeScreen() {
     const interval = setInterval(loadScheduledRides, 30 * 1000);
     return () => clearInterval(interval);
   }, [loadScheduledRides]);
+
+  // Fetch real earnings on mount and when token changes
+  useEffect(() => {
+    if (token) {
+      fetchEarnings();
+    }
+  }, [token, fetchEarnings]);
 
   const loadHighDemandAreas = useCallback(async () => {
     if (!apiUrl || !token) {
@@ -200,7 +210,14 @@ export default function HomeScreen() {
         {/* Header with Online/Offline Toggle */}
         <View style={styles.header}>
           <View style={styles.headerCopy}>
-            <Text style={styles.greeting}>Good Afternoon</Text>
+            <Text style={styles.greeting}>
+              {(() => {
+                const h = new Date().getHours();
+                if (h < 12) return `Good Morning${driverName ? `, ${driverName.split(' ')[0]}` : ''}!`;
+                if (h < 17) return `Good Afternoon${driverName ? `, ${driverName.split(' ')[0]}` : ''}!`;
+                return `Good Evening${driverName ? `, ${driverName.split(' ')[0]}` : ''}!`;
+              })()}
+            </Text>
             <Text style={styles.subGreeting} numberOfLines={1}>
               {isOnline ? "You're online and receiving orders" : "Ready to start earning"}
             </Text>
@@ -304,9 +321,9 @@ export default function HomeScreen() {
         {/* Today's Performance */}
         <PerformanceCard
           stats={[
-            { label: "Trips", value: "8" },
-            { label: "Earnings", value: "₹124", accent: true },
-            { label: "Hours", value: "5.2h" },
+            { label: "Trips", value: String(earnings.totalDeliveries) },
+            { label: "Balance", value: `₹${earnings.today}`, accent: true },
+            { label: "This Week", value: `₹${earnings.week}` },
           ]}
         />
 

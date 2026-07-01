@@ -186,7 +186,15 @@ export default function HomeScreen() {
   }, []);
 
   const user = useAuthStore((s) => s.user);
-  const userName = user?.name ? user.name.split(" ")[0] : "Uttej";
+  const token = useAuthStore((s) => s.token);
+  const isInitialized = useAuthStore((s) => s.isInitialized);
+  const userName = user?.name ? user.name.split(" ")[0] : "there";
+
+  useEffect(() => {
+    if (isInitialized && !token) {
+      router.replace("/login");
+    }
+  }, [isInitialized, token]);
 
   const famousDishes = React.useMemo(() => {
     const today = new Date();
@@ -608,7 +616,7 @@ export default function HomeScreen() {
               <TouchableOpacity style={styles.iconBtn} onPress={() => setIsDistanceSheetOpen(true)}>
                   <MaterialCommunityIcons name="radius-outline" size={24} color={colors.primary} />
               </TouchableOpacity>
-              <TouchableOpacity style={styles.iconBtn} onPress={() => router.push("/(tabs)/profile")}>
+              <TouchableOpacity style={styles.iconBtn} onPress={() => router.replace("/(tabs)/profile")}>
                   <Ionicons name="person-outline" size={24} color={colors.primary} />
               </TouchableOpacity>
               {activeService === 'Food' && (

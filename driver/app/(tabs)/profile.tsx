@@ -153,7 +153,7 @@ export default function ProfileScreen() {
       const response = await fetch(`${apiUrl}/api/v1/drivers/profile`, {
         headers: { Authorization: `Bearer ${token}` },
       });
-      if (response.status === 401 || response.status === 403) {
+      if (response.status === 401 || response.status === 403 || response.status === 404) {
         logout();
         router.replace("/auth");
         return;

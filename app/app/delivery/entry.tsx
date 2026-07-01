@@ -17,7 +17,6 @@ import { BottomSheet } from "@/components/BottomSheet";
 import { StopCard } from "@/components/StopCard";
 import { useDeliveryStore } from "@/contexts/deliveryStore";
 import { useThemeStore } from "@/contexts/themeStore";
-import { MapType } from "react-native-maps";
 
 export default function DeliveryEntryScreen() {
   const insets = useSafeAreaInsets();
@@ -39,7 +38,7 @@ export default function DeliveryEntryScreen() {
     calculatePrice
   } = useDeliveryStore();
   const [showMapControls, setShowMapControls] = useState(false);
-  const [mapType, setMapType] = useState<MapType>("standard");
+  const mapType = "standard";
   const [isCalculating, setIsCalculating] = useState(false);
   const mapRef = useRef<MapBackgroundRef>(null);
   
@@ -49,10 +48,6 @@ export default function DeliveryEntryScreen() {
 
   const handleRecenter = () => {
     mapRef.current?.recenter();
-  };
-
-  const toggleMapType = () => {
-    setMapType((prev) => (prev === "standard" ? "satellite" : "standard"));
   };
 
   const handleAddStop = () => {
@@ -155,9 +150,6 @@ export default function DeliveryEntryScreen() {
       <View style={styles.mapControls}>
         <TouchableOpacity style={styles.mapControlBtn} onPress={handleRecenter}>
           <Feather name="crosshair" size={20} color={colors.text} />
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.mapControlBtn} onPress={toggleMapType}>
-          <Feather name={mapType === "standard" ? "layers" : "map"} size={20} color={colors.text} />
         </TouchableOpacity>
       </View>
 

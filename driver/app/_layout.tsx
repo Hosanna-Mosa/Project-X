@@ -29,22 +29,32 @@ function RootLayoutNav() {
   const token = useDriverStore((s) => s.token);
   const isAuthenticated = useDriverStore((s) => s.isAuthenticated);
   const hasCompletedOnboarding = useDriverStore((s) => s.hasCompletedOnboarding);
-  const refreshSession = useDriverStore((s) => s.refreshSession);
   const loginPromptShown = useRef(false);
+  const sessionChecked = useRef(false); // prevent double refresh
+
   const [hydrated, setHydrated] = useState(
     () => useDriverStore.persist.hasHydrated?.() ?? false,
   );
   const [needsLoginPrompt, setNeedsLoginPrompt] = useState(false);
 
+  // ── Step 1: Hydrate the store from AsyncStorage ───────────────────────────
   useEffect(() => {
     const finishHydration = async () => {
       const state = useDriverStore.getState();
-      if (state.isAuthenticated && state.token) {
-        await state.refreshSession();
+
+      if (state.isAuthenticated && state.token && !sessionChecked.current) {
+        sessionChecked.current = true;
+        const valid = await state.refreshSession();
+        if (!valid) {
+          state.logout();
+          setNeedsLoginPrompt(true);
+        }
       } else if (state.isAuthenticated && !state.token) {
+        // Auth flag set but no token — clear stale state
         state.logout();
         setNeedsLoginPrompt(true);
       }
+
       setHydrated(true);
     };
 
@@ -60,6 +70,7 @@ function RootLayoutNav() {
     return unsub;
   }, []);
 
+  // ── Step 2: Route the user based on auth + onboarding state ──────────────
   useEffect(() => {
     if (!hydrated) return;
 
@@ -68,9 +79,11 @@ function RootLayoutNav() {
     const inOnboarding = segments[0] === "onboarding";
 
     if (!isLoggedIn) {
+      // Unauthenticated → always go to auth screen
       if (!inAuth) {
         router.replace("/auth");
       }
+      // Show a helpful alert if session expired
       if (needsLoginPrompt && !loginPromptShown.current) {
         loginPromptShown.current = true;
         Alert.alert("Login required", "Please sign in again to continue as a driver.");
@@ -79,6 +92,7 @@ function RootLayoutNav() {
       return;
     }
 
+    // Authenticated: guard auth/onboarding screens
     if (hasCompletedOnboarding) {
       if (inAuth || inOnboarding) {
         router.replace("/(tabs)");
@@ -86,21 +100,15 @@ function RootLayoutNav() {
       return;
     }
 
+    // Authenticated but onboarding incomplete
     if (!inOnboarding) {
       router.replace("/onboarding");
     }
   }, [hydrated, isAuthenticated, token, hasCompletedOnboarding, needsLoginPrompt, segments]);
 
-  useEffect(() => {
-    if (!hydrated || !token) return;
-
-    refreshSession().then((valid) => {
-      if (!valid) {
-        setNeedsLoginPrompt(true);
-        router.replace("/auth");
-      }
-    });
-  }, [hydrated, token, refreshSession]);
+  if (!hydrated) {
+    return null; // Or a custom Loading/Splash view
+  }
 
   return (
     <Stack screenOptions={{ headerShown: false }}>

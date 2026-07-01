@@ -131,18 +131,20 @@ export default function RestaurantDetails() {
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <StatusBar barStyle="dark-content" translucent backgroundColor="transparent" />
 
-      {/* Header Overlay */}
-      <View style={[styles.appBar, { paddingTop: insets.top, borderBottomColor: colors.borderLight }]}>
-        <TouchableOpacity
-          onPress={() => router.back()}
-          style={styles.barButton}
-          activeOpacity={0.8}
-        >
-          <Ionicons name="arrow-back" size={22} color={colors.primary} />
-        </TouchableOpacity>
-        <Text style={[styles.appBarTitle, { color: colors.primary }]} numberOfLines={1}>About Restaurant</Text>
-        <View style={{ width: 40 }} />
-      </View>
+      <TouchableOpacity
+        onPress={() => router.back()}
+        style={[
+          styles.floatingBackButton,
+          {
+            top: insets.top + 12,
+            backgroundColor: colors.surface,
+            borderColor: colors.borderLight,
+          },
+        ]}
+        activeOpacity={0.85}
+      >
+        <Ionicons name="arrow-back" size={22} color={colors.primary} />
+      </TouchableOpacity>
 
       <ScrollView
         contentContainerStyle={{ paddingBottom: insets.bottom + 40 }}
@@ -335,28 +337,21 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  appBar: {
-    height: Platform.OS === 'ios' ? 96 : 56,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    borderBottomWidth: 1,
-    backgroundColor: '#ffffff',
-    zIndex: 999,
-  },
-  appBarTitle: {
-    fontSize: 18,
-    fontFamily: "Inter_700Bold",
-    flex: 1,
-    textAlign: "center",
-  },
-  barButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+  floatingBackButton: {
+    position: "absolute",
+    left: 16,
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
+    zIndex: 20,
+    elevation: 5,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.12,
+    shadowRadius: 6,
   },
   heroSection: {
     width: "100%",

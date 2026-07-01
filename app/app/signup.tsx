@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   KeyboardAvoidingView,
   Platform,
@@ -9,9 +9,10 @@ import {
   TouchableOpacity,
   View,
   Alert,
+  ActivityIndicator,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Feather, Ionicons } from "@expo/vector-icons";
+import { Ionicons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
 import Colors from "@/constants/colors";
 import { useAuthStore } from "@/contexts/authStore";
@@ -19,19 +20,27 @@ import { useThemeStore } from "@/contexts/themeStore";
 
 export default function SignupScreen() {
   const insets = useSafeAreaInsets();
-  const { phone } = useLocalSearchParams<{ phone: string }>();
+  const { phone: prefillPhone } = useLocalSearchParams<{ phone: string }>();
+
   const [name, setName] = useState("");
-  const [phoneNumber, setPhoneNumber] = useState(phone || "");
+  const [phoneNumber, setPhoneNumber] = useState(prefillPhone || "");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [isPasswordVisible, setIsPasswordVisible] = useState(false);
 
-  const { verifyOTP, loading } = useAuthStore();
+  const { register, loading, token, isInitialized } = useAuthStore();
   const { theme } = useThemeStore();
   const colors = Colors[theme];
   const styles = React.useMemo(() => createStyles(colors), [theme]);
 
-  const isPhoneDisabled = !!phone;
+  const isPhoneDisabled = !!prefillPhone;
+
+  // Guard: already logged-in users should not see signup
+  useEffect(() => {
+    if (isInitialized && token) {
+      router.replace("/(tabs)");
+    }
+  }, [isInitialized, token]);
 
   const handleRegister = async () => {
     if (name.trim().length < 3) {
@@ -53,16 +62,10 @@ export default function SignupScreen() {
     }
 
     try {
-      // Create user using OTP endpoint with dummy code since OTP verification already occurred
-      const result = await verifyOTP(
-        phoneNumber.trim(),
-        "123456",
-        "USER",
-        name.trim(),
-        email.trim(),
-        password
-      );
+      // Uses the dedicated register action which saves the token in AsyncStorage
+      const result = await register(name.trim(), phoneNumber.trim(), email.trim(), password);
       if (result.success) {
+        // Token is now persisted — go into the app
         router.replace("/(tabs)");
       }
     } catch (error: any) {
@@ -75,25 +78,20 @@ export default function SignupScreen() {
       style={styles.root}
       behavior={Platform.OS === "ios" ? "padding" : "height"}
     >
-      {/* Top Header Row */}
+      {/* Top Header */}
       <View style={[styles.headerRow, { paddingTop: insets.top + 12 }]}>
-        <TouchableOpacity 
-          style={styles.brandTitleContainer} 
-          onPress={() => router.back()}
+        <TouchableOpacity
+          style={styles.backBtn}
+          onPress={() => {
+            if (router.canGoBack()) router.back();
+            else router.replace("/login");
+          }}
           activeOpacity={0.7}
         >
-          <Ionicons name="arrow-back" size={24} color="#002045" style={styles.backArrow} />
-          <Text style={styles.brandTitle}>Flavor</Text>
+          <Ionicons name="arrow-back" size={24} color="#002045" />
         </TouchableOpacity>
-        
-        <TouchableOpacity 
-          style={styles.skipBtn} 
-          onPress={() => router.replace("/(tabs)")}
-          activeOpacity={0.85}
-        >
-          <Text style={styles.skipText}>Skip</Text>
-          <Feather name="chevron-right" size={16} color="#43474e" />
-        </TouchableOpacity>
+        <Text style={styles.headerTitle}>Create Account</Text>
+        <View style={{ width: 40 }} />
       </View>
 
       <ScrollView
@@ -102,15 +100,15 @@ export default function SignupScreen() {
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.card}>
-          <Text style={styles.cardTitle}>Create account</Text>
+          <Text style={styles.cardTitle}>Join Flavor</Text>
           <Text style={styles.cardSubtitle}>
-            Welcome! Please enter your details to start.
+            Fill in your details to get started.
           </Text>
 
           <View style={styles.form}>
             {/* Name Input */}
             <View style={styles.fieldWrapper}>
-              <Text style={styles.fieldLabel}>Name</Text>
+              <Text style={styles.fieldLabel}>Full Name</Text>
               <View style={styles.inputContainer}>
                 <Ionicons name="person-outline" size={18} color="#43474e" style={styles.inputIcon} />
                 <TextInput
@@ -131,7 +129,7 @@ export default function SignupScreen() {
                 <Ionicons name="phone-portrait-outline" size={18} color="#43474e" style={styles.inputIcon} />
                 <TextInput
                   style={[styles.input, isPhoneDisabled && styles.inputDisabled]}
-                  placeholder="+1 (555) 000-0000"
+                  placeholder="e.g. 9876543210"
                   placeholderTextColor="#74777f"
                   value={phoneNumber}
                   onChangeText={setPhoneNumber}
@@ -143,7 +141,7 @@ export default function SignupScreen() {
 
             {/* Email Input */}
             <View style={styles.fieldWrapper}>
-              <Text style={styles.fieldLabel}>Email</Text>
+              <Text style={styles.fieldLabel}>Email Address</Text>
               <View style={styles.inputContainer}>
                 <Ionicons name="mail-outline" size={18} color="#43474e" style={styles.inputIcon} />
                 <TextInput
@@ -174,15 +172,15 @@ export default function SignupScreen() {
                   autoCapitalize="none"
                   autoCorrect={false}
                 />
-                <TouchableOpacity 
+                <TouchableOpacity
                   onPress={() => setIsPasswordVisible(!isPasswordVisible)}
                   style={styles.eyeBtn}
                   activeOpacity={0.7}
                 >
-                  <Ionicons 
-                    name={isPasswordVisible ? "eye-off-outline" : "eye-outline"} 
-                    size={20} 
-                    color="#43474e" 
+                  <Ionicons
+                    name={isPasswordVisible ? "eye-off-outline" : "eye-outline"}
+                    size={20}
+                    color="#43474e"
                   />
                 </TouchableOpacity>
               </View>
@@ -192,29 +190,31 @@ export default function SignupScreen() {
             <TouchableOpacity
               style={[
                 styles.signUpBtn,
-                (!name || !email || !password || loading) && styles.signUpBtnDisabled
+                (!name || !phoneNumber || !email || !password || loading) && styles.signUpBtnDisabled
               ]}
               onPress={handleRegister}
-              disabled={!name || !email || !password || loading}
+              disabled={!name || !phoneNumber || !email || !password || loading}
               activeOpacity={0.85}
             >
-              <Text style={styles.signUpBtnText}>
-                {loading ? "Signing up..." : "Sign Up"}
-              </Text>
-              {!loading && (
-                <Ionicons name="arrow-forward" size={18} color="#ffffff" style={{ marginLeft: 6 }} />
+              {loading ? (
+                <ActivityIndicator size="small" color="#ffffff" />
+              ) : (
+                <>
+                  <Text style={styles.signUpBtnText}>Create Account</Text>
+                  <Ionicons name="arrow-forward" size={18} color="#ffffff" style={{ marginLeft: 6 }} />
+                </>
               )}
             </TouchableOpacity>
           </View>
 
           {/* Already have account row */}
-          <TouchableOpacity 
-            style={styles.loginLinkRow} 
-            onPress={() => router.replace("/")}
+          <TouchableOpacity
+            style={styles.loginLinkRow}
+            onPress={() => router.replace("/login")}
             activeOpacity={0.7}
           >
             <Text style={styles.loginLinkText}>
-              Already have an account? <Text style={styles.loginLinkHighlight}>Log in</Text>
+              Already have an account? <Text style={styles.loginLinkHighlight}>Sign In</Text>
             </Text>
           </TouchableOpacity>
         </View>
@@ -226,64 +226,49 @@ export default function SignupScreen() {
 const createStyles = (colors: typeof Colors.light) => StyleSheet.create({
   root: {
     flex: 1,
-    backgroundColor: "#f7f9fb", // Neutral background color
+    backgroundColor: "#f7f9fb",
   },
   headerRow: {
     flexDirection: "row",
-    justifyContent: "space-between",
     alignItems: "center",
-    paddingHorizontal: 24,
+    justifyContent: "space-between",
+    paddingHorizontal: 16,
     paddingBottom: 12,
     backgroundColor: "#f7f9fb",
   },
-  brandTitleContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-  },
-  backArrow: {
-    marginRight: 4,
-  },
-  brandTitle: {
-    fontSize: 22,
-    fontWeight: "700",
-    color: "#002045", // Primary brand color
-    letterSpacing: -0.5,
-  },
-  skipBtn: {
-    flexDirection: "row",
-    alignItems: "center",
+  backBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     backgroundColor: "#ffffff",
     borderWidth: 1,
-    borderColor: "#c4c6cf",
-    borderRadius: 20,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
+    borderColor: "#e6e8ea",
+    alignItems: "center",
+    justifyContent: "center",
   },
-  skipText: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: "#43474e",
-    marginRight: 2,
+  headerTitle: {
+    fontSize: 18,
+    fontWeight: "700",
+    color: "#191c1e",
   },
   scrollContainer: {
     flexGrow: 1,
     justifyContent: "center",
     paddingHorizontal: 24,
-    paddingTop: 16,
+    paddingTop: 8,
     paddingBottom: 40,
   },
   card: {
-    backgroundColor: "#ffffff", // white container card
-    borderRadius: 16,
+    backgroundColor: "#ffffff",
+    borderRadius: 20,
     borderWidth: 1,
     borderColor: "#e6e8ea",
-    padding: 24,
+    padding: 28,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.04,
-    shadowRadius: 10,
-    elevation: 3,
+    shadowOpacity: 0.06,
+    shadowRadius: 12,
+    elevation: 4,
     width: "100%",
   },
   cardTitle: {
@@ -314,13 +299,13 @@ const createStyles = (colors: typeof Colors.light) => StyleSheet.create({
   inputContainer: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#f2f4f6", // container low background
-    borderRadius: 8,
-    height: 48,
-    paddingHorizontal: 12,
+    backgroundColor: "#f2f4f6",
+    borderRadius: 10,
+    height: 50,
+    paddingHorizontal: 14,
   },
   inputContainerDisabled: {
-    backgroundColor: "#eceef0", // dimmer background for disabled
+    backgroundColor: "#eceef0",
   },
   inputIcon: {
     marginRight: 10,
@@ -340,14 +325,14 @@ const createStyles = (colors: typeof Colors.light) => StyleSheet.create({
   signUpBtn: {
     height: 52,
     borderRadius: 12,
-    backgroundColor: "#002045", // brand primary deep blue
+    backgroundColor: "#002045",
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
     marginTop: 8,
   },
   signUpBtnDisabled: {
-    backgroundColor: "#c4c6cf", // disabled gray
+    backgroundColor: "#c4c6cf",
   },
   signUpBtnText: {
     color: "#ffffff",
@@ -355,7 +340,7 @@ const createStyles = (colors: typeof Colors.light) => StyleSheet.create({
     fontWeight: "700",
   },
   loginLinkRow: {
-    marginTop: 20,
+    marginTop: 24,
     alignItems: "center",
   },
   loginLinkText: {
@@ -363,7 +348,7 @@ const createStyles = (colors: typeof Colors.light) => StyleSheet.create({
     color: "#43474e",
   },
   loginLinkHighlight: {
-    color: "#0061a5", // secondary action blue
+    color: "#0061a5",
     fontWeight: "700",
   },
 });

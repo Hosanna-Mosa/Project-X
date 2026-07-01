@@ -77,7 +77,11 @@ export class AuthService {
   }
 
   async loginWithPassword(phoneOrEmail: string, password: string, role: UserRole) {
-    const user = await User.findOne(buildLoginIdentifierQuery(phoneOrEmail));
+    const query = {
+      ...buildLoginIdentifierQuery(phoneOrEmail),
+      role,
+    };
+    const user = await User.findOne(query);
 
     if (!user) {
       throw new NotFoundError("User not found. Please sign up first.");

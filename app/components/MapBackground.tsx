@@ -1,6 +1,6 @@
 import React, { useEffect, useState, forwardRef, useImperativeHandle, useRef } from 'react';
 import { StyleSheet, View, Platform, ViewStyle, Text } from 'react-native';
-import MapView, { PROVIDER_GOOGLE, Region, MapType, MapStyleElement, Marker, Polyline, Circle } from 'react-native-maps';
+import MapView, { PROVIDER_GOOGLE, Region, MapType, Marker, Polyline, Circle } from 'react-native-maps';
 import * as Location from 'expo-location';
 import { Feather } from '@expo/vector-icons';
 import { DeliveryStop } from '@/contexts/deliveryStore';
@@ -32,75 +32,6 @@ export interface MapBackgroundRef {
   fitToMarkers: (markers: any[]) => void;
 }
 
-
-// Minimalist, premium map style
-const mapStyle: MapStyleElement[] = [
-  {
-    "featureType": "all",
-    "elementType": "labels.text.fill",
-    "stylers": [{ "color": "#7c93a3" }]
-  },
-  {
-    "featureType": "all",
-    "elementType": "labels.text.stroke",
-    "stylers": [
-      { "visibility": "on" },
-      { "color": "#ffffff" },
-      { "weight": 2 },
-      { "gamma": 0.84 }
-    ]
-  },
-  {
-    "featureType": "all",
-    "elementType": "labels.icon",
-    "stylers": [{ "visibility": "off" }]
-  },
-  {
-    "featureType": "landscape",
-    "elementType": "geometry",
-    "stylers": [{ "color": "#f1f5f9" }]
-  },
-  {
-    "featureType": "poi",
-    "elementType": "geometry",
-    "stylers": [{ "color": "#e2e8f0" }]
-  },
-  {
-    "featureType": "road.highway",
-    "elementType": "geometry.fill",
-    "stylers": [{ "color": "#ffffff" }]
-  },
-  {
-    "featureType": "road.highway",
-    "elementType": "geometry.stroke",
-    "stylers": [{ "visibility": "off" }]
-  },
-  {
-    "featureType": "road.arterial",
-    "elementType": "geometry.fill",
-    "stylers": [{ "color": "#ffffff" }]
-  },
-  {
-    "featureType": "road.arterial",
-    "elementType": "geometry.stroke",
-    "stylers": [{ "color": "#e2e8f0" }]
-  },
-  {
-    "featureType": "road.local",
-    "elementType": "geometry.fill",
-    "stylers": [{ "color": "#ffffff" }]
-  },
-  {
-    "featureType": "transit",
-    "elementType": "geometry",
-    "stylers": [{ "color": "#e2e8f0" }]
-  },
-  {
-    "featureType": "water",
-    "elementType": "geometry",
-    "stylers": [{ "color": "#cbd5e1" }]
-  }
-];
 
 const FALLBACK_REGION: Region = {
   latitude: 16.9891,
@@ -273,7 +204,6 @@ export const MapBackground = forwardRef<MapBackgroundRef, Props>(({
           style={StyleSheet.absoluteFill}
           initialRegion={region}
           mapType={mapType}
-          customMapStyle={Platform.OS === 'web' || mapType === 'satellite' ? undefined : mapStyle}
           showsUserLocation={!userLocation}
           showsPointsOfInterest={false}
           showsCompass={false}
@@ -361,7 +291,7 @@ export const MapBackground = forwardRef<MapBackgroundRef, Props>(({
             <Polyline
               coordinates={decodePolyline(polyline)}
               strokeWidth={4}
-              strokeColor="#000000"
+              strokeColor="#16A34A"
             />
           )}
         </MapView>

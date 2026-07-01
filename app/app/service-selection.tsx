@@ -46,7 +46,7 @@ export default function ServiceSelectionScreen() {
   const initialRadiusKm = Number(radiusKm);
   const hasRoutedRadius = Number.isFinite(initialRadiusKm) && initialRadiusKm > 0;
   const routedRadiusKm = hasRoutedRadius ? String(initialRadiusKm) : "2";
-  const [mapType, setMapType] = useState<"standard" | "satellite">("standard");
+  const mapType = "standard";
   const [searchText, setSearchText] = useState("");
   const [nearbyPlaces, setNearbyPlaces] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
@@ -977,16 +977,6 @@ export default function ServiceSelectionScreen() {
         onMarkerPress={handleMarkerPress}
         mapType={mapType}
       />
-
-      {/* Map Action Buttons */}
-      <View style={[styles.mapActions, { top: insets.top + (Platform.OS === 'web' ? 70 : 10) + 70 }]}>
-        <TouchableOpacity 
-          style={styles.actionBtn} 
-          onPress={() => setMapType(m => m === 'standard' ? 'satellite' : 'standard')}
-        >
-          <Feather name="layers" size={20} color={mapType === 'satellite' ? colors.primary : colors.text} />
-        </TouchableOpacity>
-      </View>
 
       {/* Top Header */}
       <View
