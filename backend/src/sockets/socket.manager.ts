@@ -11,6 +11,7 @@ export class SocketManager {
   private static instance: SocketManager;
   private io: Server;
   private redisClient: any;
+  private connectedUsers = new Map<string, Map<string, string>>();
 
   private constructor(server: http.Server) {
     this.io = new Server(server, {
@@ -94,14 +95,77 @@ export class SocketManager {
     return this.io.sockets.adapter.rooms.get(roomId)?.size || 0;
   }
 
+  private rememberSocket(userId: string, socketId: string, role: string) {
+    const sockets = this.connectedUsers.get(userId) || new Map<string, string>();
+    sockets.set(socketId, role);
+    this.connectedUsers.set(userId, sockets);
+  }
+
+  private forgetSocket(userId: string, socketId: string) {
+    const sockets = this.connectedUsers.get(userId);
+    if (!sockets) return;
+
+    sockets.delete(socketId);
+    if (sockets.size === 0) {
+      this.connectedUsers.delete(userId);
+    }
+  }
+
+  private getUserSocketStatus(userId: string) {
+    const sockets = this.connectedUsers.get(userId);
+    return {
+      online: Boolean(sockets?.size),
+      socketIds: sockets ? Array.from(sockets.keys()) : [],
+      roles: sockets ? Array.from(new Set(sockets.values())) : [],
+      personalRoomSize: this.getRoomSize(userId),
+    };
+  }
+
+  private getDriverRoomStatus() {
+    const socketIds = Array.from(this.io.sockets.adapter.rooms.get("drivers") || []);
+    return {
+      onlineDrivers: socketIds.length,
+      socketIds,
+    };
+  }
+
+  public logConnectionStatus(label: string, userId?: string, driverUserId?: string, orderId?: string) {
+    const userStatus = userId ? this.getUserSocketStatus(userId) : null;
+    const driverStatus = driverUserId ? this.getUserSocketStatus(driverUserId) : null;
+    const orderRoomSize = orderId ? this.getRoomSize(orderId) : null;
+    const driverRoomStatus = this.getDriverRoomStatus();
+
+    console.log(
+      `[SOCKET][STATUS][${label}] ` +
+      `user=${userId || "n/a"} userOnline=${userStatus?.online ?? "n/a"} userSockets=${userStatus?.socketIds.join(",") || "none"} ` +
+      `driver=${driverUserId || "n/a"} driverOnline=${driverStatus?.online ?? "n/a"} driverSockets=${driverStatus?.socketIds.join(",") || "none"} ` +
+      `order=${orderId || "n/a"} orderRoomSize=${orderRoomSize ?? "n/a"} ` +
+      `driversRoomSize=${driverRoomStatus.onlineDrivers} driverRoomSockets=${driverRoomStatus.socketIds.join(",") || "none"}`
+    );
+  }
+
   private initializeHandlers() {
     this.io.on("connection", (socket: Socket) => {
       const authUser = socket.data.user;
-      console.log(`[SOCKET][CONNECT] socket=${socket.id} user=${authUser?.userId} role=${authUser?.role}`);
+      const userId = authUser?.userId;
+      const role = authUser?.role || "UNKNOWN";
+      if (userId) {
+        this.rememberSocket(userId, socket.id, role);
+      }
+
+      console.log(
+        `[SOCKET][CONNECT] source=client socket=${socket.id} user=${userId || "unknown"} role=${role} ` +
+        `userOnline=${userId ? this.getUserSocketStatus(userId).online : false} ` +
+        `userSocketCount=${userId ? this.getUserSocketStatus(userId).socketIds.length : 0}`
+      );
 
       // Automatically join the user to their own personal room
       if (authUser?.userId) {
         socket.join(authUser.userId);
+        console.log(
+          `[SOCKET][ROOM][JOIN] source=auto-personal socket=${socket.id} user=${authUser.userId} ` +
+          `role=${role} personalRoomSize=${this.getRoomSize(authUser.userId)}`
+        );
       }
 
       // Authenticated joining for drivers and vendors
@@ -112,16 +176,24 @@ export class SocketManager {
         }
 
         socket.join(data.userId);
+        console.log(
+          `[SOCKET][ROOM][JOIN] source=client-join socket=${socket.id} user=${data.userId} ` +
+          `requestedRole=${data.role} authRole=${authUser.role} personalRoomSize=${this.getRoomSize(data.userId)}`
+        );
 
         if (data.role === "DRIVER" && authUser.role === "DRIVER") {
           socket.join("drivers");
-          console.log(`Driver ${data.userId} joined drivers room`);
+          const driverRoomStatus = this.getDriverRoomStatus();
+          console.log(
+            `[SOCKET][DRIVER][ONLINE] source=join socket=${socket.id} driverUser=${data.userId} ` +
+            `driversRoomSize=${driverRoomStatus.onlineDrivers} driverRoomSockets=${driverRoomStatus.socketIds.join(",") || "none"}`
+          );
         }
 
         const isVendorRole = ["VENDOR", "meat_vendor", "restaurant_vendor", "ADMIN"].includes(authUser.role);
         if (data.role === "VENDOR" && isVendorRole) {
           socket.join("vendors");
-          console.log(`Vendor ${data.userId} joined vendors room`);
+          console.log(`[SOCKET][VENDOR][ONLINE] source=join socket=${socket.id} vendorUser=${data.userId} vendorsRoomSize=${this.getRoomSize("vendors")}`);
         }
       });
 
@@ -132,7 +204,11 @@ export class SocketManager {
           return;
         }
 
-        console.log(`[SOCKET] Driver Location Update: ID=${data.driverId}, OrderID=${data.orderId || "none"}, Lat=${data.lat}, Lng=${data.lng}`);
+        console.log(
+          `[SOCKET][DRIVER][LOCATION] source=driver_location_update socket=${socket.id} ` +
+          `driverUser=${data.driverId} order=${data.orderId || "none"} lat=${data.lat} lng=${data.lng} ` +
+          `driverOnline=${this.getUserSocketStatus(data.driverId).online}`
+        );
         
         if (this.redisClient) {
           try {
@@ -156,6 +232,10 @@ export class SocketManager {
             lat: data.lat,
             lng: data.lng,
           });
+          console.log(
+            `[SOCKET][EMIT] source=driver_location_update target=order_room event=driver_location_update ` +
+            `order=${data.orderId} recipients=${this.getRoomSize(data.orderId)} driverUser=${data.driverId}`
+          );
         }
       });
 
@@ -192,6 +272,7 @@ export class SocketManager {
 
           socket.join(orderId);
           console.log(`[SOCKET][TRACK][JOINED] socket=${socket.id} user=${authUser.userId} role=${authUser.role} order=${orderId} roomSize=${this.getRoomSize(orderId)}`);
+          this.logConnectionStatus("track_order", order.user.toString(), driverUserId || undefined, orderId);
         } catch (error) {
           console.error(`[SOCKET] track_order error:`, error);
         }
@@ -209,6 +290,10 @@ export class SocketManager {
             orderId: data.orderId,
             driver: data.driverInfo,
           });
+          console.log(
+            `[SOCKET][EMIT] source=driver_accepted_order target=order_room event=order_accepted ` +
+            `order=${data.orderId} recipients=${this.getRoomSize(data.orderId)} driverUser=${authUser.userId}`
+          );
         }
       });
 
@@ -216,6 +301,10 @@ export class SocketManager {
       socket.on("order_status_update", (data: { orderId: string; status: string }) => {
         if (data.orderId) {
           this.io.to(data.orderId).emit("order_status_update", data);
+          console.log(
+            `[SOCKET][EMIT] source=order_status_update target=order_room event=order_status_update ` +
+            `order=${data.orderId} status=${data.status} recipients=${this.getRoomSize(data.orderId)} fromUser=${authUser?.userId || "unknown"}`
+          );
         }
       });
 
@@ -262,26 +351,53 @@ export class SocketManager {
       });
 
       socket.on("disconnect", () => {
-        console.log(`[SOCKET][DISCONNECT] socket=${socket.id} user=${authUser?.userId} role=${authUser?.role}`);
+        if (userId) {
+          this.forgetSocket(userId, socket.id);
+        }
+
+        console.log(
+          `[SOCKET][DISCONNECT] source=client socket=${socket.id} user=${userId || "unknown"} role=${role} ` +
+          `userStillOnline=${userId ? this.getUserSocketStatus(userId).online : false} ` +
+          `remainingUserSockets=${userId ? this.getUserSocketStatus(userId).socketIds.length : 0} ` +
+          `driversRoomSize=${this.getDriverRoomStatus().onlineDrivers}`
+        );
       });
     });
   }
 
   // Public methods to emit events from services
-  public emitToUser(userId: string, event: string, data: any) {
+  public emitToUser(userId: string, event: string, data: any, source = "service") {
+    const status = this.getUserSocketStatus(userId);
+    console.log(
+      `[SOCKET][EMIT] source=${source} target=user event=${event} user=${userId} ` +
+      `online=${status.online} recipients=${status.personalRoomSize} socketIds=${status.socketIds.join(",") || "none"} roles=${status.roles.join(",") || "none"}`
+    );
     this.io.to(userId).emit(event, data);
   }
 
-  public emitToDriver(driverId: string, event: string, data: any) {
+  public emitToDriver(driverId: string, event: string, data: any, source = "service") {
+    const status = this.getUserSocketStatus(driverId);
+    console.log(
+      `[SOCKET][EMIT] source=${source} target=driver event=${event} driverUser=${driverId} ` +
+      `online=${status.online} recipients=${status.personalRoomSize} socketIds=${status.socketIds.join(",") || "none"} roles=${status.roles.join(",") || "none"}`
+    );
     this.io.to(driverId).emit(event, data);
   }
 
-  public broadcastToDrivers(event: string, data: any) {
-    console.log(`Broadcasting ${event} to all drivers`);
+  public broadcastToDrivers(event: string, data: any, source = "service") {
+    const driverRoomStatus = this.getDriverRoomStatus();
+    console.log(
+      `[SOCKET][BROADCAST] source=${source} target=drivers event=${event} ` +
+      `onlineDrivers=${driverRoomStatus.onlineDrivers} socketIds=${driverRoomStatus.socketIds.join(",") || "none"}`
+    );
     this.io.to("drivers").emit(event, data);
   }
 
-  public emitToOrderRoom(orderId: string, event: string, data: any) {
+  public emitToOrderRoom(orderId: string, event: string, data: any, source = "service") {
+    console.log(
+      `[SOCKET][EMIT] source=${source} target=order_room event=${event} ` +
+      `order=${orderId} recipients=${this.getRoomSize(orderId)}`
+    );
     this.io.to(orderId).emit(event, data);
   }
 }
