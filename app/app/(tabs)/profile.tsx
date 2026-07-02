@@ -10,6 +10,7 @@ import {
   TextInput,
   Modal,
   Image,
+  Switch,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather, MaterialIcons, Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
@@ -31,6 +32,20 @@ export default function ProfileScreen() {
   const [loading, setLoading] = useState(false);
   const [editing, setEditing] = useState(false);
   const [ordersCount, setOrdersCount] = useState(0);
+
+  // Notifications Modal States
+  const [notificationsVisible, setNotificationsVisible] = useState(false);
+  const [pushEnabled, setPushEnabled] = useState(true);
+  const [emailEnabled, setEmailEnabled] = useState(true);
+  const [smsEnabled, setSmsEnabled] = useState(false);
+  const [promoEnabled, setPromoEnabled] = useState(false);
+
+  // Security Modal States
+  const [securityVisible, setSecurityVisible] = useState(false);
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [changingPassword, setChangingPassword] = useState(false);
   
   // Edit States
   const [formData, setFormData] = useState({
@@ -139,6 +154,47 @@ export default function ProfileScreen() {
     }
   };
 
+  const handleChangePassword = async () => {
+    if (!currentPassword || !newPassword || !confirmPassword) {
+      Alert.alert("Error", "All fields are required");
+      return;
+    }
+    if (newPassword.length < 6) {
+      Alert.alert("Error", "New password must be at least 6 characters");
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      Alert.alert("Error", "Passwords do not match");
+      return;
+    }
+
+    try {
+      setChangingPassword(true);
+      const token = useAuthStore.getState().token;
+      const response = await fetch(`${process.env.EXPO_PUBLIC_API_URL}/api/v1/users/change-password`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ currentPassword, newPassword }),
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.message || "Failed to change password");
+      }
+      Alert.alert("Success", "Password changed successfully!");
+      setSecurityVisible(false);
+      setCurrentPassword("");
+      setNewPassword("");
+      setConfirmPassword("");
+    } catch (err: any) {
+      Alert.alert("Error", err.message || "Something went wrong");
+    } finally {
+      setChangingPassword(false);
+    }
+  };
+
   const handleLogout = async () => {
     try {
       setLoading(true);
@@ -206,7 +262,7 @@ export default function ProfileScreen() {
           </View>
         </View>
 
-        {/* Dashboard 2x2 Neobrutalist Grid */}
+        {/* Dashboard 1x2 Neobrutalist Grid */}
         <View style={styles.neobrutalistGrid}>
           <View style={styles.neobrutalistRow}>
             {/* Total Orders Card */}
@@ -219,34 +275,6 @@ export default function ProfileScreen() {
               <View>
                 <Text style={[styles.neoCardValue, { color: colors.primary }]}>{ordersCount}</Text>
                 <Text style={[styles.neoCardLabel, { color: colors.textSecondary }]}>TOTAL ORDERS</Text>
-              </View>
-            </TouchableOpacity>
-
-            {/* Wallet Card */}
-            <TouchableOpacity 
-              style={[styles.neoCard, { shadowColor: colors.text }]} 
-              activeOpacity={0.9}
-              onPress={() => Alert.alert("Wallet", "Wallet balance is $0.00")}
-            >
-              <MaterialCommunityIcons name="wallet-outline" size={26} color={colors.teal} style={styles.neoCardIcon} />
-              <View>
-                <Text style={[styles.neoCardValue, { color: colors.primary }]}>$0.00</Text>
-                <Text style={[styles.neoCardLabel, { color: colors.textSecondary }]}>WALLET BALANCE</Text>
-              </View>
-            </TouchableOpacity>
-          </View>
-
-          <View style={styles.neobrutalistRow}>
-            {/* Favourites Card */}
-            <TouchableOpacity 
-              style={[styles.neoCard, { shadowColor: colors.text }]} 
-              activeOpacity={0.9}
-              onPress={() => Alert.alert("Favourites", "Your Favourites list")}
-            >
-              <Ionicons name="heart-outline" size={26} color={colors.teal} style={styles.neoCardIcon} />
-              <View>
-                <Text style={[styles.neoCardValue, { color: colors.primary }]}>0 Items</Text>
-                <Text style={[styles.neoCardLabel, { color: colors.textSecondary }]}>FAVOURITES</Text>
               </View>
             </TouchableOpacity>
 
@@ -290,9 +318,11 @@ export default function ProfileScreen() {
               <Text style={[styles.softCardLabel, { color: colors.text }]}>Places</Text>
             </TouchableOpacity>
 
+  
+
             <TouchableOpacity 
               style={[styles.softCard, { borderColor: colors.borderLight }]}
-              onPress={() => Alert.alert("Support", "How can we help you today?")}
+              onPress={() => router.push("/support")}
             >
               <View style={[styles.softCardIconWrapper, { backgroundColor: colors.surfaceSecondary }]}>
                 <Feather name="help-circle" size={20} color={colors.primary} />
@@ -302,19 +332,18 @@ export default function ProfileScreen() {
           </View>
 
           <View style={[styles.controlGrid, { marginTop: 10 }]}>
-            <TouchableOpacity 
+          <TouchableOpacity 
               style={[styles.softCard, { borderColor: colors.borderLight }]}
-              onPress={() => Alert.alert("Favorites", "Manage your favorite items.")}
+              onPress={() => router.push("/favorites")}
             >
               <View style={[styles.softCardIconWrapper, { backgroundColor: colors.surfaceSecondary }]}>
                 <Feather name="heart" size={20} color={colors.primary} />
               </View>
               <Text style={[styles.softCardLabel, { color: colors.text }]}>Favorites</Text>
             </TouchableOpacity>
-
             <TouchableOpacity 
               style={[styles.softCard, { borderColor: colors.borderLight }]}
-              onPress={() => Alert.alert("Notifications", "Notification Settings")}
+              onPress={() => setNotificationsVisible(true)}
             >
               <View style={[styles.softCardIconWrapper, { backgroundColor: colors.surfaceSecondary }]}>
                 <Feather name="bell" size={20} color={colors.primary} />
@@ -324,7 +353,7 @@ export default function ProfileScreen() {
 
             <TouchableOpacity 
               style={[styles.softCard, { borderColor: colors.borderLight }]}
-              onPress={() => Alert.alert("Security", "Account security options")}
+              onPress={() => setSecurityVisible(true)}
             >
               <View style={[styles.softCardIconWrapper, { backgroundColor: colors.surfaceSecondary }]}>
                 <Feather name="shield" size={20} color={colors.primary} />
@@ -436,6 +465,149 @@ export default function ProfileScreen() {
               disabled={loading}
             >
               {loading ? <ActivityIndicator color="#fff" /> : <Text style={styles.saveBtnText}>Update Profile</Text>}
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Notifications Bottom Sheet */}
+      <Modal visible={notificationsVisible} animationType="slide" transparent>
+        <View style={[styles.modalOverlay, { backgroundColor: colors.overlay }]}>
+          <View style={[styles.modalBody, { backgroundColor: colors.surface }]}>
+            <View style={styles.modalHeader}>
+              <Text style={[styles.modalTitle, { color: colors.primary }]}>Notification Settings</Text>
+              <TouchableOpacity onPress={() => setNotificationsVisible(false)}>
+                <Feather name="x" size={24} color={colors.text} />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView style={styles.modalScroll}>
+              <View style={[styles.settingRow, { borderBottomColor: colors.borderLight }]}>
+                <View style={styles.settingTextContainer}>
+                  <Text style={[styles.settingLabel, { color: colors.text }]}>Push Notifications</Text>
+                  <Text style={[styles.settingSub, { color: colors.textSecondary }]}>Receive real-time alerts about order status and delivery updates</Text>
+                </View>
+                <Switch
+                  value={pushEnabled}
+                  onValueChange={setPushEnabled}
+                  trackColor={{ false: "#CBD5E1", true: colors.primary }}
+                  thumbColor="#ffffff"
+                />
+              </View>
+
+              <View style={[styles.settingRow, { borderBottomColor: colors.borderLight }]}>
+                <View style={styles.settingTextContainer}>
+                  <Text style={[styles.settingLabel, { color: colors.text }]}>Email Notifications</Text>
+                  <Text style={[styles.settingSub, { color: colors.textSecondary }]}>Receive bills, receipts, and order summary emails</Text>
+                </View>
+                <Switch
+                  value={emailEnabled}
+                  onValueChange={setEmailEnabled}
+                  trackColor={{ false: "#CBD5E1", true: colors.primary }}
+                  thumbColor="#ffffff"
+                />
+              </View>
+
+              <View style={[styles.settingRow, { borderBottomColor: colors.borderLight }]}>
+                <View style={styles.settingTextContainer}>
+                  <Text style={[styles.settingLabel, { color: colors.text }]}>SMS Updates</Text>
+                  <Text style={[styles.settingSub, { color: colors.textSecondary }]}>Get SMS alerts when driver is arriving or for security codes</Text>
+                </View>
+                <Switch
+                  value={smsEnabled}
+                  onValueChange={setSmsEnabled}
+                  trackColor={{ false: "#CBD5E1", true: colors.primary }}
+                  thumbColor="#ffffff"
+                />
+              </View>
+
+              <View style={[styles.settingRow, { borderBottomColor: colors.borderLight }]}>
+                <View style={styles.settingTextContainer}>
+                  <Text style={[styles.settingLabel, { color: colors.text }]}>Promotional Updates</Text>
+                  <Text style={[styles.settingSub, { color: colors.textSecondary }]}>Offers, discounts, and regional promotions</Text>
+                </View>
+                <Switch
+                  value={promoEnabled}
+                  onValueChange={setPromoEnabled}
+                  trackColor={{ false: "#CBD5E1", true: colors.primary }}
+                  thumbColor="#ffffff"
+                />
+              </View>
+            </ScrollView>
+
+            <TouchableOpacity 
+              style={[styles.saveBtn, { backgroundColor: colors.primary }]} 
+              onPress={() => {
+                Alert.alert("Success", "Notification preferences saved!");
+                setNotificationsVisible(false);
+              }}
+            >
+              <Text style={styles.saveBtnText}>Save Preferences</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Security Bottom Sheet */}
+      <Modal visible={securityVisible} animationType="slide" transparent>
+        <View style={[styles.modalOverlay, { backgroundColor: colors.overlay }]}>
+          <View style={[styles.modalBody, { backgroundColor: colors.surface }]}>
+            <View style={styles.modalHeader}>
+              <Text style={[styles.modalTitle, { color: colors.primary }]}>Change Password</Text>
+              <TouchableOpacity onPress={() => {
+                setSecurityVisible(false);
+                setCurrentPassword("");
+                setNewPassword("");
+                setConfirmPassword("");
+              }}>
+                <Feather name="x" size={24} color={colors.text} />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView style={styles.modalScroll}>
+              <View style={styles.inputGroup}>
+                <Text style={[styles.inputLabel, { color: colors.textSecondary }]}>Current Password</Text>
+                <TextInput 
+                  style={[styles.textInput, { backgroundColor: colors.surfaceSecondary, borderColor: colors.borderLight, color: colors.text }]}
+                  value={currentPassword}
+                  onChangeText={setCurrentPassword}
+                  secureTextEntry
+                  placeholder="Enter current password"
+                  placeholderTextColor={colors.textMuted}
+                />
+              </View>
+
+              <View style={styles.inputGroup}>
+                <Text style={[styles.inputLabel, { color: colors.textSecondary }]}>New Password</Text>
+                <TextInput 
+                  style={[styles.textInput, { backgroundColor: colors.surfaceSecondary, borderColor: colors.borderLight, color: colors.text }]}
+                  value={newPassword}
+                  onChangeText={setNewPassword}
+                  secureTextEntry
+                  placeholder="At least 6 characters"
+                  placeholderTextColor={colors.textMuted}
+                />
+              </View>
+
+              <View style={styles.inputGroup}>
+                <Text style={[styles.inputLabel, { color: colors.textSecondary }]}>Confirm New Password</Text>
+                <TextInput 
+                  style={[styles.textInput, { backgroundColor: colors.surfaceSecondary, borderColor: colors.borderLight, color: colors.text }]}
+                  value={confirmPassword}
+                  onChangeText={setConfirmPassword}
+                  secureTextEntry
+                  placeholder="Confirm new password"
+                  placeholderTextColor={colors.textMuted}
+                />
+              </View>
+            </ScrollView>
+
+            <TouchableOpacity 
+              style={[styles.saveBtn, { backgroundColor: colors.primary }, changingPassword && styles.saveBtnDisabled]} 
+              onPress={handleChangePassword}
+              disabled={changingPassword}
+            >
+              {changingPassword ? <ActivityIndicator color="#fff" /> : <Text style={styles.saveBtnText}>Update Password</Text>}
             </TouchableOpacity>
           </View>
         </View>
@@ -724,5 +896,26 @@ const styles = StyleSheet.create({
     color: '#ffffff', 
     fontSize: 16, 
     fontFamily: 'Inter_700Bold',
+  },
+  settingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 14,
+    borderBottomWidth: 1,
+  },
+  settingTextContainer: {
+    flex: 1,
+    paddingRight: 16,
+  },
+  settingLabel: {
+    fontSize: 14,
+    fontFamily: 'Inter_600SemiBold',
+    marginBottom: 4,
+  },
+  settingSub: {
+    fontSize: 11,
+    fontFamily: 'Inter_400Regular',
+    lineHeight: 14,
   },
 });

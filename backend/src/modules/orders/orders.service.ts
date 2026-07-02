@@ -8,10 +8,14 @@ import { RoutingService } from "../routing/routing.service";
 import { PricingService } from "../pricing/pricing.service";
 import { SocketManager } from "../../sockets/socket.manager";
 import { QueueManager } from "../../services/queue.service";
+import { ZonesService } from "../zones/zones.service";
+import Zone from "../../database/models/Zone";
+import { ValidationError } from "../../utils/errors";
 
 export class OrdersService {
   private routingService = new RoutingService();
   private pricingService = new PricingService();
+  private zonesService = new ZonesService();
 
   async createOrder(userId: string, stopsData: any[], serviceType?: ServiceType, vendorId?: string, totals?: any, radius?: number, duration?: number, isReserved?: boolean, reservedAt?: Date | string, metadata?: any) {
     if (!mongoose.Types.ObjectId.isValid(userId)) {
@@ -45,6 +49,16 @@ export class OrdersService {
     const effectiveType = serviceType || ServiceType.DELIVERY;
     const isRide = effectiveType !== ServiceType.DELIVERY;
 
+    let surgeMultiplier = 1.0;
+    const activeZonesCount = await Zone.countDocuments({ isActive: true });
+    if (activeZonesCount > 0) {
+      const zone = await this.zonesService.getZoneForCoordinates(startPos.latitude, startPos.longitude, effectiveType);
+      if (!zone) {
+        throw new ValidationError("We do not operate in your pickup location yet.");
+      }
+      surgeMultiplier = zone.pricingMultiplier;
+    }
+
     let totalPrice: number;
     let priceBreakdown: any;
 
@@ -62,18 +76,20 @@ export class OrdersService {
         effectiveType,
         optimizationResult.totalDistance,
         optimizationResult.estimatedTime,
+        surgeMultiplier,
       );
       totalPrice = priceBreakdown.total;
     } else {
       totalPrice = totals?.total ?? this.pricingService.calculatePrice(
         optimizationResult.totalDistance, 
-        optimizationResult.optimizedStops.length
+        optimizationResult.optimizedStops.length,
+        surgeMultiplier,
       );
       priceBreakdown = {
         baseFare: totals?.subtotal ?? this.pricingService.getRateConfig(effectiveType).baseFare,
         distanceFare: totals?.deliveryFee ?? totalPrice - this.pricingService.getRateConfig(effectiveType).baseFare,
         timeFare: 0,
-        surgeMultiplier: 1,
+        surgeMultiplier,
         total: totalPrice,
       };
     }
@@ -366,10 +382,21 @@ export class OrdersService {
     const distanceInKm = this.haversineDistance(pickupLat, pickupLng, dropLat, dropLng);
     const estimatedMinutes = Math.round(distanceInKm * 4); // assume avg speed 15 km/h
 
+    let surgeMultiplier = 1.0;
+    const activeZonesCount = await Zone.countDocuments({ isActive: true });
+    if (activeZonesCount > 0) {
+      const zone = await this.zonesService.getZoneForCoordinates(pickupLat, pickupLng, serviceType);
+      if (!zone) {
+        throw new ValidationError("We do not operate in your pickup location yet.");
+      }
+      surgeMultiplier = zone.pricingMultiplier;
+    }
+
     const breakdown = this.pricingService.calculateFareBreakdown(
       serviceType,
       distanceInKm,
       estimatedMinutes,
+      surgeMultiplier,
     );
 
     return {

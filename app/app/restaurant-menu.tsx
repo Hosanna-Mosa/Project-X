@@ -59,6 +59,16 @@ export default function RestaurantMenu() {
     }
   };
 
+  const handleCategoryPress = (category: string) => {
+    setActiveCategory(category);
+    if (scrollViewRef.current) {
+      scrollViewRef.current.scrollTo({
+        y: 280,
+        animated: true,
+      });
+    }
+  };
+
   useEffect(() => {
     if (id) setVendorId(id as string);
   }, [id]);
@@ -254,7 +264,7 @@ export default function RestaurantMenu() {
             {categories.map((cat) => (
               <TouchableOpacity 
                 key={cat} 
-                onPress={() => setActiveCategory(cat)}
+                onPress={() => handleCategoryPress(cat)}
                 style={[
                   styles.tabItem, 
                   activeCategory === cat && styles.tabItemActive
@@ -326,32 +336,34 @@ export default function RestaurantMenu() {
         </View>
 
         {/* Category Navbar (Sticky Header) */}
-        <View style={[styles.stickyTabsContainer, { backgroundColor: colors.background }]}>
-          <ScrollView 
-            horizontal 
-            showsHorizontalScrollIndicator={false} 
-            contentContainerStyle={styles.tabsScrollContent}
-          >
-            {categories.map((cat) => (
-              <TouchableOpacity 
-                key={cat} 
-                onPress={() => setActiveCategory(cat)}
-                style={[
-                  styles.tabItem, 
-                  activeCategory === cat && styles.tabItemActive
-                ]}
-                activeOpacity={0.8}
-              >
-                <Text style={[
-                  styles.tabText, 
-                  activeCategory === cat && styles.tabTextActive
-                ]}>
-                  {cat}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
-        </View>
+        {!scrolledPast && (
+          <View style={[styles.stickyTabsContainer, { backgroundColor: colors.background }]}>
+            <ScrollView 
+              horizontal 
+              showsHorizontalScrollIndicator={false} 
+              contentContainerStyle={styles.tabsScrollContent}
+            >
+              {categories.map((cat) => (
+                <TouchableOpacity 
+                  key={cat} 
+                  onPress={() => handleCategoryPress(cat)}
+                  style={[
+                    styles.tabItem, 
+                    activeCategory === cat && styles.tabItemActive
+                  ]}
+                  activeOpacity={0.8}
+                >
+                  <Text style={[
+                    styles.tabText, 
+                    activeCategory === cat && styles.tabTextActive
+                  ]}>
+                    {cat}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+        )}
 
         {/* Menu Items */}
         {loading ? (
@@ -368,10 +380,7 @@ export default function RestaurantMenu() {
             .filter((category) => !activeCategory || category === activeCategory)
             .map((category) => (
               <View key={category} style={styles.categorySection}>
-              {/* Category Header with separator line */}
-              <View style={styles.categoryHeader}>
-                <Text style={styles.categoryTitle}>{category}</Text>
-              </View>
+              {/* Category Header with separator line removed */}
               
               {/* Food list items */}
               {groupedMenu[category].map((item) => {
@@ -579,7 +588,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#eceef0",
   },
   stickyTabsContainer: {
-    borderBottomWidth: 1,
+    borderBottomWidth: 0,
     borderBottomColor: "#eceef0",
     paddingVertical: 4,
     zIndex: 10,
@@ -610,7 +619,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
   },
   categoryHeader: {
-    borderBottomWidth: 1,
+    borderBottomWidth: 0,
     borderBottomColor: "#eceef0",
     paddingBottom: 8,
     marginBottom: 16,
@@ -809,7 +818,7 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     zIndex: 999,
-    borderBottomWidth: 1,
+    borderBottomWidth: 0,
   },
   searchHeader: {
     position: "absolute",

@@ -211,6 +211,44 @@ export class UsersController {
       return res.status(500).json({ message: "Internal server error" });
     }
   }
+
+  async getFavorites(req: AuthRequest, res: Response) {
+    try {
+      const user = await User.findById(req.user?.userId).populate("favorites");
+      if (!user) return res.status(404).json({ message: "User not found" });
+      return res.json(user.favorites || []);
+    } catch (error) {
+      console.error("Get favorites error:", error);
+      return res.status(500).json({ message: "Internal server error" });
+    }
+  }
+
+  async toggleFavorite(req: AuthRequest, res: Response) {
+    try {
+      const { vendorId } = req.params;
+      const user = await User.findById(req.user?.userId);
+      if (!user) return res.status(404).json({ message: "User not found" });
+
+      if (!user.favorites) {
+        user.favorites = [];
+      }
+
+      const index = user.favorites.indexOf(vendorId as any);
+      let isFavorite = false;
+      if (index === -1) {
+        user.favorites.push(vendorId as any);
+        isFavorite = true;
+      } else {
+        user.favorites.splice(index, 1);
+      }
+
+      await user.save();
+      return res.json({ isFavorite, favorites: user.favorites });
+    } catch (error) {
+      console.error("Toggle favorite error:", error);
+      return res.status(500).json({ message: "Internal server error" });
+    }
+  }
 }
 
 
