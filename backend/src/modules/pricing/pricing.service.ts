@@ -56,13 +56,13 @@ export class PricingService {
     serviceType: ServiceType,
     distanceInKm: number,
     estimatedMinutes: number = 0,
+    surgeMultiplier: number = 1,
   ): FareBreakdown {
     const rates = this.getRateConfig(serviceType);
 
     const baseFare = rates.baseFare;
     const distanceFare = Math.round(distanceInKm * rates.perKmRate * 100) / 100;
     const timeFare = Math.round(estimatedMinutes * rates.perMinRate * 100) / 100;
-    const surgeMultiplier = 1; // can be dynamic based on demand
 
     const total = Math.round((baseFare + distanceFare + timeFare) * surgeMultiplier * 100) / 100;
 
@@ -70,10 +70,10 @@ export class PricingService {
   }
 
   // Keep backward compatibility with delivery pricing
-  calculatePrice(distanceInKm: number, stopCount: number): number {
+  calculatePrice(distanceInKm: number, stopCount: number, surgeMultiplier: number = 1): number {
     const rates = DEFAULT_RATES[ServiceType.DELIVERY];
     const distancePrice = distanceInKm * rates.perKmRate;
     const stopPrice = stopCount * 20;
-    return rates.baseFare + distancePrice + stopPrice;
+    return Math.round((rates.baseFare + distancePrice + stopPrice) * surgeMultiplier * 100) / 100;
   }
 }

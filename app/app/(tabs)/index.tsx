@@ -150,7 +150,7 @@ export default function HomeScreen() {
   const [hasMore, setHasMore] = useState(true);
   const { theme } = useThemeStore();
   const [scrollOffset, setScrollOffset] = useState(0);
-  const categoriesScrollRef = useRef<ScrollView>(null);
+  // const categoriesScrollRef = useRef<ScrollView>(null);
   const colors = Colors[theme];
   const styles = React.useMemo(() => createStyles(colors), [theme]);
   const searchGlowSpin = useRef(new Animated.Value(0)).current;
@@ -666,54 +666,29 @@ export default function HomeScreen() {
             styles.categoriesContainer,
             { transform: [{ translateY: categoriesTranslateY }] }
           ]}>
-            <ScrollView
-              ref={categoriesScrollRef}
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.categoriesScrollContent}
-              scrollEventThrottle={16}
-            >
-              <ServiceCategory
-                icon="bag-outline"
-                label="Task"
-                onPress={() => router.push({ pathname: "/service-selection", params: { label: "Task" } })}
-              />
-              <ServiceCategory
-                icon="car-outline"
-                label="Rides"
-                onPress={() => router.push({ pathname: "/all-services" })}
-              />
-              <ServiceCategory
-                icon="fast-food-outline"
-                label="Food"
-                active={activeService === 'Food'}
-                onPress={() => handleServiceSwitch('Food')}
-              />
-              <ServiceCategory
-                icon="heart-pulse"
-                iconFamily="MaterialCommunityIcons"
-                label="Health"
-                onPress={() => router.push({
-                  pathname: "/service-selection",
-                  params: appliedDistanceKm ? { label: "Health", radiusKm: String(appliedDistanceKm) } : { label: "Health" },
-                })}
-              />
-              <ServiceCategory
-                icon="food-steak"
-                iconFamily="MaterialCommunityIcons"
-                label="Meat"
-                active={activeService === 'Meat'}
-                onPress={() => handleServiceSwitch('Meat')}
-              />
-              <ServiceCategory
-                icon="paw-outline"
-                label="Pets"
-                onPress={() => router.push({
-                  pathname: "/service-selection",
-                  params: appliedDistanceKm ? { label: "pets", radiusKm: String(appliedDistanceKm) } : { label: "pets" },
-                })}
-              />
-            </ScrollView>
+            <ServiceCategory
+              icon="bag-outline"
+              label="Task"
+              onPress={() => router.push({ pathname: "/service-selection", params: { label: "Task" } })}
+            />
+            <ServiceCategory
+              icon="car-outline"
+              label="Rides"
+              onPress={() => router.push({ pathname: "/all-services" })}
+            />
+            <ServiceCategory
+              icon="fast-food-outline"
+              label="Food"
+              active={activeService === 'Food'}
+              onPress={() => handleServiceSwitch('Food')}
+            />
+            <ServiceCategory
+              icon="food-steak"
+              iconFamily="MaterialCommunityIcons"
+              label="Meat"
+              active={activeService === 'Meat'}
+              onPress={() => handleServiceSwitch('Meat')}
+            />
           </Animated.View>
         </Animated.View>
       </View>
@@ -1124,6 +1099,9 @@ const createStyles = (colors: typeof Colors.light) => StyleSheet.create({
   categoriesContainer: {
     marginTop: 8,
     paddingBottom: 4,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    paddingHorizontal: 16,
   },
   categoriesScrollContent: {
     flexDirection: "row",
