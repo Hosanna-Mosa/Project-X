@@ -239,7 +239,9 @@ export default function AddAddressScreen() {
 
   const handleSelectSearchResult = async (item: any) => {
     try {
-      const details = await customFetch<any>(`/api/v1/places/details/${item.id}`);
+      const details = Number.isFinite(Number(item.lat)) && Number.isFinite(Number(item.lng))
+        ? { lat: Number(item.lat), lng: Number(item.lng) }
+        : await customFetch<any>(`/api/v1/places/details/${item.id}`);
       const newRegion = {
         ...region,
         latitude: details.lat,

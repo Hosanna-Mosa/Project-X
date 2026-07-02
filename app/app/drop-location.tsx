@@ -173,10 +173,14 @@ export default function LocationSelectionScreen() {
   const [fetchingLocation, setFetchingLocation] = useState(false);
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [isSearching, setIsSearching] = useState(false);
+  const [searchLoading, setSearchLoading] = useState(false);
+  const [searchText, setSearchText] = useState("");
+  const [searchError, setSearchError] = useState("");
   const [focusedInput, setFocusedInput] = useState<{ type: 'pickup' | 'drop' | 'stop', id?: string } | null>(null);
 
   const pickupRef = useRef<any>(null);
   const dropRef = useRef<any>(null);
+  const searchRequestIdRef = useRef(0);
 
   const saveRecentPlace = async (placeInput: Partial<RecentPlace> & { description?: string }) => {
     const place = toRecentPlace(placeInput);
@@ -198,23 +202,46 @@ export default function LocationSelectionScreen() {
 
   const handleSearch = async (text: string, type: 'pickup' | 'drop' | 'stop', id?: string) => {
     setFocusedInput({ type, id });
+    setSearchText(text);
+    setSearchError("");
     if (!text || text.length < 2) {
       setSearchResults([]);
       setIsSearching(false);
+      setSearchLoading(false);
       return;
     }
+    const requestId = ++searchRequestIdRef.current;
     setIsSearching(true);
+    setSearchLoading(true);
     try {
-      const data = await customFetch<any[]>(`/api/v1/places/autocomplete?input=${encodeURIComponent(text)}`);
-      setSearchResults(data);
+      const locationQuery = pickup?.lat && pickup?.lng
+        ? `&lat=${encodeURIComponent(String(pickup.lat))}&lng=${encodeURIComponent(String(pickup.lng))}`
+        : "";
+      const data = await customFetch<any[]>(
+        `/api/v1/places/autocomplete?input=${encodeURIComponent(text)}${locationQuery}`,
+        { responseType: "json" },
+      );
+      if (requestId === searchRequestIdRef.current) {
+        setSearchResults(Array.isArray(data) ? data : []);
+      }
     } catch (e) {
       console.error("Search error:", e);
+      if (requestId === searchRequestIdRef.current) {
+        setSearchResults([]);
+        setSearchError("Could not load places. Check your connection and try again.");
+      }
+    } finally {
+      if (requestId === searchRequestIdRef.current) {
+        setSearchLoading(false);
+      }
     }
   };
 
   const selectResult = async (result: any) => {
     try {
-      const details = await customFetch<{ lat: number, lng: number }>(`/api/v1/places/details/${result.id}`);
+      const details = Number.isFinite(Number(result.lat)) && Number.isFinite(Number(result.lng))
+        ? { lat: Number(result.lat), lng: Number(result.lng) }
+        : await customFetch<{ lat: number, lng: number }>(`/api/v1/places/details/${result.id}`);
       const completeData = {
         description: result.address,
         lat: details.lat,
@@ -234,6 +261,8 @@ export default function LocationSelectionScreen() {
 
       setSearchResults([]);
       setIsSearching(false);
+      setSearchLoading(false);
+      setSearchText("");
     } catch (e) {
       console.error("Selection error:", e);
     }
@@ -521,7 +550,15 @@ export default function LocationSelectionScreen() {
         <Text style={styles.sectionTitle}>
           {isSearching ? "Search Results" : "Recent Places"}
         </Text>
-        
+
+        {isSearching && searchText.trim().length >= 2 && searchResults.length === 0 ? (
+          <View style={styles.emptyRecents}>
+            <Text style={styles.emptyRecentsText}>
+              {searchLoading ? "Searching places..." : searchError || "No matching places found."}
+            </Text>
+          </View>
+        ) : null}
+
         {!isSearching && recentPlaces.length === 0 ? (
           <View style={styles.emptyRecents}>
             <Text style={styles.emptyRecentsText}>Your searched places will appear here.</Text>

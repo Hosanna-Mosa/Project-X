@@ -22,7 +22,6 @@ interface AuthState {
   /** Registers a new user account and logs them in, saving the token */
   register: (name: string, phone: string, email: string, password: string) => Promise<{ success: boolean }>;
   initializeAuth: () => Promise<void>;
-  toggleFavorite: (vendorId: string) => Promise<void>;
 }
 
 export const useAuthStore = create<AuthState>((set, get) => ({
@@ -197,28 +196,6 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     } catch (err: any) {
       set({ loading: false, error: err.message });
       throw err;
-    }
-  },
-
-  toggleFavorite: async (vendorId: string) => {
-    const { token, user, setUser } = get();
-    if (!token || !user) return;
-    try {
-      const response = await fetch(`${apiUrl}/api/v1/users/favorites/${vendorId}`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-      });
-      if (response.ok) {
-        const data = await response.json();
-        const updatedUser = { ...user, favorites: data.favorites };
-        setUser(updatedUser);
-        await AsyncStorage.setItem("user", JSON.stringify(updatedUser));
-      }
-    } catch (err) {
-      console.error("Failed to toggle favorite:", err)
     }
   },
 }));

@@ -126,7 +126,7 @@ export default function DriverChatScreen() {
           </View>
           <View>
             <Text style={styles.headerName}>{currentOrder?.customerName || "Customer"}</Text>
-            <Text style={styles.headerStatus}>Customer · Online</Text>
+            <Text style={styles.headerStatus}>Customer ï¿½ Online</Text>
           </View>
         </View>
         <TouchableOpacity
@@ -183,7 +183,9 @@ export default function DriverChatScreen() {
           onPress={() => handleSend(inputText)}
           disabled={!inputText.trim()}
         >
-          <Feather name="send" size={20} color="#fff" />
+          <View style={{ transform: [{ rotate: "45deg" }] }}>
+            <Feather name="send" size={20} color="#fff" />
+          </View>
         </TouchableOpacity>
       </View>
     </KeyboardAvoidingView>
@@ -363,7 +365,7 @@ const styles = StyleSheet.create({
   },
   inputBar: {
     flexDirection: "row",
-    alignItems: "flex-end",
+    alignItems: "center",
     gap: 10,
     paddingHorizontal: 16,
     paddingTop: 12,
@@ -374,22 +376,23 @@ const styles = StyleSheet.create({
   inputContainer: {
     flex: 1,
     backgroundColor: "#F1F5F9",
-    borderRadius: 18,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    minHeight: 36,
+    borderRadius: 22,
+    height: 44,
+    paddingHorizontal: 14,
     justifyContent: "center",
   },
   textInput: {
+    flex: 1,
     fontSize: 15,
     color: "#191c1e",
     fontWeight: "500",
-    maxHeight: 100,
+    paddingVertical: 0,
+    textAlignVertical: "center",
   },
   sendBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     backgroundColor: "#0EA5E9",
     alignItems: "center",
     justifyContent: "center",

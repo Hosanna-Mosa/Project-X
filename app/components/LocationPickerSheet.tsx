@@ -193,7 +193,9 @@ export function LocationPickerSheet({ isOpen, onClose, onSelectAddress }: Props)
       style={styles.searchResultItem}
       onPress={async () => {
         try {
-          const details = await customFetch<any>(`/api/v1/places/details/${item.id}`);
+          const details = Number.isFinite(Number(item.lat)) && Number.isFinite(Number(item.lng))
+            ? { lat: Number(item.lat), lng: Number(item.lng) }
+            : await customFetch<any>(`/api/v1/places/details/${item.id}`);
           onSelectAddress?.({
             addressLine: item.address,
             coordinates: { lat: details.lat, lng: details.lng },

@@ -42,12 +42,23 @@ export class RoutingService {
     }
 
     // 2. Fetch Polyline from Google Directions API
-    // Waypoints for the URL (all optimized stops except origin)
-    const waypoints = optimizedSequence.map(s => `${s.latitude},${s.longitude}`).join('|');
+    // The final optimized stop is the destination, so only intermediate stops
+    // belong in the waypoints list.
+    const waypointStops = optimizedSequence.slice(0, -1);
+    const waypoints = waypointStops.map(s => `${s.latitude},${s.longitude}`).join('|');
     const destination = `${optimizedSequence[optimizedSequence.length - 1].latitude},${optimizedSequence[optimizedSequence.length - 1].longitude}`;
-    
+
     try {
-      const url = `https://maps.googleapis.com/maps/api/directions/json?origin=${origin.latitude},${origin.longitude}&destination=${destination}&waypoints=${waypoints}&key=${GOOGLE_MAPS_APIKEY}`;
+      const params = new URLSearchParams({
+        origin: `${origin.latitude},${origin.longitude}`,
+        destination,
+        mode: "driving",
+        key: GOOGLE_MAPS_APIKEY,
+      });
+      if (waypoints) {
+        params.set("waypoints", waypoints);
+      }
+      const url = `https://maps.googleapis.com/maps/api/directions/json?${params.toString()}`;
       
       const response = await fetch(url);
       const data = await response.json();
@@ -64,12 +75,33 @@ export class RoutingService {
           polyline,
           totalDistance: Math.round(totalDistance * 10) / 10,
           estimatedTime: Math.round(estimatedTime),
+          routeSource: "google",
         };
       } else {
         console.warn("Google Directions API status:", data.status, data.error_message);
       }
     } catch (error) {
       console.error("Routing Service Error:", error);
+    }
+
+    try {
+      const osrmResult = await fetchOsrmRoute([
+        { latitude: origin.latitude, longitude: origin.longitude },
+        ...optimizedSequence,
+      ]);
+
+      if (osrmResult) {
+        console.log("Routing Service: Successfully fetched route from OSRM.");
+        return {
+          optimizedStops: optimizedSequence,
+          polyline: osrmResult.polyline,
+          totalDistance: Math.round(osrmResult.totalDistance * 10) / 10,
+          estimatedTime: Math.round(osrmResult.estimatedTime),
+          routeSource: "osrm",
+        };
+      }
+    } catch (error) {
+      console.error("OSRM Routing Service Error:", error);
     }
 
     // Fallback: Generate a simple encoded polyline from optimizedSequence
@@ -84,8 +116,35 @@ export class RoutingService {
       polyline: fallbackPolyline,
       totalDistance: Math.round(totalDirectDistance / 100) / 10,
       estimatedTime: Math.round(totalDirectDistance / 400),
+      routeSource: "fallback",
     };
   }
+}
+
+async function fetchOsrmRoute(points: Coordinate[]) {
+  if (points.length < 2) return null;
+
+  const coordinates = points.map((point) => `${point.longitude},${point.latitude}`).join(";");
+  const params = new URLSearchParams({
+    overview: "full",
+    geometries: "polyline",
+    steps: "false",
+  });
+  const url = `https://router.project-osrm.org/route/v1/driving/${coordinates}?${params.toString()}`;
+  const response = await fetch(url);
+  const data = await response.json();
+
+  if (data.code !== "Ok" || !data.routes?.[0]?.geometry) {
+    console.warn("OSRM status:", data.code, data.message);
+    return null;
+  }
+
+  const route = data.routes[0];
+  return {
+    polyline: route.geometry,
+    totalDistance: Number(route.distance || 0) / 1000,
+    estimatedTime: Number(route.duration || 0) / 60,
+  };
 }
 
 // Helper to compute geographic distance between two coordinates

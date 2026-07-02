@@ -1,10 +1,11 @@
-import React, { useEffect, useState, forwardRef, useImperativeHandle, useRef } from 'react';
+import React, { useEffect, useMemo, useState, forwardRef, useImperativeHandle, useRef } from 'react';
 import { StyleSheet, View, Platform, ViewStyle, Text } from 'react-native';
 import MapView, { PROVIDER_GOOGLE, Region, MapType, Marker, Polyline, Circle } from 'react-native-maps';
 import * as Location from 'expo-location';
 import { Feather } from '@expo/vector-icons';
 import { DeliveryStop } from '@/contexts/deliveryStore';
 import Colors from '@/constants/colors';
+import { customFetch } from '@/utils/api/custom-fetch';
 
 const DRIVER_MARKER_IMAGE = require('@/assets/images/driver-marker.png');
 
@@ -57,8 +58,20 @@ export const MapBackground = forwardRef<MapBackgroundRef, Props>(({
   radiusMeters
 }, ref) => {
   const [region, setRegion] = useState<Region>(initialRegion || FALLBACK_REGION);
+  const [autoRoutePolyline, setAutoRoutePolyline] = useState<string | null>(null);
   const internalMapRef = useRef<MapView>(null);
   const locationRef = useRef<{lat: number, lng: number} | null>(null);
+  const validRouteStops = useMemo(
+    () =>
+      stops
+        .map((stop) => ({
+          ...stop,
+          lat: Number(stop.lat),
+          lng: Number(stop.lng),
+        }))
+        .filter((stop) => Number.isFinite(stop.lat) && Number.isFinite(stop.lng)),
+    [stops],
+  );
 
   const getRegionForLocation = (lat: number, lng: number, latDelta = 0.015, lngDelta = 0.015): Region => ({
     latitude: lat - (latDelta / 3), // offset slightly so pins are visible above bottom sheet
@@ -196,6 +209,51 @@ export const MapBackground = forwardRef<MapBackgroundRef, Props>(({
     }
   }, [stops, driverMarkers, userLocation, driverLocation]);
 
+  useEffect(() => {
+    if (polyline || validRouteStops.length < 2) {
+      setAutoRoutePolyline(null);
+      return;
+    }
+
+    let cancelled = false;
+
+    const loadRoadRoute = async () => {
+      try {
+        const [origin, ...destinationStops] = validRouteStops;
+        const route = await customFetch<{ polyline?: string; routeSource?: string }>("/api/v1/routing/optimize", {
+          method: "POST",
+          body: JSON.stringify({
+            origin: {
+              latitude: origin.lat,
+              longitude: origin.lng,
+            },
+            stops: destinationStops.map((stop, index) => ({
+              id: stop.id || `stop-${index}`,
+              address: stop.address || stop.storeName || `Stop ${index + 1}`,
+              latitude: stop.lat,
+              longitude: stop.lng,
+              type: stop.type || "stop",
+            })),
+          }),
+          responseType: "json",
+        });
+
+        if (!cancelled) {
+          setAutoRoutePolyline(route?.polyline || null);
+        }
+      } catch (error) {
+        console.warn("MapBackground route fetch failed:", error);
+        if (!cancelled) setAutoRoutePolyline(null);
+      }
+    };
+
+    loadRoadRoute();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [polyline, validRouteStops]);
+
   return (
     <View style={[styles.container, style]} pointerEvents="box-none">
       <MapView
@@ -287,9 +345,9 @@ export const MapBackground = forwardRef<MapBackgroundRef, Props>(({
             />
           )}
 
-          {polyline && (
+          {(polyline || autoRoutePolyline) && (
             <Polyline
-              coordinates={decodePolyline(polyline)}
+              coordinates={decodePolyline(polyline || autoRoutePolyline || "")}
               strokeWidth={4}
               strokeColor="#16A34A"
             />

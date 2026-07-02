@@ -6,7 +6,6 @@ import {
   Text,
   TouchableOpacity,
   Dimensions,
-  Platform,
   TextInput,
   Alert,
   Linking,
@@ -21,74 +20,6 @@ import Colors from "@/constants/colors";
 import { socketService } from "@/utils/socketService";
 
 const { width, height } = Dimensions.get("window");
-
-const mapStyle = [
-  {
-    "featureType": "all",
-    "elementType": "labels.text.fill",
-    "stylers": [{ "color": "#7c93a3" }]
-  },
-  {
-    "featureType": "all",
-    "elementType": "labels.text.stroke",
-    "stylers": [
-      { "visibility": "on" },
-      { "color": "#ffffff" },
-      { "weight": 2 },
-      { "gamma": 0.84 }
-    ]
-  },
-  {
-    "featureType": "all",
-    "elementType": "labels.icon",
-    "stylers": [{ "visibility": "off" }]
-  },
-  {
-    "featureType": "landscape",
-    "elementType": "geometry",
-    "stylers": [{ "color": "#f1f5f9" }]
-  },
-  {
-    "featureType": "poi",
-    "elementType": "geometry",
-    "stylers": [{ "color": "#e2e8f0" }]
-  },
-  {
-    "featureType": "road.highway",
-    "elementType": "geometry.fill",
-    "stylers": [{ "color": "#ffffff" }]
-  },
-  {
-    "featureType": "road.highway",
-    "elementType": "geometry.stroke",
-    "stylers": [{ "visibility": "off" }]
-  },
-  {
-    "featureType": "road.arterial",
-    "elementType": "geometry.fill",
-    "stylers": [{ "color": "#ffffff" }]
-  },
-  {
-    "featureType": "road.arterial",
-    "elementType": "geometry.stroke",
-    "stylers": [{ "color": "#e2e8f0" }]
-  },
-  {
-    "featureType": "road.local",
-    "elementType": "geometry.fill",
-    "stylers": [{ "color": "#ffffff" }]
-  },
-  {
-    "featureType": "transit",
-    "elementType": "geometry",
-    "stylers": [{ "color": "#e2e8f0" }]
-  },
-  {
-    "featureType": "water",
-    "elementType": "geometry",
-    "stylers": [{ "color": "#cbd5e1" }]
-  }
-];
 
 export default function ActiveOrderScreen() {
   const insets = useSafeAreaInsets();
@@ -710,7 +641,7 @@ export default function ActiveOrderScreen() {
                       style={styles.roundCommBtn}
                       onPress={openRideNavigation}
                     >
-                      <Ionicons name="navigate" size={18} color="#00B7EB" />
+                      <Ionicons name="location" size={18} color="#00B7EB" />
                     </TouchableOpacity>
                   </View>
                 </View>
@@ -993,7 +924,7 @@ export default function ActiveOrderScreen() {
                     Linking.openURL(url);
                   }}
                 >
-                  <Ionicons name="navigate" size={18} color="#00B7EB" />
+                  <Ionicons name="location" size={18} color="#00B7EB" />
                 </TouchableOpacity>
               )}
             </View>
@@ -1077,7 +1008,7 @@ export default function ActiveOrderScreen() {
                     Linking.openURL(url);
                   }}
                 >
-                  <Ionicons name="navigate" size={18} color="#00B7EB" />
+                  <Ionicons name="location" size={18} color="#00B7EB" />
                 </TouchableOpacity>
               )}
             </View>
@@ -1475,7 +1406,6 @@ export default function ActiveOrderScreen() {
           style={StyleSheet.absoluteFill}
           provider={PROVIDER_GOOGLE}
           showsUserLocation={true}
-          customMapStyle={Platform.OS === "web" ? undefined : mapStyle}
           initialRegion={{
             latitude: pickupStop?.lat || 12.9716,
             longitude: pickupStop?.lng || 77.5946,
