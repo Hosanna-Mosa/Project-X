@@ -19,12 +19,14 @@ class SocketService {
   public connect() {
     if (this.socket) return;
 
+    const token = localStorage.getItem("admin_token") || localStorage.getItem("vendor_token");
     console.log(`[Vendor Socket] Connecting to ${SOCKET_URL}/ws/v1/socket.io`);
 
     this.socket = io(SOCKET_URL, {
-      transports: ["websocket"],
+      transports: ["websocket", "polling"],
       autoConnect: true,
       path: "/ws/v1/socket.io",
+      auth: token ? { token } : undefined,
     });
 
     this.socket.on("connect", () => {
@@ -33,6 +35,10 @@ class SocketService {
 
     this.socket.on("disconnect", () => {
       console.log("Disconnected from Real-time Hub (Vendor)");
+    });
+
+    this.socket.on("connect_error", (error) => {
+      console.error(`[Vendor Socket] Connection failed: ${error.message}`);
     });
   }
 
