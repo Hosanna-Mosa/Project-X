@@ -433,7 +433,7 @@ export default function Home() {
                     </div>
 
                     {/* App Tabs Selection */}
-                    <div className="grid grid-cols-4 gap-2 p-3 bg-white border-b border-[#edeeef] text-center">
+                    <div className="grid grid-cols-3 gap-2 p-3 bg-white border-b border-[#edeeef] text-center">
                       <div className="flex flex-col items-center">
                         <div className="w-8 h-8 rounded-full bg-neutral-100 flex items-center justify-center">
                           <Icon name="assignment" className="text-xs text-neutral-600" />
@@ -451,12 +451,6 @@ export default function Home() {
                           <Icon name="restaurant" className="text-xs text-white" />
                         </div>
                         <span className="text-[8px] font-bold text-[#002045] mt-1">Food</span>
-                      </div>
-                      <div className="flex flex-col items-center">
-                        <div className="w-8 h-8 rounded-full bg-neutral-100 flex items-center justify-center">
-                          <Icon name="heart_plus" className="text-xs text-neutral-600" />
-                        </div>
-                        <span className="text-[8px] font-bold text-[#4a5568] mt-1">Health</span>
                       </div>
                     </div>
 

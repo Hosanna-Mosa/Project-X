@@ -30,8 +30,8 @@ type ServiceItem = {
 const SERVICES: ServiceItem[] = [
   { id: "bike", name: "Bike", image: require("@/assets/images/services/bike.png") },
   { id: "auto", name: "Auto", image: require("@/assets/images/services/auto.png") },
-  { id: "cab-economy", name: "Cab Economy", image: require("@/assets/images/services/cab.png") },
-  { id: "cab-prime", name: "Cab Prime", image: require("@/assets/images/services/cab.png"), isPremium: true },
+  // { id: "cab-economy", name: "Cab Economy", image: require("@/assets/images/services/cab.png") },
+  // { id: "cab-prime", name: "Cab Prime", image: require("@/assets/images/services/cab.png"), isPremium: true },
 ];
 
 export default function AllServicesScreen() {

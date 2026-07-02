@@ -17,6 +17,7 @@ import {
   Dimensions,
   type ViewStyle,
   Keyboard,
+  FlatList,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons, MaterialCommunityIcons, Feather } from "@expo/vector-icons";
@@ -137,6 +138,53 @@ const GET_FAMOUS_DISHES = (dayIndex: number): Dish[] => {
   }
 };
 
+const popularTags = [
+  { name: "Biryani", icon: "flame-outline", iconFamily: "Ionicons", color: "#EF4444" },
+  { name: "Dosa", icon: "restaurant-outline", iconFamily: "Ionicons", color: "#F59E0B" },
+  { name: "Idly", icon: "disc-outline", iconFamily: "Ionicons", color: "#10B981" },
+  { name: "Fried Rice", icon: "rice", iconFamily: "MaterialCommunityIcons", color: "#06B6D4" },
+  { name: "Fast Food", icon: "fast-food-outline", iconFamily: "Ionicons", color: "#EF4444" },
+  { name: "Breakfast", icon: "egg-cooking", iconFamily: "MaterialCommunityIcons", color: "#F59E0B" },
+  { name: "Healthy", icon: "leaf-outline", iconFamily: "Ionicons", color: "#10B981" },
+  { name: "Deals", icon: "percent", iconFamily: "Feather", color: "#E11D48" },
+  { name: "Burgers", icon: "hamburger", iconFamily: "MaterialCommunityIcons", color: "#F97316" },
+  { name: "Smoothie", icon: "cup-water", iconFamily: "MaterialCommunityIcons", color: "#06B6D4" },
+  { name: "Pizza", icon: "pizza-outline", iconFamily: "Ionicons", color: "#E11D48" },
+  { name: "Desserts", icon: "ice-cream-outline", iconFamily: "Ionicons", color: "#EC4899" },
+  { name: "Noodles", icon: "restaurant-outline", iconFamily: "Ionicons", color: "#8B5CF6" },
+  { name: "Chicken", icon: "flame", iconFamily: "Ionicons", color: "#EF4444" },
+];
+
+const TAG_SEARCH_MAP: { [key: string]: string } = {
+  "Biryani": "Biryani",
+  "Dosa": "Dosa",
+  "Idly": "Idli",
+  "Fried Rice": "Rice",
+  "Fast Food": "Burger",
+  "Breakfast": "Breakfast",
+  "Healthy": "Salad",
+  "Deals": "Thali",
+  "Burgers": "Burger",
+  "Smoothie": "Lassi",
+  "Pizza": "Pizza",
+  "Desserts": "Waffles",
+  "Tea & Coffee": "Coffee",
+  "Noodles": "Noodles",
+  "Chicken": "Chicken",
+  "Paneer": "Paneer",
+  "Fish": "Fish"
+};
+
+const renderTagIcon = (tag: typeof popularTags[0]) => {
+  if (tag.iconFamily === "MaterialCommunityIcons") {
+    return <MaterialCommunityIcons name={tag.icon as any} size={16} color={tag.color} />;
+  }
+  if (tag.iconFamily === "Feather") {
+    return <Feather name={tag.icon as any} size={16} color={tag.color} />;
+  }
+  return <Ionicons name={tag.icon as any} size={16} color={tag.color} />;
+};
+
 const HOME_SKELETON_ITEMS = Array.from({ length: 4 }, (_, index) => ({ _id: `home-skeleton-${index}` }));
 
 import * as Location from "expo-location";
@@ -144,7 +192,39 @@ import * as Location from "expo-location";
 export default function HomeScreen() {
   const insets = useSafeAreaInsets();
   const [searchText, setSearchText] = useState("");
+  const [isSearchActive, setIsSearchActive] = useState(false);
+  const [recentSearches, setRecentSearches] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const stored = await AsyncStorage.getItem("recent_searches");
+        if (stored) {
+          setRecentSearches(JSON.parse(stored));
+        }
+      } catch (e) {
+        console.error("Failed to load recent searches", e);
+      }
+    })();
+  }, []);
+
+  const addRecentSearch = async (query: string) => {
+    if (!query.trim()) return;
+    const trimmed = query.trim();
+    const newRecent = [trimmed, ...recentSearches.filter(q => q !== trimmed)].slice(0, 5);
+    setRecentSearches(newRecent);
+    try {
+      await AsyncStorage.setItem("recent_searches", JSON.stringify(newRecent));
+    } catch (e) {
+      console.error("Failed to save recent searches", e);
+    }
+  };
+
+  const clearRecentSearches = async () => {
+    setRecentSearches([]);
+    await AsyncStorage.removeItem("recent_searches");
+  };
   const [loadingMore, setLoadingMore] = useState(false);
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
@@ -190,10 +270,6 @@ export default function HomeScreen() {
   const isInitialized = useAuthStore((s) => s.isInitialized);
   const userName = user?.name ? user.name.split(" ")[0] : "there";
 
-  const famousDishes = React.useMemo(() => {
-    const today = new Date();
-    return GET_FAMOUS_DISHES(today.getDay());
-  }, []);
 
   const [restaurants, setRestaurants] = useState<any[]>([]);
   const [meatCenters, setMeatCenters] = useState<any[]>([]);
@@ -201,6 +277,16 @@ export default function HomeScreen() {
   const [isLocationSheetOpen, setIsLocationSheetOpen] = useState(false);
   const [selectedAddress, setSelectedAddress] = useState<any>(null);
   const [foodFilter, setFoodFilter] = useState<'all' | 'veg' | 'nonveg'>('all');
+  const vegAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.spring(vegAnim, {
+      toValue: foodFilter === 'veg' ? 1 : 0,
+      useNativeDriver: false,
+      friction: 6,
+      tension: 40,
+    }).start();
+  }, [foodFilter]);
   const [isDistanceSheetOpen, setIsDistanceSheetOpen] = useState(false);
   const [distanceOption, setDistanceOption] = useState<"3" | "5" | "7" | "custom">("5");
   const [customDistance, setCustomDistance] = useState("");
@@ -227,8 +313,9 @@ export default function HomeScreen() {
     const delayDebounceFn = setTimeout(async () => {
       try {
         setIsSearchingDishes(true);
+        const queryTerm = TAG_SEARCH_MAP[searchText] || searchText;
         const baseUrl = process.env.EXPO_PUBLIC_API_URL || Constants.expoConfig?.extra?.apiUrl;
-        const response = await fetch(`${baseUrl}/api/v1/food/search?query=${encodeURIComponent(searchText)}`);
+        const response = await fetch(`${baseUrl}/api/v1/food/search?query=${encodeURIComponent(queryTerm)}`);
         if (response.ok) {
           const data = await response.json();
           setSearchedDishes(data);
@@ -452,19 +539,102 @@ export default function HomeScreen() {
       {activeService === 'Food' && (
         <>
           <View style={styles.greetingSection}>
-            <Text style={styles.greetingTitle}>
-              {getGreeting(userName)}
-            </Text>
-            <View style={styles.dishesGrid}>
-              {famousDishes.map((dish) => (
-                <TouchableOpacity key={dish.id} style={styles.dishChip} activeOpacity={0.8}>
-                  <View style={[styles.dishIconCircle, { backgroundColor: dish.color + '15' }]}>
-                    <Ionicons name={dish.icon as any} size={16} color={dish.color} />
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+              <Text style={[styles.greetingTitle, { marginBottom: 0, flex: 1, marginRight: 10 }]}>
+                {getGreeting(userName)}
+              </Text>
+              
+              <TouchableOpacity 
+                activeOpacity={0.85}
+                onPress={() => setFoodFilter(foodFilter === 'veg' ? 'all' : 'veg')}
+              >
+                <Animated.View style={[
+                  styles.vegMorphBadge,
+                  {
+                    width: vegAnim.interpolate({ inputRange: [0, 1], outputRange: [38, 85] }),
+                    backgroundColor: vegAnim.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [colors.surface, '#16A34A']
+                    }),
+                    borderColor: vegAnim.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [colors.border, '#15803D']
+                    }),
+                  }
+                ]}>
+                  <View style={styles.vegMorphIconWrap}>
+                    <Ionicons 
+                      name="leaf" 
+                      size={14} 
+                      color={foodFilter === 'veg' ? '#FFFFFF' : '#16A34A'} 
+                    />
                   </View>
-                  <Text style={styles.dishChipText}>{dish.name}</Text>
-                </TouchableOpacity>
-              ))}
+                  <Animated.Text 
+                    numberOfLines={1}
+                    style={[
+                      styles.vegMorphText,
+                      {
+                        opacity: vegAnim,
+                        transform: [{
+                          translateX: vegAnim.interpolate({
+                            inputRange: [0, 1],
+                            outputRange: [-10, 0]
+                          })
+                        }]
+                      }
+                    ]}
+                  >
+                    VEG
+                  </Animated.Text>
+                </Animated.View>
+              </TouchableOpacity>
             </View>
+
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.dishesScrollContent}
+              style={styles.dishesScroll}
+            >
+              <View style={styles.dishesRowsContainer}>
+                <View style={styles.dishesRow}>
+                  {popularTags.slice(0, 7).map((tag, index) => (
+                    <TouchableOpacity 
+                      key={index} 
+                      style={styles.dishChip} 
+                      activeOpacity={0.8}
+                      onPress={() => {
+                        setSearchText(tag.name);
+                        setIsSearchActive(true);
+                      }}
+                    >
+                      <View style={[styles.dishIconCircle, { backgroundColor: tag.color + '15' }]}>
+                        {renderTagIcon(tag)}
+                      </View>
+                      <Text style={styles.dishChipText}>{tag.name}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+                <View style={styles.dishesRow}>
+                  {popularTags.slice(7, 14).map((tag, index) => (
+                    <TouchableOpacity 
+                      key={index} 
+                      style={styles.dishChip} 
+                      activeOpacity={0.8}
+                      onPress={() => {
+                        setSearchText(tag.name);
+                        setIsSearchActive(true);
+                      }}
+                    >
+                      <View style={[styles.dishIconCircle, { backgroundColor: tag.color + '15' }]}>
+                        {renderTagIcon(tag)}
+                      </View>
+                      <Text style={styles.dishChipText}>{tag.name}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+            </ScrollView>
           </View>
 
           {store149Items.length > 0 && (
@@ -771,46 +941,6 @@ export default function HomeScreen() {
               <TouchableOpacity style={styles.iconBtn} onPress={() => router.push("/(tabs)/profile")}>
                   <Ionicons name="person-outline" size={24} color={colors.primary} />
               </TouchableOpacity>
-              {activeService === 'Food' && (
-                <View style={styles.topVegNonVegToggle}>
-                  <TouchableOpacity
-                    style={[
-                      styles.topToggleOption,
-                      foodFilter === 'veg' && styles.topToggleOptionVegActive
-                    ]}
-                    onPress={() => setFoodFilter(foodFilter === 'veg' ? 'all' : 'veg')}
-                    activeOpacity={0.8}
-                  >
-                    <Ionicons 
-                      name="leaf" 
-                      size={11} 
-                      color={foodFilter === 'veg' ? "#ffffff" : "#16A34A"} 
-                    />
-                    <Text style={[
-                      styles.topToggleText,
-                      foodFilter === 'veg' && styles.topToggleTextActive
-                    ]}>Veg</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={[
-                      styles.topToggleOption,
-                      foodFilter === 'nonveg' && styles.topToggleOptionNonVegActive
-                    ]}
-                    onPress={() => setFoodFilter(foodFilter === 'nonveg' ? 'all' : 'nonveg')}
-                    activeOpacity={0.8}
-                  >
-                    <Ionicons 
-                      name="flame" 
-                      size={11} 
-                      color={foodFilter === 'nonveg' ? "#ffffff" : "#E11D48"} 
-                    />
-                    <Text style={[
-                      styles.topToggleText,
-                      foodFilter === 'nonveg' && styles.topToggleTextActive
-                    ]}>Non</Text>
-                  </TouchableOpacity>
-                </View>
-              )}
             </View>
           </Animated.View>
 
@@ -908,18 +1038,167 @@ export default function HomeScreen() {
               style={StyleSheet.absoluteFill}
             />
           </Animated.View>
-          <View style={styles.searchBar}>
+          <TouchableOpacity 
+            style={styles.searchBar} 
+            activeOpacity={0.9} 
+            onPress={() => setIsSearchActive(true)}
+          >
             <Ionicons name="search" size={18} color={colors.primary} />
-            <TextInput
-              style={styles.searchInput}
-              placeholder='Search "milk", "eggs", "bread"'
-              placeholderTextColor={colors.textSecondary}
-              value={searchText}
-              onChangeText={setSearchText}
-            />
-          </View>
+            <Text style={[styles.searchInput, { color: searchText ? colors.text : colors.textSecondary, paddingTop: Platform.OS === 'ios' ? 0 : 3 }]}>
+              {searchText || 'Search "milk", "eggs", "bread"'}
+            </Text>
+          </TouchableOpacity>
         </Animated.View>
       </View>
+
+      {/* DOORDASH STYLE SEARCH SCREEN OVERLAY */}
+      <Modal
+        visible={isSearchActive}
+        animationType="slide"
+        transparent={false}
+        onRequestClose={() => setIsSearchActive(false)}
+      >
+        <View style={[styles.ddSearchRoot, { paddingTop: insets.top }]}>
+          {/* Header Row */}
+          <View style={styles.ddSearchHeader}>
+            <TouchableOpacity 
+              onPress={() => {
+                setIsSearchActive(false);
+                setSearchText("");
+              }}
+              style={styles.ddSearchCloseBtn}
+            >
+              <Ionicons name="close" size={26} color={colors.text} />
+            </TouchableOpacity>
+            
+            <View style={styles.ddSearchInputWrapper}>
+              <Ionicons name="search" size={20} color={colors.textSecondary} style={{ marginRight: 8 }} />
+              <TextInput
+                style={styles.ddSearchInput}
+                placeholder="Search food, dishes, restaurants"
+                placeholderTextColor={colors.textMuted}
+                value={searchText}
+                onChangeText={setSearchText}
+                autoFocus
+                returnKeyType="search"
+                onSubmitEditing={() => addRecentSearch(searchText)}
+              />
+              {searchText ? (
+                <TouchableOpacity onPress={() => setSearchText("")}>
+                  <Ionicons name="close-circle" size={18} color={colors.textMuted} />
+                </TouchableOpacity>
+              ) : null}
+            </View>
+          </View>
+
+          {/* Body Content */}
+          {!searchText ? (
+            <ScrollView 
+              showsVerticalScrollIndicator={false} 
+              contentContainerStyle={styles.ddSearchBody}
+              keyboardShouldPersistTaps="handled"
+            >
+              {/* Recent Searches */}
+              {recentSearches.length > 0 && (
+                <View style={styles.ddRecentSection}>
+                  <View style={styles.ddSectionHeader}>
+                    <Text style={styles.ddSectionTitle}>Recent Searches</Text>
+                    <TouchableOpacity onPress={clearRecentSearches}>
+                      <Text style={styles.ddClearLink}>Clear</Text>
+                    </TouchableOpacity>
+                  </View>
+                  <View style={styles.ddRecentList}>
+                    {recentSearches.map((query, index) => (
+                      <TouchableOpacity 
+                        key={index} 
+                        style={styles.ddRecentItem}
+                        onPress={() => setSearchText(query)}
+                      >
+                        <Ionicons name="time-outline" size={20} color={colors.textMuted} style={{ marginRight: 12 }} />
+                        <Text style={styles.ddRecentText}>{query}</Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                </View>
+              )}
+
+              {/* Recommended Chips */}
+              <View style={styles.ddRecommendedSection}>
+                <Text style={styles.ddSectionTitle}>Recommended</Text>
+                <View style={styles.ddRecommendedGrid}>
+                  {["Ice cream", "Grocery", "Cat food", "Cookie", "Soda", "Tacos", "Burger", "Pizza"].map((rec, i) => (
+                    <TouchableOpacity 
+                      key={i} 
+                      style={styles.ddRecChip}
+                      onPress={() => setSearchText(rec)}
+                    >
+                      <Text style={styles.ddRecChipText}>{rec}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+
+              {/* Cuisines Grid */}
+              <View style={styles.ddCuisinesSection}>
+                <Text style={styles.ddSectionTitle}>Cuisines</Text>
+                <View style={styles.ddCuisinesGrid}>
+                  {[
+                    { name: "Fast Food", emoji: "🍟", query: "Burger" },
+                    { name: "Breakfast", emoji: "🍳", query: "Breakfast" },
+                    { name: "Pizza", emoji: "🍕", query: "Pizza" },
+                    { name: "Indian", emoji: "🍛", query: "Biryani" },
+                    { name: "Desserts", emoji: "🍰", query: "Waffles" },
+                    { name: "Chinese", emoji: "🍜", query: "Noodles" }
+                  ].map((item, i) => (
+                    <TouchableOpacity 
+                      key={i} 
+                      style={styles.ddCuisineCard}
+                      onPress={() => setSearchText(item.query)}
+                    >
+                      <View style={styles.ddCuisineIconBg}>
+                        <Text style={{ fontSize: 32 }}>{item.emoji}</Text>
+                      </View>
+                      <Text style={styles.ddCuisineText}>{item.name}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+            </ScrollView>
+          ) : (
+            /* Search Results */
+            <View style={{ flex: 1, backgroundColor: colors.background }}>
+              <FlatList
+                data={listData.filter((item: any) => item.isHeader || item.isRestaurant || item.isDish)}
+                keyExtractor={(item) => item._id}
+                keyboardShouldPersistTaps="handled"
+                renderItem={({ item }: any) => {
+                  if (item.isHeader) {
+                    return <Text style={styles.listSectionHeader}>{item.title}</Text>;
+                  }
+                  if (item.isRestaurant) {
+                    return <RestaurantListItem {...item} isMeat={activeService === 'Meat'} />;
+                  }
+                  if (item.isDish) {
+                    return <DishSearchResultItem item={item} colors={colors} styles={styles} />;
+                  }
+                  return null;
+                }}
+                contentContainerStyle={{ padding: 16, paddingBottom: 40 }}
+                showsVerticalScrollIndicator={false}
+                ListEmptyComponent={() => (
+                  <View style={styles.emptySearchContainer}>
+                    <Ionicons name="search-outline" size={60} color={colors.textMuted} />
+                    <Text style={[styles.emptySearchTitle, { color: colors.text }]}>No results found</Text>
+                    <Text style={[styles.emptySearchSubtitle, { color: colors.textSecondary }]}>
+                      We couldn't find any outlets matching "{searchText}"
+                    </Text>
+                  </View>
+                )}
+              />
+            </View>
+          )}
+        </View>
+      </Modal>
 
       <LocationPickerSheet 
         isOpen={isLocationSheetOpen} 
@@ -1008,6 +1287,7 @@ export default function HomeScreen() {
           </View>
         </KeyboardAvoidingView>
       </Modal>
+
     </View>
   );
 }
@@ -1294,10 +1574,48 @@ const createStyles = (colors: typeof Colors.light) => StyleSheet.create({
     letterSpacing: -0.5,
     marginBottom: 16,
   },
-  dishesGrid: {
+  vegMorphBadge: {
+    height: 38,
+    borderRadius: 19,
+    borderWidth: 1.5,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingLeft: 10,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  vegMorphIconWrap: {
+    width: 16,
+    height: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  vegMorphText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: '900',
+    marginLeft: 6,
+    letterSpacing: 0.5,
+  },
+  dishesScroll: {
+    marginHorizontal: -16,
+    marginTop: 4,
+  },
+  dishesScrollContent: {
+    paddingHorizontal: 16,
+    paddingBottom: 4,
+  },
+  dishesRowsContainer: {
+    flexDirection: "column",
+    gap: 8,
+  },
+  dishesRow: {
     flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 6,
+    gap: 8,
   },
   dishChip: {
     flexDirection: "row",
@@ -1995,5 +2313,258 @@ const createStyles = (colors: typeof Colors.light) => StyleSheet.create({
     color: colors.textSecondary,
     fontSize: 13,
     fontWeight: "800",
+  },
+  searchSheetRoot: {
+    flex: 1,
+    backgroundColor: colors.background,
+  },
+  ddSearchRoot: {
+    flex: 1,
+    backgroundColor: colors.background,
+  },
+  ddSearchHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.borderLight,
+    backgroundColor: colors.background,
+    gap: 12,
+  },
+  ddSearchCloseBtn: {
+    padding: 4,
+  },
+  ddSearchInputWrapper: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: colors.surfaceSecondary,
+    borderRadius: 24,
+    paddingHorizontal: 16,
+    paddingVertical: Platform.OS === "ios" ? 10 : 6,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  ddSearchInput: {
+    flex: 1,
+    fontSize: 16,
+    fontWeight: "600",
+    color: colors.text,
+  },
+  ddSearchBody: {
+    padding: 20,
+    paddingBottom: 40,
+  },
+  ddSectionHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 16,
+  },
+  ddSectionTitle: {
+    fontSize: 18,
+    fontWeight: "900",
+    color: colors.text,
+    marginTop: 12,
+    marginBottom: 16,
+  },
+  ddClearLink: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: "#64748B",
+  },
+  ddRecentSection: {
+    marginBottom: 28,
+  },
+  ddRecentList: {
+    gap: 16,
+  },
+  ddRecentItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 4,
+  },
+  ddRecentText: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: colors.textSecondary,
+  },
+  ddRecommendedSection: {
+    marginBottom: 28,
+  },
+  ddRecommendedGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+  },
+  ddRecChip: {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    backgroundColor: colors.surfaceSecondary,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  ddRecChipText: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: colors.textSecondary,
+  },
+  ddCuisinesSection: {
+    marginBottom: 20,
+  },
+  ddCuisinesGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 12,
+  },
+  ddCuisineCard: {
+    width: (Dimensions.get("window").width - 64) / 3, // fits 3 items perfectly with gaps
+    alignItems: "center",
+    marginBottom: 16,
+  },
+  ddCuisineIconBg: {
+    width: 70,
+    height: 70,
+    borderRadius: 35,
+    backgroundColor: colors.surfaceSecondary,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 8,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 1,
+  },
+  ddCuisineText: {
+    fontSize: 13,
+    fontWeight: "800",
+    color: colors.text,
+    textAlign: "center",
+  },
+  attachedSearchSheet: {
+    backgroundColor: colors.surface,
+    borderRadius: 24,
+    marginBottom: 12,
+    marginHorizontal: 8,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    elevation: 8,
+    maxHeight: 400,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: colors.borderLight,
+  },
+  searchSheetHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.borderLight,
+    backgroundColor: colors.background,
+    gap: 12,
+  },
+  searchSheetBackBtn: {
+    padding: 4,
+  },
+  searchSheetInputWrapper: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.surfaceSecondary,
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    paddingVertical: Platform.OS === "ios" ? 12 : 8,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  searchSheetInput: {
+    flex: 1,
+    fontSize: 15,
+    fontWeight: '600',
+    color: colors.text,
+  },
+  searchSheetMic: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: colors.surface,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  searchSheetContent: {
+    padding: 20,
+  },
+  recentSearchesSection: {
+    marginBottom: 30,
+  },
+  recentSearchesHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  recentSearchesTitle: {
+    fontSize: 16,
+    fontWeight: '900',
+    color: colors.text,
+  },
+  clearRecentText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#E11D48',
+  },
+  recentSearchesList: {
+    gap: 16,
+  },
+  recentSearchItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+  },
+  recentSearchText: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: colors.textSecondary,
+  },
+  suggestionsSection: {
+    marginBottom: 20,
+  },
+  suggestionsTitle: {
+    fontSize: 16,
+    fontWeight: '900',
+    color: colors.text,
+    marginBottom: 16,
+  },
+  suggestionsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+  },
+  suggestionChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    backgroundColor: colors.surface,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  suggestionChipText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: colors.text,
   },
 });

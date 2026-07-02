@@ -43,6 +43,7 @@ export interface IUser extends Document, IUserMethods {
   addresses: IAddress[];
   bookingPreference?: IBookingPreference;
   password?: string;
+  favorites?: Types.ObjectId[];
   createdAt: Date;
   updatedAt: Date;
 }
@@ -98,7 +99,8 @@ const UserSchema: Schema = new Schema(
       contactNumber: { type: String },
       updatedAt: { type: Date },
     },
-  password: { type: String },
+    password: { type: String },
+    favorites: [{ type: Schema.Types.ObjectId, ref: "Vendor", default: [] }],
   },
   { timestamps: true }
 );

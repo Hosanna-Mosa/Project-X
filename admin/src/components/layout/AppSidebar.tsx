@@ -13,6 +13,7 @@ import {
   Drumstick,
   LogOut,
   IndianRupee,
+  Map,
 } from "lucide-react";
 
 const navItems = [
@@ -23,6 +24,7 @@ const navItems = [
   { title: "Vendors", url: "/vendors", icon: Store },
   { title: "Meat Centers", url: "/meat-centers", icon: Drumstick },
   { title: "Meat Pricing", url: "/meat-pricing", icon: IndianRupee },
+  { title: "Zones", url: "/zones", icon: Map },
   { title: "Multi-Stop Orders", url: "/multi-stop", icon: GitBranch },
 
   { title: "Payments", url: "/payments", icon: CreditCard },

@@ -31,7 +31,7 @@ type FareEstimate = {
 
 const normalizeServiceType = (serviceId?: string) => {
   if (serviceId === "bike-lite") return "bike";
-  if (serviceId === "cab-prime") return "cab_prime";
+  // if (serviceId === "cab-prime") return "cab_prime";
   if (serviceId === "bike" || serviceId === "auto" || serviceId === "cab") {
     return serviceId;
   }

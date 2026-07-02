@@ -427,8 +427,24 @@ export default function OnboardingScreen() {
         if (d.bankAccountNumber) setBankAccount(d.bankAccountNumber);
         if (d.bankIfsc) setIfsc(d.bankIfsc);
         if (d.bankVerified) setBankVerified(d.bankVerified);
+        if (d.preferredZone) setPreferredZone(d.preferredZone);
       } catch {
         // silently ignore
+      }
+
+      try {
+        const token = useDriverStore.getState().token;
+        if (token) {
+          const res = await fetch(`${API_URL}/api/v1/zones`, {
+            headers: { Authorization: `Bearer ${token}` },
+          });
+          if (res.ok) {
+            const result = await res.json();
+            setZones(result.data || []);
+          }
+        }
+      } catch (err) {
+        console.error("Failed to fetch zones for onboarding:", err);
       }
     })();
   }, []);
@@ -436,6 +452,8 @@ export default function OnboardingScreen() {
   // ── Step 1 State ──────────────────────────────────────────────────────────
   const [gender, setGender] = useState<string | null>(null);
   const [vehicle, setVehicle] = useState<string | null>(null);
+  const [preferredZone, setPreferredZone] = useState<string | null>(null);
+  const [zones, setZones] = useState<any[]>([]);
 
   // ── Step 2 State ──────────────────────────────────────────────────────────
   const [aadhaarNumber, setAadhaarNumber] = useState("");
@@ -469,6 +487,7 @@ export default function OnboardingScreen() {
   const step1Sections = [
     { key: "gender", label: "Gender" },
     { key: "vehicle", label: "Vehicle" },
+    { key: "zone", label: "Preferred Zone" },
   ];
 
   const step2SectionsBase = [
@@ -683,6 +702,9 @@ export default function OnboardingScreen() {
       case "bank":
         data = { bankAccountNumber: bankAccount, bankIfsc: ifsc, bankVerified };
         break;
+      case "zone":
+        data = { preferredZone };
+        break;
       default:
         return;
     }
@@ -785,6 +807,7 @@ export default function OnboardingScreen() {
     switch (sec) {
       case "gender": return !!gender;
       case "vehicle": return !!vehicle;
+      case "zone": return !!preferredZone;
       case "aadhaar": return canProceedAadhaar();
       case "pan": return canProceedPAN();
       case "license": return validateDLFormat(dlNumber) && !!dlExpiry;
@@ -801,6 +824,7 @@ export default function OnboardingScreen() {
     switch (sec) {
       case "gender": return "Select Your Gender";
       case "vehicle": return "Select Your Vehicle";
+      case "zone": return "Select Preferred Zone";
       case "aadhaar": return "Aadhaar Verification";
       case "pan": return "PAN Card Details";
       case "license": return "Driving License";
@@ -815,6 +839,7 @@ export default function OnboardingScreen() {
     switch (sec) {
       case "gender": return "This helps us personalise your experience.";
       case "vehicle": return "Choose the vehicle you'll use for deliveries. You can change this later.";
+      case "zone": return "Choose your preferred operational zone. This is where you will receive ride and delivery requests.";
       case "aadhaar": return panVerified ? "Aadhaar details collected for records (PAN was used for identity verification)." : "Enter your 12-digit Aadhaar number to verify your identity.";
       case "pan": return aadhaarVerified ? "PAN details collected for records (Aadhaar was used for identity verification)." : "Enter your PAN details for identity verification.";
       case "license": return "Enter your driving license number and expiry date.";
@@ -862,6 +887,30 @@ export default function OnboardingScreen() {
               />
             ))}
           </View>
+        );
+
+      case "zone":
+        return (
+          <ScrollView style={{ maxHeight: 350 }} showsVerticalScrollIndicator={true}>
+            <View style={{ gap: 12, paddingBottom: 10 }}>
+              {zones.length === 0 ? (
+                <Text style={{ fontSize: 14, color: Colors.textMuted, textAlign: "center", marginTop: 20 }}>
+                  No active operational zones available. Please contact admin.
+                </Text>
+              ) : (
+                zones.map((z) => (
+                  <SelectCard
+                    key={z._id}
+                    selected={preferredZone === z._id}
+                    onSelect={() => setPreferredZone(z._id)}
+                    icon="map"
+                    label={z.name}
+                    desc={z.description || `${z.type === 'circle' ? 'Circular' : 'Polygon'} Geofence`}
+                  />
+                ))
+              )}
+            </View>
+          </ScrollView>
         );
 
       // ── Step 2 ────────────────────────────────────────────────────────────
@@ -1269,6 +1318,20 @@ export default function OnboardingScreen() {
             }
 
             if (sec === "vehicle" && canProceedSection()) {
+              return (
+                <PrimaryButton
+                  title="Save & Continue"
+                  onPress={async () => {
+                    await saveCurrentSectionData();
+                    goToNextSection();
+                  }}
+                  icon="arrow-right"
+                  loading={saving}
+                />
+              );
+            }
+
+            if (sec === "zone" && canProceedSection()) {
               return (
                 <PrimaryButton
                   title="Save & Continue"
