@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from "react";
+import React, { useEffect, useState } from "react";
 import {
   ScrollView,
   StyleSheet,
@@ -8,7 +8,6 @@ import {
   ActivityIndicator,
   Platform,
   Alert,
-  TextInput,
   KeyboardAvoidingView,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -54,24 +53,15 @@ export default function SavedAddressesScreen() {
   const [addresses, setAddresses] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Search States
-  const [searchQuery, setSearchQuery] = useState("");
-  const [searchResults, setSearchResults] = useState<any[]>([]);
-  const [searching, setSearching] = useState(false);
-
   // Recent Locations
   const [recentLocations, setRecentLocations] = useState<any[]>([
     { id: "mock-1", name: "Coffee Collective", address: "42 Market Street, San Francisco", lat: 37.7939, lng: -122.3965 },
     { id: "mock-2", name: "Equinox Gym", address: "747 Howard St, San Francisco", lat: 37.7849, lng: -122.4019 },
   ]);
 
-  // Map States
-  const [userCoords, setUserCoords] = useState<{ latitude: number; longitude: number } | null>(null);
-
   useEffect(() => {
     fetchAddresses();
     loadRecentLocations();
-    detectUserCoords();
   }, []);
 
   const fetchAddresses = async () => {
@@ -98,18 +88,6 @@ export default function SavedAddressesScreen() {
       }
     } catch (err) {
       console.error("Failed to load recent locations:", err);
-    }
-  };
-
-  const detectUserCoords = async () => {
-    try {
-      let { status } = await Location.requestForegroundPermissionsAsync();
-      if (status === "granted") {
-        const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
-        setUserCoords({ latitude: loc.coords.latitude, longitude: loc.coords.longitude });
-      }
-    } catch (e) {
-      console.warn("Could not determine user location dynamically:", e);
     }
   };
 
@@ -149,63 +127,6 @@ export default function SavedAddressesScreen() {
       Alert.alert("Error", err.message || "Failed to determine current location.");
     } finally {
       setLoading(false);
-    }
-  };
-
-  const handleSearch = async (text: string) => {
-    setSearchQuery(text);
-    if (text.trim().length > 2) {
-      setSearching(true);
-      try {
-        const url = `/api/v1/places/autocomplete?input=${encodeURIComponent(text)}${
-          userCoords ? `&lat=${userCoords.latitude}&lng=${userCoords.longitude}` : ""
-        }`;
-        const results = await customFetch<any[]>(url);
-        setSearchResults(results || []);
-      } catch (error) {
-        console.error("Autocomplete search error:", error);
-      } finally {
-        setSearching(false);
-      }
-    } else {
-      setSearchResults([]);
-    }
-  };
-
-  const handleSelectSearchResult = async (item: any) => {
-    try {
-      setSearching(true);
-      const details = await customFetch<any>(`/api/v1/places/details/${item.id}`);
-      setSearchQuery("");
-      setSearchResults([]);
-
-      // Save to Recents
-      const newRecentItem = {
-        id: item.id || String(Date.now()),
-        name: item.name || item.description?.split(",")[0] || "Searched Area",
-        address: item.address || item.description || "",
-        lat: details.lat,
-        lng: details.lng,
-      };
-
-      const updatedRecents = [newRecentItem, ...recentLocations.filter((r) => r.address !== newRecentItem.address)].slice(0, 5);
-      setRecentLocations(updatedRecents);
-      await AsyncStorage.setItem(RECENT_LOCATIONS_KEY, JSON.stringify(updatedRecents));
-
-      router.push({
-        pathname: "/delivery/add-address",
-        params: {
-          step: "2",
-          addressLine: newRecentItem.address,
-          lat: String(details.lat),
-          lng: String(details.lng),
-        },
-      });
-    } catch (err) {
-      console.error("Failed to resolve place details:", err);
-      Alert.alert("Error", "Failed to load address details.");
-    } finally {
-      setSearching(false);
     }
   };
 
@@ -271,11 +192,6 @@ export default function SavedAddressesScreen() {
       },
     ]);
   };
-
-
-
-  const isSearchingActive = searchQuery.length > 0;
-
   return (
     <KeyboardAvoidingView
       behavior={Platform.OS === "ios" ? "padding" : "height"}
@@ -292,62 +208,10 @@ export default function SavedAddressesScreen() {
         <View style={styles.headerSpacer} />
       </View>
 
-      {/* Persistent Search Bar */}
-      <View style={styles.searchContainer}>
-        <View style={styles.searchBar}>
-          <Feather name="map-pin" size={20} color={COLORS.secondary} style={styles.searchBarIcon} />
-          <TextInput
-            style={styles.searchInput}
-            placeholder="Search for area, street or landmark"
-            placeholderTextColor={COLORS.onSurfaceVariant}
-            value={searchQuery}
-            onChangeText={handleSearch}
-          />
-          <TouchableOpacity onPress={handleUseCurrentLocation} style={styles.gpsIconBtn}>
-            <Feather name="crosshair" size={20} color={COLORS.secondary} />
-          </TouchableOpacity>
-        </View>
-      </View>
-
-      {isSearchingActive ? (
-        // Autocomplete Search Results Screen
-        <View style={styles.searchResultsContainer}>
-          {searching && <ActivityIndicator color={COLORS.secondary} style={{ marginVertical: 16 }} />}
-          <ScrollView keyboardShouldPersistTaps="handled">
-            {searchResults.length === 0 && !searching ? (
-              <View style={styles.emptyState}>
-                <Text style={styles.emptyText}>No matches found</Text>
-              </View>
-            ) : (
-              searchResults.map((item) => (
-                <TouchableOpacity
-                  key={item.id}
-                  style={styles.searchItem}
-                  onPress={() => handleSelectSearchResult(item)}
-                >
-                  <View style={styles.searchItemIconBox}>
-                    <Feather name="map-pin" size={18} color={COLORS.secondary} />
-                  </View>
-                  <View style={styles.searchItemContent}>
-                    <Text style={styles.searchItemName} numberOfLines={1}>
-                      {item.name || item.description?.split(",")[0]}
-                    </Text>
-                    <Text style={styles.searchItemAddress} numberOfLines={1}>
-                      {item.address || item.description}
-                    </Text>
-                  </View>
-                  <Feather name="chevron-right" size={16} color={COLORS.outline} />
-                </TouchableOpacity>
-              ))
-            )}
-          </ScrollView>
-        </View>
-      ) : (
-        // Default Redesigned Content
-        <ScrollView
-          showsVerticalScrollIndicator={false}
-          contentContainerStyle={[styles.container, { paddingBottom: insets.bottom + 100 }]}
-        >
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={[styles.container, { paddingBottom: insets.bottom + 100 }]}
+      >
           {/* Current Location GPS Button */}
           <TouchableOpacity style={styles.currentLocRow} onPress={handleUseCurrentLocation}>
             <View style={styles.currentLocIconBox}>
@@ -436,8 +300,7 @@ export default function SavedAddressesScreen() {
               </TouchableOpacity>
             ))}
           </View>
-        </ScrollView>
-      )}
+      </ScrollView>
 
       {/* Sticky Bottom Add Address Button */}
       <View style={[styles.footer, { paddingBottom: insets.bottom + (Platform.OS === "ios" ? 10 : 16) }]}>
@@ -482,40 +345,6 @@ const styles = StyleSheet.create({
   },
   headerSpacer: {
     width: 32,
-  },
-  searchContainer: {
-    paddingHorizontal: 24,
-    paddingTop: 10,
-    paddingBottom: 6,
-    backgroundColor: COLORS.surfaceContainerLowest,
-  },
-  searchBar: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: COLORS.surfaceContainerLowest,
-    borderWidth: 1.5,
-    borderColor: COLORS.outlineVariant,
-    borderRadius: 8,
-    paddingHorizontal: 16,
-    height: 46,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 2,
-  },
-  searchBarIcon: {
-    marginRight: 12,
-  },
-  searchInput: {
-    flex: 1,
-    fontSize: 14,
-    color: COLORS.onSurface,
-    fontWeight: "500",
-  },
-  gpsIconBtn: {
-    padding: 6,
-    marginLeft: 8,
   },
   container: {
     paddingHorizontal: 24,
@@ -693,47 +522,9 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "700",
   },
-  searchResultsContainer: {
-    flex: 1,
-    backgroundColor: COLORS.surfaceContainerLowest,
-    paddingHorizontal: 24,
-  },
-  emptyState: {
-    paddingVertical: 40,
-    alignItems: "center",
-  },
   emptyText: {
     color: COLORS.onSurfaceVariant,
     fontSize: 14,
     fontWeight: "500",
-  },
-  searchItem: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingVertical: 14,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.outlineVariant,
-  },
-  searchItemIconBox: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: COLORS.surfaceContainer,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  searchItemContent: {
-    flex: 1,
-    marginLeft: 14,
-  },
-  searchItemName: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: COLORS.onSurface,
-  },
-  searchItemAddress: {
-    fontSize: 12,
-    color: COLORS.onSurfaceVariant,
-    marginTop: 2,
   },
 });

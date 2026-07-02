@@ -453,8 +453,11 @@ export default function RideConfirmationScreen() {
         });
 
         const decoded = route?.polyline ? decodePolyline(route.polyline) : [];
-        if (!cancelled && decoded.length > 1) {
+        const hasRoadShape = decoded.length > tripCoordinates.length;
+        if (!cancelled && hasRoadShape) {
           setRouteCoordinates(decoded);
+        } else if (!cancelled) {
+          setRouteCoordinates([]);
         }
       } catch (error) {
         console.warn("Backend route fetch failed:", error);
@@ -476,6 +479,7 @@ export default function RideConfirmationScreen() {
     dropCoords.longitude,
     params.dropName,
     validStops,
+    tripCoordinates.length,
   ]);
 
   const selectedVehicleType = React.useMemo(() => {
@@ -589,7 +593,7 @@ export default function RideConfirmationScreen() {
           onMapReady={() => setMapReady(true)}
         >
           {/* Route */}
-          {routeCoordinates.length >= 2 && (!GOOGLE_MAPS_APIKEY || directionsFailed) && (
+          {routeCoordinates.length > tripCoordinates.length && (
             <Polyline
               coordinates={routeCoordinates}
               strokeWidth={4}
