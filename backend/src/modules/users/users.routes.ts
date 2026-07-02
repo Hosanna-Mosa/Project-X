@@ -19,5 +19,8 @@ router.delete("/addresses/:id", authenticateToken, usersController.deleteAddress
 
 router.patch("/booking-preference", authenticateToken, usersController.saveBookingPreference.bind(usersController));
 
+router.get("/favorites", authenticateToken, usersController.getFavorites.bind(usersController));
+router.post("/favorites/:vendorId", authenticateToken, usersController.toggleFavorite.bind(usersController));
+
 export default router;
 

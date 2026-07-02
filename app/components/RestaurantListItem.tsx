@@ -1,9 +1,10 @@
 import React from "react";
 import { Image, StyleSheet, Text, TouchableOpacity, View } from "react-native";
-import { Feather, MaterialIcons } from "@expo/vector-icons";
+import { Feather, MaterialIcons, Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import Colors from "@/constants/colors";
 import { useThemeStore } from "@/contexts/themeStore";
+import { useAuthStore } from "@/contexts/authStore";
 
 interface Props {
   _id: string;
@@ -38,6 +39,13 @@ export function RestaurantListItem({
   const { theme } = useThemeStore();
   const colors = Colors[theme];
   const styles = React.useMemo(() => createStyles(colors), [theme]);
+
+  const user = useAuthStore((s) => s.user);
+  const toggleFavorite = useAuthStore((s) => s.toggleFavorite);
+
+  const isFavorite = React.useMemo(() => {
+    return user?.favorites?.includes(_id) || false;
+  }, [user?.favorites, _id]);
 
   // Generate a stable sponsored state based on restaurant ID hash
   const isSponsored = React.useMemo(() => {
@@ -75,8 +83,15 @@ export function RestaurantListItem({
       <View style={styles.details}>
         <View style={styles.nameRow}>
           <Text style={styles.name} numberOfLines={1}>{name}</Text>
-          <TouchableOpacity hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
-            <Feather name="heart" size={20} color={colors.textMuted} />
+          <TouchableOpacity 
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            onPress={() => toggleFavorite(_id)}
+          >
+            <Ionicons 
+              name={isFavorite ? "heart" : "heart-outline"} 
+              size={20} 
+              color={isFavorite ? "#EF4444" : colors.textMuted} 
+            />
           </TouchableOpacity>
         </View>
 
