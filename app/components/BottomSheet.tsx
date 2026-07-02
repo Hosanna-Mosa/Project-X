@@ -18,9 +18,10 @@ interface Props {
   children: React.ReactNode;
   style?: any;
   defaultHeight?: number;
+  disableExpand?: boolean;
 }
 
-export function BottomSheet({ children, style, defaultHeight = 220 }: Props) {
+export function BottomSheet({ children, style, defaultHeight = 220, disableExpand = false }: Props) {
   const insets = useSafeAreaInsets();
   const { theme } = useThemeStore();
   const colors = Colors[theme];
@@ -40,15 +41,18 @@ export function BottomSheet({ children, style, defaultHeight = 220 }: Props) {
     .activeOffsetY([-10, 10])
     .failOffsetX([-20, 20])
     .onStart(() => {
+      if (disableExpand) return;
       context.value = { y: translateY.value };
     })
     .onUpdate((event) => {
+      if (disableExpand) return;
       translateY.value = event.translationY + context.value.y;
       // Clamp values so it doesn't go off screen
       translateY.value = Math.max(translateY.value, MAX_TRANSLATE_Y);
       translateY.value = Math.min(translateY.value, MIN_TRANSLATE_Y);
     })
     .onEnd((event) => {
+      if (disableExpand) return;
       // Determine snap point based on velocity and position
       if (translateY.value < MIN_TRANSLATE_Y - 50 || event.velocityY < -500) {
         translateY.value = withSpring(MAX_TRANSLATE_Y, { damping: 50 });
