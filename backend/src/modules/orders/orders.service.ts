@@ -53,10 +53,9 @@ export class OrdersService {
     const activeZonesCount = await Zone.countDocuments({ isActive: true });
     if (activeZonesCount > 0) {
       const zone = await this.zonesService.getZoneForCoordinates(startPos.latitude, startPos.longitude, effectiveType);
-      if (!zone) {
-        throw new ValidationError("We do not operate in your pickup location yet.");
+      if (zone) {
+        surgeMultiplier = zone.pricingMultiplier;
       }
-      surgeMultiplier = zone.pricingMultiplier;
     }
 
     let totalPrice: number;
@@ -386,10 +385,9 @@ export class OrdersService {
     const activeZonesCount = await Zone.countDocuments({ isActive: true });
     if (activeZonesCount > 0) {
       const zone = await this.zonesService.getZoneForCoordinates(pickupLat, pickupLng, serviceType);
-      if (!zone) {
-        throw new ValidationError("We do not operate in your pickup location yet.");
+      if (zone) {
+        surgeMultiplier = zone.pricingMultiplier;
       }
-      surgeMultiplier = zone.pricingMultiplier;
     }
 
     const breakdown = this.pricingService.calculateFareBreakdown(
