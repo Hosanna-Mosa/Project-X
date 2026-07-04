@@ -34,6 +34,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 
 import { useAuthStore } from "@/contexts/authStore";
 import { useCartStore } from "@/contexts/cartStore";
+import { customFetch } from "@/utils/api/custom-fetch";
 
 const FESTIVALS: { [key: string]: string } = {
   "01-01": "New Year's Day",
@@ -144,7 +145,7 @@ const popularTags = [
   { name: "Idly", icon: "disc-outline", iconFamily: "Ionicons", color: "#10B981" },
   { name: "Fried Rice", icon: "rice", iconFamily: "MaterialCommunityIcons", color: "#06B6D4" },
   { name: "Fast Food", icon: "fast-food-outline", iconFamily: "Ionicons", color: "#EF4444" },
-  { name: "Breakfast", icon: "egg-cooking", iconFamily: "MaterialCommunityIcons", color: "#F59E0B" },
+  { name: "Breakfast", icon: "egg-fried", iconFamily: "MaterialCommunityIcons", color: "#F59E0B" },
   { name: "Healthy", icon: "leaf-outline", iconFamily: "Ionicons", color: "#10B981" },
   { name: "Deals", icon: "percent", iconFamily: "Feather", color: "#E11D48" },
   { name: "Burgers", icon: "hamburger", iconFamily: "MaterialCommunityIcons", color: "#F97316" },
@@ -316,12 +317,8 @@ export default function HomeScreen() {
       try {
         setIsSearchingDishes(true);
         const queryTerm = TAG_SEARCH_MAP[searchText] || searchText;
-        const baseUrl = process.env.EXPO_PUBLIC_API_URL || Constants.expoConfig?.extra?.apiUrl;
-        const response = await fetch(`${baseUrl}/api/v1/food/search?query=${encodeURIComponent(queryTerm)}`);
-        if (response.ok) {
-          const data = await response.json();
-          setSearchedDishes(data);
-        }
+        const data = await customFetch<any>(`/api/v1/food/search?query=${encodeURIComponent(queryTerm)}`);
+        setSearchedDishes(data);
       } catch (error) {
         console.error("Error searching dishes:", error);
       } finally {
@@ -442,15 +439,18 @@ export default function HomeScreen() {
     try {
       if (pageNum === 1) setLoading(true);
       else setLoadingMore(true);
-      const baseUrl = process.env.EXPO_PUBLIC_API_URL;
       const radiusParam = appliedDistanceKm ? `&radius=${Math.round(appliedDistanceKm * 1000)}` : "";
-      const response = await fetch(`${baseUrl}/api/v1/vendors/nearby?lat=${lat}&lng=${lng}&page=${pageNum}&limit=20${radiusParam}`);
-      if (!response.ok) throw new Error(`Failed to fetch vendors: ${response.status}`);
-      const data = await response.json();
+      const data = await customFetch<any>(`/api/v1/vendors/nearby?lat=${lat}&lng=${lng}&page=${pageNum}&limit=20${radiusParam}`);
       if (Array.isArray(data)) {
         if (data.length < 20) setHasMore(false); else setHasMore(true);
-        if (pageNum === 1) setRestaurants(data);
-        else setRestaurants(prev => [...prev, ...data]);
+        if (pageNum === 1) {
+          setRestaurants(data);
+        } else {
+          setRestaurants(prev => {
+            const newItems = data.filter(d => !prev.some(p => p._id === d._id));
+            return [...prev, ...newItems];
+          });
+        }
       }
     } catch (error) {
       console.error("Error fetching vendors:", error);
@@ -464,15 +464,18 @@ export default function HomeScreen() {
     try {
       if (pageNum === 1) setLoading(true);
       else setLoadingMore(true);
-      const baseUrl = process.env.EXPO_PUBLIC_API_URL;
       const radiusParam = appliedDistanceKm ? `&radius=${Math.round(appliedDistanceKm * 1000)}` : "";
-      const response = await fetch(`${baseUrl}/api/v1/meat/nearby?lat=${lat}&lng=${lng}&page=${pageNum}&limit=20${radiusParam}`);
-      if (!response.ok) throw new Error(`Failed to fetch meat centers: ${response.status}`);
-      const data = await response.json();
+      const data = await customFetch<any>(`/api/v1/meat/nearby?lat=${lat}&lng=${lng}&page=${pageNum}&limit=20${radiusParam}`);
       if (Array.isArray(data)) {
         if (data.length < 20) setHasMore(false); else setHasMore(true);
-        if (pageNum === 1) setMeatCenters(data);
-        else setMeatCenters(prev => [...prev, ...data]);
+        if (pageNum === 1) {
+          setMeatCenters(data);
+        } else {
+          setMeatCenters(prev => {
+            const newItems = data.filter(d => !prev.some(p => p._id === d._id));
+            return [...prev, ...newItems];
+          });
+        }
       }
     } catch (error) {
       console.error("Error fetching meat centers:", error);
@@ -485,12 +488,8 @@ export default function HomeScreen() {
   const fetch149StoreItems = async (lat: number, lng: number) => {
     try {
       setLoading149(true);
-      const baseUrl = process.env.EXPO_PUBLIC_API_URL || Constants.expoConfig?.extra?.apiUrl;
-      const response = await fetch(`${baseUrl}/api/v1/food/store-149?lat=${lat}&lng=${lng}`);
-      if (response.ok) {
-        const data = await response.json();
-        setStore149Items(data);
-      }
+      const data = await customFetch<any>(`/api/v1/food/store-149?lat=${lat}&lng=${lng}`);
+      setStore149Items(data);
     } catch (error) {
       console.error("Error fetching 149 store items:", error);
     } finally {
@@ -1040,61 +1039,57 @@ export default function HomeScreen() {
             )}
           </Animated.View>
 
-          {showCategories && (
-            <Animated.View style={[
-              styles.categoriesContainer,
-              { transform: [{ translateY: categoriesTranslateY }] }
-            ]}>
-              <ScrollView
-                ref={categoriesScrollRef}
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={styles.categoriesScrollContent}
-                scrollEventThrottle={16}
-              >
-                <ServiceCategory
-                  icon="bag-outline"
-                  label="Task"
-                  onPress={() => router.push({ pathname: "/service-selection", params: { label: "Task" } })}
-                />
-                <ServiceCategory
-                  icon="car-outline"
-                  label="Rides"
-                  onPress={() => router.push({ pathname: "/all-services" })}
-                />
-                <ServiceCategory
-                  icon="fast-food-outline"
-                  label="Food"
-                  active={activeService === 'Food'}
-                  onPress={() => handleServiceSwitch('Food')}
-                />
-                <ServiceCategory
-                  icon="heart-pulse"
-                  iconFamily="MaterialCommunityIcons"
-                  label="Health"
-                  onPress={() => router.push({
-                    pathname: "/service-selection",
-                    params: appliedDistanceKm ? { label: "Health", radiusKm: String(appliedDistanceKm) } : { label: "Health" },
-                  })}
-                />
-                <ServiceCategory
-                  icon="food-steak"
-                  iconFamily="MaterialCommunityIcons"
-                  label="Meat"
-                  active={activeService === 'Meat'}
-                  onPress={() => handleServiceSwitch('Meat')}
-                />
-                <ServiceCategory
-                  icon="paw-outline"
-                  label="Pets"
-                  onPress={() => router.push({
-                    pathname: "/service-selection",
-                    params: appliedDistanceKm ? { label: "pets", radiusKm: String(appliedDistanceKm) } : { label: "pets" },
-                  })}
-                />
-              </ScrollView>
-            </Animated.View>
-          )}
+          <Animated.View style={[
+            styles.categoriesContainer,
+            { transform: [{ translateY: categoriesTranslateY }] }
+          ]}>
+            <ScrollView
+              ref={categoriesScrollRef}
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.categoriesScrollContent}
+              scrollEventThrottle={16}
+            >
+              <ServiceCategory
+                icon="bag-outline"
+                label="Task"
+                onPress={() => router.push({ pathname: "/service-selection", params: { label: "Task" } })}
+              />
+              <ServiceCategory
+                icon="car-outline"
+                label="Rides"
+                onPress={() => router.push({ pathname: "/all-services" })}
+              />
+              <ServiceCategory
+                icon="fast-food-outline"
+                label="Food"
+                onPress={() => handleServiceSwitch('Food')}
+              />
+              <ServiceCategory
+                icon="heart-pulse"
+                iconFamily="MaterialCommunityIcons"
+                label="Health"
+                onPress={() => router.push({
+                  pathname: "/service-selection",
+                  params: appliedDistanceKm ? { label: "Health", radiusKm: String(appliedDistanceKm) } : { label: "Health" },
+                })}
+              />
+              <ServiceCategory
+                icon="food-steak"
+                iconFamily="MaterialCommunityIcons"
+                label="Meat"
+                onPress={() => handleServiceSwitch('Meat')}
+              />
+              <ServiceCategory
+                icon="paw-outline"
+                label="Pets"
+                onPress={() => router.push({
+                  pathname: "/service-selection",
+                  params: appliedDistanceKm ? { label: "pets", radiusKm: String(appliedDistanceKm) } : { label: "pets" },
+                })}
+              />
+            </ScrollView>
+          </Animated.View>
         </Animated.View>
       </View>
 

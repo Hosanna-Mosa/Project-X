@@ -22,6 +22,7 @@ interface AuthState {
   /** Registers a new user account and logs them in, saving the token */
   register: (name: string, phone: string, email: string, password: string) => Promise<{ success: boolean }>;
   initializeAuth: () => Promise<void>;
+  toggleFavorite: (restaurantId: string) => Promise<void>;
 }
 
 export const useAuthStore = create<AuthState>((set, get) => ({
@@ -36,6 +37,27 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   setToken: (token) => {
     set({ token });
     AsyncStorage.setItem("token", token);
+  },
+
+  toggleFavorite: async (restaurantId: string) => {
+    const { user, token } = get();
+    if (!user) return;
+    
+    const currentFavorites = user.favorites || [];
+    const isFavorite = currentFavorites.includes(restaurantId);
+    const newFavorites = isFavorite
+      ? currentFavorites.filter((id: string) => id !== restaurantId)
+      : [...currentFavorites, restaurantId];
+      
+    const updatedUser = { ...user, favorites: newFavorites };
+    set({ user: updatedUser });
+    
+    // Attempt to persist local storage
+    try {
+      await AsyncStorage.setItem("user", JSON.stringify(updatedUser));
+    } catch (e) {
+      console.error("Failed to persist favorites", e);
+    }
   },
 
   /**

@@ -10,6 +10,7 @@ import {
   Animated,
   StatusBar,
   TextInput,
+  Modal,
 } from "react-native";
 import { useLocalSearchParams, router } from "expo-router";
 import { Ionicons, Feather, MaterialIcons } from "@expo/vector-icons";
@@ -45,7 +46,27 @@ export default function RestaurantMenu() {
   const [searchQuery, setSearchQuery] = useState("");
   const [showSearchBar, setShowSearchBar] = useState(false);
   const [highlightedItemId, setHighlightedItemId] = useState("");
+  const [selectedDishDetail, setSelectedDishDetail] = useState<any | null>(null);
   const scrollViewRef = useRef<ScrollView>(null);
+  
+  const pulseAnim = useRef(new Animated.Value(1)).current;
+
+  useEffect(() => {
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulseAnim, {
+          toValue: 1.1,
+          duration: 1000,
+          useNativeDriver: true,
+        }),
+        Animated.timing(pulseAnim, {
+          toValue: 1,
+          duration: 1000,
+          useNativeDriver: true,
+        })
+      ])
+    ).start();
+  }, []);
 
   const itemCount = getItemCount();
 
@@ -98,7 +119,7 @@ export default function RestaurantMenu() {
 
         setMenu(normalizedData);
         if (normalizedData.length > 0) {
-          let categoryToSelect = normalizedData[0].category;
+          let categoryToSelect = "Recommended";
           if (highlightDishId) {
             const targetItem = normalizedData.find((item: any) => item._id === highlightDishId);
             if (targetItem) {
@@ -140,11 +161,18 @@ export default function RestaurantMenu() {
   }, {} as Record<string, FoodItem[]>);
 
   const categories = Object.keys(groupedMenu);
+  const recommendedItems = menu.slice(0, 4);
+  const showRecommended = !searchQuery && activeCategory === "Recommended" && recommendedItems.length > 0;
+  const tabCategories = searchQuery ? categories : (menu.length > 0 ? ["Recommended", ...categories] : categories);
 
-  // Auto-select category if search renders current category empty
+  // Auto-select category if search renders current category empty, or if Recommended is active when searching
   useEffect(() => {
-    if (searchQuery && categories.length > 0 && !categories.includes(activeCategory)) {
-      setActiveCategory(categories[0]);
+    if (searchQuery) {
+      if (activeCategory === "Recommended" || !categories.includes(activeCategory)) {
+        if (categories.length > 0) {
+          setActiveCategory(categories[0]);
+        }
+      }
     }
   }, [searchQuery, categories]);
 
@@ -261,7 +289,7 @@ export default function RestaurantMenu() {
             showsHorizontalScrollIndicator={false} 
             contentContainerStyle={styles.tabsScrollContent}
           >
-            {categories.map((cat) => (
+            {tabCategories.map((cat) => (
               <TouchableOpacity 
                 key={cat} 
                 onPress={() => handleCategoryPress(cat)}
@@ -297,6 +325,19 @@ export default function RestaurantMenu() {
             style={styles.heroImage} 
           />
           
+          <Animated.View style={[styles.fabContainer, { transform: [{ scale: pulseAnim }] }]}>
+            <TouchableOpacity 
+              activeOpacity={0.8}
+              onPress={() => router.push({
+                pathname: "/restaurant-details",
+                params: { id: id as string, name: name as string, image: image as string, rating: rating as string, reviews: reviews as string, isMeat: isMeat as string }
+              })}
+              style={styles.fabButton}
+            >
+              <Ionicons name="information" size={24} color="#ffffff" />
+            </TouchableOpacity>
+          </Animated.View>
+
           <View style={styles.floatingCard}>
             <Text style={styles.restaurantTitle}>{name}</Text>
             
@@ -305,16 +346,6 @@ export default function RestaurantMenu() {
               <Ionicons name="star" size={16} color="#0061a5" />
               <Text style={styles.ratingValue}>{rating || "4.8"}</Text>
               <Text style={styles.ratingCount}>({reviews || "2k+"} ratings)</Text>
-              <Text style={styles.dot}>•</Text>
-              <TouchableOpacity 
-                activeOpacity={0.7}
-                onPress={() => router.push({
-                  pathname: "/restaurant-details",
-                  params: { id: id as string, name: name as string, image: image as string, rating: rating as string, reviews: reviews as string, isMeat: isMeat as string }
-                })}
-              >
-                <Text style={styles.aboutLink}>About</Text>
-              </TouchableOpacity>
             </View>
 
             {/* Separator line */}
@@ -332,6 +363,7 @@ export default function RestaurantMenu() {
                 <Text style={styles.gridLabel}>delivery</Text>
               </View>
             </View>
+
           </View>
         </View>
 
@@ -343,7 +375,7 @@ export default function RestaurantMenu() {
               showsHorizontalScrollIndicator={false} 
               contentContainerStyle={styles.tabsScrollContent}
             >
-              {categories.map((cat) => (
+              {tabCategories.map((cat) => (
                 <TouchableOpacity 
                   key={cat} 
                   onPress={() => handleCategoryPress(cat)}
@@ -376,89 +408,247 @@ export default function RestaurantMenu() {
             </Text>
           </View>
         ) : (
-          categories
-            .filter((category) => !activeCategory || category === activeCategory)
-            .map((category) => (
-              <View key={category} style={styles.categorySection}>
-              {/* Category Header with separator line removed */}
-              
-              {/* Food list items */}
-              {groupedMenu[category].map((item) => {
-                const cartItem = items.find(i => i._id === item._id);
-                return (
-                  <View 
-                    key={item._id} 
-                    style={[
-                      styles.menuItem,
-                      highlightedItemId === item._id && {
-                        backgroundColor: "#FEF08A",
-                        borderColor: "#CA8A04",
-                        borderWidth: 1,
-                        borderRadius: 12,
-                      }
-                    ]}
-                  >
-                    {/* Left details */}
-                    <View style={styles.itemInfo}>
-                      <View style={styles.itemTitleRow}>
-                        <View style={[styles.vegIndicator, { borderColor: item.isVeg ? "#16A34A" : "#E11D48" }]}>
-                          <View style={[styles.vegDot, { backgroundColor: item.isVeg ? "#16A34A" : "#E11D48" }]} />
-                        </View>
-                        <Text style={styles.itemName} numberOfLines={1}>
-                          {item.name}
-                        </Text>
-                      </View>
-                      <Text style={styles.itemPrice}>₹{item.price}</Text>
-                      <Text style={styles.itemDesc} numberOfLines={3}>
-                        {item.description}
-                      </Text>
-                    </View>
-
-                    {/* Right image with overlapping ADD pill */}
-                    <View style={styles.itemImageContainer}>
-                      <Image 
-                        source={{ uri: item.images && item.images.length > 0 ? item.images[0] : 'https://images.unsplash.com/photo-1587593810167-a84920ea0781?w=400' }} 
-                        style={styles.itemImage} 
-                      />
-                      
-                      {/* ADD pill / qty selectors overlay */}
-                      <View style={styles.addButtonOverlay}>
-                        {cartItem ? (
-                          <View style={styles.quantityPill}>
-                            <TouchableOpacity 
-                              onPress={() => updateQuantity(item._id, cartItem.quantity - 1)}
-                              style={styles.qtyActionBtn}
-                              activeOpacity={0.7}
-                            >
-                              <Feather name="minus" size={14} color="#002045" />
-                            </TouchableOpacity>
-                            <Text style={styles.qtyText}>{cartItem.quantity}</Text>
-                            <TouchableOpacity 
-                              onPress={() => addItem(item, id as string)}
-                              style={styles.qtyActionBtn}
-                              activeOpacity={0.7}
-                            >
-                              <Feather name="plus" size={14} color="#002045" />
-                            </TouchableOpacity>
+          <View>
+            {/* Recommended Items Grid */}
+            {showRecommended && (
+              <View style={styles.recommendedSection}>
+                <Text style={styles.recommendedTitle}>★ Recommended</Text>
+                <View style={styles.recommendedGrid}>
+                  {recommendedItems.map((item) => {
+                    const cartItem = items.find(i => i._id === item._id);
+                    const isBestseller = item.price > 200 || item.name.toLowerCase().includes("special") || item.name.toLowerCase().includes("biryani");
+                    return (
+                      <View key={`rec-${item._id}`} style={styles.recommendedCard}>
+                        <TouchableOpacity activeOpacity={0.9} onPress={() => setSelectedDishDetail(item)}>
+                          <View style={styles.recImageContainer}>
+                            <Image 
+                              source={{ uri: item.images && item.images.length > 0 ? item.images[0] : 'https://images.unsplash.com/photo-1587593810167-a84920ea0781?w=400' }} 
+                              style={styles.recImage} 
+                            />
+                            {isBestseller && (
+                              <View style={styles.bestsellerBadge}>
+                                <Text style={styles.bestsellerText}>BESTSELLER</Text>
+                              </View>
+                            )}
                           </View>
-                        ) : (
-                          <TouchableOpacity 
-                            onPress={() => addItem(item, id as string)}
-                            style={styles.addPill}
-                            activeOpacity={0.85}
-                          >
-                            <Text style={styles.addPillText}>ADD</Text>
-                          </TouchableOpacity>
-                        )}
+                        </TouchableOpacity>
+                        
+                        <View style={styles.recDetails}>
+                          <View style={styles.recTitleRow}>
+                            <View style={[styles.vegIndicator, { borderColor: item.isVeg ? "#16A34A" : "#E11D48", marginRight: 4 }]}>
+                              <View style={[styles.vegDot, { backgroundColor: item.isVeg ? "#16A34A" : "#E11D48" }]} />
+                            </View>
+                          </View>
+                          <Text style={styles.recItemName} numberOfLines={1}>
+                            {item.name}
+                          </Text>
+                          
+                          <View style={styles.recFooter}>
+                            <Text style={styles.recItemPrice}>₹{item.price}</Text>
+                            
+                            <View style={styles.recAddButtonContainer}>
+                              {cartItem ? (
+                                <View style={styles.recQuantityPill}>
+                                  <TouchableOpacity 
+                                    onPress={() => updateQuantity(item._id, cartItem.quantity - 1)}
+                                    style={styles.recQtyActionBtn}
+                                    activeOpacity={0.7}
+                                  >
+                                    <Feather name="minus" size={12} color="#002045" />
+                                  </TouchableOpacity>
+                                  <Text style={styles.recQtyText}>{cartItem.quantity}</Text>
+                                  <TouchableOpacity 
+                                    onPress={() => addItem(item, id as string)}
+                                    style={styles.recQtyActionBtn}
+                                    activeOpacity={0.7}
+                                  >
+                                    <Feather name="plus" size={12} color="#002045" />
+                                  </TouchableOpacity>
+                                </View>
+                              ) : (
+                                <TouchableOpacity 
+                                  onPress={() => addItem(item, id as string)}
+                                  style={styles.recAddPill}
+                                  activeOpacity={0.85}
+                                >
+                                  <Text style={styles.recAddPillText}>ADD</Text>
+                                </TouchableOpacity>
+                              )}
+                            </View>
+                          </View>
+                        </View>
                       </View>
-                    </View>
+                    );
+                  })}
+                </View>
+              </View>
+            )}
+
+            {/* Standard Category Menu List */}
+            {categories
+              .filter((category) => activeCategory === "Recommended" || category === activeCategory)
+              .map((category) => (
+                <View key={category} style={styles.categorySection}>
+                  {/* Category Header */}
+                  <View style={styles.categoryHeader}>
+                    <Text style={styles.categoryTitle}>{category}</Text>
                   </View>
-                );
-              })}
-            </View>
-          ))
+                  
+                  {/* Food list items */}
+                  {groupedMenu[category].map((item) => {
+                    const cartItem = items.find(i => i._id === item._id);
+                    return (
+                      <View 
+                        key={item._id} 
+                        style={[
+                          styles.menuItem,
+                          highlightedItemId === item._id && {
+                            backgroundColor: "#FEF08A",
+                            borderColor: "#CA8A04",
+                            borderWidth: 1,
+                            borderRadius: 12,
+                          }
+                        ]}
+                      >
+                        {/* Left details */}
+                        <View style={styles.itemInfo}>
+                          <View style={styles.itemTitleRow}>
+                            <View style={[styles.vegIndicator, { borderColor: item.isVeg ? "#16A34A" : "#E11D48" }]}>
+                              <View style={[styles.vegDot, { backgroundColor: item.isVeg ? "#16A34A" : "#E11D48" }]} />
+                            </View>
+                            <Text style={styles.itemName} numberOfLines={1}>
+                              {item.name}
+                            </Text>
+                          </View>
+                          <Text style={styles.itemPrice}>₹{item.price}</Text>
+                          <Text style={styles.itemDesc} numberOfLines={3}>
+                            {item.description}
+                          </Text>
+                        </View>
+
+                        {/* Right image with overlapping ADD pill */}
+                        <View style={styles.itemImageContainer}>
+                          <TouchableOpacity activeOpacity={0.9} onPress={() => setSelectedDishDetail(item)}>
+                            <Image 
+                              source={{ uri: item.images && item.images.length > 0 ? item.images[0] : 'https://images.unsplash.com/photo-1587593810167-a84920ea0781?w=400' }} 
+                              style={styles.itemImage} 
+                            />
+                          </TouchableOpacity>
+                          
+                          {/* ADD pill / qty selectors overlay */}
+                          <View style={styles.addButtonOverlay}>
+                            {cartItem ? (
+                              <View style={styles.quantityPill}>
+                                <TouchableOpacity 
+                                  onPress={() => updateQuantity(item._id, cartItem.quantity - 1)}
+                                  style={styles.qtyActionBtn}
+                                  activeOpacity={0.7}
+                                >
+                                  <Feather name="minus" size={14} color="#002045" />
+                                </TouchableOpacity>
+                                <Text style={styles.qtyText}>{cartItem.quantity}</Text>
+                                <TouchableOpacity 
+                                  onPress={() => addItem(item, id as string)}
+                                  style={styles.qtyActionBtn}
+                                  activeOpacity={0.7}
+                                >
+                                  <Feather name="plus" size={14} color="#002045" />
+                                </TouchableOpacity>
+                              </View>
+                            ) : (
+                              <TouchableOpacity 
+                                onPress={() => addItem(item, id as string)}
+                                style={styles.addPill}
+                                activeOpacity={0.85}
+                              >
+                                <Text style={styles.addPillText}>ADD</Text>
+                              </TouchableOpacity>
+                            )}
+                          </View>
+                        </View>
+                      </View>
+                    );
+                  })}
+                </View>
+              ))}
+          </View>
         )}
       </ScrollView>
+
+      {/* Dish Detail Modal */}
+      <Modal visible={!!selectedDishDetail} transparent animationType="slide" statusBarTranslucent={true}>
+        <View style={styles.dishModalBackdrop}>
+          <TouchableOpacity style={styles.dishModalDismissArea} onPress={() => setSelectedDishDetail(null)} activeOpacity={1} />
+          
+          <View style={styles.dishModalContainer}>
+            {/* Floating Close Button */}
+            <TouchableOpacity style={styles.dishModalCloseBtn} onPress={() => setSelectedDishDetail(null)}>
+              <Ionicons name="close" size={24} color="#fff" />
+            </TouchableOpacity>
+
+            {selectedDishDetail && (
+              <>
+                <Image 
+                  source={{ uri: selectedDishDetail.images && selectedDishDetail.images.length > 0 ? selectedDishDetail.images[0] : 'https://images.unsplash.com/photo-1587593810167-a84920ea0781?w=800' }} 
+                  style={styles.dishModalImage}
+                />
+                <View style={styles.dishModalContent}>
+                  <View style={styles.dishModalHeaderRow}>
+                    <View style={styles.dishModalHeaderLeft}>
+                      <View style={[styles.vegIndicator, { borderColor: selectedDishDetail.isVeg ? "#16A34A" : "#E11D48", marginRight: 6 }]}>
+                        <View style={[styles.vegDot, { backgroundColor: selectedDishDetail.isVeg ? "#16A34A" : "#E11D48" }]} />
+                      </View>
+                      {(selectedDishDetail.price > 200 || selectedDishDetail.name.toLowerCase().includes("special") || selectedDishDetail.name.toLowerCase().includes("biryani")) && (
+                        <Text style={styles.dishModalBestseller}>★ Bestseller</Text>
+                      )}
+                    </View>
+                    <View style={styles.recAddButtonContainer}>
+                      {items.find(i => i._id === selectedDishDetail._id) ? (
+                        <View style={[styles.recQuantityPill, { width: 100, height: 36, borderRadius: 18, paddingHorizontal: 12 }]}>
+                          <TouchableOpacity 
+                            onPress={() => updateQuantity(selectedDishDetail._id, (items.find(i => i._id === selectedDishDetail._id)?.quantity || 1) - 1)}
+                            style={[styles.recQtyActionBtn, { width: 24, height: 24 }]}
+                            activeOpacity={0.7}
+                          >
+                            <Feather name="minus" size={16} color="#002045" />
+                          </TouchableOpacity>
+                          <Text style={[styles.recQtyText, { fontSize: 16 }]}>{items.find(i => i._id === selectedDishDetail._id)?.quantity}</Text>
+                          <TouchableOpacity 
+                            onPress={() => addItem(selectedDishDetail, id as string)}
+                            style={[styles.recQtyActionBtn, { width: 24, height: 24 }]}
+                            activeOpacity={0.7}
+                          >
+                            <Feather name="plus" size={16} color="#002045" />
+                          </TouchableOpacity>
+                        </View>
+                      ) : (
+                        <TouchableOpacity 
+                          onPress={() => addItem(selectedDishDetail, id as string)}
+                          style={[styles.recAddPill, { width: 100, height: 36, borderRadius: 18 }]}
+                          activeOpacity={0.85}
+                        >
+                          <Text style={[styles.recAddPillText, { fontSize: 16 }]}>ADD</Text>
+                        </TouchableOpacity>
+                      )}
+                    </View>
+                  </View>
+
+                  <Text style={styles.dishModalTitle}>{selectedDishDetail.name}</Text>
+                  <Text style={styles.dishModalPrice}>₹{selectedDishDetail.price}</Text>
+                  
+                  <View style={{flexDirection: "row", alignItems: "center", marginTop: 4, marginBottom: 12}}>
+                    <Text style={styles.dishModalRatingText}>★ 4.7 (34)</Text>
+                  </View>
+
+                  <Text style={styles.dishModalDesc}>
+                    {selectedDishDetail.description || "Soft, thick rice pancake generously topped with fresh ingredients and lightly crisped. Served with sambar and three chutneys."}
+                  </Text>
+                </View>
+              </>
+            )}
+          </View>
+        </View>
+      </Modal>
 
       {/* Sticky Bottom Cart Bar */}
       {itemCount > 0 && (
@@ -504,6 +694,27 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 4,
   },
+  fabContainer: {
+    position: "absolute",
+    top: 158,
+    right: 36,
+    zIndex: 10,
+    shadowColor: "#002045",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  fabButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: "#002045",
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 2,
+    borderColor: "#ffffff",
+  },
   heroSection: {
     width: "100%",
     position: "relative",
@@ -548,15 +759,6 @@ const styles = StyleSheet.create({
   ratingCount: {
     fontSize: 14,
     color: "#43474e",
-  },
-  dot: {
-    fontSize: 14,
-    color: "#c4c6cf",
-  },
-  aboutLink: {
-    fontSize: 14,
-    color: "#0061a5",
-    fontWeight: "700",
   },
   cardSeparator: {
     height: 1,
@@ -846,5 +1048,214 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     fontSize: 14,
     fontFamily: "Inter_500Medium",
+  },
+  recommendedSection: {
+    marginTop: 24,
+    paddingHorizontal: 24,
+  },
+  recommendedTitle: {
+    fontSize: 18,
+    fontWeight: "700",
+    color: "#002045",
+    marginBottom: 16,
+  },
+  recommendedGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    justifyContent: "space-between",
+  },
+  recommendedCard: {
+    width: "48%",
+    backgroundColor: "#ffffff",
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: "#eceef0",
+    marginBottom: 16,
+    overflow: "hidden",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  recImageContainer: {
+    width: "100%",
+    height: 110,
+    position: "relative",
+  },
+  recImage: {
+    width: "100%",
+    height: "100%",
+    resizeMode: "cover",
+  },
+  bestsellerBadge: {
+    position: "absolute",
+    top: 8,
+    left: 8,
+    backgroundColor: "#FF6F00",
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  bestsellerText: {
+    color: "#ffffff",
+    fontSize: 8,
+    fontWeight: "800",
+    letterSpacing: 0.5,
+  },
+  recDetails: {
+    padding: 10,
+    gap: 4,
+  },
+  recTitleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  recItemName: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: "#191c1e",
+  },
+  recFooter: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginTop: 6,
+  },
+  recItemPrice: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: "#191c1e",
+  },
+  recAddButtonContainer: {
+    minWidth: 60,
+    height: 26,
+  },
+  recAddPill: {
+    width: 60,
+    height: 26,
+    borderRadius: 13,
+    backgroundColor: "#ffffff",
+    borderWidth: 1,
+    borderColor: "#002045",
+    alignItems: "center",
+    justifyContent: "center",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  recAddPillText: {
+    fontSize: 11,
+    fontWeight: "700",
+    color: "#002045",
+  },
+  recQuantityPill: {
+    width: 60,
+    height: 26,
+    borderRadius: 13,
+    backgroundColor: "#ffffff",
+    borderWidth: 1,
+    borderColor: "#002045",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 6,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  recQtyActionBtn: {
+    width: 16,
+    height: 16,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  recQtyText: {
+    fontSize: 11,
+    fontWeight: "700",
+    color: "#002045",
+  },
+
+  
+  // Dish Detail Modal Styles
+  dishModalBackdrop: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    justifyContent: "flex-end",
+  },
+  dishModalDismissArea: {
+    flex: 1,
+  },
+  dishModalContainer: {
+    width: "100%",
+    backgroundColor: "transparent",
+    position: "relative",
+  },
+  dishModalCloseBtn: {
+    alignSelf: "center",
+    backgroundColor: "rgba(0,0,0,0.7)",
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: "center",
+    alignItems: "center",
+    marginBottom: 12,
+  },
+  dishModalImage: {
+    width: "100%",
+    height: 280,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    resizeMode: "cover",
+  },
+  dishModalContent: {
+    backgroundColor: "#ffffff",
+    padding: 20,
+    paddingBottom: 40,
+  },
+  dishModalHeaderRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    marginBottom: 8,
+  },
+  dishModalHeaderLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  dishModalBestseller: {
+    color: "#E5774E",
+    fontWeight: "bold",
+    fontSize: 13,
+  },
+  dishModalTitle: {
+    fontSize: 22,
+    fontWeight: "800",
+    color: "#1f2937",
+    marginBottom: 4,
+  },
+  dishModalPrice: {
+    fontSize: 18,
+    fontWeight: "700",
+    color: "#4b5563",
+  },
+  dishModalRatingText: {
+    fontSize: 14,
+    color: "#059669",
+    fontWeight: "bold",
+    backgroundColor: "#ecfdf5",
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  dishModalDesc: {
+    fontSize: 15,
+    color: "#6b7280",
+    lineHeight: 22,
+    marginTop: 8,
   },
 });

@@ -66,6 +66,12 @@ export function FloatingCart() {
 
   const context = useSharedValue({ x: initialX, y: restingY });
   const isHoveringSearchShared = useSharedValue(false);
+  const isHoveringAltDropzone = useSharedValue(false);
+  const isDragging = useSharedValue(false);
+  const dropzoneOpacity = useSharedValue(0);
+
+  const ALT_DROPZONE_X = SCREEN_WIDTH / 2;
+  const ALT_DROPZONE_Y = SCREEN_HEIGHT - insets.bottom - 150;
 
   const navigateToCart = () => {
     router.push('/cart');
@@ -94,38 +100,35 @@ export function FloatingCart() {
   const gesture = Gesture.Pan()
     .onStart(() => {
       context.value = { x: translateX.value, y: translateY.value };
+      isDragging.value = true;
+      dropzoneOpacity.value = withTiming(1, { duration: 300 });
     })
     .onUpdate((event) => {
       translateX.value = context.value.x + event.translationX;
       translateY.value = context.value.y + event.translationY;
 
-      // Check if on Home Screen
-      const isHomeScreen = pathname === '/' || pathname === '/index' || ((segments as string[]).includes('(tabs)') && (segments as string[]).includes('index'));
-      if (isHomeScreen) {
-        const currentX = translateX.value + BUTTON_SIZE / 2;
-        const currentY = translateY.value + BUTTON_SIZE / 2;
-        const searchBarX = SCREEN_WIDTH / 2;
-        const searchBarY = SCREEN_HEIGHT - insets.bottom - 46;
+      const currentX = translateX.value + BUTTON_SIZE / 2;
+      const currentY = translateY.value + BUTTON_SIZE / 2;
 
-        const dx = currentX - searchBarX;
-        const dy = currentY - searchBarY;
-        const dist = Math.sqrt(dx * dx + dy * dy);
+      const dx = currentX - ALT_DROPZONE_X;
+      const dy = currentY - ALT_DROPZONE_Y;
+      const dist = Math.sqrt(dx * dx + dy * dy);
 
-        const hovering = dist < 70;
-        if (hovering !== isHoveringSearchShared.value) {
-          isHoveringSearchShared.value = hovering;
-          runOnJS(setIsHoveringSearch)(hovering);
-        }
+      const hovering = dist < 70;
+      if (hovering !== isHoveringAltDropzone.value) {
+        isHoveringAltDropzone.value = hovering;
       }
     })
     .onEnd(() => {
-      if (isHoveringSearchShared.value) {
-        runOnJS(setIsHoveringSearch)(false);
-        isHoveringSearchShared.value = false;
+      isDragging.value = false;
+      dropzoneOpacity.value = withTiming(0, { duration: 300 });
 
-        // Swallow animation: center the button and scale it to 0
-        const targetX = (SCREEN_WIDTH - BUTTON_SIZE) / 2;
-        const targetY = SCREEN_HEIGHT - insets.bottom - 46 - (BUTTON_SIZE / 2);
+      if (isHoveringAltDropzone.value) {
+        isHoveringAltDropzone.value = false;
+
+        // Swallow animation for alt dropzone
+        const targetX = ALT_DROPZONE_X - (BUTTON_SIZE / 2);
+        const targetY = ALT_DROPZONE_Y - (BUTTON_SIZE / 2);
 
         translateX.value = withTiming(targetX, { duration: 200 });
         translateY.value = withTiming(targetY, { duration: 200 });
@@ -159,12 +162,42 @@ export function FloatingCart() {
     };
   });
 
+  const dropzoneAnimatedStyle = useAnimatedStyle(() => {
+    const scale = isHoveringAltDropzone.value ? withSpring(1.2) : withSpring(1);
+    return {
+      opacity: dropzoneOpacity.value,
+      transform: [{ scale }],
+      position: 'absolute',
+      left: ALT_DROPZONE_X - 45,
+      top: ALT_DROPZONE_Y - 45,
+      width: 90,
+      height: 90,
+      borderRadius: 45,
+      backgroundColor: 'rgba(255, 255, 255, 0.95)',
+      borderWidth: 2,
+      borderColor: isHoveringAltDropzone.value ? colors.primary : '#d1d5db',
+      justifyContent: 'center',
+      alignItems: 'center',
+      shadowColor: colors.primary,
+      shadowOffset: { width: 0, height: 0 },
+      shadowOpacity: isHoveringAltDropzone.value ? 0.6 : 0.2,
+      shadowRadius: isHoveringAltDropzone.value ? 15 : 5,
+      elevation: 5,
+      pointerEvents: 'none',
+    };
+  });
+
   const handlePress = () => {
     router.push('/cart');
   };
 
   return (
     <View style={styles.container} pointerEvents="box-none">
+      <Animated.View style={dropzoneAnimatedStyle}>
+        <Ionicons name="bag-check" size={32} color={colors.primary} />
+        <Text style={{ fontSize: 10, fontWeight: 'bold', color: colors.primary, marginTop: 4 }}>CHECKOUT</Text>
+      </Animated.View>
+      
       <GestureDetector gesture={gesture}>
         <Animated.View style={[styles.button, { backgroundColor: colors.primary }, animatedStyle]}>
           <TouchableOpacity
