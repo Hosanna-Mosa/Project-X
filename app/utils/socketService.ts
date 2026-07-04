@@ -29,7 +29,7 @@ class SocketService {
     }
 
     this.socket = io(SOCKET_URL, {
-      transports: ["websocket"],
+      transports: ["websocket", "polling"],
       autoConnect: true,
       path: "/ws/v1/socket.io",
       auth: token ? { token } : undefined,
@@ -40,6 +40,10 @@ class SocketService {
       if (this.trackedOrderId) {
         this.socket?.emit("track_order", this.trackedOrderId);
       }
+    });
+
+    this.socket.on("connect_error", (error) => {
+      console.error(`[Customer Socket] Connection failed: ${error.message}`);
     });
   }
 

@@ -25,77 +25,79 @@ export class DriverService {
     const redisClient = socketManager ? (socketManager as any).redisClient : null;
 
     // For development/testing: Ensure we have at least 2 drivers of each vehicle type in the database
-    const allTypes = ["bike", "auto", "car"];
-    for (const t of allTypes) {
-      const totalOfType = await Driver.countDocuments({ vehicleType: t });
-      if (totalOfType < 2) {
-        const driverToConvert = await Driver.findOne({
-          $or: [
-            { vehicleType: { $exists: false } },
-            { vehicleType: null },
-            { vehicleType: "bike", status: DriverStatus.OFFLINE }
-          ]
-        });
-        if (driverToConvert) {
-          driverToConvert.vehicleType = t as "bike" | "auto" | "car";
-          await driverToConvert.save();
-          console.log(`[SIMULATOR] Converted driver ${driverToConvert._id} vehicleType to ${t}`);
+    if (process.env.DISABLE_DRIVER_SIMULATOR !== "true") {
+      const allTypes = ["bike", "auto", "car"];
+      for (const t of allTypes) {
+        const totalOfType = await Driver.countDocuments({ vehicleType: t });
+        if (totalOfType < 2) {
+          const driverToConvert = await Driver.findOne({
+            $or: [
+              { vehicleType: { $exists: false } },
+              { vehicleType: null },
+              { vehicleType: "bike", status: DriverStatus.OFFLINE }
+            ]
+          });
+          if (driverToConvert) {
+            driverToConvert.vehicleType = t as "bike" | "auto" | "car";
+            await driverToConvert.save();
+            console.log(`[SIMULATOR] Converted driver ${driverToConvert._id} vehicleType to ${t}`);
+          }
         }
       }
-    }
 
-    // Ensure we have online drivers of the requested vehicle type near the user.
-    const typesToEnsure = vehicleType ? [vehicleType] : ["bike", "auto", "car"];
-    for (const type of typesToEnsure) {
-      const activeCount = await Driver.countDocuments({
-        status: DriverStatus.ONLINE,
-        vehicleType: type,
-      });
-
-      if (activeCount < 2) {
-        const driversToActivate = await Driver.find({
+      // Ensure we have online drivers of the requested vehicle type near the user.
+      const typesToEnsure = vehicleType ? [vehicleType] : ["bike", "auto", "car"];
+      for (const type of typesToEnsure) {
+        const activeCount = await Driver.countDocuments({
+          status: DriverStatus.ONLINE,
           vehicleType: type,
-          status: DriverStatus.OFFLINE
-        }).limit(2 - activeCount);
+        });
 
-        for (const d of driversToActivate) {
-          d.status = DriverStatus.ONLINE;
-          d.isAvailable = true;
-          await d.save();
-          console.log(`[SIMULATOR] Set driver ${d._id} (${type}) to ONLINE`);
+        if (activeCount < 2) {
+          const driversToActivate = await Driver.find({
+            vehicleType: type,
+            status: DriverStatus.OFFLINE
+          }).limit(2 - activeCount);
+
+          for (const d of driversToActivate) {
+            d.status = DriverStatus.ONLINE;
+            d.isAvailable = true;
+            await d.save();
+            console.log(`[SIMULATOR] Set driver ${d._id} (${type}) to ONLINE`);
+          }
         }
-      }
 
-      const onlineDrivers = await Driver.find({
-        status: DriverStatus.ONLINE,
-        vehicleType: type
-      });
+        const onlineDrivers = await Driver.find({
+          status: DriverStatus.ONLINE,
+          vehicleType: type
+        });
 
-      for (const d of onlineDrivers) {
-        const coords = d.currentLocation?.coordinates;
-        if (!coords || (coords[0] === 0 && coords[1] === 0)) {
-          const randomLatOffset = (Math.random() - 0.5) * 0.03;
-          const randomLngOffset = (Math.random() - 0.5) * 0.03;
-          const finalLng = lng + randomLngOffset;
-          const finalLat = lat + randomLatOffset;
-          d.currentLocation = {
-            type: "Point",
-            coordinates: [finalLng, finalLat]
-          };
-          await d.save();
-          console.log(`[SIMULATOR] Moved online driver ${d._id} (${type}) to [${finalLng}, ${finalLat}]`);
+        for (const d of onlineDrivers) {
+          const coords = d.currentLocation?.coordinates;
+          if (!coords || (coords[0] === 0 && coords[1] === 0)) {
+            const randomLatOffset = (Math.random() - 0.5) * 0.03;
+            const randomLngOffset = (Math.random() - 0.5) * 0.03;
+            const finalLng = lng + randomLngOffset;
+            const finalLat = lat + randomLatOffset;
+            d.currentLocation = {
+              type: "Point",
+              coordinates: [finalLng, finalLat]
+            };
+            await d.save();
+            console.log(`[SIMULATOR] Moved online driver ${d._id} (${type}) to [${finalLng}, ${finalLat}]`);
 
-          // Sync simulator locations to Redis geospatial store
-          if (redisClient) {
-            try {
-              await redisClient.geoAdd("drivers:locations", {
-                longitude: finalLng,
-                latitude: finalLat,
-                member: d._id.toString()
-              });
-              await redisClient.set(`driver_status:${d._id}`, "online", { EX: 30 });
-            } catch (err: any) {
-              console.error(`[SIMULATOR REDIS] geoAdd failed:`, err.message);
+            // Sync simulator locations to Redis geospatial store
+            if (redisClient) {
+              try {
+                await redisClient.geoAdd("drivers:locations", {
+                  longitude: finalLng,
+                  latitude: finalLat,
+                  member: d._id.toString()
+                });
+                await redisClient.set(`driver_status:${d._id}`, "online", { EX: 30 });
+              } catch (err: any) {
+                console.error(`[SIMULATOR REDIS] geoAdd failed:`, err.message);
+              }
             }
           }
         }

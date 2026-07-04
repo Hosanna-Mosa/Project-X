@@ -277,6 +277,8 @@ export default function HomeScreen() {
   const [activeService, setActiveService] = useState<'Food' | 'Meat'>('Food');
   const [isLocationSheetOpen, setIsLocationSheetOpen] = useState(false);
   const [selectedAddress, setSelectedAddress] = useState<any>(null);
+  const [nearbyDriversCount, setNearbyDriversCount] = useState<number | null>(null);
+  const [loadingDrivers, setLoadingDrivers] = useState<boolean>(false);
   const [foodFilter, setFoodFilter] = useState<'all' | 'veg' | 'nonveg'>('all');
   const vegAnim = useRef(new Animated.Value(0)).current;
 
@@ -370,6 +372,46 @@ export default function HomeScreen() {
   );
 
   const getCoords = async () => {
+    try {
+      // 1. Priority 1: Device GPS location (only check status first)
+      let { status } = await Location.getForegroundPermissionsAsync();
+      if (status === 'undetermined') {
+        const { status: newStatus } = await Location.requestForegroundPermissionsAsync();
+        status = newStatus;
+      }
+      
+      if (status === 'granted') {
+        const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
+        const coords = { lat: loc.coords.latitude, lng: loc.coords.longitude };
+        useDeliveryStore.getState().setCurrentCoords(coords);
+
+        try {
+          const [address] = await Location.reverseGeocodeAsync({
+            latitude: coords.lat,
+            longitude: coords.lng
+          });
+          if (address) {
+            const formatted = [
+              address.name,
+              address.street,
+              address.district || address.subregion,
+              address.city,
+              address.region,
+              address.postalCode
+            ].filter(Boolean).join(", ");
+            useDeliveryStore.getState().setCurrentLocation(formatted);
+          }
+        } catch (e) {
+          console.warn("Home Screen: Reverse geocoding failed:", e);
+        }
+
+        return coords;
+      }
+    } catch (error) {
+      console.warn("Home Screen: GPS fetch failed:", error);
+    }
+
+    // 2. Priority 2: Fallback to Selected Address
     if (selectedAddress) {
       const lat = selectedAddress.coordinates?.lat ?? selectedAddress.location?.coordinates?.[1];
       const lng = selectedAddress.coordinates?.lng ?? selectedAddress.location?.coordinates?.[0];
@@ -384,37 +426,9 @@ export default function HomeScreen() {
         return { lat, lng };
       }
     }
-    let { status } = await Location.requestForegroundPermissionsAsync();
-    if (status !== 'granted') {
-      const defaultCoords = { lat: 17.4447, lng: 78.3498 };
-      useDeliveryStore.getState().setCurrentCoords(defaultCoords);
-      return defaultCoords;
-    }
-    const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
-    const coords = { lat: loc.coords.latitude, lng: loc.coords.longitude };
-    useDeliveryStore.getState().setCurrentCoords(coords);
 
-    try {
-      const [address] = await Location.reverseGeocodeAsync({
-        latitude: coords.lat,
-        longitude: coords.lng
-      });
-      if (address) {
-        const formatted = [
-          address.name,
-          address.street,
-          address.district || address.subregion,
-          address.city,
-          address.region,
-          address.postalCode
-        ].filter(Boolean).join(", ");
-        useDeliveryStore.getState().setCurrentLocation(formatted);
-      }
-    } catch (e) {
-      console.warn("Home Screen: Reverse geocoding failed:", e);
-    }
-
-    return coords;
+    // 3. Both are unavailable: Return nulls
+    return { lat: null, lng: null };
   };
 
   const selectedDistanceKm = distanceOption === "custom"
@@ -483,17 +497,41 @@ export default function HomeScreen() {
     }
   };
 
+  const checkNearbyDrivers = async (lat: number, lng: number) => {
+    try {
+      setLoadingDrivers(true);
+      const baseUrl = process.env.EXPO_PUBLIC_API_URL;
+      const response = await fetch(`${baseUrl}/api/v1/drivers/nearby?latitude=${lat}&longitude=${lng}&radius=5000`);
+      if (response.ok) {
+        const data = await response.json();
+        if (Array.isArray(data)) {
+          setNearbyDriversCount(data.length);
+        }
+      }
+    } catch (error) {
+      console.error("Error checking nearby drivers:", error);
+    } finally {
+      setLoadingDrivers(false);
+    }
+  };
+
   useEffect(() => {
     (async () => {
       setPage(1);
       setHasMore(true);
       setLoading(true);
       const { lat, lng } = await getCoords();
-      if (activeService === 'Meat') {
-        fetchMeatCenters(lat, lng, 1);
+      if (lat && lng) {
+        checkNearbyDrivers(lat, lng);
+        if (activeService === 'Meat') {
+          fetchMeatCenters(lat, lng, 1);
+        } else {
+          fetchVendors(lat, lng, 1);
+          fetch149StoreItems(lat, lng);
+        }
       } else {
-        fetchVendors(lat, lng, 1);
-        fetch149StoreItems(lat, lng);
+        setLoading(false);
+        setIsLocationSheetOpen(true);
       }
     })();
   }, [selectedAddress, activeService, appliedDistanceKm, distanceRefreshKey]);
@@ -503,8 +541,10 @@ export default function HomeScreen() {
       const nextPage = page + 1;
       setPage(nextPage);
       const { lat, lng } = await getCoords();
-      if (activeService === 'Meat') fetchMeatCenters(lat, lng, nextPage);
-      else fetchVendors(lat, lng, nextPage);
+      if (lat && lng) {
+        if (activeService === 'Meat') fetchMeatCenters(lat, lng, nextPage);
+        else fetchVendors(lat, lng, nextPage);
+      }
     }
   };
 
@@ -533,8 +573,30 @@ export default function HomeScreen() {
 
   const topPadding = insets.top + (Platform.OS === "web" ? 67 : 0);
 
-  const renderHeader = () => (
-    <>
+  const showHomeSkeleton = (loading && !loadingMore) || loadingDrivers;
+
+  const filteredItems = (activeService === 'Meat' ? meatCenters : restaurants)
+    .filter((item) => {
+      if (!searchText) return true;
+      const query = searchText.toLowerCase();
+      const nameMatch = item.name.toLowerCase().includes(query);
+      const categoryMatch = item.categories && item.categories.some((cat: string) => cat.toLowerCase().includes(query));
+      const addressMatch = item.address && item.address.toLowerCase().includes(query);
+      return nameMatch || categoryMatch || addressMatch;
+    });
+
+  const visibleItems = activeService === 'Meat'
+    ? filteredItems
+    : foodFilter === 'all'
+      ? filteredItems
+      : filteredItems.filter(r => foodFilter === 'veg' ? r.isPureVeg : !r.isPureVeg);
+
+  const showCategories = showHomeSkeleton || (nearbyDriversCount > 0 && visibleItems.length > 0);
+
+  const renderHeader = () => {
+    if (!showCategories) return null;
+    return (
+      <>
       {activeService === 'Food' && (
         <>
           <View style={styles.greetingSection}>
@@ -771,7 +833,8 @@ export default function HomeScreen() {
 
      
     </>
-  );
+    );
+  };
 
   const scrollY = useRef(new Animated.Value(0)).current;
 
@@ -803,26 +866,14 @@ export default function HomeScreen() {
     inputRange: [0, 1],
     outputRange: ["0deg", "360deg"],
   });
-  const filteredItems = (activeService === 'Meat' ? meatCenters : restaurants)
-    .filter((item) => {
-      if (!searchText) return true;
-      const query = searchText.toLowerCase();
-      const nameMatch = item.name.toLowerCase().includes(query);
-      const categoryMatch = item.categories && item.categories.some((cat: string) => cat.toLowerCase().includes(query));
-      const addressMatch = item.address && item.address.toLowerCase().includes(query);
-      return nameMatch || categoryMatch || addressMatch;
-    });
-
-  const visibleItems = activeService === 'Meat'
-    ? filteredItems
-    : foodFilter === 'all'
-      ? filteredItems
-      : filteredItems.filter(r => foodFilter === 'veg' ? r.isPureVeg : !r.isPureVeg);
-  const showHomeSkeleton = loading && !loadingMore;
+  // (Duplicate declarations removed - moved above renderHeader)
 
   const listData = React.useMemo(() => {
     if (showHomeSkeleton) {
       return HOME_SKELETON_ITEMS.map((item) => ({ ...item, isSkeleton: true }));
+    }
+    if (!loadingDrivers && nearbyDriversCount === 0) {
+      return [];
     }
     if (!searchText) {
       return visibleItems.map((item) => ({ ...item, isRestaurant: true }));
@@ -840,7 +891,7 @@ export default function HomeScreen() {
       searchedDishes.forEach((d) => items.push({ ...d, isDish: true }));
     }
     return items;
-  }, [showHomeSkeleton, searchText, visibleItems, searchedDishes]);
+  }, [showHomeSkeleton, searchText, visibleItems, searchedDishes, loadingDrivers, nearbyDriversCount]);
 
   return (
     <View style={styles.root}>
@@ -863,17 +914,60 @@ export default function HomeScreen() {
           return null;
         }}
         ListHeaderComponent={renderHeader}
-        ListEmptyComponent={() => (
-          !showHomeSkeleton && searchText ? (
-            <View style={styles.emptySearchContainer}>
-              <Ionicons name="search-outline" size={60} color={colors.textMuted} />
-              <Text style={[styles.emptySearchTitle, { color: colors.text }]}>No results found</Text>
-              <Text style={[styles.emptySearchSubtitle, { color: colors.textSecondary }]}>
-                We couldn't find any outlets matching "{searchText}"
-              </Text>
-            </View>
-          ) : null
-        )}
+        ListEmptyComponent={() => {
+          if (showHomeSkeleton || loadingDrivers) return null;
+          
+          if (searchText) {
+            return (
+              <View style={styles.emptySearchContainer}>
+                <Ionicons name="search-outline" size={60} color={colors.textMuted} />
+                <Text style={[styles.emptySearchTitle, { color: colors.text }]}>No results found</Text>
+                <Text style={[styles.emptySearchSubtitle, { color: colors.textSecondary }]}>
+                  We couldn't find any outlets matching "{searchText}"
+                </Text>
+              </View>
+            );
+          }
+
+          if (nearbyDriversCount === 0) {
+            return (
+              <View style={styles.noServiceContainer}>
+                <Ionicons name="bicycle-outline" size={80} color={colors.error} />
+                <Text style={[styles.noServiceTitle, { color: colors.text }]}>No Riders Available</Text>
+                <Text style={[styles.noServiceSubtitle, { color: colors.textSecondary }]}>
+                  We don't have riders in this location to deliver your orders. Please try changing your location.
+                </Text>
+                <TouchableOpacity 
+                  style={[styles.noServiceButton, { backgroundColor: colors.primary }]}
+                  onPress={() => setIsLocationSheetOpen(true)}
+                >
+                  <Text style={[styles.noServiceButtonText, { color: colors.surface }]}>Change Location</Text>
+                </TouchableOpacity>
+              </View>
+            );
+          }
+          
+          if (visibleItems.length === 0) {
+            const serviceName = activeService === "Meat" ? "meat" : "food";
+            return (
+              <View style={styles.noServiceContainer}>
+                <Ionicons name="location-outline" size={80} color={colors.error} />
+                <Text style={[styles.noServiceTitle, { color: colors.text }]}>No Service in this Location</Text>
+                <Text style={[styles.noServiceSubtitle, { color: colors.textSecondary }]}>
+                  We don't have {serviceName} delivery services in this location. Please try changing your location.
+                </Text>
+                <TouchableOpacity 
+                  style={[styles.noServiceButton, { backgroundColor: colors.primary }]}
+                  onPress={() => setIsLocationSheetOpen(true)}
+                >
+                  <Text style={[styles.noServiceButtonText, { color: colors.surface }]}>Change Location</Text>
+                </TouchableOpacity>
+              </View>
+            );
+          }
+          
+          return null;
+        }}
         ListFooterComponent={() => (
           loadingMore ? <ActivityIndicator size="small" color={colors.primary} style={{ marginVertical: 20 }} /> : <View style={{ height: 120 }} />
         )}
@@ -882,7 +976,7 @@ export default function HomeScreen() {
         contentContainerStyle={[
           styles.mainScrollContent, 
           { 
-            paddingTop: topPadding + 175,
+            paddingTop: showCategories ? topPadding + 175 : topPadding + 60,
             paddingBottom: keyboardHeight > 0 ? keyboardHeight + 100 : 120
           }
         ]}
@@ -933,14 +1027,16 @@ export default function HomeScreen() {
                 </View>
               </TouchableOpacity>
             </View>
-            <View style={{flexDirection: 'row', gap: 12, alignItems: 'center'}}>
-              <TouchableOpacity style={styles.iconBtn} onPress={() => setIsDistanceSheetOpen(true)}>
-                  <MaterialCommunityIcons name="radius-outline" size={24} color={colors.primary} />
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.iconBtn} onPress={() => router.push("/(tabs)/profile")}>
-                  <Ionicons name="person-outline" size={24} color={colors.primary} />
-              </TouchableOpacity>
-            </View>
+            {showCategories && (
+              <View style={{flexDirection: 'row', gap: 12, alignItems: 'center'}}>
+                <TouchableOpacity style={styles.iconBtn} onPress={() => setIsDistanceSheetOpen(true)}>
+                    <MaterialCommunityIcons name="radius-outline" size={24} color={colors.primary} />
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.iconBtn} onPress={() => router.push("/(tabs)/profile")}>
+                    <Ionicons name="person-outline" size={24} color={colors.primary} />
+                </TouchableOpacity>
+              </View>
+            )}
           </Animated.View>
 
           <Animated.View style={[
@@ -997,56 +1093,58 @@ export default function HomeScreen() {
         </Animated.View>
       </View>
 
-      <View
-        style={[
-          styles.bottomSearchOverlay,
-          { 
-            bottom: keyboardHeight > 0 
-              ? keyboardHeight + (Platform.OS === "ios" ? 10 : 12) 
-              : insets.bottom + 18
-          }
-        ]}
-        pointerEvents="box-none"
-      >
-        {/* Search Bar Dropzone */}
-        <Animated.View
+      {showCategories && (
+        <View
           style={[
-            styles.searchGlowShell,
-            {
-              transform: [{ scale: searchBarScale }],
-              borderColor: isHoveringSearch ? (theme === 'light' ? '#0F172A' : '#FFFFFF') : colors.border,
-              borderWidth: isHoveringSearch ? 2.5 : 2,
-            },
+            styles.bottomSearchOverlay,
+            { 
+              bottom: keyboardHeight > 0 
+                ? keyboardHeight + (Platform.OS === "ios" ? 10 : 12) 
+                : insets.bottom + 18
+            }
           ]}
+          pointerEvents="box-none"
         >
+          {/* Search Bar Dropzone */}
           <Animated.View
             style={[
-              styles.searchGlowLayer,
+              styles.searchGlowShell,
               {
-                opacity: isHoveringSearch ? 1 : searchGlowOpacity,
-                transform: [{ rotate: searchGlowRotate }],
+                transform: [{ scale: searchBarScale }],
+                borderColor: isHoveringSearch ? (theme === 'light' ? '#0F172A' : '#FFFFFF') : colors.border,
+                borderWidth: isHoveringSearch ? 2.5 : 2,
               },
             ]}
           >
-            <LinearGradient
-              colors={["#22D3EE", "#A855F7", "#F97316", "#10B981", "#22D3EE"]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={StyleSheet.absoluteFill}
-            />
+            <Animated.View
+              style={[
+                styles.searchGlowLayer,
+                {
+                  opacity: isHoveringSearch ? 1 : searchGlowOpacity,
+                  transform: [{ rotate: searchGlowRotate }],
+                },
+              ]}
+            >
+              <LinearGradient
+                colors={["#22D3EE", "#A855F7", "#F97316", "#10B981", "#22D3EE"]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={StyleSheet.absoluteFill}
+              />
+            </Animated.View>
+            <TouchableOpacity 
+              style={styles.searchBar} 
+              activeOpacity={0.9} 
+              onPress={() => setIsSearchActive(true)}
+            >
+              <Ionicons name="search" size={18} color={colors.primary} />
+              <Text style={[styles.searchInput, { color: searchText ? colors.text : colors.textSecondary, paddingTop: Platform.OS === 'ios' ? 0 : 3 }]}>
+                {searchText || 'Search "milk", "eggs", "bread"'}
+              </Text>
+            </TouchableOpacity>
           </Animated.View>
-          <TouchableOpacity 
-            style={styles.searchBar} 
-            activeOpacity={0.9} 
-            onPress={() => setIsSearchActive(true)}
-          >
-            <Ionicons name="search" size={18} color={colors.primary} />
-            <Text style={[styles.searchInput, { color: searchText ? colors.text : colors.textSecondary, paddingTop: Platform.OS === 'ios' ? 0 : 3 }]}>
-              {searchText || 'Search "milk", "eggs", "bread"'}
-            </Text>
-          </TouchableOpacity>
-        </Animated.View>
-      </View>
+        </View>
+      )}
 
       {/* DOORDASH STYLE SEARCH SCREEN OVERLAY */}
       <Modal
@@ -2046,6 +2144,41 @@ const createStyles = (colors: typeof Colors.light) => StyleSheet.create({
     fontWeight: "500",
     textAlign: "center",
     marginTop: 6,
+  },
+  noServiceContainer: {
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 60,
+    paddingHorizontal: 32,
+  },
+  noServiceTitle: {
+    fontSize: 18,
+    fontWeight: "800",
+    marginTop: 16,
+    textAlign: "center",
+  },
+  noServiceSubtitle: {
+    fontSize: 14,
+    fontWeight: "500",
+    textAlign: "center",
+    marginTop: 8,
+    lineHeight: 20,
+    paddingHorizontal: 16,
+  },
+  noServiceButton: {
+    marginTop: 24,
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 30,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  noServiceButtonText: {
+    fontWeight: "700",
+    fontSize: 14,
   },
   listSectionHeader: {
     fontSize: 12,
