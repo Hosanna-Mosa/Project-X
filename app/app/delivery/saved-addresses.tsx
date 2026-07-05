@@ -17,6 +17,8 @@ import * as Location from "expo-location";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { customFetch } from "@/utils/api/custom-fetch";
 import { useAuthStore } from "@/contexts/authStore";
+import { useDeliveryStore } from "@/contexts/deliveryStore";
+import { useHomeStore } from "@/contexts/homeStore";
 
 // Brand Colors matching DESIGN.md
 const COLORS = {
@@ -52,6 +54,7 @@ export default function SavedAddressesScreen() {
   const { user, setUser } = useAuthStore();
   const [addresses, setAddresses] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [selectingId, setSelectingId] = useState<string | null>(null);
 
   // Recent Locations
   const [recentLocations, setRecentLocations] = useState<any[]>([
@@ -131,6 +134,7 @@ export default function SavedAddressesScreen() {
   };
 
   const handleSelectRecentLocation = (item: any) => {
+    if (selectingId) return;
     router.push({
       pathname: "/delivery/add-address",
       params: {
@@ -143,6 +147,8 @@ export default function SavedAddressesScreen() {
   };
 
   const handleSelectAddress = async (addr: any) => {
+    if (selectingId) return;
+    
     const addressWithCoords = { ...addr };
     const lat = addr.coordinates?.lat ?? addr.location?.coordinates?.[1] ?? 17.4447;
     const lng = addr.coordinates?.lng ?? addr.location?.coordinates?.[0] ?? 78.3498;
@@ -154,14 +160,29 @@ export default function SavedAddressesScreen() {
     };
     
     try {
+      setSelectingId(addr._id);
+      
+      // Update global coords and address in deliveryStore
+      useDeliveryStore.getState().setCurrentCoords({ lat, lng });
+      useDeliveryStore.getState().setCurrentLocation(addr.addressLine || addr.label || "");
+
+      // Get active service from homeStore
+      const activeService = useHomeStore.getState().activeService;
+
+      // Trigger the background fetches and await them to complete!
+      await useHomeStore.getState().fetchHomeData(lat, lng, activeService);
+
       await AsyncStorage.setItem("active_address", JSON.stringify(addressWithCoords));
       router.back();
     } catch (e) {
       console.error("Failed to save active address:", e);
+    } finally {
+      setSelectingId(null);
     }
   };
 
   const handleEditAddress = (item: any) => {
+    if (selectingId) return;
     const lat = item.location?.coordinates?.[1] ?? item.coordinates?.lat ?? "";
     const lng = item.location?.coordinates?.[0] ?? item.coordinates?.lng ?? "";
     const qs = `editId=${encodeURIComponent(item._id || "")}&label=${encodeURIComponent(item.label || "")}&addressLine=${encodeURIComponent(item.addressLine || "")}&phone=${encodeURIComponent(item.phone || "")}&receiverName=${encodeURIComponent(item.receiverName || "")}&lat=${encodeURIComponent(String(lat))}&lng=${encodeURIComponent(String(lng))}`;
@@ -169,6 +190,7 @@ export default function SavedAddressesScreen() {
   };
 
   const handleDeleteAddress = (id: string) => {
+    if (selectingId) return;
     Alert.alert("Delete Address", "Are you sure you want to remove this address?", [
       { text: "Cancel", style: "cancel" },
       {
@@ -192,6 +214,7 @@ export default function SavedAddressesScreen() {
       },
     ]);
   };
+
   return (
     <KeyboardAvoidingView
       behavior={Platform.OS === "ios" ? "padding" : "height"}
@@ -199,7 +222,7 @@ export default function SavedAddressesScreen() {
     >
       {/* Header matching screen.png */}
       <View style={[styles.header, { paddingTop: insets.top + 16 }]}>
-        <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
+        <TouchableOpacity style={styles.backBtn} onPress={() => router.back()} disabled={selectingId !== null}>
           <Feather name="arrow-left" size={24} color={COLORS.onSurface} />
         </TouchableOpacity>
         <View style={styles.headerTitleContainer}>
@@ -213,7 +236,7 @@ export default function SavedAddressesScreen() {
         contentContainerStyle={[styles.container, { paddingBottom: insets.bottom + 100 }]}
       >
           {/* Current Location GPS Button */}
-          <TouchableOpacity style={styles.currentLocRow} onPress={handleUseCurrentLocation}>
+          <TouchableOpacity style={styles.currentLocRow} onPress={handleUseCurrentLocation} disabled={selectingId !== null}>
             <View style={styles.currentLocIconBox}>
               <Feather name="navigation" size={20} color={COLORS.onPrimary} />
             </View>
@@ -238,43 +261,51 @@ export default function SavedAddressesScreen() {
                   <Text style={styles.emptyText}>No saved addresses yet</Text>
                 </View>
               ) : (
-                addresses.map((addr) => (
-                  <View key={addr._id} style={styles.addressCard}>
-                    <TouchableOpacity
-                      style={styles.addressCardTouchable}
-                      onPress={() => handleSelectAddress(addr)}
-                      activeOpacity={0.7}
-                    >
-                      <View style={styles.addressIconBox}>
-                        <Feather
-                          name={
-                            addr.label?.toLowerCase() === "home"
-                              ? "home"
-                              : addr.label?.toLowerCase() === "office" || addr.label?.toLowerCase() === "work"
-                              ? "briefcase"
-                              : "map-pin"
-                          }
-                          size={20}
-                          color={COLORS.primary}
-                        />
-                      </View>
-                      <View style={styles.addressInfo}>
-                        <Text style={styles.addressLabel}>{addr.label}</Text>
-                        <Text style={styles.addressLine} numberOfLines={1}>
-                          {addr.addressLine}
-                        </Text>
-                      </View>
-                    </TouchableOpacity>
-                    <View style={styles.addressActions}>
-                      <TouchableOpacity style={styles.actionBtn} onPress={() => handleEditAddress(addr)}>
-                        <Feather name="edit-2" size={16} color={COLORS.outline} />
+                addresses.map((addr) => {
+                  const isSelecting = selectingId === addr._id;
+                  return (
+                    <View key={addr._id} style={[styles.addressCard, isSelecting && { opacity: 0.6 }]}>
+                      <TouchableOpacity
+                        style={styles.addressCardTouchable}
+                        onPress={() => handleSelectAddress(addr)}
+                        activeOpacity={0.7}
+                        disabled={selectingId !== null}
+                      >
+                        <View style={styles.addressIconBox}>
+                          {isSelecting ? (
+                            <ActivityIndicator size="small" color={COLORS.primary} />
+                          ) : (
+                            <Feather
+                              name={
+                                addr.label?.toLowerCase() === "home"
+                                  ? "home"
+                                  : addr.label?.toLowerCase() === "office" || addr.label?.toLowerCase() === "work"
+                                  ? "briefcase"
+                                  : "map-pin"
+                              }
+                              size={20}
+                              color={COLORS.primary}
+                            />
+                          )}
+                        </View>
+                        <View style={styles.addressInfo}>
+                          <Text style={styles.addressLabel}>{addr.label}</Text>
+                          <Text style={styles.addressLine} numberOfLines={1}>
+                            {addr.addressLine}
+                          </Text>
+                        </View>
                       </TouchableOpacity>
-                      <TouchableOpacity style={styles.actionBtn} onPress={() => handleDeleteAddress(addr._id)}>
-                        <Feather name="trash-2" size={16} color={COLORS.error} />
-                      </TouchableOpacity>
+                      <View style={styles.addressActions}>
+                        <TouchableOpacity style={styles.actionBtn} onPress={() => handleEditAddress(addr)} disabled={selectingId !== null}>
+                          <Feather name="edit-2" size={16} color={COLORS.outline} />
+                        </TouchableOpacity>
+                        <TouchableOpacity style={styles.actionBtn} onPress={() => handleDeleteAddress(addr._id)} disabled={selectingId !== null}>
+                          <Feather name="trash-2" size={16} color={COLORS.error} />
+                        </TouchableOpacity>
+                      </View>
                     </View>
-                  </View>
-                ))
+                  );
+                })
               )}
             </View>
           )}
@@ -287,6 +318,7 @@ export default function SavedAddressesScreen() {
                 key={item.id}
                 style={styles.recentRow}
                 onPress={() => handleSelectRecentLocation(item)}
+                disabled={selectingId !== null}
               >
                 <View style={styles.recentIconBox}>
                   <Feather name="clock" size={18} color={COLORS.onSurfaceVariant} />
@@ -307,6 +339,7 @@ export default function SavedAddressesScreen() {
         <TouchableOpacity
           style={styles.primaryBtn}
           onPress={() => router.push("/delivery/add-address")}
+          disabled={selectingId !== null}
         >
           <Feather name="plus" size={18} color={COLORS.onPrimary} style={{ marginRight: 8 }} />
           <Text style={styles.primaryBtnText}>Add New Address</Text>

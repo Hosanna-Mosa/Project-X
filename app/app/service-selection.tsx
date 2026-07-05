@@ -843,12 +843,6 @@ export default function ServiceSelectionScreen() {
             )}
           </BottomSheet>
         )}
-
-        <LocationPickerSheet
-          isOpen={isLocationSheetOpen}
-          onClose={() => setIsLocationSheetOpen(false)}
-          onSelectAddress={(address) => setSelectedAddress(address)}
-        />
         <Modal
           visible={showPriceSheet}
           transparent

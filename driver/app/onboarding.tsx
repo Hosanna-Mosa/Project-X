@@ -414,20 +414,20 @@ export default function OnboardingScreen() {
         if (!res.ok) return;
         const result = await res.json();
         const d = result.data;
-        if (!d) return;
-
-        // Pre-populate form from saved data
-        if (d.gender) setGender(d.gender);
-        if (d.vehicleType) setVehicle(d.vehicleType);
-        if (d.aadhaarNumber) setAadhaarNumber(d.aadhaarNumber.replace(/(\d{4})(?=\d)/g, "$1 "));
-        if (d.aadhaarVerified) setAadhaarVerified(d.aadhaarVerified);
-        if (d.panNumber) setPanNumber(d.panNumber);
-        if (d.dlNumber) setDlNumber(d.dlNumber);
-        if (d.dlExpiry) setDlExpiry(d.dlExpiry);
-        if (d.bankAccountNumber) setBankAccount(d.bankAccountNumber);
-        if (d.bankIfsc) setIfsc(d.bankIfsc);
-        if (d.bankVerified) setBankVerified(d.bankVerified);
-        if (d.preferredZone) setPreferredZone(d.preferredZone);
+        if (d) {
+          // Pre-populate form from saved data
+          if (d.gender) setGender(d.gender);
+          if (d.vehicleType) setVehicle(d.vehicleType);
+          if (d.aadhaarNumber) setAadhaarNumber(d.aadhaarNumber.replace(/(\d{4})(?=\d)/g, "$1 "));
+          if (d.aadhaarVerified) setAadhaarVerified(d.aadhaarVerified);
+          if (d.panNumber) setPanNumber(d.panNumber);
+          if (d.dlNumber) setDlNumber(d.dlNumber);
+          if (d.dlExpiry) setDlExpiry(d.dlExpiry);
+          if (d.bankAccountNumber) setBankAccount(d.bankAccountNumber);
+          if (d.bankIfsc) setIfsc(d.bankIfsc);
+          if (d.bankVerified) setBankVerified(d.bankVerified);
+          if (d.preferredZone) setPreferredZone(d.preferredZone);
+        }
       } catch {
         // silently ignore
       }

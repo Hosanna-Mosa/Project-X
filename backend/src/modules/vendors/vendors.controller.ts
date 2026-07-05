@@ -4,6 +4,7 @@ import Vendor from "../../database/models/Vendor";
 import OTP from "../../database/models/OTP";
 import { sendEmail, generateOTP, getOTPEmailHtml } from "../../services/email.service";
 import type { AuthRequest } from "../../middleware/auth.middleware";
+import { ZonesService } from "../zones/zones.service";
 
 export const forgotVendorPassword = async (req: Request, res: Response) => {
   try {
@@ -95,10 +96,19 @@ export const getNearbyVendors = async (req: Request, res: Response) => {
 
     const userLat = parseFloat(lat as string);
     const userLng = parseFloat(lng as string);
+
+    // Zone Serviceability Check
+    const zonesService = new ZonesService();
+    const activeZone = await zonesService.getZoneForCoordinates(userLat, userLng);
+    if (!activeZone) {
+      console.log(`[API] Location [lat: ${userLat}, lng: ${userLng}] is outside all active zones. Returning 0 vendors.`);
+      return res.json([]);
+    }
+
     const radiusInMeters = radius ? Math.max(1000, Number(radius) || 0) : 25000;
     const skip = (Number(page) - 1) * Number(limit);
 
-    console.log(`[API] Fetching nearby vendors - Lat: ${userLat}, Lng: ${userLng}, Page: ${page}`);
+    console.log(`[API] Fetching nearby vendors - Lat: ${userLat}, Lng: ${userLng}, Page: ${page} (Zone: ${activeZone.name})`);
 
     // MongoDB Proximity Query with Pagination
     const vendors = await Vendor.aggregate([
