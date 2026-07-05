@@ -20,7 +20,7 @@ import { customFetch } from "@/utils/api/custom-fetch";
 interface Props {
   isOpen: boolean;
   onClose: () => void;
-  onSelectAddress?: (address: any) => void;
+  onSelectAddress?: (address: any) => Promise<void> | void;
 }
 
 export function LocationPickerSheet({ isOpen, onClose, onSelectAddress }: Props) {
@@ -34,6 +34,7 @@ export function LocationPickerSheet({ isOpen, onClose, onSelectAddress }: Props)
   const [savedAddresses, setSavedAddresses] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [searching, setSearching] = useState(false);
+  const [selectingAddressId, setSelectingAddressId] = useState<string | null>(null);
 
   useEffect(() => {
     if (isOpen) {
@@ -121,7 +122,11 @@ export function LocationPickerSheet({ isOpen, onClose, onSelectAddress }: Props)
       }
       
       Alert.alert("Saved!", "Your current location has been added to saved addresses.");
-      onSelectAddress?.(detectedLocation);
+      
+      setSelectingAddressId("detected");
+      if (onSelectAddress) {
+        await onSelectAddress(detectedLocation);
+      }
       setDetectedLocation(null);
       onClose();
     } catch (error: any) {
@@ -129,6 +134,7 @@ export function LocationPickerSheet({ isOpen, onClose, onSelectAddress }: Props)
       Alert.alert("Save Failed", error.message || "An error occurred while saving the address.");
     } finally {
       setSavingLocation(false);
+      setSelectingAddressId(null);
     }
   };
 
@@ -145,75 +151,110 @@ export function LocationPickerSheet({ isOpen, onClose, onSelectAddress }: Props)
     router.push(`/delivery/add-address?${qs}`);
   };
 
-  const renderAddressItem = ({ item }: { item: any }) => (
-    <View style={styles.addressCard}>
-      <TouchableOpacity 
-        style={styles.addressMainTouchable}
-        onPress={() => {
-          const addressWithCoords = { ...item };
-          if (!addressWithCoords.coordinates && item.location?.coordinates) {
-            addressWithCoords.coordinates = {
-              lng: item.location.coordinates[0],
-              lat: item.location.coordinates[1],
-            };
-          }
-          onSelectAddress?.(addressWithCoords);
-          onClose();
-        }}
-      >
-        <View style={styles.addressIconWrap}>
-          <Feather 
-            name={item.label === "Home" ? "home" : item.label === "Work" ? "briefcase" : "map-pin"} 
-            size={20} 
-            color={colors.primary} 
-          />
-        </View>
-        <View style={styles.addressContent}>
-          <View style={styles.addressTitleRow}>
-            <Text style={styles.addressType}>{item.label}</Text>
+  const renderAddressItem = ({ item }: { item: any }) => {
+    const isSelecting = selectingAddressId === item._id;
+    return (
+      <View style={styles.addressCard}>
+        <TouchableOpacity 
+          style={[styles.addressMainTouchable, isSelecting && { opacity: 0.5 }]}
+          onPress={async () => {
+            if (selectingAddressId) return;
+            const addressWithCoords = { ...item };
+            if (!addressWithCoords.coordinates && item.location?.coordinates) {
+              addressWithCoords.coordinates = {
+                lng: item.location.coordinates[0],
+                lat: item.location.coordinates[1],
+              };
+            }
+            try {
+              setSelectingAddressId(item._id);
+              if (onSelectAddress) {
+                await onSelectAddress(addressWithCoords);
+              }
+              onClose();
+            } catch (err) {
+              console.error(err);
+            } finally {
+              setSelectingAddressId(null);
+            }
+          }}
+          disabled={selectingAddressId !== null}
+        >
+          <View style={styles.addressIconWrap}>
+            {isSelecting ? (
+              <ActivityIndicator size="small" color={colors.primary} />
+            ) : (
+              <Feather 
+                name={item.label === "Home" ? "home" : item.label === "Work" ? "briefcase" : "map-pin"} 
+                size={20} 
+                color={colors.primary} 
+              />
+            )}
           </View>
-          <Text style={styles.addressText} numberOfLines={2}>
-            {item.addressLine}
-          </Text>
-          {item.phone && <Text style={styles.addressPhone}>Phone: {item.phone}</Text>}
+          <View style={styles.addressContent}>
+            <View style={styles.addressTitleRow}>
+              <Text style={styles.addressType}>{item.label}</Text>
+            </View>
+            <Text style={styles.addressText} numberOfLines={2}>
+              {item.addressLine}
+            </Text>
+            {item.phone && <Text style={styles.addressPhone}>Phone: {item.phone}</Text>}
+          </View>
+        </TouchableOpacity>
+        <TouchableOpacity 
+          style={styles.editAddressBtn}
+          onPress={() => handleEditAddress(item)}
+          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          disabled={selectingAddressId !== null}
+        >
+          <Feather name="edit-2" size={16} color={colors.textMuted} />
+        </TouchableOpacity>
+      </View>
+    );
+  };
+
+  const renderSearchResult = ({ item }: { item: any }) => {
+    const isSelecting = selectingAddressId === item.id;
+    return (
+      <TouchableOpacity 
+        style={[styles.searchResultItem, isSelecting && { opacity: 0.5 }]}
+        onPress={async () => {
+          if (selectingAddressId) return;
+          try {
+            setSelectingAddressId(item.id);
+            const details = Number.isFinite(Number(item.lat)) && Number.isFinite(Number(item.lng))
+              ? { lat: Number(item.lat), lng: Number(item.lng) }
+              : await customFetch<any>(`/api/v1/places/details/${item.id}`);
+            if (onSelectAddress) {
+              await onSelectAddress({
+                addressLine: item.address,
+                coordinates: { lat: details.lat, lng: details.lng },
+                label: item.name,
+              });
+            }
+            onClose();
+          } catch (error) {
+            console.error("Select place error:", error);
+          } finally {
+            setSelectingAddressId(null);
+          }
+        }}
+        disabled={selectingAddressId !== null}
+      >
+        <View style={{ marginRight: 8, width: 24, alignItems: "center" }}>
+          {isSelecting ? (
+            <ActivityIndicator size="small" color={colors.primary} />
+          ) : (
+            <Feather name="map-pin" size={16} color={colors.textMuted} />
+          )}
+        </View>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.searchResultName}>{item.name}</Text>
+          <Text style={styles.searchResultAddress} numberOfLines={1}>{item.address}</Text>
         </View>
       </TouchableOpacity>
-      <TouchableOpacity 
-        style={styles.editAddressBtn}
-        onPress={() => handleEditAddress(item)}
-        hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-      >
-        <Feather name="edit-2" size={16} color={colors.textMuted} />
-      </TouchableOpacity>
-    </View>
-  );
-
-  const renderSearchResult = ({ item }: { item: any }) => (
-    <TouchableOpacity 
-      style={styles.searchResultItem}
-      onPress={async () => {
-        try {
-          const details = Number.isFinite(Number(item.lat)) && Number.isFinite(Number(item.lng))
-            ? { lat: Number(item.lat), lng: Number(item.lng) }
-            : await customFetch<any>(`/api/v1/places/details/${item.id}`);
-          onSelectAddress?.({
-            addressLine: item.address,
-            coordinates: { lat: details.lat, lng: details.lng },
-            label: item.name,
-          });
-          onClose();
-        } catch (error) {
-          console.error("Select place error:", error);
-        }
-      }}
-    >
-      <Feather name="map-pin" size={16} color={colors.textMuted} />
-      <View style={{ flex: 1 }}>
-        <Text style={styles.searchResultName}>{item.name}</Text>
-        <Text style={styles.searchResultAddress} numberOfLines={1}>{item.address}</Text>
-      </View>
-    </TouchableOpacity>
-  );
+    );
+  };
 
   return (
     <Modal
@@ -542,5 +583,3 @@ const createStyles = (colors: typeof Colors.light) => StyleSheet.create({
     fontWeight: "600",
   },
 });
-
-

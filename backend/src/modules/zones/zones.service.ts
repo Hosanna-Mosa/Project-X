@@ -1,5 +1,7 @@
 import mongoose from "mongoose";
 import Zone, { IZone, ZoneType } from "../../database/models/Zone";
+import Driver from "../../database/models/Driver";
+import Order from "../../database/models/Order";
 
 export class ZonesService {
   async createZone(data: any): Promise<IZone> {

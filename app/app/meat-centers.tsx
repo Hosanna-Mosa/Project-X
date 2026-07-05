@@ -16,7 +16,6 @@ import { router, useFocusEffect } from "expo-router";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import Colors from "@/constants/colors";
 import { useThemeStore } from "@/contexts/themeStore";
-import { LocationPickerSheet } from "@/components/LocationPickerSheet";
 import { RestaurantListItem } from "@/components/RestaurantListItem";
 import * as Location from "expo-location";
 
@@ -39,7 +38,6 @@ export default function MeatCentersScreen() {
   const styles = React.useMemo(() => createStyles(colors), [theme]);
 
   const [meatCenters, setMeatCenters] = useState<any[]>([]);
-  const [isLocationSheetOpen, setIsLocationSheetOpen] = useState(false);
   const [selectedAddress, setSelectedAddress] = useState<any>(null);
 
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
@@ -228,12 +226,6 @@ export default function MeatCentersScreen() {
           </View>
         </View>
       </View>
-
-      <LocationPickerSheet 
-        isOpen={isLocationSheetOpen} 
-        onClose={() => setIsLocationSheetOpen(false)} 
-        onSelectAddress={(address) => setSelectedAddress(address)}
-      />
     </View>
   );
 }

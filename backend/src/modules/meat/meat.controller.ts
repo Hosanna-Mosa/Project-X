@@ -8,6 +8,7 @@ import FoodItem from "../../database/models/FoodItem";
 import generateToken from "../../utils/generateToken";
 import { sendEmail, generateOTP, getOTPEmailHtml } from "../../services/email.service";
 import type { AuthRequest } from "../../middleware/auth.middleware";
+import { ZonesService } from "../zones/zones.service";
 
 export const forgotMeatVendorPassword = async (req: Request, res: Response) => {
   try {
@@ -155,6 +156,14 @@ export const getNearbyMeatCenters = async (req: Request, res: Response) => {
     const userLng = parseFloat(lng as string);
     if (!Number.isFinite(userLat) || !Number.isFinite(userLng)) {
       return res.status(400).json({ message: "Latitude and Longitude must be valid numbers" });
+    }
+
+    // Zone Serviceability Check
+    const zonesService = new ZonesService();
+    const activeZone = await zonesService.getZoneForCoordinates(userLat, userLng);
+    if (!activeZone) {
+      console.log(`[API] Location [lat: ${userLat}, lng: ${userLng}] is outside all active zones. Returning 0 meat centers.`);
+      return res.json([]);
     }
 
     const pageNumber = Math.max(1, Number(page) || 1);

@@ -28,7 +28,7 @@ import Colors from "@/constants/colors";
 import { useThemeStore } from "@/contexts/themeStore";
 import { useDeliveryStore } from "@/contexts/deliveryStore";
 import { ServiceCategory } from "@/components/ServiceCategory";
-import { LocationPickerSheet } from "@/components/LocationPickerSheet";
+import { useHomeStore } from "@/contexts/homeStore";
 import { RestaurantListItem } from "@/components/RestaurantListItem";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
@@ -144,7 +144,7 @@ const popularTags = [
   { name: "Idly", icon: "disc-outline", iconFamily: "Ionicons", color: "#10B981" },
   { name: "Fried Rice", icon: "rice", iconFamily: "MaterialCommunityIcons", color: "#06B6D4" },
   { name: "Fast Food", icon: "fast-food-outline", iconFamily: "Ionicons", color: "#EF4444" },
-  { name: "Breakfast", icon: "egg-cooking", iconFamily: "MaterialCommunityIcons", color: "#F59E0B" },
+  { name: "Breakfast", icon: "egg-fried", iconFamily: "MaterialCommunityIcons", color: "#F59E0B" },
   { name: "Healthy", icon: "leaf-outline", iconFamily: "Ionicons", color: "#10B981" },
   { name: "Deals", icon: "percent", iconFamily: "Feather", color: "#E11D48" },
   { name: "Burgers", icon: "hamburger", iconFamily: "MaterialCommunityIcons", color: "#F97316" },
@@ -191,10 +191,26 @@ import * as Location from "expo-location";
 
 export default function HomeScreen() {
   const insets = useSafeAreaInsets();
+  const {
+    restaurants,
+    setRestaurants,
+    meatCenters,
+    setMeatCenters,
+    nearbyDriversCount,
+    setNearbyDriversCount,
+    loading,
+    setLoading,
+    loadingDrivers,
+    setLoadingDrivers,
+    store149Items,
+    setStore149Items,
+    activeService,
+    setActiveService,
+  } = useHomeStore();
+
   const [searchText, setSearchText] = useState("");
   const [isSearchActive, setIsSearchActive] = useState(false);
   const [recentSearches, setRecentSearches] = useState<string[]>([]);
-  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -271,15 +287,13 @@ export default function HomeScreen() {
   const userName = user?.name ? user.name.split(" ")[0] : "there";
 
 
-  const [restaurants, setRestaurants] = useState<any[]>([]);
-  const [meatCenters, setMeatCenters] = useState<any[]>([]);
-  const [activeService, setActiveService] = useState<'Food' | 'Meat'>('Food');
-  const [isLocationSheetOpen, setIsLocationSheetOpen] = useState(false);
   const [selectedAddress, setSelectedAddress] = useState<any>(null);
-  const [nearbyDriversCount, setNearbyDriversCount] = useState<number | null>(null);
-  const [loadingDrivers, setLoadingDrivers] = useState<boolean>(false);
+  const [isAddressLoaded, setIsAddressLoaded] = useState(false);
+  const [hasNoLocation, setHasNoLocation] = useState(false);
   const [foodFilter, setFoodFilter] = useState<'all' | 'veg' | 'nonveg'>('all');
   const vegAnim = useRef(new Animated.Value(0)).current;
+  const addressResolveRef = useRef<(() => void) | null>(null);
+  const hasRedirectedRef = useRef(false);
 
   useEffect(() => {
     Animated.spring(vegAnim, {
@@ -298,7 +312,6 @@ export default function HomeScreen() {
   const [searchedDishes, setSearchedDishes] = useState<any[]>([]);
   const [isSearchingDishes, setIsSearchingDishes] = useState(false);
 
-  const [store149Items, setStore149Items] = useState<any[]>([]);
   const [loading149, setLoading149] = useState(false);
 
   const cartStore = useCartStore();
@@ -367,6 +380,8 @@ export default function HomeScreen() {
           }
         } catch (e) {
           console.error("Failed to load active address:", e);
+        } finally {
+          setIsAddressLoaded(true);
         }
       })();
 
@@ -375,46 +390,7 @@ export default function HomeScreen() {
   );
 
   const getCoords = async () => {
-    try {
-      // 1. Priority 1: Device GPS location (only check status first)
-      let { status } = await Location.getForegroundPermissionsAsync();
-      if (status === 'undetermined') {
-        const { status: newStatus } = await Location.requestForegroundPermissionsAsync();
-        status = newStatus;
-      }
-      
-      if (status === 'granted') {
-        const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
-        const coords = { lat: loc.coords.latitude, lng: loc.coords.longitude };
-        useDeliveryStore.getState().setCurrentCoords(coords);
-
-        try {
-          const [address] = await Location.reverseGeocodeAsync({
-            latitude: coords.lat,
-            longitude: coords.lng
-          });
-          if (address) {
-            const formatted = [
-              address.name,
-              address.street,
-              address.district || address.subregion,
-              address.city,
-              address.region,
-              address.postalCode
-            ].filter(Boolean).join(", ");
-            useDeliveryStore.getState().setCurrentLocation(formatted);
-          }
-        } catch (e) {
-          console.warn("Home Screen: Reverse geocoding failed:", e);
-        }
-
-        return coords;
-      }
-    } catch (error) {
-      console.warn("Home Screen: GPS fetch failed:", error);
-    }
-
-    // 2. Priority 2: Fallback to Selected Address
+    // 1. Priority 1: Use Selected Address if available
     if (selectedAddress) {
       const lat = selectedAddress.coordinates?.lat ?? selectedAddress.location?.coordinates?.[1];
       const lng = selectedAddress.coordinates?.lng ?? selectedAddress.location?.coordinates?.[0];
@@ -428,6 +404,51 @@ export default function HomeScreen() {
         }
         return { lat, lng };
       }
+    }
+
+    try {
+      // 2. Priority 2: Fallback to Device GPS location
+      const gpsDeniedBefore = await AsyncStorage.getItem("gps_permission_denied");
+      if (gpsDeniedBefore !== "true") {
+        let { status } = await Location.getForegroundPermissionsAsync();
+        if (status === 'undetermined') {
+          const { status: newStatus } = await Location.requestForegroundPermissionsAsync();
+          status = newStatus;
+        }
+        
+        if (status === 'granted') {
+          const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
+          const coords = { lat: loc.coords.latitude, lng: loc.coords.longitude };
+          useDeliveryStore.getState().setCurrentCoords(coords);
+
+          try {
+            const [address] = await Location.reverseGeocodeAsync({
+              latitude: coords.lat,
+              longitude: coords.lng
+            });
+            if (address) {
+              const formatted = [
+                address.name,
+                address.street,
+                address.district || address.subregion,
+                address.city,
+                address.region,
+                address.postalCode
+              ].filter(Boolean).join(", ");
+              useDeliveryStore.getState().setCurrentLocation(formatted);
+            }
+          } catch (e) {
+            console.warn("Home Screen: Reverse geocoding failed:", e);
+          }
+
+          return coords;
+        } else {
+          // User denied permission, record in AsyncStorage so we don't prompt on reload
+          await AsyncStorage.setItem("gps_permission_denied", "true");
+        }
+      }
+    } catch (error) {
+      console.warn("Home Screen: GPS fetch failed:", error);
     }
 
     // 3. Both are unavailable: Return nulls
@@ -502,7 +523,14 @@ export default function HomeScreen() {
     try {
       setLoadingDrivers(true);
       const baseUrl = process.env.EXPO_PUBLIC_API_URL;
-      const response = await fetch(`${baseUrl}/api/v1/drivers/nearby?latitude=${lat}&longitude=${lng}&radius=5000`);
+      const headers: any = {};
+      if (token) {
+        headers["Authorization"] = `Bearer ${token}`;
+      }
+      const response = await fetch(
+        `${baseUrl}/api/v1/drivers/nearby?latitude=${lat}&longitude=${lng}&radius=5000`,
+        { headers }
+      );
       if (response.ok) {
         const data = await response.json();
         if (Array.isArray(data)) {
@@ -517,25 +545,66 @@ export default function HomeScreen() {
   };
 
   useEffect(() => {
+    if (!isAddressLoaded) return;
+
     (async () => {
-      setPage(1);
-      setHasMore(true);
-      setLoading(true);
       const { lat, lng } = await getCoords();
       if (lat && lng) {
-        checkNearbyDrivers(lat, lng);
-        if (activeService === 'Meat') {
-          fetchMeatCenters(lat, lng, 1);
-        } else {
-          fetchVendors(lat, lng, 1);
-          fetch149StoreItems(lat, lng);
+        setHasNoLocation(false);
+        // Check if the store already has the correct fetched data for these coords and service
+        const storeState = useHomeStore.getState();
+        if (
+          storeState.lastFetchedCoords &&
+          storeState.lastFetchedCoords.lat === lat &&
+          storeState.lastFetchedCoords.lng === lng &&
+          storeState.lastFetchedService === activeService
+        ) {
+          // Already fully fetched! Resolve address selection resolver if pending and exit
+          if (addressResolveRef.current) {
+            addressResolveRef.current();
+            addressResolveRef.current = null;
+          }
+          return;
         }
+
+        setPage(1);
+        setHasMore(true);
+        setLoading(true);
+        // Wait for all initial fetches to complete
+        await Promise.all([
+          checkNearbyDrivers(lat, lng),
+          activeService === 'Meat' 
+            ? fetchMeatCenters(lat, lng, 1) 
+            : Promise.all([
+                fetchVendors(lat, lng, 1),
+                fetch149StoreItems(lat, lng)
+              ])
+        ]);
+        // Cache the coordinates and service in the shared store
+        useHomeStore.setState({
+          lastFetchedCoords: { lat, lng },
+          lastFetchedService: activeService
+        });
       } else {
+        setHasNoLocation(true);
+        setPage(1);
+        setHasMore(true);
         setLoading(false);
-        setIsLocationSheetOpen(true);
+        setLoadingDrivers(false);
+        
+        if (!hasRedirectedRef.current) {
+          hasRedirectedRef.current = true;
+          router.push("/delivery/saved-addresses");
+        }
+      }
+
+      // Trigger the modal address selection resolver once loaded
+      if (addressResolveRef.current) {
+        addressResolveRef.current();
+        addressResolveRef.current = null;
       }
     })();
-  }, [selectedAddress, activeService, appliedDistanceKm, distanceRefreshKey]);
+  }, [isAddressLoaded, selectedAddress, activeService, appliedDistanceKm, distanceRefreshKey]);
 
   const loadMore = async () => {
     if (!loading && !loadingMore && hasMore) {
@@ -558,6 +627,7 @@ export default function HomeScreen() {
 
   const applyDistanceFilter = () => {
     setIsDistanceSheetOpen(false);
+    useHomeStore.setState({ lastFetchedCoords: null });
     setLoading(true);
     setAppliedDistanceKm(selectedDistanceKm);
     setDistanceRefreshKey((value) => value + 1);
@@ -567,6 +637,7 @@ export default function HomeScreen() {
     setDistanceOption("5");
     setCustomDistance("");
     setAppliedDistanceKm(null);
+    useHomeStore.setState({ lastFetchedCoords: null });
     setLoading(true);
     setDistanceRefreshKey((value) => value + 1);
     setIsDistanceSheetOpen(false);
@@ -592,7 +663,7 @@ export default function HomeScreen() {
       ? filteredItems
       : filteredItems.filter(r => foodFilter === 'veg' ? r.isPureVeg : !r.isPureVeg);
 
-  const showCategories = showHomeSkeleton || (nearbyDriversCount > 0 && visibleItems.length > 0);
+  const showCategories = !hasNoLocation && (showHomeSkeleton || (nearbyDriversCount !== 0 && visibleItems.length > 0));
 
   const renderHeader = () => {
     if (!showCategories) return null;
@@ -600,227 +671,237 @@ export default function HomeScreen() {
       <>
       {activeService === 'Food' && (
         <>
-          <View style={styles.greetingSection}>
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-              <Text style={[styles.greetingTitle, { marginBottom: 0, flex: 1, marginRight: 10 }]}>
-                {getGreeting(userName)}
-              </Text>
-              
-              <TouchableOpacity 
-                activeOpacity={0.85}
-                onPress={() => setFoodFilter(foodFilter === 'veg' ? 'all' : 'veg')}
-              >
-                <Animated.View style={[
-                  styles.vegMorphBadge,
-                  {
-                    width: vegAnim.interpolate({ inputRange: [0, 1], outputRange: [38, 85] }),
-                    backgroundColor: vegAnim.interpolate({
-                      inputRange: [0, 1],
-                      outputRange: [colors.surface, '#16A34A']
-                    }),
-                    borderColor: vegAnim.interpolate({
-                      inputRange: [0, 1],
-                      outputRange: [colors.border, '#15803D']
-                    }),
-                  }
-                ]}>
-                  <View style={styles.vegMorphIconWrap}>
-                    <Ionicons 
-                      name="leaf" 
-                      size={14} 
-                      color={foodFilter === 'veg' ? '#FFFFFF' : '#16A34A'} 
-                    />
-                  </View>
-                  <Animated.Text 
-                    numberOfLines={1}
-                    style={[
-                      styles.vegMorphText,
-                      {
-                        opacity: vegAnim,
-                        transform: [{
-                          translateX: vegAnim.interpolate({
-                            inputRange: [0, 1],
-                            outputRange: [-10, 0]
-                          })
-                        }]
-                      }
-                    ]}
-                  >
-                    VEG
-                  </Animated.Text>
-                </Animated.View>
-              </TouchableOpacity>
-            </View>
-
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.dishesScrollContent}
-              style={styles.dishesScroll}
-            >
-              <View style={styles.dishesRowsContainer}>
-                <View style={styles.dishesRow}>
-                  {popularTags.slice(0, 7).map((tag, index) => (
-                    <TouchableOpacity 
-                      key={index} 
-                      style={styles.dishChip} 
-                      activeOpacity={0.8}
-                      onPress={() => {
-                        setSearchText(tag.name);
-                        setIsSearchActive(true);
-                      }}
-                    >
-                      <View style={[styles.dishIconCircle, { backgroundColor: tag.color + '15' }]}>
-                        {renderTagIcon(tag)}
-                      </View>
-                      <Text style={styles.dishChipText}>{tag.name}</Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-                <View style={styles.dishesRow}>
-                  {popularTags.slice(7, 14).map((tag, index) => (
-                    <TouchableOpacity 
-                      key={index} 
-                      style={styles.dishChip} 
-                      activeOpacity={0.8}
-                      onPress={() => {
-                        setSearchText(tag.name);
-                        setIsSearchActive(true);
-                      }}
-                    >
-                      <View style={[styles.dishIconCircle, { backgroundColor: tag.color + '15' }]}>
-                        {renderTagIcon(tag)}
-                      </View>
-                      <Text style={styles.dishChipText}>{tag.name}</Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-              </View>
-            </ScrollView>
-          </View>
-
-          {store149Items.length > 0 && (
-            <LinearGradient
-              colors={theme === 'light' ? ['#F5F3FF', '#EDE9FE', '#F5F3FF'] : ['#2E1065', '#4C1D95', '#2E1065']}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-              style={styles.store149Container}
-            >
-              <View style={styles.store149Header}>
-                <View style={{ flex: 1 }}>
-                  <View style={styles.store149LogoContainer}>
-                    <View style={styles.store149LogoCircle}>
-                      <Text style={styles.store149LogoText}>149</Text>
+          {showHomeSkeleton ? (
+            <GreetingSectionSkeleton colors={colors} styles={styles} />
+          ) : (
+            <View style={styles.greetingSection}>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+                <Text style={[styles.greetingTitle, { marginBottom: 0, flex: 1, marginRight: 10 }]}>
+                  {getGreeting(userName)}
+                </Text>
+                
+                <TouchableOpacity 
+                  activeOpacity={0.85}
+                  onPress={() => setFoodFilter(foodFilter === 'veg' ? 'all' : 'veg')}
+                >
+                  <Animated.View style={[
+                    styles.vegMorphBadge,
+                    {
+                      width: vegAnim.interpolate({ inputRange: [0, 1], outputRange: [38, 85] }),
+                      backgroundColor: vegAnim.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: [colors.surface, '#16A34A']
+                      }),
+                      borderColor: vegAnim.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: [colors.border, '#15803D']
+                      }),
+                    }
+                  ]}>
+                    <View style={styles.vegMorphIconWrap}>
+                      <Ionicons 
+                        name="leaf" 
+                        size={14} 
+                        color={foodFilter === 'veg' ? '#FFFFFF' : '#16A34A'} 
+                      />
                     </View>
-                    <Text style={styles.store149BrandText}>store</Text>
-                  </View>
-                  <View style={styles.store149Subheader}>
-                    <Ionicons name="checkmark-circle" size={14} color={theme === 'light' ? '#7C3AED' : '#C4B5FD'} />
-                    <Text style={[styles.store149SubText, { color: theme === 'light' ? '#6D28D9' : '#C4B5FD' }]}>Meals at ₹149 + Free Delivery</Text>
-                  </View>
-                </View>
-                <TouchableOpacity style={styles.store149ViewAllBtn} activeOpacity={0.7}>
-                  <Text style={styles.store149ViewAllText}>View All</Text>
-                  <Ionicons name="chevron-forward" size={12} color="#0284C7" />
+                    <Animated.Text 
+                      numberOfLines={1}
+                      style={[
+                        styles.vegMorphText,
+                        {
+                          opacity: vegAnim,
+                          transform: [{
+                            translateX: vegAnim.interpolate({
+                              inputRange: [0, 1],
+                              outputRange: [-10, 0]
+                            })
+                          }]
+                        }
+                      ]}
+                    >
+                      VEG
+                    </Animated.Text>
+                  </Animated.View>
                 </TouchableOpacity>
               </View>
 
               <ScrollView
                 horizontal
                 showsHorizontalScrollIndicator={false}
-                contentContainerStyle={styles.store149ScrollContent}
+                contentContainerStyle={styles.dishesScrollContent}
+                style={styles.dishesScroll}
               >
-                {store149Items.map((item) => {
-                  const cartItem = cartItems.find((i) => i._id === item._id);
-                  
-                  const handleAdd = () => {
-                    const foodItem = {
-                      _id: item._id,
-                      name: item.name,
-                      description: item.description || "",
-                      price: item.price,
-                      category: item.category || "149 Store",
-                      isVeg: item.isVeg,
-                      images: item.images && item.images.length > 0 ? item.images : ["https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=400"]
+                <View style={styles.dishesRowsContainer}>
+                  <View style={styles.dishesRow}>
+                    {popularTags.slice(0, 7).map((tag, index) => (
+                      <TouchableOpacity 
+                        key={index} 
+                        style={styles.dishChip} 
+                        activeOpacity={0.8}
+                        onPress={() => {
+                          setSearchText(tag.name);
+                          setIsSearchActive(true);
+                        }}
+                      >
+                        <View style={[styles.dishIconCircle, { backgroundColor: tag.color + '15' }]}>
+                          {renderTagIcon(tag)}
+                        </View>
+                        <Text style={styles.dishChipText}>{tag.name}</Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                  <View style={styles.dishesRow}>
+                    {popularTags.slice(7, 14).map((tag, index) => (
+                      <TouchableOpacity 
+                        key={index} 
+                        style={styles.dishChip} 
+                        activeOpacity={0.8}
+                        onPress={() => {
+                          setSearchText(tag.name);
+                          setIsSearchActive(true);
+                        }}
+                      >
+                        <View style={[styles.dishIconCircle, { backgroundColor: tag.color + '15' }]}>
+                          {renderTagIcon(tag)}
+                        </View>
+                        <Text style={styles.dishChipText}>{tag.name}</Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                </View>
+              </ScrollView>
+            </View>
+          )}
+
+          {showHomeSkeleton ? (
+            activeService === 'Food' && (
+              <Store149Skeleton colors={colors} theme={theme} styles={styles} />
+            )
+          ) : (
+            store149Items.length > 0 && (
+              <LinearGradient
+                colors={theme === 'light' ? ['#F5F3FF', '#EDE9FE', '#F5F3FF'] : ['#2E1065', '#4C1D95', '#2E1065']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.store149Container}
+              >
+                <View style={styles.store149Header}>
+                  <View style={{ flex: 1 }}>
+                    <View style={styles.store149LogoContainer}>
+                      <View style={styles.store149LogoCircle}>
+                        <Text style={styles.store149LogoText}>149</Text>
+                      </View>
+                      <Text style={styles.store149BrandText}>store</Text>
+                    </View>
+                    <View style={styles.store149Subheader}>
+                      <Ionicons name="checkmark-circle" size={14} color={theme === 'light' ? '#7C3AED' : '#C4B5FD'} />
+                      <Text style={[styles.store149SubText, { color: theme === 'light' ? '#6D28D9' : '#C4B5FD' }]}>Meals at ₹149 + Free Delivery</Text>
+                    </View>
+                  </View>
+                  <TouchableOpacity style={styles.store149ViewAllBtn} activeOpacity={0.7}>
+                    <Text style={styles.store149ViewAllText}>View All</Text>
+                    <Ionicons name="chevron-forward" size={12} color="#0284C7" />
+                  </TouchableOpacity>
+                </View>
+
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={styles.store149ScrollContent}
+                >
+                  {store149Items.map((item) => {
+                    const cartItem = cartItems.find((i) => i._id === item._id);
+                    
+                    const handleAdd = () => {
+                      const foodItem = {
+                        _id: item._id,
+                        name: item.name,
+                        description: item.description || "",
+                        price: item.price,
+                        category: item.category || "149 Store",
+                        isVeg: item.isVeg,
+                        images: item.images && item.images.length > 0 ? item.images : ["https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=400"]
+                      };
+                      addCartItem(foodItem, item.vendorId);
                     };
-                    addCartItem(foodItem, item.vendorId);
-                  };
 
-                  return (
-                    <View key={item._id} style={styles.store149Card}>
-                      <View style={styles.store149ImageContainer}>
-                        <Image
-                          source={{ uri: item.images && item.images.length > 0 ? item.images[0] : "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=400" }}
-                          style={styles.store149Image}
-                        />
-                        
-                        {/* Diet overlay (top-left) */}
-                        <View style={styles.store149DietOverlay}>
-                          <View style={[styles.store149DietIcon, { borderColor: item.isVeg ? "#16A34A" : "#E11D48" }]}>
-                            <View style={[styles.store149DietDot, { backgroundColor: item.isVeg ? "#16A34A" : "#E11D48" }]} />
+                    return (
+                      <View key={item._id} style={styles.store149Card}>
+                        <View style={styles.store149ImageContainer}>
+                          <Image
+                            source={{ uri: item.images && item.images.length > 0 ? item.images[0] : "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=400" }}
+                            style={styles.store149Image}
+                          />
+                          
+                          {/* Diet overlay (top-left) */}
+                          <View style={styles.store149DietOverlay}>
+                            <View style={[styles.store149DietIcon, { borderColor: item.isVeg ? "#16A34A" : "#E11D48" }]}>
+                              <View style={[styles.store149DietDot, { backgroundColor: item.isVeg ? "#16A34A" : "#E11D48" }]} />
+                            </View>
                           </View>
-                        </View>
 
-                        {/* Rating overlay (top-right) */}
-                        <View style={styles.store149RatingOverlay}>
-                          <Ionicons name="star" size={9} color="#F59E0B" />
-                          <Text style={styles.store149RatingOverlayText}>{item.rating || "4.2"}</Text>
-                        </View>
+                          {/* Rating overlay (top-right) */}
+                          <View style={styles.store149RatingOverlay}>
+                            <Ionicons name="star" size={9} color="#F59E0B" />
+                            <Text style={styles.store149RatingOverlayText}>{item.rating || "4.2"}</Text>
+                          </View>
 
-                        {/* Add button overlay */}
-                        <View style={styles.store149AddButtonOverlay}>
-                          {cartItem ? (
-                            <View style={styles.store149QtyPill}>
-                              <TouchableOpacity
-                                onPress={() => updateCartQuantity(item._id, cartItem.quantity - 1)}
-                                style={styles.store149QtyBtn}
-                                activeOpacity={0.7}
-                              >
-                                <Feather name="minus" size={11} color="#002045" />
-                              </TouchableOpacity>
-                              <Text style={styles.store149QtyText}>{cartItem.quantity}</Text>
+                          {/* Add button overlay */}
+                          <View style={styles.store149AddButtonOverlay}>
+                            {cartItem ? (
+                              <View style={styles.store149QtyPill}>
+                                <TouchableOpacity
+                                  onPress={() => updateCartQuantity(item._id, cartItem.quantity - 1)}
+                                  style={styles.store149QtyBtn}
+                                  activeOpacity={0.7}
+                                >
+                                  <Feather name="minus" size={11} color="#002045" />
+                                </TouchableOpacity>
+                                <Text style={styles.store149QtyText}>{cartItem.quantity}</Text>
+                                <TouchableOpacity
+                                  onPress={handleAdd}
+                                  style={styles.store149QtyBtn}
+                                  activeOpacity={0.7}
+                                >
+                                  <Feather name="plus" size={11} color="#002045" />
+                                </TouchableOpacity>
+                              </View>
+                            ) : (
                               <TouchableOpacity
                                 onPress={handleAdd}
-                                style={styles.store149QtyBtn}
-                                activeOpacity={0.7}
+                                style={styles.store149AddPill}
+                                activeOpacity={0.85}
                               >
-                                <Feather name="plus" size={11} color="#002045" />
+                                <Text style={styles.store149AddText}>ADD</Text>
+                                <Feather name="plus" size={10} color="#16A34A" style={{ marginLeft: 2 }} />
                               </TouchableOpacity>
-                            </View>
-                          ) : (
-                            <TouchableOpacity
-                              onPress={handleAdd}
-                              style={styles.store149AddPill}
-                              activeOpacity={0.85}
-                            >
-                              <Text style={styles.store149AddText}>ADD</Text>
-                              <Feather name="plus" size={10} color="#16A34A" style={{ marginLeft: 2 }} />
-                            </TouchableOpacity>
-                          )}
-                        </View>
-                      </View>
-
-                      <View style={styles.store149Details}>
-                        <Text style={styles.store149Name} numberOfLines={1}>
-                          {item.name}
-                        </Text>
-
-                        <View style={styles.store149PriceRow}>
-                          <Text style={styles.store149OriginalPrice}>₹{item.originalPrice}</Text>
-                          <View style={styles.store149PriceHighlight}>
-                            <Text style={styles.store149DealPrice}>₹{item.price}</Text>
+                            )}
                           </View>
                         </View>
 
-                        <Text style={styles.store149Brand} numberOfLines={1}>
-                          {item.brand || "KFC"}
-                        </Text>
+                        <View style={styles.store149Details}>
+                          <Text style={styles.store149Name} numberOfLines={1}>
+                            {item.name}
+                          </Text>
+
+                          <View style={styles.store149PriceRow}>
+                            <Text style={styles.store149OriginalPrice}>₹{item.originalPrice}</Text>
+                            <View style={styles.store149PriceHighlight}>
+                              <Text style={styles.store149DealPrice}>₹{item.price}</Text>
+                            </View>
+                          </View>
+
+                          <Text style={styles.store149Brand} numberOfLines={1}>
+                            {item.brand || "KFC"}
+                          </Text>
+                        </View>
                       </View>
-                    </View>
-                  );
-                })}
-              </ScrollView>
-            </LinearGradient>
+                    );
+                  })}
+                </ScrollView>
+              </LinearGradient>
+            )
           )}
         </>
       )}
@@ -918,6 +999,24 @@ export default function HomeScreen() {
         ListEmptyComponent={() => {
           if (showHomeSkeleton || loadingDrivers) return null;
           
+          if (hasNoLocation) {
+            return (
+              <View style={styles.noServiceContainer}>
+                <Ionicons name="location-sharp" size={80} color={colors.primary} style={{ marginBottom: 16 }} />
+                <Text style={[styles.noServiceTitle, { color: colors.text }]}>No Location Selected</Text>
+                <Text style={[styles.noServiceSubtitle, { color: colors.textSecondary }]}>
+                  Please select your delivery location or enable device GPS to view available restaurants and services near you.
+                </Text>
+                <TouchableOpacity 
+                  style={[styles.noServiceButton, { backgroundColor: colors.primary }]}
+                  onPress={() => router.push("/delivery/saved-addresses")}
+                >
+                  <Text style={[styles.noServiceButtonText, { color: colors.surface }]}>Select Address</Text>
+                </TouchableOpacity>
+              </View>
+            );
+          }
+
           if (searchText) {
             return (
               <View style={styles.emptySearchContainer}>
@@ -926,6 +1025,25 @@ export default function HomeScreen() {
                 <Text style={[styles.emptySearchSubtitle, { color: colors.textSecondary }]}>
                   We couldn't find any outlets matching "{searchText}"
                 </Text>
+              </View>
+            );
+          }
+
+          if (visibleItems.length === 0) {
+            const serviceName = activeService === "Meat" ? "meat" : "food";
+            return (
+              <View style={styles.noServiceContainer}>
+                <Ionicons name="location-outline" size={80} color={colors.error} />
+                <Text style={[styles.noServiceTitle, { color: colors.text }]}>No Service in this Location</Text>
+                <Text style={[styles.noServiceSubtitle, { color: colors.textSecondary }]}>
+                  We don't have {serviceName} delivery services in this location. Please try changing your location.
+                </Text>
+                <TouchableOpacity 
+                  style={[styles.noServiceButton, { backgroundColor: colors.primary }]}
+                  onPress={() => router.push("/delivery/saved-addresses")}
+                >
+                  <Text style={[styles.noServiceButtonText, { color: colors.surface }]}>Change Location</Text>
+                </TouchableOpacity>
               </View>
             );
           }
@@ -940,26 +1058,7 @@ export default function HomeScreen() {
                 </Text>
                 <TouchableOpacity 
                   style={[styles.noServiceButton, { backgroundColor: colors.primary }]}
-                  onPress={() => setIsLocationSheetOpen(true)}
-                >
-                  <Text style={[styles.noServiceButtonText, { color: colors.surface }]}>Change Location</Text>
-                </TouchableOpacity>
-              </View>
-            );
-          }
-          
-          if (visibleItems.length === 0) {
-            const serviceName = activeService === "Meat" ? "meat" : "food";
-            return (
-              <View style={styles.noServiceContainer}>
-                <Ionicons name="location-outline" size={80} color={colors.error} />
-                <Text style={[styles.noServiceTitle, { color: colors.text }]}>No Service in this Location</Text>
-                <Text style={[styles.noServiceSubtitle, { color: colors.textSecondary }]}>
-                  We don't have {serviceName} delivery services in this location. Please try changing your location.
-                </Text>
-                <TouchableOpacity 
-                  style={[styles.noServiceButton, { backgroundColor: colors.primary }]}
-                  onPress={() => setIsLocationSheetOpen(true)}
+                  onPress={() => router.push("/delivery/saved-addresses")}
                 >
                   <Text style={[styles.noServiceButtonText, { color: colors.surface }]}>Change Location</Text>
                 </TouchableOpacity>
@@ -977,6 +1076,7 @@ export default function HomeScreen() {
         contentContainerStyle={[
           styles.mainScrollContent, 
           { 
+            flexGrow: showCategories ? undefined : 1,
             paddingTop: showCategories ? topPadding + 175 : topPadding + 60,
             paddingBottom: keyboardHeight > 0 ? keyboardHeight + 100 : 120
           }
@@ -1045,54 +1145,58 @@ export default function HomeScreen() {
               styles.categoriesContainer,
               { transform: [{ translateY: categoriesTranslateY }] }
             ]}>
-              <ScrollView
-                ref={categoriesScrollRef}
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={styles.categoriesScrollContent}
-                scrollEventThrottle={16}
-              >
-                <ServiceCategory
-                  icon="bag-outline"
-                  label="Task"
-                  onPress={() => router.push({ pathname: "/service-selection", params: { label: "Task" } })}
-                />
-                <ServiceCategory
-                  icon="car-outline"
-                  label="Rides"
-                  onPress={() => router.push({ pathname: "/all-services" })}
-                />
-                <ServiceCategory
-                  icon="fast-food-outline"
-                  label="Food"
-                  active={activeService === 'Food'}
-                  onPress={() => handleServiceSwitch('Food')}
-                />
-                <ServiceCategory
-                  icon="heart-pulse"
-                  iconFamily="MaterialCommunityIcons"
-                  label="Health"
-                  onPress={() => router.push({
-                    pathname: "/service-selection",
-                    params: appliedDistanceKm ? { label: "Health", radiusKm: String(appliedDistanceKm) } : { label: "Health" },
-                  })}
-                />
-                <ServiceCategory
-                  icon="food-steak"
-                  iconFamily="MaterialCommunityIcons"
-                  label="Meat"
-                  active={activeService === 'Meat'}
-                  onPress={() => handleServiceSwitch('Meat')}
-                />
-                <ServiceCategory
-                  icon="paw-outline"
-                  label="Pets"
-                  onPress={() => router.push({
-                    pathname: "/service-selection",
-                    params: appliedDistanceKm ? { label: "pets", radiusKm: String(appliedDistanceKm) } : { label: "pets" },
-                  })}
-                />
-              </ScrollView>
+              {showHomeSkeleton ? (
+                <CategorySkeleton colors={colors} />
+              ) : (
+                <ScrollView
+                  ref={categoriesScrollRef}
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={styles.categoriesScrollContent}
+                  scrollEventThrottle={16}
+                >
+                  <ServiceCategory
+                    icon="bag-outline"
+                    label="Task"
+                    onPress={() => router.push({ pathname: "/service-selection", params: { label: "Task" } })}
+                  />
+                  <ServiceCategory
+                    icon="car-outline"
+                    label="Rides"
+                    onPress={() => router.push({ pathname: "/all-services" })}
+                  />
+                  <ServiceCategory
+                    icon="fast-food-outline"
+                    label="Food"
+                    active={activeService === 'Food'}
+                    onPress={() => handleServiceSwitch('Food')}
+                  />
+                  <ServiceCategory
+                    icon="heart-pulse"
+                    iconFamily="MaterialCommunityIcons"
+                    label="Health"
+                    onPress={() => router.push({
+                      pathname: "/service-selection",
+                      params: appliedDistanceKm ? { label: "Health", radiusKm: String(appliedDistanceKm) } : { label: "Health" },
+                    })}
+                  />
+                  <ServiceCategory
+                    icon="food-steak"
+                    iconFamily="MaterialCommunityIcons"
+                    label="Meat"
+                    active={activeService === 'Meat'}
+                    onPress={() => handleServiceSwitch('Meat')}
+                  />
+                  <ServiceCategory
+                    icon="paw-outline"
+                    label="Pets"
+                    onPress={() => router.push({
+                      pathname: "/service-selection",
+                      params: appliedDistanceKm ? { label: "pets", radiusKm: String(appliedDistanceKm) } : { label: "pets" },
+                    })}
+                  />
+                </ScrollView>
+              )}
             </Animated.View>
           )}
         </Animated.View>
@@ -1110,44 +1214,48 @@ export default function HomeScreen() {
           ]}
           pointerEvents="box-none"
         >
-          {/* Search Bar Dropzone */}
-          <Animated.View
-            style={[
-              styles.searchGlowShell,
-              {
-                transform: [{ scale: searchBarScale }],
-                borderColor: isHoveringSearch ? (theme === 'light' ? '#0F172A' : '#FFFFFF') : colors.border,
-                borderWidth: isHoveringSearch ? 2.5 : 2,
-              },
-            ]}
-          >
+          {showHomeSkeleton ? (
+            <SearchBarSkeleton colors={colors} />
+          ) : (
+            /* Search Bar Dropzone */
             <Animated.View
               style={[
-                styles.searchGlowLayer,
+                styles.searchGlowShell,
                 {
-                  opacity: isHoveringSearch ? 1 : searchGlowOpacity,
-                  transform: [{ rotate: searchGlowRotate }],
+                  transform: [{ scale: searchBarScale }],
+                  borderColor: isHoveringSearch ? (theme === 'light' ? '#0F172A' : '#FFFFFF') : colors.border,
+                  borderWidth: isHoveringSearch ? 2.5 : 2,
                 },
               ]}
             >
-              <LinearGradient
-                colors={["#22D3EE", "#A855F7", "#F97316", "#10B981", "#22D3EE"]}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={StyleSheet.absoluteFill}
-              />
+              <Animated.View
+                style={[
+                  styles.searchGlowLayer,
+                  {
+                    opacity: isHoveringSearch ? 1 : searchGlowOpacity,
+                    transform: [{ rotate: searchGlowRotate }],
+                  },
+                ]}
+              >
+                <LinearGradient
+                  colors={["#22D3EE", "#A855F7", "#F97316", "#10B981", "#22D3EE"]}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={StyleSheet.absoluteFill}
+                />
+              </Animated.View>
+              <TouchableOpacity 
+                style={styles.searchBar} 
+                activeOpacity={0.9} 
+                onPress={() => setIsSearchActive(true)}
+              >
+                <Ionicons name="search" size={18} color={colors.primary} />
+                <Text style={[styles.searchInput, { color: searchText ? colors.text : colors.textSecondary, paddingTop: Platform.OS === 'ios' ? 0 : 3 }]}>
+                  {searchText || 'Search "milk", "eggs", "bread"'}
+                </Text>
+              </TouchableOpacity>
             </Animated.View>
-            <TouchableOpacity 
-              style={styles.searchBar} 
-              activeOpacity={0.9} 
-              onPress={() => setIsSearchActive(true)}
-            >
-              <Ionicons name="search" size={18} color={colors.primary} />
-              <Text style={[styles.searchInput, { color: searchText ? colors.text : colors.textSecondary, paddingTop: Platform.OS === 'ios' ? 0 : 3 }]}>
-                {searchText || 'Search "milk", "eggs", "bread"'}
-              </Text>
-            </TouchableOpacity>
-          </Animated.View>
+          )}
         </View>
       )}
 
@@ -1300,11 +1408,7 @@ export default function HomeScreen() {
         </View>
       </Modal>
 
-      <LocationPickerSheet 
-        isOpen={isLocationSheetOpen} 
-        onClose={() => setIsLocationSheetOpen(false)} 
-        onSelectAddress={(address) => setSelectedAddress(address)}
-      />
+
 
 
 
@@ -1455,6 +1559,209 @@ function HomeSkeletonCard({ colors }: { colors: typeof Colors.light }) {
         <SkeletonBlock style={styles.skeletonLineSmall} shimmer={shimmer} shimmerHighlight={shimmerHighlight} />
       </View>
       <SkeletonBlock style={styles.skeletonOffer} shimmer={shimmer} shimmerHighlight={shimmerHighlight} />
+    </View>
+  );
+}
+
+function CategorySkeleton({ colors }: { colors: typeof Colors.light }) {
+  const shimmer = useRef(new Animated.Value(0)).current;
+  const shimmerHighlight = colors.background === Colors.light.background
+    ? "rgba(255,255,255,0.72)"
+    : "rgba(255,255,255,0.12)";
+
+  useEffect(() => {
+    const animation = Animated.loop(
+      Animated.timing(shimmer, {
+        toValue: 1,
+        duration: 1300,
+        easing: Easing.linear,
+        useNativeDriver: true,
+      })
+    );
+    animation.start();
+    return () => animation.stop();
+  }, [shimmer]);
+
+  return (
+    <View style={{ flexDirection: 'row', gap: 16, paddingLeft: 16, paddingVertical: 10 }}>
+      {[1, 2, 3, 4, 5, 6].map((i) => (
+        <View key={i} style={{ alignItems: 'center' }}>
+          <SkeletonBlock 
+            style={{ width: 56, height: 56, borderRadius: 28, backgroundColor: colors.border }} 
+            shimmer={shimmer} 
+            shimmerHighlight={shimmerHighlight} 
+          />
+          <SkeletonBlock 
+            style={{ width: 44, height: 10, borderRadius: 3, backgroundColor: colors.border, marginTop: 8 }} 
+            shimmer={shimmer} 
+            shimmerHighlight={shimmerHighlight} 
+          />
+        </View>
+      ))}
+    </View>
+  );
+}
+
+function SearchBarSkeleton({ colors }: { colors: typeof Colors.light }) {
+  const shimmer = useRef(new Animated.Value(0)).current;
+  const shimmerHighlight = colors.background === Colors.light.background
+    ? "rgba(255,255,255,0.72)"
+    : "rgba(255,255,255,0.12)";
+
+  useEffect(() => {
+    const animation = Animated.loop(
+      Animated.timing(shimmer, {
+        toValue: 1,
+        duration: 1300,
+        easing: Easing.linear,
+        useNativeDriver: true,
+      })
+    );
+    animation.start();
+    return () => animation.stop();
+  }, [shimmer]);
+
+  return (
+    <View style={{ width: '92%', alignSelf: 'center', height: 56, borderRadius: 28, backgroundColor: colors.border, padding: 2, overflow: 'hidden', shadowColor: "#000", shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.15, shadowRadius: 10, elevation: 6 }}>
+      <SkeletonBlock 
+        style={{ width: '100%', height: '100%', borderRadius: 26, backgroundColor: colors.surface }} 
+        shimmer={shimmer} 
+        shimmerHighlight={shimmerHighlight} 
+      />
+    </View>
+  );
+}
+
+function Store149Skeleton({ colors, theme, styles }: { colors: typeof Colors.light, theme: 'light' | 'dark', styles: any }) {
+  const shimmer = useRef(new Animated.Value(0)).current;
+  const shimmerHighlight = colors.background === Colors.light.background
+    ? "rgba(255,255,255,0.72)"
+    : "rgba(255,255,255,0.12)";
+
+  useEffect(() => {
+    const animation = Animated.loop(
+      Animated.timing(shimmer, {
+        toValue: 1,
+        duration: 1300,
+        easing: Easing.linear,
+        useNativeDriver: true,
+      })
+    );
+    animation.start();
+    return () => animation.stop();
+  }, [shimmer]);
+
+  return (
+    <LinearGradient
+      colors={theme === 'light' ? ['#F5F3FF', '#EDE9FE', '#F5F3FF'] : ['#2E1065', '#4C1D95', '#2E1065']}
+      start={{ x: 0, y: 0 }}
+      end={{ x: 1, y: 1 }}
+      style={styles.store149Container}
+    >
+      <View style={styles.store149Header}>
+        <View style={{ flex: 1 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+            <SkeletonBlock 
+              style={{ width: 80, height: 24, borderRadius: 12, backgroundColor: colors.border }} 
+              shimmer={shimmer} 
+              shimmerHighlight={shimmerHighlight} 
+            />
+            <SkeletonBlock 
+              style={{ width: 120, height: 14, borderRadius: 7, backgroundColor: colors.border }} 
+              shimmer={shimmer} 
+              shimmerHighlight={shimmerHighlight} 
+            />
+          </View>
+        </View>
+      </View>
+
+      <View style={{ flexDirection: 'row', gap: 12, paddingLeft: 16 }}>
+        {[1, 2, 3].map((i) => (
+          <View key={i} style={[styles.store149Card, { backgroundColor: colors.surface, width: 140, height: 200, padding: 8, borderRadius: 12 }]}>
+            <SkeletonBlock 
+              style={{ width: '100%', height: 100, borderRadius: 8, backgroundColor: colors.border }} 
+              shimmer={shimmer} 
+              shimmerHighlight={shimmerHighlight} 
+            />
+            <SkeletonBlock 
+              style={{ width: '80%', height: 12, borderRadius: 3, backgroundColor: colors.border, marginTop: 12 }} 
+              shimmer={shimmer} 
+              shimmerHighlight={shimmerHighlight} 
+            />
+            <SkeletonBlock 
+              style={{ width: '50%', height: 10, borderRadius: 3, backgroundColor: colors.border, marginTop: 8 }} 
+              shimmer={shimmer} 
+              shimmerHighlight={shimmerHighlight} 
+            />
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 12 }}>
+              <SkeletonBlock 
+                style={{ width: 40, height: 14, borderRadius: 3, backgroundColor: colors.border }} 
+                shimmer={shimmer} 
+                shimmerHighlight={shimmerHighlight} 
+              />
+              <SkeletonBlock 
+                style={{ width: 48, height: 24, borderRadius: 12, backgroundColor: colors.border }} 
+                shimmer={shimmer} 
+                shimmerHighlight={shimmerHighlight} 
+              />
+            </View>
+          </View>
+        ))}
+      </View>
+    </LinearGradient>
+  );
+}
+
+function GreetingSectionSkeleton({ colors, styles }: { colors: typeof Colors.light, styles: any }) {
+  const shimmer = useRef(new Animated.Value(0)).current;
+  const shimmerHighlight = colors.background === Colors.light.background
+    ? "rgba(255,255,255,0.72)"
+    : "rgba(255,255,255,0.12)";
+
+  useEffect(() => {
+    const animation = Animated.loop(
+      Animated.timing(shimmer, {
+        toValue: 1,
+        duration: 1300,
+        easing: Easing.linear,
+        useNativeDriver: true,
+      })
+    );
+    animation.start();
+    return () => animation.stop();
+  }, [shimmer]);
+
+  return (
+    <View style={styles.greetingSection}>
+      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+        <SkeletonBlock 
+          style={{ width: 180, height: 24, borderRadius: 12, backgroundColor: colors.border }} 
+          shimmer={shimmer} 
+          shimmerHighlight={shimmerHighlight} 
+        />
+        <SkeletonBlock 
+          style={{ width: 64, height: 32, borderRadius: 16, backgroundColor: colors.border }} 
+          shimmer={shimmer} 
+          shimmerHighlight={shimmerHighlight} 
+        />
+      </View>
+
+      <View style={{ flexDirection: 'row', gap: 12, paddingBottom: 10 }}>
+        {[1, 2, 3, 4].map((i) => (
+          <View key={i} style={[styles.dishChip, { width: 90, height: 36, paddingHorizontal: 8, borderRadius: 18, flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: colors.surface, borderHeight: 1, borderColor: colors.border }]}>
+            <SkeletonBlock 
+              style={{ width: 20, height: 20, borderRadius: 10, backgroundColor: colors.border }} 
+              shimmer={shimmer} 
+              shimmerHighlight={shimmerHighlight} 
+            />
+            <SkeletonBlock 
+              style={{ width: 44, height: 10, borderRadius: 3, backgroundColor: colors.border }} 
+              shimmer={shimmer} 
+              shimmerHighlight={shimmerHighlight} 
+            />
+          </View>
+        ))}
+      </View>
     </View>
   );
 }
@@ -2151,6 +2458,7 @@ const createStyles = (colors: typeof Colors.light) => StyleSheet.create({
     marginTop: 6,
   },
   noServiceContainer: {
+    flex: 1,
     alignItems: "center",
     justifyContent: "center",
     paddingVertical: 60,

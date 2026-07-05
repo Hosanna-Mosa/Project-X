@@ -5,6 +5,7 @@ import DriverPayout, { DriverPayoutStatus } from "../../database/models/DriverPa
 import User from "../../database/models/User";
 import { PaymentService } from "../payments/payment.service";
 import { SocketManager } from "../../sockets/socket.manager";
+import { ZonesService } from "../zones/zones.service";
 
 export interface HighDemandArea {
   id: string;
@@ -20,9 +21,46 @@ export interface HighDemandArea {
 export class DriverService {
   private paymentService = new PaymentService();
 
+  private haversineDistance(lat1: number, lng1: number, lat2: number, lng2: number): number {
+    const R = 6371e3; // Earth's radius in meters
+    const phi1 = lat1 * (Math.PI / 180);
+    const phi2 = lat2 * (Math.PI / 180);
+    const deltaPhi = (lat2 - lat1) * (Math.PI / 180);
+    const deltaLambda = (lng2 - lng1) * (Math.PI / 180);
+
+    const a =
+      Math.sin(deltaPhi / 2) * Math.sin(deltaPhi / 2) +
+      Math.cos(phi1) * Math.cos(phi2) * Math.sin(deltaLambda / 2) * Math.sin(deltaLambda / 2);
+
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+
+    return R * c; // distance in meters
+  }
+
   async getNearbyDrivers(lat: number, lng: number, radiusInMeters: number = 5000, vehicleType?: string) {
     const socketManager = SocketManager.getInstance();
     const redisClient = socketManager ? (socketManager as any).redisClient : null;
+
+    console.log(`[DRIVER SEARCH] Query coordinates: [lng: ${lng}, lat: ${lat}] with radius: ${radiusInMeters}m, vehicleType: ${vehicleType}`);
+
+    // Zone Serviceability Check
+    const zonesService = new ZonesService();
+    const activeZone = await zonesService.getZoneForCoordinates(lat, lng);
+    if (!activeZone) {
+      console.log(`[DRIVER SEARCH] Coordinates [lat: ${lat}, lng: ${lng}] are outside all active zones. Returning 0 drivers.`);
+      return [];
+    }
+    const zoneId = activeZone._id;
+
+    try {
+      const allOnlineDrivers = await Driver.find({ status: DriverStatus.ONLINE });
+      console.log(`[DRIVER SEARCH DB] Total Online Drivers in DB: ${allOnlineDrivers.length}`);
+      allOnlineDrivers.forEach(d => {
+        console.log(` -> Driver ID: ${d._id}, vehicleType: ${d.vehicleType}, status: ${d.status}, isAvailable: ${d.isAvailable}, preferredZone: ${d.preferredZone}, coordinates: ${JSON.stringify(d.currentLocation?.coordinates)}`);
+      });
+    } catch (err: any) {
+      console.error("[DRIVER SEARCH DB] Error querying online drivers for logging:", err.message);
+    }
 
     // For development/testing: Ensure we have at least 2 drivers of each vehicle type in the database
     if (process.env.DISABLE_DRIVER_SIMULATOR !== "true") {
@@ -74,17 +112,33 @@ export class DriverService {
 
         for (const d of onlineDrivers) {
           const coords = d.currentLocation?.coordinates;
-          if (!coords || (coords[0] === 0 && coords[1] === 0)) {
+          const isFar = coords ? this.haversineDistance(lat, lng, coords[1], coords[0]) > radiusInMeters : true;
+          
+          // Simulator auto-assign logic: Auto-simulate only for Rajahmundry zones
+          const isAutoSimulatedZone = activeZone.name.toLowerCase().includes("533101") ||
+                                      activeZone.name.toLowerCase().includes("rajahmundry") ||
+                                      activeZone.name.toLowerCase().includes("demo") ||
+                                      activeZone.name.toLowerCase().includes("palacharla");
+                                      
+          const needsZoneUpdate = isAutoSimulatedZone && String(d.preferredZone) !== String(zoneId);
+
+          if (!coords || (coords[0] === 0 && coords[1] === 0) || isFar || needsZoneUpdate) {
             const randomLatOffset = (Math.random() - 0.5) * 0.03;
             const randomLngOffset = (Math.random() - 0.5) * 0.03;
             const finalLng = lng + randomLngOffset;
             const finalLat = lat + randomLatOffset;
+            
             d.currentLocation = {
               type: "Point",
               coordinates: [finalLng, finalLat]
             };
+            
+            if (isAutoSimulatedZone) {
+              d.preferredZone = activeZone._id;
+            }
+            
             await d.save();
-            console.log(`[SIMULATOR] Moved online driver ${d._id} (${type}) to [${finalLng}, ${finalLat}]`);
+            console.log(`[SIMULATOR] Moved online driver ${d._id} (${type}) to [${finalLng}, ${finalLat}] (Zone: ${activeZone.name})`);
 
             // Sync simulator locations to Redis geospatial store
             if (redisClient) {
@@ -107,7 +161,7 @@ export class DriverService {
     // Attempt Geospatial lookup in Redis first
     if (redisClient) {
       try {
-        console.log(`[REDIS] Querying nearby drivers within ${radiusInMeters}m of [${lng}, ${lat}]`);
+        console.log(`[REDIS] Querying nearby drivers within ${radiusInMeters}m of [${lng}, ${lat}] in Zone: ${activeZone.name}`);
         const nearbyDriverIds = await redisClient.geoSearch("drivers:locations",
           { longitude: lng, latitude: lat },
           { radius: radiusInMeters, unit: "m" }
@@ -118,6 +172,7 @@ export class DriverService {
             _id: { $in: nearbyDriverIds },
             status: DriverStatus.ONLINE,
             isAvailable: true,
+            preferredZone: activeZone._id, // Filter strictly by activeZone
           };
           if (vehicleType && ["bike", "auto", "car"].includes(vehicleType)) {
             query.vehicleType = vehicleType;
@@ -142,6 +197,7 @@ export class DriverService {
     const query: any = {
       status: DriverStatus.ONLINE,
       isAvailable: true,
+      preferredZone: activeZone._id, // Filter strictly by activeZone
       currentLocation: {
         $near: {
           $geometry: {
@@ -176,6 +232,9 @@ export class DriverService {
     if (!driver) throw new Error("Driver not found");
 
     driver.status = status;
+    if (status === DriverStatus.ONLINE) {
+      driver.isAvailable = true;
+    }
     return driver.save();
   }
 

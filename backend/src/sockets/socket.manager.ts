@@ -3,9 +3,10 @@ import { createClient } from "redis";
 import { createAdapter } from "@socket.io/redis-adapter";
 import http from "http";
 import jwt from "jsonwebtoken";
-import { UserRole } from "../database/models/User";
+import mongoose from "mongoose";
+import User, { UserRole } from "../database/models/User";
 import Order from "../database/models/Order";
-import Driver from "../database/models/Driver";
+import Driver, { DriverStatus } from "../database/models/Driver";
 
 export class SocketManager {
   private static instance: SocketManager;
@@ -127,21 +128,51 @@ export class SocketManager {
 
       // DRIVER LOCATION UPDATE: Store in Redis Geospatial & Emit to Order Room
       socket.on("driver_location_update", async (data: { driverId: string; orderId?: string; lat: number; lng: number }) => {
-        if (!authUser || (authUser.userId !== data.driverId && authUser.role !== "DRIVER")) {
+        if (!authUser || (authUser.role !== "DRIVER")) {
           console.warn(`[SOCKET SECURITY] Unauthorized driver location update from user ${authUser?.userId}`);
           return;
         }
 
-        console.log(`[SOCKET] Driver Location Update: ID=${data.driverId}, OrderID=${data.orderId || "none"}, Lat=${data.lat}, Lng=${data.lng}`);
+        let driverDocId = data.driverId;
+        try {
+          let resolvedDriver = null;
+          if (mongoose.Types.ObjectId.isValid(data.driverId)) {
+            resolvedDriver = await Driver.findById(data.driverId);
+          }
+          if (!resolvedDriver && authUser?.userId) {
+            resolvedDriver = await Driver.findOne({ user: authUser.userId });
+          }
+          if (!resolvedDriver && data.driverId) {
+            const userDoc = await User.findOne({ phone: data.driverId });
+            if (userDoc) {
+              resolvedDriver = await Driver.findOne({ user: userDoc._id });
+            }
+          }
+          
+          if (resolvedDriver) {
+            driverDocId = resolvedDriver._id.toString();
+            resolvedDriver.currentLocation = {
+              type: "Point",
+              coordinates: [Number(data.lng), Number(data.lat)]
+            };
+            resolvedDriver.status = DriverStatus.ONLINE;
+            resolvedDriver.isAvailable = true; // Set available on active tracking update
+            await resolvedDriver.save();
+          }
+        } catch (e: any) {
+          console.error("[SOCKET] Failed to resolve and update driver in MongoDB:", e.message);
+        }
+
+        console.log(`[SOCKET] Driver Location Update: ID=${data.driverId} (resolved=${driverDocId}), OrderID=${data.orderId || "none"}, Lat=${data.lat}, Lng=${data.lng}`);
         
         if (this.redisClient) {
           try {
             await this.redisClient.geoAdd("drivers:locations", {
               longitude: Number(data.lng),
               latitude: Number(data.lat),
-              member: data.driverId
+              member: driverDocId
             });
-            await this.redisClient.set(`driver_status:${data.driverId}`, "online", {
+            await this.redisClient.set(`driver_status:${driverDocId}`, "online", {
               EX: 30, // Status expiry 30 seconds
             });
           } catch (err: any) {
@@ -152,7 +183,7 @@ export class SocketManager {
         if (data.orderId) {
           // Emit to user tracking the order
           this.io.to(data.orderId).emit("driver_location_update", {
-            driverId: data.driverId,
+            driverId: driverDocId,
             lat: data.lat,
             lng: data.lng,
           });

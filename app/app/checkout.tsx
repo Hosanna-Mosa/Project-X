@@ -507,12 +507,6 @@ export default function FoodCheckoutScreen() {
         </Text>
       </View>
 
-      <LocationPickerSheet
-        isOpen={isAddressSheetOpen}
-        onClose={() => setIsAddressSheetOpen(false)}
-        onSelectAddress={handleSelectAddress}
-      />
-
       <ScheduleDateTimeSheet
         visible={showScheduleModal}
         onClose={() => setShowScheduleModal(false)}
