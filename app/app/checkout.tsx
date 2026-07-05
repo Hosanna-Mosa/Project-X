@@ -9,93 +9,98 @@ import {
   View,
   StatusBar,
   ActivityIndicator,
+  TextInput,
 } from "react-native";
 import { Feather, Ionicons } from "@expo/vector-icons";
 import { router, useLocalSearchParams, useFocusEffect } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import Colors from "@/constants/colors";
 import { useCartStore } from "@/contexts/cartStore";
 import { useDeliveryStore } from "@/contexts/deliveryStore";
-import { useThemeStore } from "@/contexts/themeStore";
 import { LocationPickerSheet } from "@/components/LocationPickerSheet";
-import { ScheduleDateTimeSheet } from "@/components/ScheduleDateTimeSheet";
 import { useAuthStore } from "@/contexts/authStore";
 import { customFetch } from "@/utils/api/custom-fetch";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { socketService } from "@/utils/socketService";
+import MapView, { Marker } from "react-native-maps";
+import { Modal } from "react-native";
 
-export default function FoodCheckoutScreen() {
+const DELIVERY_FEE_ORIGINAL = 199;
+const DELIVERY_FEE = 39; 
+const TAXES_AND_FEES = 85;
+const SERVICE_FEE = 49;
+const DISCOUNT = 160;
+
+const getMockCustomization = (itemName: string) => {
+  if (itemName.toLowerCase().includes("pancake")) {
+    return "Pancakes, Bacon, Coffee - Medium, Hash Brown Sticks";
+  }
+  if (itemName.toLowerCase().includes("burger")) {
+    return "Small Bun (4\"), Two Small Beef Patties, Tomato, Lettuce, Pickles, Diced Onions, Mustard";
+  }
+  return "Standard preparation";
+};
+
+export default function CheckoutScreen() {
   const insets = useSafeAreaInsets();
-  const params = useLocalSearchParams();
-  const { theme } = useThemeStore();
-  const colors = Colors[theme];
-  const styles = React.useMemo(() => createStyles(colors), [colors]);
-  const { getItemCount, vendorId, items, clearCart } = useCartStore();
+  const { vendorName } = useLocalSearchParams();
+  const { getItemCount, vendorId, items, getTotalPrice, clearCart } = useCartStore();
   const { user, token } = useAuthStore();
   const { setOrderId, setStatus, setServiceType } = useDeliveryStore();
+  
   const [isPlacingOrder, setIsPlacingOrder] = React.useState(false);
   const [isAddressSheetOpen, setIsAddressSheetOpen] = React.useState(false);
   const [selectedAddress, setSelectedAddress] = React.useState<any>(null);
-  const [deliveryTiming, setDeliveryTiming] = React.useState<"now" | "later" | null>("now"); // Default standard (now)
-  const [showScheduleModal, setShowScheduleModal] = React.useState(false);
-  const [scheduleStatus, setScheduleStatus] = React.useState<"idle" | "pending" | "accepted" | "rejected">("idle");
-  const [scheduledFor, setScheduledFor] = React.useState<string | null>(null);
-  const [scheduleRequestId, setScheduleRequestId] = React.useState<string | null>(null);
-  const [isSendingSchedule, setIsSendingSchedule] = React.useState(false);
+  const [selectedTip, setSelectedTip] = React.useState<number>(100);
+  const [isOtherTip, setIsOtherTip] = React.useState(false);
+  const [otherTipValue, setOtherTipValue] = React.useState("");
+  const [fetchedVendorName, setFetchedVendorName] = React.useState<string | null>(null);
+  const [deliveryMode, setDeliveryMode] = React.useState<"standard" | "scheduled">("standard");
+  const [scheduledTime, setScheduledTime] = React.useState<string | null>(null);
+  const [isTimePickerOpen, setIsTimePickerOpen] = React.useState(false);
+  const [dropOffOption, setDropOffOption] = React.useState("Leave at door");
+  const [isDropOffPickerOpen, setIsDropOffPickerOpen] = React.useState(false);
+  const [showDatePicker, setShowDatePicker] = React.useState(false);
+  
+  const [customSelectedDate, setCustomSelectedDate] = React.useState("Today");
+  const [customSelectedHour, setCustomSelectedHour] = React.useState("12");
+  const [customSelectedMinute, setCustomSelectedMinute] = React.useState("00");
+  const [customSelectedAmPm, setCustomSelectedAmPm] = React.useState("PM");
 
-  const userId = React.useMemo(
-    () => String(user?.id || user?._id || ""),
-    [user?.id, user?._id],
-  );
+  const handleCustomTimeApply = () => {
+    const formatted = `${customSelectedDate}, ${customSelectedHour}:${customSelectedMinute} ${customSelectedAmPm}`;
+    setScheduledTime(formatted);
+    setDeliveryMode("scheduled");
+    setShowDatePicker(false);
+    setIsTimePickerOpen(false);
+  };
 
-  const handleSelectAddress = React.useCallback((address: any) => {
-    setSelectedAddress(address);
-  }, []);
+  React.useEffect(() => {
+    if (vendorId) {
+      customFetch<any>(`/api/v1/vendors/${vendorId}`)
+        .then(v => {
+          if (v && v.name) setFetchedVendorName(v.name);
+        })
+        .catch(() => {});
+    }
+  }, [vendorId]);
 
-  // Mocking values if they equal standard menu sum, else use params
-  const subtotal = Number(params.subtotal || 24.00);
-  const deliveryFee = Number(params.deliveryFee || 0.99);
-  const taxes = Number(params.taxes || 1.46);
-  const total = Number(params.total || 26.45);
+  const displayVendorName = vendorName ? String(vendorName) : (fetchedVendorName || "Restaurant");
 
-  const hasValidAddress = React.useMemo(() => {
-    return Boolean(selectedAddress?.addressLine && selectedAddress?.phone);
-  }, [selectedAddress]);
+  const subtotal = getTotalPrice();
+  const baseTotal = Math.round((subtotal + TAXES_AND_FEES + DELIVERY_FEE + SERVICE_FEE - DISCOUNT) * 100) / 100;
+  const originalTotal = Math.round((subtotal + TAXES_AND_FEES + DELIVERY_FEE_ORIGINAL + SERVICE_FEE + selectedTip) * 100) / 100;
+  const finalTotal = baseTotal + selectedTip;
 
-  const isLaterConfirmed = deliveryTiming === "later" && scheduleStatus === "accepted";
-  const isNowReady = deliveryTiming === "now" && hasValidAddress;
-  const canContinue = isLaterConfirmed || isNowReady;
+  const userId = React.useMemo(() => String(user?.id || user?._id || ""), [user?.id, user?._id]);
+  const hasValidAddress = Boolean(selectedAddress?.addressLine && selectedAddress?.phone);
+
+  const dropLat = Number(selectedAddress?.coordinates?.lat ?? selectedAddress?.location?.coordinates?.[1] ?? 17.0005);
+  const dropLng = Number(selectedAddress?.coordinates?.lng ?? selectedAddress?.location?.coordinates?.[0] ?? 81.804);
 
   React.useEffect(() => {
     if (!userId) return;
     socketService.connect();
     socketService.emit("join", { userId, role: "USER" });
-
-    const matchesCustomer = (data: any) => String(data?.customerId) === userId;
-
-    const handleAccepted = (data: any) => {
-      if (!matchesCustomer(data)) return;
-      setDeliveryTiming("later");
-      setScheduleStatus("accepted");
-      if (data.scheduledFor) {
-        setScheduledFor(
-          typeof data.scheduledFor === "string"
-            ? data.scheduledFor
-            : new Date(data.scheduledFor).toISOString(),
-        );
-      }
-    };
-    const handleRejected = (data: any) => {
-      if (!matchesCustomer(data)) return;
-      setScheduleStatus("rejected");
-    };
-
-    socketService.on("scheduled_delivery_accepted", handleAccepted);
-    socketService.on("scheduled_delivery_rejected", handleRejected);
-    return () => {
-      socketService.off("scheduled_delivery_accepted", handleAccepted);
-      socketService.off("scheduled_delivery_rejected", handleRejected);
-    };
   }, [userId]);
 
   useFocusEffect(
@@ -112,35 +117,6 @@ export default function FoodCheckoutScreen() {
       })();
     }, [])
   );
-
-  React.useEffect(() => {
-    if (scheduleStatus !== "pending" || !scheduleRequestId) return;
-
-    const pollStatus = async () => {
-      try {
-        const status = await customFetch<any>(`/api/v1/orders/scheduled-delivery/${scheduleRequestId}/status`);
-        if (status.status === "accepted") {
-          setDeliveryTiming("later");
-          setScheduleStatus("accepted");
-          if (status.scheduledFor) {
-            setScheduledFor(
-              typeof status.scheduledFor === "string"
-                ? status.scheduledFor
-                : new Date(status.scheduledFor).toISOString(),
-            );
-          }
-        } else if (status.status === "rejected") {
-          setScheduleStatus("rejected");
-        }
-      } catch {
-        // Ignore transient polling errors
-      }
-    };
-
-    pollStatus();
-    const interval = setInterval(pollStatus, 2500);
-    return () => clearInterval(interval);
-  }, [scheduleStatus, scheduleRequestId]);
 
   const placeOrder = async () => {
     if (getItemCount() === 0) {

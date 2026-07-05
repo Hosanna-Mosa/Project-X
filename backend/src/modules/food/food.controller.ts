@@ -104,6 +104,27 @@ export const getStore149Items = async (req: Request, res: Response) => {
   try {
     const { lat, lng } = req.query;
     
+    // Function to get distinct Unsplash image based on name
+    const getMatchingImage = (name: string): string => {
+      const n = name.toLowerCase();
+      
+      // Verified Indian Food Unsplash IDs
+      if (n.includes("onion") || n.includes("rava")) return "https://images.unsplash.com/photo-1645177628172-a94c1f96e6db?w=400";
+      if (n.includes("mysore")) return "https://images.unsplash.com/photo-1606491956689-2ea866880c84?w=400";
+      if (n.includes("paper") || n.includes("ghee")) return "https://images.unsplash.com/photo-1668236543090-82eba5ee5976?w=400";
+      if (n.includes("dosa") || n.includes("pesarattu") || n.includes("appam")) return "https://images.unsplash.com/photo-1668236543090-82eba5ee5976?w=400";
+      
+      if (n.includes("idli")) return "https://images.unsplash.com/photo-1589301760014-d929f3979dbc?w=400";
+      if (n.includes("vada") || n.includes("wada") || n.includes("gari") || n.includes("garry")) return "https://images.unsplash.com/photo-1601050690597-df0568f70950?w=400";
+      if (n.includes("uttapam") || n.includes("uthappam")) return "https://images.unsplash.com/photo-1633383718081-22ac93e3db65?w=400";
+      if (n.includes("upma") || n.includes("pongal") || n.includes("poha")) return "https://images.unsplash.com/photo-1631515243349-e0cb75fb8d3a?w=400";
+      if (n.includes("rice") || n.includes("pulao") || n.includes("biryani")) return "https://images.unsplash.com/photo-1633383718081-22ac93e3db65?w=400";
+      if (n.includes("naan") || n.includes("roti") || n.includes("paratha") || n.includes("thepla") || n.includes("sandwich")) return "https://images.unsplash.com/photo-1565557623262-b51c2513a641?w=400";
+      if (n.includes("momos") || n.includes("manchurian") || n.includes("noodles") || n.includes("roll")) return "https://images.unsplash.com/photo-1625938146369-adc83368bda7?w=400";
+      if (n.includes("sweet") || n.includes("chocolate") || n.includes("gulab") || n.includes("jamun") || n.includes("halwa")) return "https://images.unsplash.com/photo-1605197584547-c91ffaba2dc1?w=400";
+      return "https://images.unsplash.com/photo-1631452180519-c014fe946bc0?w=400"; // fallback paneer/curry
+    };
+    
     // We will attempt to search for nearby vendors if lat/lng are provided
     let vendors: any[] = [];
     if (lat && lng) {
@@ -229,7 +250,7 @@ export const getStore149Items = async (req: Request, res: Response) => {
           description: item.description || "",
           price: 149,
           originalPrice,
-          images: item.images && item.images.length > 0 ? item.images : ["https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=400"],
+          images: [getMatchingImage(item.name)],
           isVeg: item.isVeg,
           category: item.category,
           rating: itemRating,

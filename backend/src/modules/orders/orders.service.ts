@@ -53,10 +53,9 @@ export class OrdersService {
     const activeZonesCount = await Zone.countDocuments({ isActive: true });
     if (activeZonesCount > 0) {
       const zone = await this.zonesService.getZoneForCoordinates(startPos.latitude, startPos.longitude, effectiveType);
-      if (!zone) {
-        throw new ValidationError("We do not operate in your pickup location yet.");
+      if (zone) {
+        surgeMultiplier = zone.pricingMultiplier;
       }
-      surgeMultiplier = zone.pricingMultiplier;
     }
 
     let totalPrice: number;
@@ -194,6 +193,11 @@ export class OrdersService {
     // BROADCAST to drivers
     const socketManager = SocketManager.getInstance();
     if (socketManager) {
+      console.log(
+        `[ORDER][SOCKET][REQUEST_FROM_USER] order=${savedOrder._id} customerUser=${userId} ` +
+        `serviceType=${effectiveType} isReserved=${Boolean(savedOrder.isReserved)} status=${savedOrder.status}`
+      );
+      socketManager.logConnectionStatus("before_new_order_broadcast", userId, undefined, savedOrder._id.toString());
       socketManager.broadcastToDrivers("new_order", {
         id: savedOrder._id,
         serviceType: effectiveType,
@@ -222,7 +226,8 @@ export class OrdersService {
           lng: s.location.coordinates[0],
           items: s.items,
         }))
-      });
+      }, "orders.createOrder");
+      socketManager.logConnectionStatus("after_new_order_broadcast", userId, undefined, savedOrder._id.toString());
 
       // NOTIFY vendor/restaurant
       if (vendorId && !isReserved) {
@@ -246,7 +251,7 @@ export class OrdersService {
             lng: s.location.coordinates[0],
             items: s.items,
           }))
-        });
+        }, "orders.createOrder.vendor");
       }
     }
 
@@ -386,10 +391,9 @@ export class OrdersService {
     const activeZonesCount = await Zone.countDocuments({ isActive: true });
     if (activeZonesCount > 0) {
       const zone = await this.zonesService.getZoneForCoordinates(pickupLat, pickupLng, serviceType);
-      if (!zone) {
-        throw new ValidationError("We do not operate in your pickup location yet.");
+      if (zone) {
+        surgeMultiplier = zone.pricingMultiplier;
       }
-      surgeMultiplier = zone.pricingMultiplier;
     }
 
     const breakdown = this.pricingService.calculateFareBreakdown(
@@ -572,12 +576,18 @@ export class OrdersService {
         reservedAt: order.reservedAt,
       };
 
-      socketManager.emitToOrderRoom(orderId.toString(), "order_accepted", payload);
+      console.log(
+        `[ORDER][SOCKET][DRIVER_ACCEPTED] order=${orderId} driverUser=${driverUserId} ` +
+        `customerUser=${order.user?.toString() || "unknown"} driverProfile=${driver._id}`
+      );
+      socketManager.logConnectionStatus("before_driver_accept_emit", order.user?.toString(), driverUserId, orderId.toString());
+      socketManager.emitToOrderRoom(orderId.toString(), "order_accepted", payload, "orders.acceptOrder");
 
       // Also emit directly to the customer's user room
       if (order.user) {
-        socketManager.emitToUser(order.user.toString(), "order_accepted", payload);
+        socketManager.emitToUser(order.user.toString(), "order_accepted", payload, "orders.acceptOrder.customer");
       }
+      socketManager.logConnectionStatus("after_driver_accept_emit", order.user?.toString(), driverUserId, orderId.toString());
     }
 
     const populated = await Order.findOne(this.getOrderQuery(orderId)).populate("user").populate("driver").populate("vendor");

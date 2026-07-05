@@ -1,5 +1,5 @@
 import React from "react";
-import { Image, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { Image, StyleSheet, Text, TouchableOpacity, View, ScrollView, Dimensions } from "react-native";
 import { Feather, MaterialIcons, Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import Colors from "@/constants/colors";
@@ -63,10 +63,40 @@ export function RestaurantListItem({
     });
   };
 
+  const CARD_WIDTH = Dimensions.get('window').width - 32;
+  const [activeIndex, setActiveIndex] = React.useState(0);
+  
+  const carouselImages = React.useMemo(() => {
+     return [
+       image,
+       "https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=800&q=80", 
+       "https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?w=800&q=80", 
+       "https://images.unsplash.com/photo-1499028344343-cd173ffc68a9?w=800&q=80"
+     ];
+  }, [image]);
+
+  const handleScroll = (event: any) => {
+    const scrollPosition = event.nativeEvent.contentOffset.x;
+    const index = Math.round(scrollPosition / CARD_WIDTH);
+    setActiveIndex(index);
+  };
+
   return (
-    <TouchableOpacity style={styles.container} activeOpacity={0.95} onPress={handlePress}>
+    <View style={styles.container}>
       <View style={styles.imageWrapper}>
-        <Image source={{ uri: image }} style={styles.image} />
+        <ScrollView
+          horizontal
+          pagingEnabled
+          showsHorizontalScrollIndicator={false}
+          onMomentumScrollEnd={handleScroll}
+          style={{ width: CARD_WIDTH, height: 220 }}
+        >
+          {carouselImages.map((img, idx) => (
+            <TouchableOpacity key={idx} activeOpacity={0.9} onPress={handlePress} style={{ width: CARD_WIDTH, height: 220, overflow: 'hidden' }}>
+              <Image source={{ uri: img }} style={{ width: "100%", height: "100%" }} resizeMode="cover" />
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
         {isPureVeg && (
           <View style={styles.pureVegBadge}>
             <View style={styles.pureVegDot} />
@@ -74,13 +104,13 @@ export function RestaurantListItem({
           </View>
         )}
         <View style={styles.paginationRow}>
-          {[1, 2, 3, 4, 5, 6].map((i) => (
-            <View key={i} style={[styles.paginationDot, i === 1 && styles.paginationDotActive]} />
+          {carouselImages.map((_, i) => (
+            <View key={i} style={[styles.paginationDot, i === activeIndex && styles.paginationDotActive]} />
           ))}
         </View>
       </View>
 
-      <View style={styles.details}>
+      <TouchableOpacity style={styles.details} activeOpacity={0.95} onPress={handlePress}>
         <View style={styles.nameRow}>
           <Text style={styles.name} numberOfLines={1}>{name}</Text>
           <TouchableOpacity 
@@ -121,8 +151,8 @@ export function RestaurantListItem({
             <Text style={styles.sponsoredText}>Sponsored</Text>
           </View>
         )}
-      </View>
-    </TouchableOpacity>
+      </TouchableOpacity>
+    </View>
   );
 }
 
@@ -135,11 +165,12 @@ const createStyles = (colors: typeof Colors.light) => StyleSheet.create({
     width: "100%",
     height: 220,
     position: "relative",
+    borderRadius: 17,
+    overflow: 'hidden',
   },
   image: {
     width: "100%",
     height: "100%",
-    borderRadius: 17,
   },
   paginationRow: {
     position: "absolute",

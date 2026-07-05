@@ -25,6 +25,7 @@ export default {
     },
     "android": {
       "package": "com.hosanna.triozen.x",
+      "usesCleartextTraffic": true,
       "navigationBar": {
         "backgroundColor": "#FFFFFF",
         "buttonStyle": "dark"
@@ -50,7 +51,8 @@ export default {
         }
       ],
       "expo-font",
-      "expo-web-browser"
+      "expo-web-browser",
+      "@react-native-community/datetimepicker"
     ],
     "experiments": {
       "typedRoutes": true,
