@@ -233,8 +233,8 @@ export default function MultiStopOrders() {
                   ].map((step, i) => (
                     <div key={i} className="flex flex-col items-center gap-2 relative">
                       <div className={`h-12 w-12 rounded-full flex items-center justify-center text-sm font-bold ${step.completed ? "bg-primary text-primary-foreground" :
-                          step.active ? "bg-primary/20 text-primary border-2 border-primary" :
-                            "bg-muted text-muted-foreground"
+                        step.active ? "bg-primary/20 text-primary border-2 border-primary" :
+                          "bg-muted text-muted-foreground"
                         }`}>
                         {step.completed ? <CheckCircle className="h-5 w-5" /> : step.label}
                       </div>
