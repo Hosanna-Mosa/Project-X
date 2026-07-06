@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
-import { Store, Plus, MoreVertical, Search, MapPin, Star } from "lucide-react";
+import { Store, Plus, MoreVertical, Search, MapPin, Star, Edit2, Trash2, Eye } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { adminFetch } from "@/lib/api-client";
 import { toast } from "sonner";
@@ -13,6 +13,12 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 interface Vendor {
   _id: string;
@@ -29,6 +35,77 @@ interface Vendor {
 export default function Vendors() {
   const queryClient = useQueryClient();
   const [isAddOpen, setIsAddOpen] = useState(false);
+  
+  // View/Edit states
+  const [viewingVendor, setViewingVendor] = useState<Vendor | null>(null);
+  const [editingVendor, setEditingVendor] = useState<Vendor | null>(null);
+  const [isEditOpen, setIsEditOpen] = useState(false);
+  const [isViewOpen, setIsViewOpen] = useState(false);
+
+  // Edit form state
+  const [editForm, setEditForm] = useState({
+    name: "",
+    email: "",
+    phone: "",
+    isPureVeg: false,
+    address: ""
+  });
+
+  const deleteVendorMutation = useMutation({
+    mutationFn: (id: string) => adminFetch(`/vendors/${id}`, { method: "DELETE" }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["vendors"] });
+      toast.success("Vendor deleted successfully");
+    },
+    onError: (err: any) => {
+      toast.error(err.message || "Failed to delete vendor");
+    }
+  });
+
+  const updateVendorMutation = useMutation({
+    mutationFn: ({ id, data }: { id: string; data: any }) => adminFetch(`/vendors/${id}`, {
+      method: "PUT",
+      body: JSON.stringify(data)
+    }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["vendors"] });
+      toast.success("Vendor updated successfully");
+      setIsEditOpen(false);
+    },
+    onError: (err: any) => {
+      toast.error(err.message || "Failed to update vendor");
+    }
+  });
+
+  const handleEditClick = (vendor: Vendor) => {
+    setEditingVendor(vendor);
+    setEditForm({
+      name: vendor.name,
+      email: vendor.email || "",
+      phone: vendor.phone,
+      isPureVeg: vendor.isPureVeg,
+      address: vendor.address
+    });
+    setIsEditOpen(true);
+  };
+
+  const handleEditSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingVendor) return;
+    updateVendorMutation.mutate({ id: editingVendor._id, data: editForm });
+  };
+
+  const handleDeleteClick = (vendor: Vendor) => {
+    if (confirm(`Are you sure you want to delete ${vendor.name}?`)) {
+      deleteVendorMutation.mutate(vendor._id);
+    }
+  };
+
+  const handleViewClick = (vendor: Vendor) => {
+    setViewingVendor(vendor);
+    setIsViewOpen(true);
+  };
+
   const [searchQuery, setSearchQuery] = useState("");
   const autocompleteInputRef = useRef<HTMLInputElement>(null);
   const [selectedPlace, setSelectedPlace] = useState<any>(null);
@@ -86,7 +163,7 @@ export default function Vendors() {
 
       const fullQuery = locationContext ? `${val} in ${locationContext}` : val;
       
-      const data = await adminFetch<any[]>(`/vendors/search-google?query=${encodeURIComponent(fullQuery)}&types=food`);
+      const data = await adminFetch<any[]>(`/vendors/search-google?query=${encodeURIComponent(fullQuery)}&types=establishment`);
       setSuggestions(data || []);
     } catch (error) {
       console.error("Search error:", error);
@@ -339,9 +416,24 @@ export default function Vendors() {
                       <p className="text-xs text-muted-foreground">{vendor.email}</p>
                     </td>
                     <td className="px-6 py-4">
-                      <button className="p-1 hover:bg-muted rounded transition-colors">
-                        <MoreVertical className="h-4 w-4 text-muted-foreground" />
-                      </button>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <button className="p-1 hover:bg-muted rounded transition-colors">
+                            <MoreVertical className="h-4 w-4 text-muted-foreground" />
+                          </button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem onClick={() => handleViewClick(vendor)} className="gap-2 cursor-pointer">
+                            <Eye className="h-4 w-4 text-muted-foreground" /> View Details
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => handleEditClick(vendor)} className="gap-2 cursor-pointer">
+                            <Edit2 className="h-4 w-4 text-muted-foreground" /> Edit Restaurant
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => handleDeleteClick(vendor)} className="gap-2 text-destructive focus:text-destructive cursor-pointer">
+                            <Trash2 className="h-4 w-4" /> Delete Restaurant
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                     </td>
                   </tr>
                 ))
@@ -350,6 +442,99 @@ export default function Vendors() {
           </table>
         </div>
       </div>
+
+      {/* View Details Dialog */}
+      <Dialog open={isViewOpen} onOpenChange={setIsViewOpen}>
+        <DialogContent className="sm:max-w-[450px] rounded-3xl">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-bold">Restaurant Details</DialogTitle>
+          </DialogHeader>
+          {viewingVendor && (
+            <div className="space-y-4 py-4 text-sm">
+              <div className="flex justify-between border-b pb-2 border-border">
+                <span className="font-semibold text-muted-foreground">Name:</span>
+                <span className="font-medium text-foreground">{viewingVendor.name}</span>
+              </div>
+              <div className="flex justify-between border-b pb-2 border-border">
+                <span className="font-semibold text-muted-foreground">Email:</span>
+                <span className="font-medium text-foreground">{viewingVendor.email || "N/A"}</span>
+              </div>
+              <div className="flex justify-between border-b pb-2 border-border">
+                <span className="font-semibold text-muted-foreground">Phone:</span>
+                <span className="font-medium text-foreground">{viewingVendor.phone}</span>
+              </div>
+              <div className="flex justify-between border-b pb-2 border-border">
+                <span className="font-semibold text-muted-foreground">Address:</span>
+                <span className="font-medium text-foreground text-right max-w-[250px] break-words">{viewingVendor.address}</span>
+              </div>
+              <div className="flex justify-between border-b pb-2 border-border">
+                <span className="font-semibold text-muted-foreground">Rating:</span>
+                <span className="font-medium text-foreground">{viewingVendor.rating} ★ ({viewingVendor.reviews} reviews)</span>
+              </div>
+              <div className="flex justify-between border-b pb-2 border-border">
+                <span className="font-semibold text-muted-foreground">Pure Veg:</span>
+                <span className="font-medium text-foreground">{viewingVendor.isPureVeg ? "Yes" : "No"}</span>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Vendor Dialog */}
+      <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
+        <DialogContent className="sm:max-w-[450px] rounded-3xl">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-bold">Edit Restaurant</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleEditSubmit} className="space-y-4 py-4">
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Name</label>
+              <Input
+                value={editForm.name}
+                onChange={e => setEditForm({ ...editForm, name: e.target.value })}
+                required
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Email</label>
+              <Input
+                type="email"
+                value={editForm.email}
+                onChange={e => setEditForm({ ...editForm, email: e.target.value })}
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Phone</label>
+              <Input
+                value={editForm.phone}
+                onChange={e => setEditForm({ ...editForm, phone: e.target.value })}
+                required
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Address</label>
+              <Input
+                value={editForm.address}
+                onChange={e => setEditForm({ ...editForm, address: e.target.value })}
+                required
+              />
+            </div>
+            <div className="flex items-center gap-2 py-2">
+              <input
+                type="checkbox"
+                id="editIsPureVeg"
+                checked={editForm.isPureVeg}
+                onChange={e => setEditForm({ ...editForm, isPureVeg: e.target.checked })}
+                className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary cursor-pointer"
+              />
+              <label htmlFor="editIsPureVeg" className="text-sm font-medium cursor-pointer select-none">Is Pure Veg</label>
+            </div>
+            <Button type="submit" className="w-full" disabled={updateVendorMutation.isPending}>
+              {updateVendorMutation.isPending ? "Updating..." : "Save Changes"}
+            </Button>
+          </form>
+        </DialogContent>
+      </Dialog>
     </DashboardLayout>
   );
 }

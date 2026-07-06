@@ -44,6 +44,7 @@ export interface IUser extends Document, IUserMethods {
   bookingPreference?: IBookingPreference;
   password?: string;
   favorites?: Types.ObjectId[];
+  isBlocked?: boolean;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -55,6 +56,7 @@ const UserSchema: Schema = new Schema(
     email: { type: String, unique: true, sparse: true },
     phone: { type: String, required: true, unique: true },
     profilePic: { type: String },
+    isBlocked: { type: Boolean, default: false },
     role: {
       type: String,
       enum: Object.values(UserRole),

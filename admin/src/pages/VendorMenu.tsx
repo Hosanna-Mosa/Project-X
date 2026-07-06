@@ -31,8 +31,20 @@ export default function VendorMenu() {
   const queryClient = useQueryClient();
   const vendorData = JSON.parse(localStorage.getItem("vendor_data") || "{}");
   const [isAddOpen, setIsAddOpen] = useState(false);
+  const [isEditOpen, setIsEditOpen] = useState(false);
+  const [editingItem, setEditingItem] = useState<FoodItem | null>(null);
   const [uploading, setUploading] = useState(false);
+  
   const [newItem, setNewItem] = useState({
+    name: "",
+    description: "",
+    price: "",
+    category: "Main Course",
+    isVeg: true,
+    images: [] as string[]
+  });
+
+  const [editItemForm, setEditItemForm] = useState({
     name: "",
     description: "",
     price: "",
@@ -53,10 +65,17 @@ export default function VendorMenu() {
       });
       const data = await response.json();
       if (data.imageUrls) {
-        setNewItem(prev => ({
-          ...prev,
-          images: [...prev.images, ...data.imageUrls]
-        }));
+        if (isEditOpen) {
+          setEditItemForm(prev => ({
+            ...prev,
+            images: [...prev.images, ...data.imageUrls]
+          }));
+        } else {
+          setNewItem(prev => ({
+            ...prev,
+            images: [...prev.images, ...data.imageUrls]
+          }));
+        }
         toast.success("Images uploaded successfully");
       }
     } catch (error) {
@@ -64,7 +83,7 @@ export default function VendorMenu() {
     } finally {
       setUploading(false);
     }
-  }, []);
+  }, [isEditOpen]);
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({ 
     onDrop,
@@ -73,10 +92,17 @@ export default function VendorMenu() {
   });
 
   const removeImage = (index: number) => {
-    setNewItem(prev => ({
-      ...prev,
-      images: prev.images.filter((_, i) => i !== index)
-    }));
+    if (isEditOpen) {
+      setEditItemForm(prev => ({
+        ...prev,
+        images: prev.images.filter((_, i) => i !== index)
+      }));
+    } else {
+      setNewItem(prev => ({
+        ...prev,
+        images: prev.images.filter((_, i) => i !== index)
+      }));
+    }
   };
 
   const { data: menu, isLoading } = useQuery({
@@ -112,6 +138,44 @@ export default function VendorMenu() {
       toast.success("Item removed from menu");
     }
   });
+
+  const updateFoodMutation = useMutation({
+    mutationFn: ({ id, data }: { id: string; data: any }) => adminFetch(`/food/${id}`, {
+      method: "PUT",
+      body: JSON.stringify(data)
+    }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["vendor-menu"] });
+      toast.success("Food item updated successfully");
+      setIsEditOpen(false);
+    },
+    onError: (err: any) => {
+      toast.error(err.message || "Failed to update food item");
+    }
+  });
+
+  const handleEditClick = (item: FoodItem) => {
+    setEditingItem(item);
+    setEditItemForm({
+      name: item.name,
+      description: item.description,
+      price: item.price.toString(),
+      category: item.category,
+      isVeg: item.isVeg,
+      images: item.images
+    });
+    setIsEditOpen(true);
+  };
+
+  const handleEditSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingItem) return;
+    if (!editItemForm.name || !editItemForm.price) {
+      toast.error("Please enter name and price");
+      return;
+    }
+    updateFoodMutation.mutate({ id: editingItem._id, data: editItemForm });
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -270,7 +334,10 @@ export default function VendorMenu() {
                      <div className={`h-full w-full rounded-full ${item.isVeg ? "bg-success" : "bg-destructive"}`} />
                   </div>
                   <div className="absolute top-4 right-4 flex gap-2">
-                    <button className="h-8 w-8 bg-white/90 backdrop-blur rounded-full flex items-center justify-center text-foreground hover:bg-white transition-colors">
+                    <button 
+                      onClick={() => handleEditClick(item)}
+                      className="h-8 w-8 bg-white/90 backdrop-blur rounded-full flex items-center justify-center text-foreground hover:bg-white transition-colors"
+                    >
                       <Edit2 className="h-4 w-4" />
                     </button>
                     <button 
@@ -294,6 +361,113 @@ export default function VendorMenu() {
           )}
         </div>
       </div>
+
+      {/* Edit Dish Dialog */}
+      <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
+        <DialogContent className="sm:max-w-[500px] rounded-3xl">
+          <DialogHeader>
+            <DialogTitle className="text-xl">Edit Dish</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleEditSubmit} className="space-y-4 py-4">
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Images</label>
+              <div 
+                {...getRootProps()} 
+                className={`border-2 border-dashed rounded-2xl p-6 transition-all cursor-pointer flex flex-col items-center justify-center gap-2 ${
+                  isDragActive ? "border-primary bg-primary/5" : "border-border hover:border-primary/50"
+                }`}
+              >
+                <input {...getInputProps()} />
+                {uploading ? (
+                  <Loader2 className="h-8 w-8 text-primary animate-spin" />
+                ) : (
+                  <Upload className="h-8 w-8 text-muted-foreground" />
+                )}
+                <p className="text-sm font-medium">Drag & drop images, or click to select</p>
+                <p className="text-xs text-muted-foreground">Upload up to 5 images for this dish</p>
+              </div>
+
+              {editItemForm.images.length > 0 && (
+                <div className="flex flex-wrap gap-2 mt-4">
+                  {editItemForm.images.map((url, i) => (
+                    <div key={i} className="relative h-20 w-20 rounded-xl overflow-hidden border border-border">
+                      <img src={url} className="h-full w-full object-cover" />
+                      <button 
+                        type="button"
+                        onClick={() => removeImage(i)}
+                        className="absolute top-1 right-1 h-5 w-5 bg-destructive rounded-full flex items-center justify-center text-white"
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Dish Name</label>
+              <Input 
+                value={editItemForm.name}
+                onChange={e => setEditItemForm({...editItemForm, name: e.target.value})}
+                placeholder="e.g. Special Chicken Biryani" 
+              />
+            </div>
+            
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Price (₹)</label>
+                <Input 
+                  type="number"
+                  value={editItemForm.price}
+                  onChange={e => setEditItemForm({...editItemForm, price: e.target.value})}
+                  placeholder="299" 
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Category</label>
+                <Input 
+                  value={editItemForm.category}
+                  onChange={e => setEditItemForm({...editItemForm, category: e.target.value})}
+                  placeholder="e.g. Starters" 
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Description</label>
+              <Textarea 
+                value={editItemForm.description}
+                onChange={e => setEditItemForm({...editItemForm, description: e.target.value})}
+                placeholder="Describe the dish, ingredients, etc." 
+              />
+            </div>
+
+            <div className="flex items-center gap-4 py-2">
+               <button 
+                type="button"
+                onClick={() => setEditItemForm({...editItemForm, isVeg: true})}
+                className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl border-2 transition-all ${editItemForm.isVeg ? "border-success bg-success/5 text-success" : "border-border text-muted-foreground"}`}
+               >
+                 <div className="h-3 w-3 rounded-full bg-success" />
+                 Veg
+               </button>
+               <button 
+                type="button"
+                onClick={() => setEditItemForm({...editItemForm, isVeg: false})}
+                className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl border-2 transition-all ${!editItemForm.isVeg ? "border-destructive bg-destructive/5 text-destructive" : "border-border text-muted-foreground"}`}
+               >
+                 <div className="h-3 w-3 rounded-full bg-destructive" />
+                 Non-Veg
+               </button>
+            </div>
+
+            <Button type="submit" className="w-full h-11 rounded-xl mt-4" disabled={updateFoodMutation.isPending || uploading}>
+              {updateFoodMutation.isPending ? "Saving..." : "Save Changes"}
+            </Button>
+          </form>
+        </DialogContent>
+      </Dialog>
     </VendorLayout>
   );
 }

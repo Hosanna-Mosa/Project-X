@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
-import { Store, Plus, MoreVertical, Search, MapPin, Star, Drumstick } from "lucide-react";
+import { Store, Plus, MoreVertical, Search, MapPin, Star, Drumstick, Edit2, Trash2, Eye } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { adminFetch } from "@/lib/api-client";
 import { toast } from "sonner";
@@ -13,6 +13,12 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 interface MeatCenter {
   _id: string;
@@ -27,6 +33,73 @@ interface MeatCenter {
 export default function MeatCenters() {
   const queryClient = useQueryClient();
   const [isAddOpen, setIsAddOpen] = useState(false);
+  
+  // View/Edit states for Meat Centers
+  const [viewingCenter, setViewingCenter] = useState<MeatCenter | null>(null);
+  const [editingCenter, setEditingCenter] = useState<MeatCenter | null>(null);
+  const [isEditOpen, setIsEditOpen] = useState(false);
+  const [isViewOpen, setIsViewOpen] = useState(false);
+
+  // Edit form state
+  const [editForm, setEditForm] = useState({
+    name: "",
+    phone: "",
+    address: ""
+  });
+
+  const deleteCenterMutation = useMutation({
+    mutationFn: (id: string) => adminFetch(`/meat/${id}`, { method: "DELETE" }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["meat-centers"] });
+      toast.success("Meat Center deleted successfully");
+    },
+    onError: (err: any) => {
+      toast.error(err.message || "Failed to delete meat center");
+    }
+  });
+
+  const updateCenterMutation = useMutation({
+    mutationFn: ({ id, data }: { id: string; data: any }) => adminFetch(`/meat/${id}`, {
+      method: "PUT",
+      body: JSON.stringify(data)
+    }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["meat-centers"] });
+      toast.success("Meat Center updated successfully");
+      setIsEditOpen(false);
+    },
+    onError: (err: any) => {
+      toast.error(err.message || "Failed to update meat center");
+    }
+  });
+
+  const handleEditClick = (center: MeatCenter) => {
+    setEditingCenter(center);
+    setEditForm({
+      name: center.name,
+      phone: center.phone,
+      address: center.address
+    });
+    setIsEditOpen(true);
+  };
+
+  const handleEditSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingCenter) return;
+    updateCenterMutation.mutate({ id: editingCenter._id, data: editForm });
+  };
+
+  const handleDeleteClick = (center: MeatCenter) => {
+    if (confirm(`Are you sure you want to delete ${center.name}?`)) {
+      deleteCenterMutation.mutate(center._id);
+    }
+  };
+
+  const handleViewClick = (center: MeatCenter) => {
+    setViewingCenter(center);
+    setIsViewOpen(true);
+  };
+
   const [searchQuery, setSearchQuery] = useState("");
   const [suggestions, setSuggestions] = useState<any[]>([]);
   const [isSearching, setIsSearching] = useState(false);
@@ -350,9 +423,24 @@ export default function MeatCenters() {
                       <p className="text-sm">{center.phone}</p>
                     </td>
                     <td className="px-6 py-4">
-                      <button className="p-1 hover:bg-muted rounded">
-                        <MoreVertical className="h-4 w-4 text-muted-foreground" />
-                      </button>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <button className="p-1 hover:bg-muted rounded transition-colors">
+                            <MoreVertical className="h-4 w-4 text-muted-foreground" />
+                          </button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem onClick={() => handleViewClick(center)} className="gap-2 cursor-pointer">
+                            <Eye className="h-4 w-4 text-muted-foreground" /> View Details
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => handleEditClick(center)} className="gap-2 cursor-pointer">
+                            <Edit2 className="h-4 w-4 text-muted-foreground" /> Edit Center
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => handleDeleteClick(center)} className="gap-2 text-destructive focus:text-destructive cursor-pointer">
+                            <Trash2 className="h-4 w-4" /> Delete Center
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                     </td>
                   </tr>
                 ))
@@ -361,6 +449,73 @@ export default function MeatCenters() {
           </table>
         </div>
       </div>
+
+      {/* View Details Dialog */}
+      <Dialog open={isViewOpen} onOpenChange={setIsViewOpen}>
+        <DialogContent className="sm:max-w-[450px] rounded-3xl">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-bold">Meat Center Details</DialogTitle>
+          </DialogHeader>
+          {viewingCenter && (
+            <div className="space-y-4 py-4 text-sm">
+              <div className="flex justify-between border-b pb-2 border-border">
+                <span className="font-semibold text-muted-foreground">Name:</span>
+                <span className="font-medium text-foreground">{viewingCenter.name}</span>
+              </div>
+              <div className="flex justify-between border-b pb-2 border-border">
+                <span className="font-semibold text-muted-foreground">Phone:</span>
+                <span className="font-medium text-foreground">{viewingCenter.phone}</span>
+              </div>
+              <div className="flex justify-between border-b pb-2 border-border">
+                <span className="font-semibold text-muted-foreground">Address:</span>
+                <span className="font-medium text-foreground text-right max-w-[250px] break-words">{viewingCenter.address}</span>
+              </div>
+              <div className="flex justify-between border-b pb-2 border-border">
+                <span className="font-semibold text-muted-foreground">Rating:</span>
+                <span className="font-medium text-foreground">{viewingCenter.rating} ★ ({viewingCenter.reviews} reviews)</span>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Center Dialog */}
+      <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
+        <DialogContent className="sm:max-w-[450px] rounded-3xl">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-bold">Edit Meat Center</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleEditSubmit} className="space-y-4 py-4">
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Name</label>
+              <Input
+                value={editForm.name}
+                onChange={e => setEditForm({ ...editForm, name: e.target.value })}
+                required
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Phone</label>
+              <Input
+                value={editForm.phone}
+                onChange={e => setEditForm({ ...editForm, phone: e.target.value })}
+                required
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="text-sm font-medium">Address</label>
+              <Input
+                value={editForm.address}
+                onChange={e => setEditForm({ ...editForm, address: e.target.value })}
+                required
+              />
+            </div>
+            <Button type="submit" className="w-full mt-4" disabled={updateCenterMutation.isPending}>
+              {updateCenterMutation.isPending ? "Updating..." : "Save Changes"}
+            </Button>
+          </form>
+        </DialogContent>
+      </Dialog>
     </DashboardLayout>
   );
 }
