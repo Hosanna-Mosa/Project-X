@@ -305,6 +305,12 @@ const DEFAULT_MEAT_ITEMS = [
 
 export const createMeatCenter = async (req: Request, res: Response) => {
   try {
+    const { email, phone } = req.body;
+    const existing = await MeatCenter.findOne({ $or: [{ email }, { phone }] });
+    if (existing) {
+      return res.status(400).json({ message: "Meat center with this email or phone already exists" });
+    }
+
     const meatCenter = new MeatCenter(req.body);
     await meatCenter.save();
 
@@ -586,6 +592,65 @@ export const updateMeatItemPrice = async (req: AuthRequest, res: Response) => {
     await item.save();
     res.json(item);
   } catch (error) {
+    res.status(500).json({ message: "Internal server error" });
+  }
+};
+
+export const updateMeatCenter = async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { name, phone, email, password, location, address, image, categories, isOpen, deliveryFee, minOrderValue } = req.body;
+
+    const center = await MeatCenter.findById(id);
+    if (!center) {
+      return res.status(404).json({ message: "Meat center not found" });
+    }
+
+    if (email && email !== center.email) {
+      const emailExists = await MeatCenter.findOne({ email, _id: { $ne: id as any } } as any);
+      if (emailExists) {
+        return res.status(400).json({ message: "Meat center with this email already exists" });
+      }
+    }
+    if (phone && phone !== center.phone) {
+      const phoneExists = await MeatCenter.findOne({ phone, _id: { $ne: id as any } } as any);
+      if (phoneExists) {
+        return res.status(400).json({ message: "Meat center with this phone already exists" });
+      }
+    }
+
+    if (name !== undefined) center.name = name;
+    if (phone !== undefined) center.phone = phone;
+    if (email !== undefined) center.email = email;
+    if (password) center.password = password; // pre-save hashes it
+    if (location !== undefined) center.location = location;
+    if (address !== undefined) center.address = address;
+    if (image !== undefined) center.image = image;
+    if (categories !== undefined) center.categories = categories;
+    if (isOpen !== undefined) center.isOpen = isOpen;
+    if (deliveryFee !== undefined) center.deliveryFee = deliveryFee;
+    if (minOrderValue !== undefined) center.minOrderValue = minOrderValue;
+
+    await center.save();
+    res.json({ message: "Meat center updated successfully", center });
+  } catch (error) {
+    console.error("Error updating meat center:", error);
+    res.status(500).json({ message: "Internal server error" });
+  }
+};
+
+export const deleteMeatCenter = async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const center = await MeatCenter.findByIdAndDelete(id);
+    if (!center) {
+      return res.status(404).json({ message: "Meat center not found" });
+    }
+
+    await MeatItem.deleteMany({ meatCenterId: id });
+    res.json({ message: "Meat center and items deleted successfully" });
+  } catch (error) {
+    console.error("Error deleting meat center:", error);
     res.status(500).json({ message: "Internal server error" });
   }
 };

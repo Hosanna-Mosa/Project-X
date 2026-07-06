@@ -42,8 +42,12 @@ SocketManager.getInstance(server);
 
 // Database Initialization
 import Order, { OrderStatus } from "./database/models/Order";
+import { seedDatabase } from "./database/seeder";
 
 connectDB().then(async () => {
+  // Run seed script
+  await seedDatabase();
+
   // Sample Route
   app.get("/", (req, res) => {
     res.json({ message: "Multi-Service Logistics Platform Backend API" });

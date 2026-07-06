@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { authenticateToken } from "../../middleware/auth.middleware";
-import { getNearbyVendors, getVendorById, createVendor, searchGooglePlaces, getPlaceDetails, loginVendor, saveVendorOnboarding, changeVendorPassword, forgotVendorPassword, resetVendorPassword } from "./vendors.controller";
+import { getNearbyVendors, getVendorById, createVendor, searchGooglePlaces, getPlaceDetails, loginVendor, saveVendorOnboarding, changeVendorPassword, forgotVendorPassword, resetVendorPassword, updateVendor, deleteVendor } from "./vendors.controller";
 
 const router = Router();
 
@@ -14,5 +14,8 @@ router.post("/", createVendor);
 router.put("/change-password", authenticateToken, changeVendorPassword);
 router.post("/forgot-password", forgotVendorPassword);
 router.post("/reset-password", resetVendorPassword);
+router.put("/:id", updateVendor);
+router.delete("/:id", deleteVendor);
 
 export default router;
+

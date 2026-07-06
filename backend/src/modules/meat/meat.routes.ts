@@ -12,7 +12,9 @@ import {
   updateMeatItemPrice,
   changeMeatVendorPassword,
   forgotMeatVendorPassword,
-  resetMeatVendorPassword
+  resetMeatVendorPassword,
+  updateMeatCenter,
+  deleteMeatCenter
 } from "./meat.controller";
 
 const router = Router();
@@ -20,6 +22,9 @@ const router = Router();
 router.post("/login", loginMeatCenter);
 router.get("/nearby", getNearbyMeatCenters);
 router.post("/", createMeatCenter);
+router.put("/:id", updateMeatCenter);
+router.delete("/:id", deleteMeatCenter);
+
 
 // Global Price Management (Admin)
 router.get("/menu/global", getGlobalMeatPrices);

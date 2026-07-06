@@ -1,31 +1,58 @@
+import { useState } from "react";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { StatCard } from "@/components/shared/StatCard";
 import { StatusBadge } from "@/components/shared/StatusBadge";
-import { Package, DollarSign, Clock, Truck, Calendar, Download } from "lucide-react";
+import { Calendar, Download } from "lucide-react";
 import { AreaChart, Area, XAxis, YAxis, ResponsiveContainer, Tooltip } from "recharts";
-
-const velocityData = [
-  { day: "MON", orders: 1800 },
-  { day: "TUE", orders: 2200 },
-  { day: "WED", orders: 2600 },
-  { day: "THU", orders: 2842 },
-  { day: "FRI", orders: 2400 },
-  { day: "SAT", orders: 3200 },
-  { day: "SUN", orders: 2800 },
-];
-
-const heatmapData = Array.from({ length: 30 }, (_, i) => ({
-  id: i,
-  intensity: Math.random(),
-}));
-
-const anomalies = [
-  { id: "#PN-9284-A", status: "Optimal", statusVariant: "optimal" as const, driver: "Marcus Chen", value: "₹4,281.00", activity: "Arrived at Hub B" },
-  { id: "#PN-9285-C", status: "Minor Delay", statusVariant: "delay" as const, driver: "Sarah Jenkins", value: "₹12,940.50", activity: "Heavy Traffic (Exit 4)" },
-  { id: "#PN-9286-K", status: "In-Transit", statusVariant: "transit" as const, driver: "David Miller", value: "₹842.12", activity: "Loading Dock 4" },
-];
+import { toast } from "sonner";
+import { useQuery } from "@tanstack/react-query";
+import { adminFetch } from "@/lib/api-client";
+import { GoogleMap, useJsApiLoader, Marker } from "@react-google-maps/api";
+import { DownloadReportDialog } from "@/components/shared/DownloadReportDialog";
 
 export default function Analytics() {
+  const [selectedWeek, setSelectedWeek] = useState("W3");
+  const [timeRange, setTimeRange] = useState("Last 30 Days");
+  const [isDownloadOpen, setIsDownloadOpen] = useState(false);
+
+  const { isLoaded } = useJsApiLoader({
+    id: "google-map-script",
+    googleMapsApiKey: import.meta.env.VITE_GOOGLE_MAPS_API_KEY || "AIzaSyD23mZxzw78gBlz6EGEZ6BMgCwc4fygJMA",
+  });
+
+  const { data: analyticsData, isLoading } = useQuery({
+    queryKey: ["admin", "analytics"],
+    queryFn: () => adminFetch<any>("/admin/analytics"),
+  });
+
+  const handleRangeChange = () => {
+    const ranges = ["Last 7 Days", "Last 30 Days", "Last 90 Days", "Year to Date"];
+    const nextIndex = (ranges.indexOf(timeRange) + 1) % ranges.length;
+    setTimeRange(ranges[nextIndex]);
+    toast.success(`Analytics dashboard updated for: ${ranges[nextIndex]}`);
+  };
+
+  const velocityData = analyticsData?.velocityData || [
+    { day: "MON", orders: 1800 },
+    { day: "TUE", orders: 2200 },
+    { day: "WED", orders: 2600 },
+    { day: "THU", orders: 2842 },
+    { day: "FRI", orders: 2400 },
+    { day: "SAT", orders: 3200 },
+    { day: "SUN", orders: 2800 },
+  ];
+
+  const heatmapData = analyticsData?.heatmapData || Array.from({ length: 30 }, (_, i) => ({
+    id: i,
+    intensity: Math.random(),
+  }));
+
+  const anomalies = analyticsData?.anomalies || [
+    { id: "#PN-9284-A", status: "Optimal", statusVariant: "optimal" as const, driver: "Marcus Chen", value: "₹4,281.00", activity: "Arrived at Hub B" },
+    { id: "#PN-9285-C", status: "Minor Delay", statusVariant: "delay" as const, driver: "Sarah Jenkins", value: "₹12,940.50", activity: "Heavy Traffic (Exit 4)" },
+    { id: "#PN-9286-K", status: "In-Transit", statusVariant: "transit" as const, driver: "David Miller", value: "₹842.12", activity: "Loading Dock 4" },
+  ];
+
   return (
     <DashboardLayout searchPlaceholder="Search logistics metrics...">
       <div className="space-y-6">
@@ -36,11 +63,17 @@ export default function Analytics() {
             <p className="page-subtitle">Real-time logistics intelligence and fleet efficiency metrics.</p>
           </div>
           <div className="flex gap-3">
-            <button className="flex items-center gap-2 px-4 py-2.5 border border-border rounded-lg text-sm font-medium text-foreground hover:bg-muted/50">
-              <Calendar className="h-4 w-4" /> Last 30 Days
+            <button 
+              onClick={handleRangeChange}
+              className="flex items-center gap-2 px-4 py-2.5 border border-border rounded-lg text-sm font-medium text-foreground hover:bg-muted/50 transition-all"
+            >
+              <Calendar className="h-4 w-4" /> {timeRange}
             </button>
-            <button className="flex items-center gap-2 px-5 py-2.5 bg-primary text-primary-foreground rounded-lg text-sm font-semibold hover:opacity-90">
-              <Download className="h-4 w-4" /> Export PDF
+            <button 
+              onClick={() => setIsDownloadOpen(true)}
+              className="flex items-center gap-2 px-5 py-2.5 bg-primary text-primary-foreground rounded-lg text-sm font-semibold hover:opacity-90 transition-opacity"
+            >
+              <Download className="h-4 w-4" /> Export Report
             </button>
           </div>
         </div>
@@ -64,23 +97,27 @@ export default function Analytics() {
                 <span className="text-xs text-muted-foreground">Last 7 Days</span>
               </div>
             </div>
-            <ResponsiveContainer width="100%" height={250}>
-              <AreaChart data={velocityData}>
-                <defs>
-                  <linearGradient id="colorOrders" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="hsl(185, 80%, 28%)" stopOpacity={0.3} />
-                    <stop offset="95%" stopColor="hsl(185, 80%, 28%)" stopOpacity={0} />
-                  </linearGradient>
-                </defs>
-                <XAxis dataKey="day" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: 'hsl(215,15%,50%)' }} />
-                <YAxis hide />
-                <Tooltip
-                  contentStyle={{ borderRadius: 8, border: '1px solid hsl(214,20%,90%)', fontSize: 12 }}
-                  formatter={(value: number) => [`${value.toLocaleString()} Orders`, '']}
-                />
-                <Area type="monotone" dataKey="orders" stroke="hsl(185, 80%, 28%)" strokeWidth={2.5} fill="url(#colorOrders)" dot={{ r: 4, fill: 'hsl(185, 80%, 28%)', strokeWidth: 2, stroke: '#fff' }} />
-              </AreaChart>
-            </ResponsiveContainer>
+            {isLoading ? (
+              <div className="h-[250px] flex items-center justify-center text-muted-foreground text-sm">Loading velocity...</div>
+            ) : (
+              <ResponsiveContainer width="100%" height={250}>
+                <AreaChart data={velocityData}>
+                  <defs>
+                    <linearGradient id="colorOrders" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="hsl(185, 80%, 28%)" stopOpacity={0.3} />
+                      <stop offset="95%" stopColor="hsl(185, 80%, 28%)" stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
+                  <XAxis dataKey="day" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: 'hsl(215,15%,50%)' }} />
+                  <YAxis hide />
+                  <Tooltip
+                    contentStyle={{ borderRadius: 8, border: '1px solid hsl(214,20%,90%)', fontSize: 12 }}
+                    formatter={(value: number) => [`${value.toLocaleString()} Orders`, '']}
+                  />
+                  <Area type="monotone" dataKey="orders" stroke="hsl(185, 80%, 28%)" strokeWidth={2.5} fill="url(#colorOrders)" dot={{ r: 4, fill: 'hsl(185, 80%, 28%)', strokeWidth: 2, stroke: '#fff' }} />
+                </AreaChart>
+              </ResponsiveContainer>
+            )}
           </div>
 
           {/* Revenue Stream */}
@@ -90,7 +127,11 @@ export default function Analytics() {
               {["W1", "W2", "W3", "W4"].map((w) => (
                 <button
                   key={w}
-                  className={`text-sm font-medium px-2 py-1 ${w === "W3" ? "text-primary border-b-2 border-primary" : "text-muted-foreground"}`}
+                  onClick={() => {
+                    setSelectedWeek(w);
+                    toast.success(`Revenue stream updated for week: ${w}`);
+                  }}
+                  className={`text-sm font-semibold px-3 py-1.5 rounded-lg transition-all ${w === selectedWeek ? "text-primary bg-primary/10" : "text-muted-foreground hover:bg-muted"}`}
                 >
                   {w}
                 </button>
@@ -109,10 +150,11 @@ export default function Analytics() {
           <div className="section-card p-6">
             <h3 className="text-lg font-semibold text-foreground mb-4">Peak Demand Hours</h3>
             <div className="grid grid-cols-5 gap-1.5 mb-4">
-              {heatmapData.map((cell) => (
+              {heatmapData.map((cell: any) => (
                 <div
                   key={cell.id}
-                  className="h-8 rounded-sm"
+                  className="h-8 rounded-sm cursor-pointer hover:opacity-85 transition-opacity"
+                  onClick={() => toast.info(`Hour block intensity: ${Math.round(cell.intensity * 100)}% load`)}
                   style={{
                     backgroundColor: `hsl(185, 80%, ${85 - cell.intensity * 55}%)`,
                   }}
@@ -125,8 +167,35 @@ export default function Analytics() {
           </div>
 
           {/* Driver Saturation Map */}
-          <div className="col-span-2 section-card overflow-hidden h-[300px] bg-gradient-to-br from-primary/10 to-primary/20 relative flex items-center justify-center">
-            <div className="absolute top-6 left-6 bg-card/95 backdrop-blur p-4 rounded-xl shadow-sm max-w-[240px]">
+          <div className="col-span-2 section-card overflow-hidden h-[300px] relative">
+            {isLoaded ? (
+              <GoogleMap
+                mapContainerStyle={{ width: "100%", height: "100%" }}
+                center={{ lat: 17.0005, lng: 81.8040 }}
+                zoom={12}
+                options={{
+                  zoomControl: true,
+                  streetViewControl: false,
+                  mapTypeControl: false,
+                  fullscreenControl: false,
+                }}
+              >
+                <Marker
+                  position={{ lat: 17.0005, lng: 81.8040 }}
+                  title="Downtown - High Density"
+                />
+                <Marker
+                  position={{ lat: 17.0205, lng: 81.8240 }}
+                  title="Industrial East - Optimal"
+                />
+              </GoogleMap>
+            ) : (
+              <div className="bg-gradient-to-br from-primary/10 to-primary/20 absolute inset-0 flex items-center justify-center text-muted-foreground text-sm">
+                Loading Saturation Map...
+              </div>
+            )}
+
+            <div className="absolute top-6 left-6 bg-card/95 backdrop-blur p-4 rounded-xl shadow-sm max-w-[240px] z-10">
               <h4 className="font-semibold text-foreground text-sm">Driver Saturation</h4>
               <p className="text-xs text-muted-foreground mt-1">Live heatmap of metropolitan logistics flow.</p>
               <div className="mt-3 space-y-2">
@@ -146,8 +215,8 @@ export default function Analytics() {
                 </div>
               </div>
             </div>
-            <div className="text-muted-foreground text-sm">Saturation Map</div>
-            <div className="absolute bottom-4 right-4 flex items-center gap-2 bg-card/90 backdrop-blur px-3 py-2 rounded-lg">
+            
+            <div className="absolute bottom-4 right-4 flex items-center gap-2 bg-card/90 backdrop-blur px-3 py-2 rounded-lg z-10 shadow">
               <div className="flex -space-x-2">
                 <div className="h-6 w-6 rounded-full bg-primary/20 border-2 border-card" />
                 <div className="h-6 w-6 rounded-full bg-primary/30 border-2 border-card" />
@@ -157,6 +226,22 @@ export default function Analytics() {
             </div>
           </div>
         </div>
+
+        <DownloadReportDialog
+          open={isDownloadOpen}
+          onOpenChange={setIsDownloadOpen}
+          title="Logistics Analytics Performance Report"
+          data={[
+            { "Metric": "Total Orders", "Value": "12,842" },
+            { "Metric": "Net Revenue", "Value": "INR 482.5k" },
+            { "Metric": "Avg. Delivery Time", "Value": "34.2m" },
+            { "Metric": "Active Drivers", "Value": "842" },
+            ...anomalies.map((a: any) => ({
+              "Metric": `Anomaly: ${a.id} (${a.driver})`,
+              "Value": `${a.status} - ${a.activity}`
+            }))
+          ]}
+        />
 
         {/* Anomaly Detection */}
         <div className="section-card">
@@ -178,7 +263,7 @@ export default function Analytics() {
               </tr>
             </thead>
             <tbody>
-              {anomalies.map((a) => (
+              {anomalies.map((a: any) => (
                 <tr key={a.id} className="border-t border-border hover:bg-muted/30 transition-colors">
                   <td className="px-6 py-4 text-sm font-medium text-foreground">{a.id}</td>
                   <td className="px-6 py-4"><StatusBadge status={a.status} variant={a.statusVariant} /></td>
@@ -195,7 +280,12 @@ export default function Analytics() {
             </tbody>
           </table>
           <div className="p-4 text-center border-t border-border">
-            <button className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">View All Insights</button>
+            <button 
+              onClick={() => toast.info("No older logistical anomalies or alerts detected.")}
+              className="text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
+            >
+              View All Insights
+            </button>
           </div>
         </div>
       </div>

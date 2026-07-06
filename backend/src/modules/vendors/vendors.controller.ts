@@ -215,7 +215,11 @@ export const createVendor = async (req: Request, res: Response) => {
   try {
     const { name, email, phone, password, googlePlaceId, location, address, image, categories, isPureVeg, deliveryFee, minOrderValue } = req.body;
 
-    const existingVendor = await Vendor.findOne({ $or: [{ email }, { phone }] });
+    const queryConditions: any[] = [{ phone }];
+    if (email && email.trim() !== "") {
+      queryConditions.push({ email });
+    }
+    const existingVendor = await Vendor.findOne({ $or: queryConditions });
     if (existingVendor) {
       return res.status(400).json({ message: "Vendor with this email or phone already exists" });
     }
@@ -533,7 +537,7 @@ export const searchGooglePlaces = async (req: Request, res: Response) => {
         params: {
           input: query,
           key: apiKey,
-          types: types || "establishment",
+          types: (types && ["establishment", "geocode", "address", "regions", "cities"].includes(String(types))) ? types : "establishment",
           language: "en",
         },
       }
@@ -609,3 +613,63 @@ export const getPlaceDetails = async (req: Request, res: Response) => {
     res.status(500).json({ message: "Internal server error" });
   }
 };
+
+export const updateVendor = async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const { name, email, phone, password, googlePlaceId, location, address, image, categories, isPureVeg, deliveryFee, minOrderValue } = req.body;
+
+    const vendor = await Vendor.findById(id);
+    if (!vendor) {
+      return res.status(404).json({ message: "Vendor not found" });
+    }
+
+    // Check if email or phone is already taken by another vendor
+    if (email && email !== vendor.email) {
+      const emailExists = await Vendor.findOne({ email, _id: { $ne: id as any } } as any);
+      if (emailExists) {
+        return res.status(400).json({ message: "Vendor with this email already exists" });
+      }
+    }
+    if (phone && phone !== vendor.phone) {
+      const phoneExists = await Vendor.findOne({ phone, _id: { $ne: id as any } } as any);
+      if (phoneExists) {
+        return res.status(400).json({ message: "Vendor with this phone already exists" });
+      }
+    }
+
+    if (name !== undefined) vendor.name = name;
+    if (email !== undefined) vendor.email = email;
+    if (phone !== undefined) vendor.phone = phone;
+    if (password) vendor.password = password; // pre-save hook will hash it
+    if (googlePlaceId !== undefined) vendor.googlePlaceId = googlePlaceId;
+    if (location !== undefined) vendor.location = location;
+    if (address !== undefined) vendor.address = address;
+    if (image !== undefined) vendor.image = image;
+    if (categories !== undefined) vendor.categories = categories;
+    if (isPureVeg !== undefined) vendor.isPureVeg = isPureVeg;
+    if (deliveryFee !== undefined) vendor.deliveryFee = deliveryFee;
+    if (minOrderValue !== undefined) vendor.minOrderValue = minOrderValue;
+
+    await vendor.save();
+    res.json({ message: "Vendor updated successfully", vendor });
+  } catch (error) {
+    console.error("Error updating vendor:", error);
+    res.status(500).json({ message: "Internal server error" });
+  }
+};
+
+export const deleteVendor = async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const vendor = await Vendor.findByIdAndDelete(id);
+    if (!vendor) {
+      return res.status(404).json({ message: "Vendor not found" });
+    }
+    res.json({ message: "Vendor deleted successfully" });
+  } catch (error) {
+    console.error("Error deleting vendor:", error);
+    res.status(500).json({ message: "Internal server error" });
+  }
+};
+
