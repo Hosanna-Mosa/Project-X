@@ -111,7 +111,7 @@ async function runTest() {
       }
 
       // Test pricing calculation output
-      const breakdown = pricingService.calculateFareBreakdown(
+      const breakdown = await pricingService.calculateFareBreakdown(
         ServiceType.CAB,
         5.0, // 5 km
         15,  // 15 minutes

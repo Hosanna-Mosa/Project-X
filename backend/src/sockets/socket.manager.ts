@@ -7,6 +7,7 @@ import mongoose from "mongoose";
 import User, { UserRole } from "../database/models/User";
 import Order from "../database/models/Order";
 import Driver, { DriverStatus } from "../database/models/Driver";
+import ChatMessage from "../database/models/ChatMessage";
 
 export class SocketManager {
   private static instance: SocketManager;
@@ -356,7 +357,7 @@ export class SocketManager {
       });
 
       // CHAT MESSAGES: Forward messages within the order room
-      socket.on("send_message", (data: { orderId: string; senderId: string; role: string; text: string; id?: string }) => {
+      socket.on("send_message", async (data: { orderId: string; senderId: string; role: string; text: string; id?: string }) => {
         if (!authUser) return;
         
         const from = data.role?.toLowerCase();
@@ -376,6 +377,44 @@ export class SocketManager {
         if (!data.orderId) {
           console.warn(`[CHAT][DROP] Missing orderId for message id=${payload.id}`);
           return;
+        }
+
+        // Save to DB
+        try {
+          let realSenderId = authUser?.userId;
+          
+          if (!realSenderId || !mongoose.Types.ObjectId.isValid(realSenderId)) {
+            if (data.senderId && mongoose.Types.ObjectId.isValid(data.senderId)) {
+              realSenderId = data.senderId;
+            } else {
+              const orderDoc = await Order.findById(data.orderId);
+              if (orderDoc) {
+                if (from === "driver") {
+                  if (orderDoc.driver) {
+                    const drv = await Driver.findById(orderDoc.driver);
+                    if (drv) realSenderId = drv.user.toString();
+                  }
+                } else {
+                  realSenderId = orderDoc.user.toString();
+                }
+              }
+            }
+          }
+
+          if (realSenderId && mongoose.Types.ObjectId.isValid(realSenderId)) {
+            const chatMsg = new ChatMessage({
+              orderId: data.orderId,
+              senderId: realSenderId,
+              role: from,
+              text: data.text,
+              time: payload.time
+            });
+            await chatMsg.save();
+          } else {
+            console.warn(`[CHAT] Could not resolve a valid senderId for message orderId=${data.orderId}`);
+          }
+        } catch (error) {
+          console.error("Error saving chat message to database:", error);
         }
 
         this.io.to(data.orderId).emit("receive_message", payload);

@@ -41,6 +41,7 @@ export default function Vendors() {
   const [editingVendor, setEditingVendor] = useState<Vendor | null>(null);
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [isViewOpen, setIsViewOpen] = useState(false);
+  const [commRate, setCommRate] = useState<number>(10);
 
   // Edit form state
   const [editForm, setEditForm] = useState({
@@ -101,8 +102,9 @@ export default function Vendors() {
     }
   };
 
-  const handleViewClick = (vendor: Vendor) => {
+  const handleViewClick = (vendor: any) => {
     setViewingVendor(vendor);
+    setCommRate(vendor.commissionRate || 10);
     setIsViewOpen(true);
   };
 
@@ -396,7 +398,17 @@ export default function Vendors() {
                           <Store className="h-5 w-5 text-primary" />
                         </div>
                         <div>
-                          <p className="text-sm font-medium text-foreground">{vendor.name}</p>
+                          <div className="flex items-center gap-2">
+                            <p className="text-sm font-medium text-foreground">{vendor.name}</p>
+                            <span className={`text-[9px] px-1.5 py-0.5 rounded font-bold uppercase ${
+                              (vendor as any).onboardingStatus === "approved" ? "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400" :
+                              (vendor as any).onboardingStatus === "rejected" ? "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400" :
+                              (vendor as any).onboardingStatus === "submitted" ? "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400" :
+                              "bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-400"
+                            }`}>
+                              {(vendor as any).onboardingStatus || "draft"}
+                            </span>
+                          </div>
                           <p className="text-[10px] text-muted-foreground uppercase">{vendor.isPureVeg ? "Pure Veg" : "Multi-Cuisine"}</p>
                         </div>
                       </div>
@@ -445,7 +457,7 @@ export default function Vendors() {
 
       {/* View Details Dialog */}
       <Dialog open={isViewOpen} onOpenChange={setIsViewOpen}>
-        <DialogContent className="sm:max-w-[450px] rounded-3xl">
+        <DialogContent className="sm:max-w-[485px] rounded-3xl max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="text-xl font-bold">Restaurant Details</DialogTitle>
           </DialogHeader>
@@ -474,6 +486,87 @@ export default function Vendors() {
               <div className="flex justify-between border-b pb-2 border-border">
                 <span className="font-semibold text-muted-foreground">Pure Veg:</span>
                 <span className="font-medium text-foreground">{viewingVendor.isPureVeg ? "Yes" : "No"}</span>
+              </div>
+              <div className="flex justify-between border-b pb-2 border-border">
+                <span className="font-semibold text-muted-foreground">Current Onboarding:</span>
+                <span className="font-medium text-foreground uppercase">{(viewingVendor as any).onboardingStatus || "draft"}</span>
+              </div>
+
+              {/* Commission Control Section */}
+              <div className="p-3 bg-muted rounded-xl space-y-2">
+                <label className="font-bold text-foreground text-xs block">Platform Commission Rate (%)</label>
+                <div className="flex gap-2">
+                  <Input 
+                    type="number" 
+                    value={commRate} 
+                    onChange={e => setCommRate(Number(e.target.value))}
+                    className="h-9 w-24 bg-card"
+                    min="0"
+                    max="100"
+                  />
+                  <Button 
+                    size="sm" 
+                    onClick={() => {
+                      updateVendorMutation.mutate({
+                        id: viewingVendor._id,
+                        data: { commissionRate: commRate }
+                      });
+                      setViewingVendor({ ...viewingVendor, commissionRate: commRate });
+                    }}
+                  >
+                    Save Rate
+                  </Button>
+                </div>
+              </div>
+
+              {/* Legal Documentation Info */}
+              <div className="mt-2 border-t border-border pt-4 space-y-2">
+                <h4 className="font-bold text-foreground text-xs uppercase tracking-wider">Legal & Merchant Details</h4>
+                <div className="grid grid-cols-2 gap-2 text-xs bg-muted/50 p-2.5 rounded-lg border border-border">
+                  <div>
+                    <span className="font-semibold text-muted-foreground block">GSTIN / PAN</span>
+                    <span className="font-medium text-foreground">{(viewingVendor as any).legal?.gstin || (viewingVendor as any).legal?.panNumber || "Not Provided"}</span>
+                  </div>
+                  <div>
+                    <span className="font-semibold text-muted-foreground block">FSSAI License</span>
+                    <span className="font-medium text-foreground">{(viewingVendor as any).legal?.fssaiNumber || "Not Provided"}</span>
+                  </div>
+                  <div className="col-span-2 mt-1 pt-1 border-t border-border/50">
+                    <span className="font-semibold text-muted-foreground block">Bank Settlement A/C</span>
+                    <span className="font-medium text-foreground">
+                      {(viewingVendor as any).legal?.bankAccount ? `${(viewingVendor as any).legal.bankAccount} (${(viewingVendor as any).legal.ifsc})` : "Not Provided"}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Action Approval Toggles */}
+              <div className="flex gap-2 pt-2">
+                <Button 
+                  className="flex-1 bg-green-600 hover:bg-green-700 text-white rounded-lg"
+                  onClick={() => {
+                    updateVendorMutation.mutate({
+                      id: viewingVendor._id,
+                      data: { onboardingStatus: "approved" }
+                    });
+                    setViewingVendor({ ...viewingVendor, onboardingStatus: "approved" });
+                  }}
+                >
+                  Approve Restaurant
+                </Button>
+                <Button 
+                  variant="destructive"
+                  className="flex-1 rounded-lg"
+                  onClick={() => {
+                    updateVendorMutation.mutate({
+                      id: viewingVendor._id,
+                      data: { onboardingStatus: "rejected" }
+                    });
+                    setViewingVendor({ ...viewingVendor, onboardingStatus: "rejected" });
+                  }}
+                >
+                  Reject
+                </Button>
               </div>
             </div>
           )}

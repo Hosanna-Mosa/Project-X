@@ -1,20 +1,10 @@
-import { Search, Bell, Building2, User, LogOut } from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import { Search } from "lucide-react";
 
 interface TopBarProps {
   searchPlaceholder?: string;
 }
 
 export function TopBar({ searchPlaceholder = "Search orders, drivers..." }: TopBarProps) {
-  const navigate = useNavigate();
-
-  const handleLogout = () => {
-    localStorage.removeItem("admin_token");
-    localStorage.removeItem("vendor_token");
-    localStorage.removeItem("vendor_data");
-    navigate("/vendor-login");
-  };
-
   return (
     <header className="h-14 bg-card border-b border-border flex items-center justify-between px-6 shrink-0">
       <div className="relative w-[360px]">
@@ -25,32 +15,7 @@ export function TopBar({ searchPlaceholder = "Search orders, drivers..." }: TopB
           className="w-full h-9 pl-9 pr-4 rounded-lg bg-muted/50 border border-border text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary/30"
         />
       </div>
-
-      <div className="flex items-center gap-4">
-        <button className="relative p-2 rounded-lg hover:bg-muted/50 transition-colors">
-          <Bell className="h-[18px] w-[18px] text-muted-foreground" />
-          <span className="absolute top-1.5 right-1.5 h-2 w-2 rounded-full bg-destructive" />
-        </button>
-        <button className="flex items-center gap-2 p-2 rounded-lg hover:bg-muted/50 transition-colors">
-          <Building2 className="h-[18px] w-[18px] text-muted-foreground" />
-          <span className="text-sm text-muted-foreground">City Selector</span>
-        </button>
-        <div className="flex items-center gap-3 pl-3 border-l border-border">
-          <div className="flex flex-col items-end mr-1">
-            <span className="text-sm font-medium text-foreground">Admin Profile</span>
-            <button 
-              onClick={handleLogout}
-              className="text-[10px] text-destructive hover:underline flex items-center gap-1"
-            >
-              <LogOut className="h-2.5 w-2.5" />
-              Sign Out
-            </button>
-          </div>
-          <div className="h-8 w-8 rounded-full bg-primary flex items-center justify-center">
-            <User className="h-4 w-4 text-primary-foreground" />
-          </div>
-        </div>
-      </div>
+      <div></div>
     </header>
   );
 }

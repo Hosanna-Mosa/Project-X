@@ -3,6 +3,10 @@ import Order, { OrderStatus } from "../../database/models/Order";
 import Driver, { DriverStatus } from "../../database/models/Driver";
 import User from "../../database/models/User";
 import SupportTicket from "../../database/models/SupportTicket";
+import Coupon from "../../database/models/Coupon";
+import SystemConfig from "../../database/models/SystemConfig";
+import ChatMessage from "../../database/models/ChatMessage";
+import AppVersion from "../../database/models/AppVersion";
 
 export class AdminController {
   async getAllOrders(req: Request, res: Response) {
@@ -262,7 +266,7 @@ export class AdminController {
   async updateDriver(req: Request, res: Response) {
     try {
       const { id } = req.params;
-      const { status, isAvailable, vehicleType, gender, isBlocked } = req.body;
+      const { status, isAvailable, vehicleType, gender, isBlocked, onboardingStatus, aadhaarVerified, bankVerified, preferredZone, preferredZones } = req.body;
 
       const driver = await Driver.findById(id);
       if (!driver) return res.status(404).json({ message: "Driver not found" });
@@ -271,6 +275,15 @@ export class AdminController {
       if (isAvailable !== undefined) driver.isAvailable = isAvailable;
       if (vehicleType !== undefined) driver.vehicleType = vehicleType;
       if (gender !== undefined) driver.gender = gender;
+      if (onboardingStatus !== undefined) driver.onboardingStatus = onboardingStatus;
+      if (aadhaarVerified !== undefined) driver.aadhaarVerified = aadhaarVerified;
+      if (bankVerified !== undefined) driver.bankVerified = bankVerified;
+      if (preferredZone !== undefined) {
+        driver.preferredZone = preferredZone ? preferredZone : undefined;
+      }
+      if (preferredZones !== undefined) {
+        driver.preferredZones = (preferredZones || []).slice(0, 2);
+      }
 
       if (isBlocked !== undefined && driver.user) {
         await User.findByIdAndUpdate(driver.user, { isBlocked });
@@ -279,6 +292,7 @@ export class AdminController {
       await driver.save();
       return res.json({ message: "Driver updated successfully", driver });
     } catch (error) {
+      console.error("Error updating driver:", error);
       return res.status(500).json({ message: "Internal server error" });
     }
   }
@@ -531,6 +545,234 @@ export class AdminController {
       return res.status(201).json(order);
     } catch (error) {
       console.error("Error creating order:", error);
+      return res.status(500).json({ message: "Internal server error" });
+    }
+  }
+
+  async getSystemConfig(req: Request, res: Response) {
+    try {
+      let config = await SystemConfig.findOne({ key: "global_settings" });
+      if (!config) {
+        // Create default system config
+        config = new SystemConfig({
+          key: "global_settings",
+          value: {
+            rates: {
+              BIKE: { baseFare: 15, perKmRate: 5, perMinRate: 1 },
+              AUTO: { baseFare: 25, perKmRate: 8, perMinRate: 2 },
+              CAB: { baseFare: 50, perKmRate: 12, perMinRate: 3 },
+              CAB_PRIME: { baseFare: 80, perKmRate: 18, perMinRate: 4 },
+              DELIVERY: { baseFare: 50, perKmRate: 12, perMinRate: 2 },
+              HELPER: { baseFare: 99, perKmRate: 15, perMinRate: 2 }
+            },
+            platformFee: 5,
+            surgeMultiplier: 1
+          }
+        });
+        await config.save();
+      }
+      return res.json(config.value);
+    } catch (error) {
+      console.error("Error getting system config:", error);
+      return res.status(500).json({ message: "Internal server error" });
+    }
+  }
+
+  async updateSystemConfig(req: Request, res: Response) {
+    try {
+      const { rates, platformFee, surgeMultiplier } = req.body;
+      let config = await SystemConfig.findOne({ key: "global_settings" });
+      if (!config) {
+        config = new SystemConfig({ key: "global_settings", value: {} });
+      }
+
+      config.value = {
+        rates: rates || config.value.rates,
+        platformFee: platformFee !== undefined ? platformFee : config.value.platformFee,
+        surgeMultiplier: surgeMultiplier !== undefined ? surgeMultiplier : config.value.surgeMultiplier
+      };
+
+      config.markModified("value");
+      await config.save();
+      return res.json({ message: "System configuration updated successfully", config: config.value });
+    } catch (error) {
+      console.error("Error updating system config:", error);
+      return res.status(500).json({ message: "Internal server error" });
+    }
+  }
+
+  async getCoupons(req: Request, res: Response) {
+    try {
+      const coupons = await Coupon.find().sort({ createdAt: -1 });
+      return res.json(coupons);
+    } catch (error) {
+      console.error("Error getting coupons:", error);
+      return res.status(500).json({ message: "Internal server error" });
+    }
+  }
+
+  async createCoupon(req: Request, res: Response) {
+    try {
+      const { code, discountType, discountValue, maxDiscount, minOrderValue, expiryDate } = req.body;
+      if (!code || !discountType || !discountValue) {
+        return res.status(400).json({ message: "Code, discount type, and discount value are required" });
+      }
+
+      const existingCoupon = await Coupon.findOne({ code: code.toUpperCase() });
+      if (existingCoupon) {
+        return res.status(400).json({ message: "Coupon code already exists" });
+      }
+
+      const coupon = new Coupon({
+        code: code.toUpperCase(),
+        discountType,
+        discountValue,
+        maxDiscount,
+        minOrderValue,
+        expiryDate: expiryDate ? new Date(expiryDate) : undefined,
+        isActive: true
+      });
+
+      await coupon.save();
+      return res.status(201).json({ message: "Coupon created successfully", coupon });
+    } catch (error) {
+      console.error("Error creating coupon:", error);
+      return res.status(500).json({ message: "Internal server error" });
+    }
+  }
+
+  async toggleCouponStatus(req: Request, res: Response) {
+    try {
+      const { id } = req.params;
+      const coupon = await Coupon.findById(id);
+      if (!coupon) return res.status(404).json({ message: "Coupon not found" });
+
+      coupon.isActive = !coupon.isActive;
+      await coupon.save();
+      return res.json({ message: "Coupon status toggled successfully", coupon });
+    } catch (error) {
+      console.error("Error toggling coupon status:", error);
+      return res.status(500).json({ message: "Internal server error" });
+    }
+  }
+
+  async deleteCoupon(req: Request, res: Response) {
+    try {
+      const { id } = req.params;
+      const coupon = await Coupon.findByIdAndDelete(id);
+      if (!coupon) return res.status(404).json({ message: "Coupon not found" });
+      return res.json({ message: "Coupon deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting coupon:", error);
+      return res.status(500).json({ message: "Internal server error" });
+    }
+  }
+
+  async getUserDetail(req: Request, res: Response) {
+    try {
+      const { id } = req.params;
+      const user = await User.findById(id);
+      if (!user) return res.status(404).json({ message: "User not found" });
+
+      const orders = await Order.find({ user: id })
+        .populate("driver")
+        .populate("vendor")
+        .sort({ createdAt: -1 });
+
+      const totalOrders = orders.length;
+      const deliveryOrders = orders.filter(o => o.serviceType === "delivery").length;
+      const ridesOrders = orders.filter(o => o.serviceType !== "delivery" && o.serviceType !== "helper").length;
+      const helperOrders = orders.filter(o => o.serviceType === "helper").length;
+
+      return res.json({
+        user,
+        stats: {
+          totalOrders,
+          deliveryOrders,
+          ridesOrders,
+          helperOrders
+        },
+        orders
+      });
+    } catch (error) {
+      console.error("Error getting user detail:", error);
+      return res.status(500).json({ message: "Internal server error" });
+    }
+  }
+
+  async getDriverDetail(req: Request, res: Response) {
+    try {
+      const { id } = req.params;
+      const driver = await Driver.findById(id)
+        .populate("user")
+        .populate("preferredZone")
+        .populate("preferredZones");
+      if (!driver) return res.status(404).json({ message: "Driver not found" });
+
+      const orders = await Order.find({ driver: id })
+        .populate("user")
+        .populate("vendor")
+        .sort({ createdAt: -1 });
+
+      const totalOrders = orders.length;
+      const completedOrders = orders.filter(o => o.status === "DELIVERED" || o.status === "COMPLETED" || o.status === "delivered").length;
+      const cancelledOrders = orders.filter(o => o.status === "CANCELLED").length;
+
+      return res.json({
+        driver,
+        stats: {
+          totalOrders,
+          completedOrders,
+          cancelledOrders
+        },
+        orders
+      });
+    } catch (error) {
+      console.error("Error getting driver detail:", error);
+      return res.status(500).json({ message: "Internal server error" });
+    }
+  }
+
+  async getOrderChat(req: Request, res: Response) {
+    try {
+      const { orderId } = req.params;
+      const messages = await ChatMessage.find({ orderId })
+        .populate("senderId", "name phone email")
+        .sort({ createdAt: 1 });
+      return res.json(messages);
+    } catch (error) {
+      console.error("Error getting order chat:", error);
+      return res.status(500).json({ message: "Internal server error" });
+    }
+  }
+
+  async getAppVersions(req: Request, res: Response) {
+    try {
+      const configs = await AppVersion.find({});
+      return res.json(configs);
+    } catch (error) {
+      console.error("Error getting app versions:", error);
+      return res.status(500).json({ message: "Internal server error" });
+    }
+  }
+
+  async updateAppVersion(req: Request, res: Response) {
+    try {
+      const { platform, latest, minRequired, storeUrl } = req.body;
+
+      if (!platform || !latest || !minRequired || !storeUrl) {
+        return res.status(400).json({ message: "platform, latest, minRequired, and storeUrl are required" });
+      }
+
+      const config = await AppVersion.findOneAndUpdate(
+        { platform },
+        { latest, minRequired, storeUrl },
+        { new: true, upsert: true }
+      );
+
+      return res.json({ success: true, data: config });
+    } catch (error) {
+      console.error("Error updating app version:", error);
       return res.status(500).json({ message: "Internal server error" });
     }
   }

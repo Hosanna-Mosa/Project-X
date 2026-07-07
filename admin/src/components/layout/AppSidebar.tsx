@@ -14,6 +14,8 @@ import {
   LogOut,
   IndianRupee,
   Map,
+  Ticket,
+  RefreshCw,
 } from "lucide-react";
 
 const navItems = [
@@ -30,7 +32,8 @@ const navItems = [
   { title: "Payments", url: "/payments", icon: CreditCard },
   { title: "Analytics", url: "/analytics", icon: BarChart3 },
   { title: "Support", url: "/support", icon: Headphones },
-  { title: "Settings", url: "/settings", icon: Settings },
+  { title: "Coupons", url: "/coupons", icon: Ticket },
+  { title: "App Updates", url: "/app-updates", icon: RefreshCw },
 ];
 
 export function AppSidebar() {
@@ -47,9 +50,9 @@ export function AppSidebar() {
     <aside className="w-[220px] min-h-screen bg-card border-r border-border flex flex-col justify-between shrink-0">
       <div>
         <div className="px-5 py-6">
-          <h1 className="text-lg font-bold text-primary">Precision Nav</h1>
+          <h1 className="text-lg font-bold text-primary">FLAVOUR</h1>
           <p className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground font-medium">
-            Logistics Fluidity
+            Food & Service
           </p>
         </div>
 

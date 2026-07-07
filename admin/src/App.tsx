@@ -23,7 +23,11 @@ import VendorScheduledOrders from "./pages/VendorScheduledOrders";
 import VendorMenu from "./pages/VendorMenu";
 import VendorMeatMenu from "./pages/VendorMeatMenu";
 import VendorSettings from "./pages/VendorSettings";
+import Coupons from "./pages/Coupons";
+import UserDetail from "./pages/UserDetail";
+import DriverDetail from "./pages/DriverDetail";
 import NotFound from "./pages/NotFound";
+import AppVersions from "./pages/AppVersions";
 
 const RootRedirect = () => {
   const adminToken = localStorage.getItem("admin_token");
@@ -64,7 +68,10 @@ const App = () => (
           <Route path="/vendor/menu" element={<VendorMenu />} />
           <Route path="/vendor/meat-menu" element={<VendorMeatMenu />} />
           <Route path="/vendor/settings" element={<VendorSettings />} />
-          <Route path="/settings" element={<NotFound />} />
+          <Route path="/coupons" element={<Coupons />} />
+          <Route path="/users/:id" element={<UserDetail />} />
+          <Route path="/drivers/:id" element={<DriverDetail />} />
+          <Route path="/app-updates" element={<AppVersions />} />
 
           <Route path="*" element={<NotFound />} />
         </Routes>

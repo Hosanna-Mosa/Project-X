@@ -27,4 +27,19 @@ router.get("/tickets", authenticateToken, authorizeRole([UserRole.ADMIN]), admin
 router.post("/tickets", authenticateToken, authorizeRole([UserRole.ADMIN]), adminController.createSupportTicket.bind(adminController));
 router.put("/tickets/:id", authenticateToken, authorizeRole([UserRole.ADMIN]), adminController.updateSupportTicket.bind(adminController));
 
+// Settings and Coupons routes
+router.get("/config", authenticateToken, authorizeRole([UserRole.ADMIN]), adminController.getSystemConfig.bind(adminController));
+router.put("/config", authenticateToken, authorizeRole([UserRole.ADMIN]), adminController.updateSystemConfig.bind(adminController));
+router.get("/coupons", authenticateToken, authorizeRole([UserRole.ADMIN]), adminController.getCoupons.bind(adminController));
+router.post("/coupons", authenticateToken, authorizeRole([UserRole.ADMIN]), adminController.createCoupon.bind(adminController));
+router.put("/coupons/:id/toggle", authenticateToken, authorizeRole([UserRole.ADMIN]), adminController.toggleCouponStatus.bind(adminController));
+router.delete("/coupons/:id", authenticateToken, authorizeRole([UserRole.ADMIN]), adminController.deleteCoupon.bind(adminController));
+
+// User and Driver details routes
+router.get("/users/:id", authenticateToken, authorizeRole([UserRole.ADMIN]), adminController.getUserDetail.bind(adminController));
+router.get("/drivers/:id", authenticateToken, authorizeRole([UserRole.ADMIN]), adminController.getDriverDetail.bind(adminController));
+router.get("/orders/:orderId/chat", authenticateToken, authorizeRole([UserRole.ADMIN]), adminController.getOrderChat.bind(adminController));
+router.get("/app-versions", authenticateToken, authorizeRole([UserRole.ADMIN]), adminController.getAppVersions.bind(adminController));
+router.put("/app-versions", authenticateToken, authorizeRole([UserRole.ADMIN]), adminController.updateAppVersion.bind(adminController));
+
 export default router;

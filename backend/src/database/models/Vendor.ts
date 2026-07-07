@@ -7,7 +7,8 @@ export interface IVendor extends Document {
   phone: string;
   password?: string;
   googlePlaceId?: string;
-  onboardingStatus?: "draft" | "submitted";
+  onboardingStatus?: "draft" | "submitted" | "approved" | "rejected";
+  commissionRate?: number;
   partnerType?: "food" | "meat";
   owner?: {
     name?: string;
@@ -99,8 +100,12 @@ const VendorSchema: Schema = new Schema(
     googlePlaceId: { type: String },
     onboardingStatus: {
       type: String,
-      enum: ["draft", "submitted"],
+      enum: ["draft", "submitted", "approved", "rejected"],
       default: "draft",
+    },
+    commissionRate: {
+      type: Number,
+      default: 10,
     },
     partnerType: {
       type: String,

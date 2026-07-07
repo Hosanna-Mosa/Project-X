@@ -617,7 +617,7 @@ export const getPlaceDetails = async (req: Request, res: Response) => {
 export const updateVendor = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    const { name, email, phone, password, googlePlaceId, location, address, image, categories, isPureVeg, deliveryFee, minOrderValue } = req.body;
+    const { name, email, phone, password, googlePlaceId, location, address, image, categories, isPureVeg, deliveryFee, minOrderValue, onboardingStatus, commissionRate } = req.body;
 
     const vendor = await Vendor.findById(id);
     if (!vendor) {
@@ -650,6 +650,8 @@ export const updateVendor = async (req: Request, res: Response) => {
     if (isPureVeg !== undefined) vendor.isPureVeg = isPureVeg;
     if (deliveryFee !== undefined) vendor.deliveryFee = deliveryFee;
     if (minOrderValue !== undefined) vendor.minOrderValue = minOrderValue;
+    if (onboardingStatus !== undefined) vendor.onboardingStatus = onboardingStatus;
+    if (commissionRate !== undefined) vendor.commissionRate = commissionRate;
 
     await vendor.save();
     res.json({ message: "Vendor updated successfully", vendor });

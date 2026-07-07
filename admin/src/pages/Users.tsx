@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Link } from "react-router-dom";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { StatCard } from "@/components/shared/StatCard";
 import { Users as UsersIcon, UserCheck, UserX, Shield, SlidersHorizontal, UserPlus, Eye, Ban, ChevronLeft, ChevronRight, Mail, Trash2, Phone } from "lucide-react";
@@ -194,7 +195,9 @@ export default function Users() {
                           {u.name.split(" ").map((n: string) => n[0]).join("")}
                         </div>
                         <div>
-                          <p className="text-sm font-semibold text-foreground">{u.name}</p>
+                          <Link to={`/users/${u._id}`} className="text-sm font-semibold text-foreground hover:text-primary transition-colors hover:underline">
+                            {u.name}
+                          </Link>
                           <p className="text-xs text-muted-foreground">{u.email || u.phone}</p>
                         </div>
                       </div>
@@ -221,9 +224,9 @@ export default function Users() {
                     </td>
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-1.5">
-                        <button onClick={() => handleViewClick(u)} className="p-1.5 rounded-full bg-primary/10 text-primary hover:bg-primary/20 transition-colors" title="View details">
+                        <Link to={`/users/${u._id}`} className="p-1.5 rounded-full bg-primary/10 text-primary hover:bg-primary/20 transition-colors" title="View details">
                           <Eye className="h-4 w-4" />
-                        </button>
+                        </Link>
                         <button onClick={() => toast.success(`Initiating call with user ${u.name} at ${u.phone}...`)} className="p-1.5 rounded-full bg-primary/10 text-primary hover:bg-primary/20 transition-colors" title="Call User">
                           <Phone className="h-4 w-4" />
                         </button>

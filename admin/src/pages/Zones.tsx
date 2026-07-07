@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { StatCard } from "@/components/shared/StatCard";
-import { Map as MapIcon, MapPin, Compass, Trash2, Plus, SlidersHorizontal, ToggleLeft, ToggleRight, X, AlertTriangle, RefreshCw, Eye, Undo, Clock, ShieldCheck, ChevronDown, ChevronUp, Flame } from "lucide-react";
+import { Map as MapIcon, MapPin, Compass, Trash2, Plus, SlidersHorizontal, ToggleLeft, ToggleRight, X, AlertTriangle, RefreshCw, Eye, Undo, Clock, ShieldCheck, ChevronDown, ChevronUp, Flame, Pencil } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { adminFetch } from "@/lib/api-client";
 import { toast } from "sonner";
@@ -679,6 +679,22 @@ export default function Zones() {
                                   title="View on Map"
                                 >
                                   <Eye className="h-4 w-4" />
+                                </button>
+                                <button 
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    const newName = prompt("Enter new name for this zone:", z.name);
+                                    if (newName && newName.trim() !== "" && newName !== z.name) {
+                                      toggleZoneMutation.mutate({
+                                        zoneId: z._id,
+                                        data: { name: newName.trim() },
+                                      });
+                                    }
+                                  }}
+                                  className="p-1.5 text-muted-foreground hover:text-primary hover:bg-primary/10 rounded transition-colors"
+                                  title="Rename Zone"
+                                >
+                                  <Pencil className="h-4 w-4" />
                                 </button>
                                 <button 
                                   onClick={(e) => handleDelete(z._id, e)}
