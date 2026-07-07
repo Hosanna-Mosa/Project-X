@@ -268,12 +268,31 @@ export default function LocationSelectionScreen() {
     }
   };
 
-  const handleSelection = (type: 'pickup' | 'drop', data: any, details: any = null) => {
+  const handleSelection = async (type: 'pickup' | 'drop', data: any, details: any = null) => {
     const lat = details?.geometry?.location?.lat || data.lat;
     const lng = details?.geometry?.location?.lng || data.lng;
     const addrName = data.description || data.name;
     const placeId = data.place_id || data.id || details?.place_id;
     const placeName = data.structured_formatting?.main_text || data.name || addrName?.split(",")?.[0]?.trim();
+
+    if (lat && lng) {
+      try {
+        const checkRes = await customFetch<any>(`/api/v1/zones/check?lat=${lat}&lng=${lng}`);
+        if (!checkRes || !checkRes.inZone) {
+          Alert.alert("No Service", `No service at current ${type} location.`);
+          if (type === 'pickup') {
+            pickupRef.current?.setAddressText("");
+            setPickup(null);
+          } else {
+            dropRef.current?.setAddressText("");
+            setDrop(null);
+          }
+          return;
+        }
+      } catch (err) {
+        console.error("Zone check failed:", err);
+      }
+    }
 
     saveRecentPlace({
       id: placeId || addrName,
@@ -347,6 +366,20 @@ export default function LocationSelectionScreen() {
         return;
       }
       const location = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
+      
+      // Check zone for current location
+      try {
+        const checkRes = await customFetch<any>(`/api/v1/zones/check?lat=${location.coords.latitude}&lng=${location.coords.longitude}`);
+        if (!checkRes || !checkRes.inZone) {
+          Alert.alert("No Service", "No service at current pickup location.");
+          pickupRef.current?.setAddressText("");
+          setPickup(null);
+          return;
+        }
+      } catch (err) {
+        console.error("Zone check failed:", err);
+      }
+
       const geocode = await Location.reverseGeocodeAsync({
         latitude: location.coords.latitude,
         longitude: location.coords.longitude,
@@ -592,7 +625,7 @@ export default function LocationSelectionScreen() {
               <Text style={styles.placeName}>{place.name}</Text>
               <Text style={styles.placeAddress} numberOfLines={1}>{place.address}</Text>
             </View>
-            {!isSearching && <Ionicons name="heart-outline" size={20} color={colors.textSecondary} />}
+            
           </TouchableOpacity>
         ))}
       </ScrollView>
@@ -790,6 +823,8 @@ const createStyles = (colors: typeof Colors.light) =>
       marginVertical: 2,
     },
     locationInput: {
+      flex: 1,
+      width: "100%",
       height: 40,
       fontSize: 15,
       fontWeight: "600",

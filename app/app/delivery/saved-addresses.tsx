@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import {
   ScrollView,
   StyleSheet,
@@ -12,7 +12,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
-import { router } from "expo-router";
+import { router, useFocusEffect } from "expo-router";
 import * as Location from "expo-location";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { customFetch } from "@/utils/api/custom-fetch";
@@ -62,10 +62,12 @@ export default function SavedAddressesScreen() {
     { id: "mock-2", name: "Equinox Gym", address: "747 Howard St, San Francisco", lat: 37.7849, lng: -122.4019 },
   ]);
 
-  useEffect(() => {
-    fetchAddresses();
-    loadRecentLocations();
-  }, []);
+  useFocusEffect(
+    useCallback(() => {
+      fetchAddresses();
+      loadRecentLocations();
+    }, [])
+  );
 
   const fetchAddresses = async () => {
     try {
