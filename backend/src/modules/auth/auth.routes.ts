@@ -10,5 +10,6 @@ router.post("/request-otp", validateRequest(requestOtpSchema), authController.re
 router.post("/verify-otp", validateRequest(verifyOtpSchema), authController.verifyOTP.bind(authController));
 router.post("/login-password", validateRequest(loginWithPasswordSchema), authController.loginWithPassword.bind(authController));
 router.post("/logout", authController.logout.bind(authController));
+router.get("/version-check", authController.versionCheck.bind(authController));
 
 export default router;

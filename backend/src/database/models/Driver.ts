@@ -24,6 +24,7 @@ export interface IDriver extends Document {
   gender?: "male" | "female";
   vehicleType?: "bike" | "auto" | "car";
   preferredZone?: mongoose.Types.ObjectId;
+  preferredZones?: mongoose.Types.ObjectId[];
   aadhaarNumber?: string;
   aadhaarVerified?: boolean;
   panNumber?: string;
@@ -76,6 +77,7 @@ const DriverSchema: Schema = new Schema(
     gender: { type: String, enum: ["male", "female"] },
     vehicleType: { type: String, enum: ["bike", "auto", "car"] },
     preferredZone: { type: Schema.Types.ObjectId, ref: "Zone" },
+    preferredZones: [{ type: Schema.Types.ObjectId, ref: "Zone" }],
     aadhaarNumber: { type: String },
     aadhaarVerified: { type: Boolean, default: false },
     panNumber: { type: String },

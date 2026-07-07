@@ -71,7 +71,7 @@ export class OrdersService {
         total: totalPrice,
       };
     } else if (isRide) {
-      priceBreakdown = this.pricingService.calculateFareBreakdown(
+      priceBreakdown = await this.pricingService.calculateFareBreakdown(
         effectiveType,
         optimizationResult.totalDistance,
         optimizationResult.estimatedTime,
@@ -79,14 +79,15 @@ export class OrdersService {
       );
       totalPrice = priceBreakdown.total;
     } else {
-      totalPrice = totals?.total ?? this.pricingService.calculatePrice(
+      totalPrice = totals?.total ?? await this.pricingService.calculatePrice(
         optimizationResult.totalDistance, 
         optimizationResult.optimizedStops.length,
         surgeMultiplier,
       );
+      const rateConfig = await this.pricingService.getRateConfig(effectiveType);
       priceBreakdown = {
-        baseFare: totals?.subtotal ?? this.pricingService.getRateConfig(effectiveType).baseFare,
-        distanceFare: totals?.deliveryFee ?? totalPrice - this.pricingService.getRateConfig(effectiveType).baseFare,
+        baseFare: totals?.subtotal ?? rateConfig.baseFare,
+        distanceFare: totals?.deliveryFee ?? totalPrice - rateConfig.baseFare,
         timeFare: 0,
         surgeMultiplier,
         total: totalPrice,
@@ -396,7 +397,7 @@ export class OrdersService {
       }
     }
 
-    const breakdown = this.pricingService.calculateFareBreakdown(
+    const breakdown = await this.pricingService.calculateFareBreakdown(
       serviceType,
       distanceInKm,
       estimatedMinutes,

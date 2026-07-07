@@ -18,6 +18,9 @@ import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { useDriverStore } from "@/store/driverStore";
 import { LocationHandler } from "@/components/LocationHandler";
 import { GlobalSocketHandler } from "@/components/GlobalSocketHandler";
+import UpdateModal from "@/components/UpdateModal";
+import Constants from "expo-constants";
+import { Platform } from "react-native";
 import "@/utils/networkLogger";
 
 SplashScreen.preventAutoHideAsync();
@@ -101,7 +104,8 @@ function RootLayoutNav() {
     }
 
     // Authenticated but onboarding incomplete
-    if (!inOnboarding) {
+    const isAllowedOnboardingScreen = inOnboarding || segments[0] === "zone-map";
+    if (!isAllowedOnboardingScreen) {
       router.replace("/onboarding");
     }
   }, [hydrated, isAuthenticated, token, hasCompletedOnboarding, needsLoginPrompt, segments]);
@@ -114,6 +118,7 @@ function RootLayoutNav() {
     <Stack screenOptions={{ headerShown: false }}>
       <Stack.Screen name="auth" options={{ headerShown: false }} />
       <Stack.Screen name="onboarding" options={{ headerShown: false }} />
+      <Stack.Screen name="zone-map" options={{ headerShown: false }} />
       <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
       <Stack.Screen name="+not-found" />
     </Stack>
@@ -121,6 +126,10 @@ function RootLayoutNav() {
 }
 
 export default function RootLayout() {
+  const [showUpdate, setShowUpdate] = useState(false);
+  const [forceUpdate, setForceUpdate] = useState(false);
+  const [storeUrl, setStoreUrl] = useState("");
+
   const [fontsLoaded, fontError] = useFonts({
     Inter_400Regular,
     Inter_500Medium,
@@ -134,6 +143,27 @@ export default function RootLayout() {
     }
   }, [fontsLoaded, fontError]);
 
+  useEffect(() => {
+    // Check version on launch
+    (async () => {
+      try {
+        const platform = Platform.OS === "ios" ? "ios" : "android";
+        const currentVersion = Constants.expoConfig?.version || "1.0.0";
+        const apiUri = process.env.EXPO_PUBLIC_API_URL || "http://localhost:8000";
+        const res = await fetch(`${apiUri}/api/v1/auth/version-check?platform=${platform}&version=${currentVersion}`);
+        if (!res.ok) return;
+        const result = await res.json();
+        if (result.updateRequired) {
+          setStoreUrl(result.url || (platform === "ios" ? "https://apps.apple.com" : "https://play.google.com"));
+          setForceUpdate(result.forceUpdate);
+          setShowUpdate(true);
+        }
+      } catch (err) {
+        console.warn("Failed to check app updates:", err);
+      }
+    })();
+  }, []);
+
   if (!fontsLoaded && !fontError) return null;
 
   return (
@@ -145,6 +175,12 @@ export default function RootLayout() {
               <RootLayoutNav />
               <LocationHandler />
               <GlobalSocketHandler />
+              <UpdateModal 
+                visible={showUpdate} 
+                forceUpdate={forceUpdate} 
+                storeUrl={storeUrl} 
+                onDismiss={() => setShowUpdate(false)} 
+              />
             </KeyboardProvider>
           </GestureHandlerRootView>
         </QueryClientProvider>

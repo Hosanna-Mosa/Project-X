@@ -10,6 +10,7 @@ import {
   View,
   Alert,
   ActivityIndicator,
+  Animated,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -21,6 +22,49 @@ import { useThemeStore } from "@/contexts/themeStore";
 export default function AuthScreen() {
   const insets = useSafeAreaInsets();
   const [activeTab, setActiveTab] = useState<"Phone" | "Email">("Phone");
+
+  // Arrival Animation States for "FLAVOUR"
+  const [showSplash, setShowSplash] = useState(true);
+  const splashOpacity = React.useRef(new Animated.Value(1)).current;
+  const letters = ["F", "L", "A", "V", "O", "U", "R"];
+  const translateAnim = React.useRef(letters.map(() => new Animated.Value(0))).current;
+  const opacityAnim = React.useRef(letters.map(() => new Animated.Value(0))).current;
+
+  useEffect(() => {
+    // Set up spring arrival animations from opposite vertical directions
+    const animations = letters.map((_, idx) => {
+      const isOdd = idx % 2 !== 0;
+      translateAnim[idx].setValue(isOdd ? -450 : 450);
+      opacityAnim[idx].setValue(0);
+
+      return Animated.parallel([
+        Animated.spring(translateAnim[idx], {
+          toValue: 0,
+          tension: 40,
+          friction: 6.5,
+          useNativeDriver: true,
+        }),
+        Animated.timing(opacityAnim[idx], {
+          toValue: 1,
+          duration: 900,
+          useNativeDriver: true,
+        })
+      ]);
+    });
+
+    Animated.sequence([
+      Animated.delay(200),
+      Animated.stagger(120, animations),
+      Animated.delay(1200), // Let the complete name rest in the center
+      Animated.timing(splashOpacity, {
+        toValue: 0,
+        duration: 500,
+        useNativeDriver: true,
+      })
+    ]).start(() => {
+      setShowSplash(false);
+    });
+  }, []);
   const [phone, setPhone] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -34,10 +78,10 @@ export default function AuthScreen() {
   // Guard: if a token already exists, skip straight to the app.
   // This handles the edge case where the user navigates back to "/" while still logged in.
   useEffect(() => {
-    if (isInitialized && token) {
+    if (!showSplash && isInitialized && token) {
       router.replace("/(tabs)");
     }
-  }, [isInitialized, token]);
+  }, [showSplash, isInitialized, token]);
 
   const handleSignIn = async () => {
     const identifier = activeTab === "Phone" ? phone.trim() : email.trim();
@@ -75,6 +119,41 @@ export default function AuthScreen() {
   };
 
   // Show a loading indicator while auth state is being restored
+  if (showSplash) {
+    return (
+      <Animated.View style={{
+        flex: 1,
+        backgroundColor: "#002045", // deep blue branding background
+        justifyContent: "center",
+        alignItems: "center",
+        opacity: splashOpacity,
+      }}>
+        <View style={{ flexDirection: "row", alignItems: "center" }}>
+          {letters.map((letter, idx) => (
+            <Animated.Text
+              key={idx}
+              style={{
+                fontSize: 48,
+                fontWeight: "900",
+                color: "#ffffff",
+                marginHorizontal: 4,
+                textTransform: "uppercase",
+                letterSpacing: 2,
+                transform: [{ translateY: translateAnim[idx] }],
+                opacity: opacityAnim[idx],
+                textShadowColor: "rgba(0,0,0,0.3)",
+                textShadowOffset: { width: 0, height: 4 },
+                textShadowRadius: 6,
+              }}
+            >
+              {letter}
+            </Animated.Text>
+          ))}
+        </View>
+      </Animated.View>
+    );
+  }
+
   if (!isInitialized) {
     return (
       <View style={[styles.root, { justifyContent: "center", alignItems: "center" }]}>

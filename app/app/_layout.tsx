@@ -35,6 +35,8 @@ setAuthTokenGetter(() => {
 
 
 import { FloatingCart } from "@/components/FloatingCart";
+import UpdateModal from "@/components/UpdateModal";
+import { useState } from "react";
 import { GlobalSocketHandler } from "@/components/GlobalSocketHandler";
 
 SplashScreen.preventAutoHideAsync();
@@ -79,10 +81,32 @@ function RootLayoutNav() {
 }
 
 export default function RootLayout() {
+  const [showUpdate, setShowUpdate] = useState(false);
+  const [forceUpdate, setForceUpdate] = useState(false);
+  const [storeUrl, setStoreUrl] = useState("");
+
   useEffect(() => {
     if (Platform.OS === "android") {
       NavigationBar.setButtonStyleAsync("dark");
     }
+
+    // Call version-check API on app launch
+    (async () => {
+      try {
+        const platform = Platform.OS === "ios" ? "ios" : "android";
+        const currentVersion = Constants.expoConfig?.version || "1.0.0";
+        const res = await fetch(`${apiUrl}/api/v1/auth/version-check?platform=${platform}&version=${currentVersion}`);
+        if (!res.ok) return;
+        const result = await res.json();
+        if (result.updateRequired) {
+          setStoreUrl(result.url || (platform === "ios" ? "https://apps.apple.com" : "https://play.google.com"));
+          setForceUpdate(result.forceUpdate);
+          setShowUpdate(true);
+        }
+      } catch (err) {
+        console.warn("Failed to check app updates:", err);
+      }
+    })();
   }, []);
 
   const [fontsLoaded, fontError] = useFonts({
@@ -139,6 +163,12 @@ export default function RootLayout() {
               <RootLayoutNav />
               <FloatingCart />
               <GlobalSocketHandler />
+              <UpdateModal 
+                visible={showUpdate} 
+                forceUpdate={forceUpdate} 
+                storeUrl={storeUrl} 
+                onDismiss={() => setShowUpdate(false)} 
+              />
             </KeyboardProvider>
           </GestureHandlerRootView>
         </QueryClientProvider>

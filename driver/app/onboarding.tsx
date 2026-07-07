@@ -454,6 +454,8 @@ export default function OnboardingScreen() {
   const [vehicle, setVehicle] = useState<string | null>(null);
   const [preferredZone, setPreferredZone] = useState<string | null>(null);
   const [zones, setZones] = useState<any[]>([]);
+  const [zoneSearchText, setZoneSearchText] = useState("");
+  const [isZoneDropdownOpen, setIsZoneDropdownOpen] = useState(false);
 
   // ── Step 2 State ──────────────────────────────────────────────────────────
   const [aadhaarNumber, setAadhaarNumber] = useState("");
@@ -889,29 +891,128 @@ export default function OnboardingScreen() {
           </View>
         );
 
-      case "zone":
-        return (
-          <ScrollView style={{ maxHeight: 350 }} showsVerticalScrollIndicator={true}>
-            <View style={{ gap: 12, paddingBottom: 10 }}>
-              {zones.length === 0 ? (
-                <Text style={{ fontSize: 14, color: Colors.textMuted, textAlign: "center", marginTop: 20 }}>
-                  No active operational zones available. Please contact admin.
-                </Text>
-              ) : (
-                zones.map((z) => (
-                  <SelectCard
-                    key={z._id}
-                    selected={preferredZone === z._id}
-                    onSelect={() => setPreferredZone(z._id)}
-                    icon="map"
-                    label={z.name}
-                    desc={z.description || `${z.type === 'circle' ? 'Circular' : 'Polygon'} Geofence`}
-                  />
-                ))
-              )}
-            </View>
-          </ScrollView>
+      case "zone": {
+        const filtered = zones.filter((z) =>
+          z.name.toLowerCase().includes(zoneSearchText.toLowerCase())
         );
+        const selectedZoneDoc = zones.find((z) => z._id === preferredZone);
+
+        return (
+          <View style={{ gap: 12, paddingBottom: 10 }}>
+            {/* Search Input field */}
+            <FormInput
+              label="Search Zone"
+              value={zoneSearchText}
+              onChangeText={(t) => {
+                setZoneSearchText(t);
+                setIsZoneDropdownOpen(true);
+              }}
+              placeholder="Search by city or zone name..."
+              icon="search"
+            />
+
+            {/* Dropdown Menu */}
+            {isZoneDropdownOpen && (
+              <View style={{ 
+                borderWidth: 1, 
+                borderColor: Colors.border || "#e2e8f0", 
+                borderRadius: 12, 
+                backgroundColor: "#ffffff", 
+                maxHeight: 180, 
+                overflow: "hidden", 
+                marginTop: -4,
+                shadowColor: "#000",
+                shadowOffset: { width: 0, height: 2 },
+                shadowOpacity: 0.1,
+                shadowRadius: 4,
+                elevation: 3,
+                zIndex: 999
+              }}>
+                <ScrollView nestedScrollEnabled={true} style={{ maxHeight: 180 }}>
+                  {filtered.length === 0 ? (
+                    <Text style={{ padding: 12, fontSize: 13, color: Colors.textMuted || "#64748b", textAlign: "center" }}>
+                      No matching zones found.
+                    </Text>
+                  ) : (
+                    filtered.map((z) => (
+                      <TouchableOpacity 
+                        key={z._id} 
+                        onPress={() => {
+                          setPreferredZone(z._id);
+                          setIsZoneDropdownOpen(false);
+                          setZoneSearchText("");
+                        }}
+                        style={{ 
+                          padding: 12, 
+                          borderBottomWidth: 1, 
+                          borderBottomColor: "#f1f5f9"
+                        }}
+                      >
+                        <Text style={{ fontSize: 14, color: "#1e293b", fontWeight: "600" }}>{z.name}</Text>
+                      </TouchableOpacity>
+                    ))
+                  )}
+                </ScrollView>
+              </View>
+            )}
+
+            {/* Selected Zone Full Card */}
+            {selectedZoneDoc && (
+              <View style={{ marginTop: 12 }}>
+                <Text style={{ fontSize: 12, fontWeight: "600", color: Colors.textMuted || "#64748b", marginBottom: 6 }}>
+                  Selected Preferred Zone:
+                </Text>
+                <TouchableOpacity 
+                  onPress={() => {
+                    router.push({
+                      pathname: "/zone-map",
+                      params: { zoneId: selectedZoneDoc._id }
+                    });
+                  }}
+                  style={{
+                    flexDirection: "row",
+                    alignItems: "center",
+                    backgroundColor: "#f0f9ff",
+                    borderWidth: 2,
+                    borderColor: Colors.primary || "#0ea5e9",
+                    borderRadius: 16,
+                    padding: 16,
+                    gap: 12,
+                    shadowColor: Colors.primary || "#0ea5e9",
+                    shadowOffset: { width: 0, height: 4 },
+                    shadowOpacity: 0.1,
+                    shadowRadius: 6,
+                    elevation: 2,
+                  }}
+                >
+                  <View style={{ 
+                    width: 44, 
+                    height: 44, 
+                    borderRadius: 22, 
+                    backgroundColor: "#e0f2fe", 
+                    alignItems: "center", 
+                    justifyContent: "center" 
+                  }}>
+                    <Feather name="map-pin" size={20} color="#0ea5e9" />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ fontSize: 16, fontWeight: "700", color: "#0369a1" }}>
+                      {selectedZoneDoc.name}
+                    </Text>
+                    <Text style={{ fontSize: 12, color: "#0284c7", marginTop: 2 }}>
+                      {selectedZoneDoc.description || "Operational geofence area."}
+                    </Text>
+                    <Text style={{ fontSize: 11, fontWeight: "700", color: Colors.primary || "#0ea5e9", marginTop: 8 }}>
+                      🗺️ View Zone Coverage Map
+                    </Text>
+                  </View>
+                  <Feather name="chevron-right" size={20} color="#0ea5e9" />
+                </TouchableOpacity>
+              </View>
+            )}
+          </View>
+        );
+      }
 
       // ── Step 2 ────────────────────────────────────────────────────────────
       case "aadhaar":

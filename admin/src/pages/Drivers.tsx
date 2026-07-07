@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Link } from "react-router-dom";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { StatCard } from "@/components/shared/StatCard";
 import { Truck, Users as UsersIcon, Star, DollarSign, SlidersHorizontal, UserPlus, Eye, PhoneOff, ChevronLeft, ChevronRight, MapPin, Trash2, Ban, Phone } from "lucide-react";
@@ -87,6 +88,20 @@ export default function Drivers() {
     },
     onError: (err: any) => {
       toast.error(err.message || "Failed to update block status");
+    }
+  });
+
+  const updateDriverMutation = useMutation({
+    mutationFn: ({ id, data }: { id: string; data: any }) => adminFetch(`/admin/drivers/${id}`, {
+      method: "PUT",
+      body: JSON.stringify(data)
+    }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["admin", "drivers"] });
+      toast.success("Driver dossier updated successfully");
+    },
+    onError: (err: any) => {
+      toast.error(err.message || "Failed to update driver dossier");
     }
   });
 
@@ -229,7 +244,9 @@ export default function Drivers() {
                         </div>
                         <div>
                           <div className="flex items-center gap-2">
-                            <p className="text-sm font-semibold text-foreground">{d.user?.name}</p>
+                            <Link to={`/drivers/${d._id}`} className="text-sm font-semibold text-foreground hover:text-primary transition-colors hover:underline">
+                              {d.user?.name}
+                            </Link>
                             {d.user?.isBlocked && (
                               <span className="px-1.5 py-0.5 rounded bg-destructive/10 text-destructive text-[9px] font-bold uppercase">Blocked</span>
                             )}
@@ -262,9 +279,9 @@ export default function Drivers() {
                     </td>
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-1.5">
-                        <button onClick={() => handleViewClick(d)} className="p-1.5 rounded-full bg-primary/10 text-primary hover:bg-primary/20 transition-colors" title="View Details">
+                        <Link to={`/drivers/${d._id}`} className="p-1.5 rounded-full bg-primary/10 text-primary hover:bg-primary/20 transition-colors" title="View Details">
                           <Eye className="h-4 w-4" />
-                        </button>
+                        </Link>
                         <button onClick={() => toast.success(`Initiating call with ${d.user?.name || "Driver"} at ${d.user?.phone}...`)} className="p-1.5 rounded-full bg-primary/10 text-primary hover:bg-primary/20 transition-colors" title="Call Driver">
                           <Phone className="h-4 w-4" />
                         </button>
@@ -456,9 +473,9 @@ export default function Drivers() {
 
       {/* View Driver Details Dialog */}
       <Dialog open={isViewOpen} onOpenChange={setIsViewOpen}>
-        <DialogContent className="sm:max-w-[450px] rounded-3xl">
+        <DialogContent className="sm:max-w-[500px] rounded-3xl max-h-[85vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle className="text-xl font-bold">Driver Dossier</DialogTitle>
+            <DialogTitle className="text-xl font-bold">Driver Dossier & Onboarding</DialogTitle>
           </DialogHeader>
           {viewingDriver && (
             <div className="space-y-4 py-4 text-sm">
@@ -484,11 +501,99 @@ export default function Drivers() {
               </div>
               <div className="flex justify-between border-b pb-2 border-border">
                 <span className="font-semibold text-muted-foreground">Onboarding Status:</span>
-                <span className="font-medium text-foreground uppercase">{viewingDriver.onboardingStatus}</span>
+                <span className="font-medium text-foreground uppercase">{viewingDriver.onboardingStatus || "not_started"}</span>
               </div>
               <div className="flex justify-between border-b pb-2 border-border">
                 <span className="font-semibold text-muted-foreground">Active Location:</span>
                 <span className="font-medium text-foreground">{viewingDriver.currentLocation?.coordinates?.join(", ") || "Unknown"}</span>
+              </div>
+
+              {/* Legal & Onboarding Verification section */}
+              <div className="mt-4 pt-4 border-t border-border space-y-3">
+                <h4 className="font-bold text-foreground text-base">Documents & Verification</h4>
+                
+                <div className="flex items-center justify-between p-2 bg-muted rounded-lg">
+                  <div>
+                    <p className="font-semibold text-xs">Aadhaar Verification</p>
+                    <p className="text-[11px] text-muted-foreground">{viewingDriver.aadhaarNumber || "No Aadhaar provided"}</p>
+                  </div>
+                  <Button 
+                    size="sm"
+                    variant={viewingDriver.aadhaarVerified ? "outline" : "default"}
+                    className={viewingDriver.aadhaarVerified ? "" : "bg-primary text-white"}
+                    onClick={() => {
+                      updateDriverMutation.mutate({
+                        id: viewingDriver._id,
+                        data: { aadhaarVerified: !viewingDriver.aadhaarVerified }
+                      });
+                      setViewingDriver({ ...viewingDriver, aadhaarVerified: !viewingDriver.aadhaarVerified });
+                    }}
+                  >
+                    {viewingDriver.aadhaarVerified ? "Verified" : "Verify"}
+                  </Button>
+                </div>
+
+                <div className="flex items-center justify-between p-2 bg-muted rounded-lg">
+                  <div>
+                    <p className="font-semibold text-xs">Bank Details Verification</p>
+                    <p className="text-[11px] text-muted-foreground">
+                      {viewingDriver.bankAccountNumber ? `A/C: ${viewingDriver.bankAccountNumber} (${viewingDriver.bankIfsc})` : "No bank details provided"}
+                    </p>
+                  </div>
+                  <Button 
+                    size="sm"
+                    variant={viewingDriver.bankVerified ? "outline" : "default"}
+                    className={viewingDriver.bankVerified ? "" : "bg-primary text-white"}
+                    onClick={() => {
+                      updateDriverMutation.mutate({
+                        id: viewingDriver._id,
+                        data: { bankVerified: !viewingDriver.bankVerified }
+                      });
+                      setViewingDriver({ ...viewingDriver, bankVerified: !viewingDriver.bankVerified });
+                    }}
+                  >
+                    {viewingDriver.bankVerified ? "Verified" : "Verify"}
+                  </Button>
+                </div>
+
+                {viewingDriver.dlNumber && (
+                  <div className="p-2 bg-muted rounded-lg space-y-1">
+                    <p className="font-semibold text-xs">Driving License</p>
+                    <p className="text-[11px] text-muted-foreground">DL No: {viewingDriver.dlNumber}</p>
+                    {viewingDriver.dlExpiry && (
+                      <p className="text-[10px] text-muted-foreground">Expires: {new Date(viewingDriver.dlExpiry).toLocaleDateString()}</p>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* Onboarding Approval Buttons */}
+              <div className="flex gap-2 pt-4">
+                <Button 
+                  className="flex-1 bg-green-600 hover:bg-green-700 text-white rounded-lg"
+                  onClick={() => {
+                    updateDriverMutation.mutate({
+                      id: viewingDriver._id,
+                      data: { onboardingStatus: "completed", aadhaarVerified: true, bankVerified: true }
+                    });
+                    setViewingDriver({ ...viewingDriver, onboardingStatus: "completed", aadhaarVerified: true, bankVerified: true });
+                  }}
+                >
+                  Approve Driver
+                </Button>
+                <Button 
+                  variant="destructive"
+                  className="flex-1 rounded-lg"
+                  onClick={() => {
+                    updateDriverMutation.mutate({
+                      id: viewingDriver._id,
+                      data: { onboardingStatus: "rejected" }
+                    });
+                    setViewingDriver({ ...viewingDriver, onboardingStatus: "rejected" });
+                  }}
+                >
+                  Reject Driver
+                </Button>
               </div>
             </div>
           )}

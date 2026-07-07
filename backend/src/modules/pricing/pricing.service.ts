@@ -1,4 +1,5 @@
 import { ServiceType } from "../../database/models/Order";
+import SystemConfig from "../../database/models/SystemConfig";
 
 interface FareBreakdown {
   baseFare: number;
@@ -48,17 +49,25 @@ const DEFAULT_RATES: Record<ServiceType, RateConfig> = {
 };
 
 export class PricingService {
-  getRateConfig(serviceType: ServiceType): RateConfig {
+  async getRateConfig(serviceType: ServiceType): Promise<RateConfig> {
+    try {
+      const config = await SystemConfig.findOne({ key: "global_settings" });
+      if (config && config.value?.rates?.[serviceType]) {
+        return config.value.rates[serviceType];
+      }
+    } catch (error) {
+      console.error("Error reading system config, using default rates:", error);
+    }
     return DEFAULT_RATES[serviceType] || DEFAULT_RATES[ServiceType.CAB];
   }
 
-  calculateFareBreakdown(
+  async calculateFareBreakdown(
     serviceType: ServiceType,
     distanceInKm: number,
     estimatedMinutes: number = 0,
     surgeMultiplier: number = 1,
-  ): FareBreakdown {
-    const rates = this.getRateConfig(serviceType);
+  ): Promise<FareBreakdown> {
+    const rates = await this.getRateConfig(serviceType);
 
     const baseFare = rates.baseFare;
     const distanceFare = Math.round(distanceInKm * rates.perKmRate * 100) / 100;
@@ -70,8 +79,8 @@ export class PricingService {
   }
 
   // Keep backward compatibility with delivery pricing
-  calculatePrice(distanceInKm: number, stopCount: number, surgeMultiplier: number = 1): number {
-    const rates = DEFAULT_RATES[ServiceType.DELIVERY];
+  async calculatePrice(distanceInKm: number, stopCount: number, surgeMultiplier: number = 1): Promise<number> {
+    const rates = await this.getRateConfig(ServiceType.DELIVERY);
     const distancePrice = distanceInKm * rates.perKmRate;
     const stopPrice = stopCount * 20;
     return Math.round((rates.baseFare + distancePrice + stopPrice) * surgeMultiplier * 100) / 100;
