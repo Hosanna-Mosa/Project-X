@@ -55,6 +55,14 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     // Attempt to persist local storage
     try {
       await AsyncStorage.setItem("user", JSON.stringify(updatedUser));
+      
+      // Update favorites in database
+      if (token) {
+        await fetch(`${apiUrl}/api/v1/users/favorites/${restaurantId}`, {
+          method: "POST",
+          headers: { Authorization: `Bearer ${token}` },
+        });
+      }
     } catch (e) {
       console.error("Failed to persist favorites", e);
     }

@@ -14,6 +14,9 @@ import MapView, { Marker, PROVIDER_GOOGLE } from "react-native-maps";
 import * as Location from "expo-location";
 import Colors from "@/constants/colors";
 import { useThemeStore } from "@/contexts/themeStore";
+import { LIGHT_GREEN_MAP_STYLE } from "@/constants/mapStyle";
+import { customFetch } from "@/utils/api/custom-fetch";
+import { Alert } from "react-native";
 
 const { width, height } = Dimensions.get("window");
 
@@ -79,7 +82,20 @@ export default function MapPickerScreen() {
     }
   };
 
-  const handleConfirm = () => {
+  const handleConfirm = async () => {
+    setLoading(true);
+    try {
+      const checkRes = await customFetch<any>(`/api/v1/zones/check?lat=${region.latitude}&lng=${region.longitude}`);
+      if (!checkRes || !checkRes.inZone) {
+        Alert.alert("No Service", `No service at current ${step} location.`);
+        return;
+      }
+    } catch (err) {
+      console.error("Zone check failed:", err);
+    } finally {
+      setLoading(false);
+    }
+
     const currentData = {
       name: address,
       lat: region.latitude,
@@ -124,6 +140,7 @@ export default function MapPickerScreen() {
           style={StyleSheet.absoluteFill}
           initialRegion={region}
           onRegionChangeComplete={handleRegionChangeComplete}
+          customMapStyle={LIGHT_GREEN_MAP_STYLE}
         />
         
         {/* Fixed Center Marker */}
@@ -329,19 +346,19 @@ const createStyles = (colors: any, insets: any) =>
        lineHeight: 18,
     },
     confirmBtn: {
-       backgroundColor: "#F59E0B",
-       paddingVertical: 16,
-       borderRadius: 30,
-       alignItems: 'center',
-       shadowColor: "#F59E0B",
-       shadowOffset: { width: 0, height: 4 },
-       shadowOpacity: 0.2,
-       shadowRadius: 8,
-       elevation: 5,
-    },
-    confirmBtnText: {
-       fontSize: 16,
-       fontWeight: '900',
-       color: '#000',
-    },
+        backgroundColor: colors.primary,
+        paddingVertical: 16,
+        borderRadius: 30,
+        alignItems: 'center',
+        shadowColor: colors.primary,
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.2,
+        shadowRadius: 8,
+        elevation: 5,
+     },
+     confirmBtnText: {
+        fontSize: 16,
+        fontWeight: '900',
+        color: '#fff',
+     },
   });
