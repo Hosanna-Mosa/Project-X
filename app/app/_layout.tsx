@@ -84,6 +84,19 @@ export default function RootLayout() {
   const [showUpdate, setShowUpdate] = useState(false);
   const [forceUpdate, setForceUpdate] = useState(false);
   const [storeUrl, setStoreUrl] = useState("");
+  const [latestVersion, setLatestVersion] = useState("");
+
+  const handleDismissUpdate = async () => {
+    try {
+      const AsyncStorage = require("@react-native-async-storage/async-storage").default;
+      if (latestVersion) {
+        await AsyncStorage.setItem("dismissed_update_version", latestVersion);
+      }
+    } catch (err) {
+      console.warn("Failed to save dismissed version:", err);
+    }
+    setShowUpdate(false);
+  };
 
   useEffect(() => {
     if (Platform.OS === "android") {
@@ -99,9 +112,21 @@ export default function RootLayout() {
         if (!res.ok) return;
         const result = await res.json();
         if (result.updateRequired) {
+          const latest = result.latest || "1.0.0";
+          setLatestVersion(latest);
           setStoreUrl(result.url || (platform === "ios" ? "https://apps.apple.com" : "https://play.google.com"));
           setForceUpdate(result.forceUpdate);
-          setShowUpdate(true);
+          
+          if (result.forceUpdate) {
+            setShowUpdate(true);
+          } else {
+            // Check if this version was already dismissed
+            const AsyncStorage = require("@react-native-async-storage/async-storage").default;
+            const dismissedVersion = await AsyncStorage.getItem("dismissed_update_version");
+            if (dismissedVersion !== latest) {
+              setShowUpdate(true);
+            }
+          }
         }
       } catch (err) {
         console.warn("Failed to check app updates:", err);
@@ -167,7 +192,7 @@ export default function RootLayout() {
                 visible={showUpdate} 
                 forceUpdate={forceUpdate} 
                 storeUrl={storeUrl} 
-                onDismiss={() => setShowUpdate(false)} 
+                onDismiss={handleDismissUpdate} 
               />
             </KeyboardProvider>
           </GestureHandlerRootView>

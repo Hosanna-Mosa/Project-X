@@ -23,7 +23,7 @@ export default function UpdateModal({ visible, forceUpdate, storeUrl, onDismiss 
       animationType="fade"
       hardwareAccelerated={true}
       onRequestClose={() => {
-        if (!forceUpdate) onDismiss();
+        onDismiss();
       }}
     >
       <View style={styles.overlay}>
@@ -47,11 +47,9 @@ export default function UpdateModal({ visible, forceUpdate, storeUrl, onDismiss 
               <Text style={styles.updateText}>Update Now</Text>
             </TouchableOpacity>
 
-            {!forceUpdate && (
-              <TouchableOpacity style={styles.laterButton} onPress={onDismiss} activeOpacity={0.8}>
-                <Text style={styles.laterText}>Maybe Later</Text>
-              </TouchableOpacity>
-            )}
+            <TouchableOpacity style={styles.laterButton} onPress={onDismiss} activeOpacity={0.8}>
+              <Text style={styles.laterText}>Maybe Later</Text>
+            </TouchableOpacity>
           </View>
         </View>
       </View>
