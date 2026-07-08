@@ -45,7 +45,8 @@ export type OrderStatus =
   | "picking_items"
   | "en_route_delivery"
   | "arrived_delivery"
-  | "delivered";
+  | "delivered"
+  | "cancelled";
 
 export interface DeliveryState {
   stops: DeliveryStop[];
