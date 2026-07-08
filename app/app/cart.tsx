@@ -13,6 +13,7 @@ import { router, useLocalSearchParams } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useCartStore } from "@/contexts/cartStore";
 import { customFetch } from "@/utils/api/custom-fetch";
+import { useHomeStore } from "@/contexts/homeStore";
 
 const DELIVERY_FEE_ORIGINAL = 199;
 const DELIVERY_FEE = 39; 
@@ -39,8 +40,9 @@ const COMPLEMENTS = [
 export default function CartScreen() {
   const insets = useSafeAreaInsets();
   const { vendorName } = useLocalSearchParams();
-  const { items, getTotalPrice, vendorId, updateQuantity } = useCartStore();
+  const { items, getTotalPrice, vendorId, updateQuantity, addItem } = useCartStore();
   const [fetchedVendorName, setFetchedVendorName] = React.useState<string | null>(null);
+  const [menuItems, setMenuItems] = React.useState<any[]>([]);
 
   React.useEffect(() => {
     if (vendorId) {
@@ -51,6 +53,51 @@ export default function CartScreen() {
         .catch(() => {});
     }
   }, [vendorId]);
+
+  React.useEffect(() => {
+    if (vendorId) {
+      customFetch<any[]>(`/api/v1/food/vendor/${vendorId}`)
+        .then(data => {
+          if (data && Array.isArray(data) && data.length > 0) {
+            setMenuItems(data);
+          } else {
+            // Try fetching meat menu
+            customFetch<any[]>(`/api/v1/meat/menu/${vendorId}`)
+              .then(meatData => {
+                if (meatData && Array.isArray(meatData)) {
+                  const normalized = meatData.map((item: any) => ({
+                    ...item,
+                    isVeg: false,
+                    images: item.images || [item.image || "https://images.unsplash.com/photo-1587593810167-a84920ea0781?w=400"],
+                    description: item.description || `Fresh ${item.name} - ${item.weight}`,
+                  }));
+                  setMenuItems(normalized);
+                }
+              })
+              .catch(() => {});
+          }
+        })
+        .catch(() => {
+          customFetch<any[]>(`/api/v1/meat/menu/${vendorId}`)
+            .then(meatData => {
+              if (meatData && Array.isArray(meatData)) {
+                const normalized = meatData.map((item: any) => ({
+                  ...item,
+                  isVeg: false,
+                  images: item.images || [item.image || "https://images.unsplash.com/photo-1587593810167-a84920ea0781?w=400"],
+                  description: item.description || `Fresh ${item.name} - ${item.weight}`,
+                }));
+                setMenuItems(normalized);
+              }
+            })
+            .catch(() => {});
+        });
+    }
+  }, [vendorId]);
+
+  const complements = React.useMemo(() => {
+    return menuItems.filter(menuItem => !items.some(cartItem => cartItem._id === menuItem._id));
+  }, [menuItems, items]);
 
   const displayVendorName = vendorName ? String(vendorName) : (fetchedVendorName || "Whataburger");
 
@@ -140,27 +187,37 @@ export default function CartScreen() {
         <View style={styles.thickDivider} />
 
         {/* Complement Your Cart Section */}
-        <Text style={styles.sectionTitle}>Complement your cart</Text>
-        <ScrollView 
-          horizontal 
-          showsHorizontalScrollIndicator={false} 
-          contentContainerStyle={styles.complementsList}
-        >
-          {COMPLEMENTS.map((comp) => (
-            <View key={comp.id} style={styles.complementCard}>
-              <View style={styles.compImageContainer}>
-                <Image source={{ uri: comp.image }} style={styles.compImage} />
-                <TouchableOpacity style={styles.compAddBtn}>
-                  <Feather name="plus" size={16} color="#000000" />
-                </TouchableOpacity>
-              </View>
-              <Text style={styles.compName}>{comp.name}</Text>
-              <Text style={styles.compPrice}>₹{comp.price.toFixed(2)}</Text>
-            </View>
-          ))}
-        </ScrollView>
-
-        <View style={styles.thickDivider} />
+        {complements.length > 0 && (
+          <>
+            <Text style={styles.sectionTitle}>Complement your cart</Text>
+            <ScrollView 
+              horizontal 
+              showsHorizontalScrollIndicator={false} 
+              contentContainerStyle={styles.complementsList}
+            >
+              {complements.map((comp) => (
+                <View key={comp._id} style={styles.complementCard}>
+                  <View style={styles.compImageContainer}>
+                    <Image source={{ uri: comp.images?.[0] || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=300' }} style={styles.compImage} />
+                    <TouchableOpacity 
+                      style={styles.compAddBtn}
+                      onPress={() => {
+                        if (vendorId) {
+                          addItem(comp, vendorId);
+                        }
+                      }}
+                    >
+                      <Feather name="plus" size={16} color="#000000" />
+                    </TouchableOpacity>
+                  </View>
+                  <Text style={styles.compName} numberOfLines={1}>{comp.name}</Text>
+                  <Text style={styles.compPrice}>₹{comp.price.toFixed(2)}</Text>
+                </View>
+              ))}
+            </ScrollView>
+            <View style={styles.thickDivider} />
+          </>
+        )}
 
         {/* Order Summary Card */}
         <View style={styles.summaryContainer}>
@@ -212,17 +269,26 @@ export default function CartScreen() {
 
       {/* Sticky Footer */}
       <View style={[styles.stickyFooter, { paddingBottom: insets.bottom > 0 ? insets.bottom : 20 }]}>
-        <View style={styles.savingsBanner}>
-          <Ionicons name="pricetag" size={18} color="#000000" />
-          <Text style={styles.savingsText}>Saving ₹{DISCOUNT.toFixed(2)} with Deals</Text>
-        </View>
-        <TouchableOpacity 
-          style={styles.continueBtn} 
-          onPress={goToCheckout}
-          activeOpacity={0.9}
-        >
-          <Text style={styles.continueBtnText}>Continue</Text>
-        </TouchableOpacity>
+        {items.length > 0 ? (
+          <TouchableOpacity 
+            style={styles.continueBtn} 
+            onPress={goToCheckout}
+            activeOpacity={0.9}
+          >
+            <Text style={styles.continueBtnText}>Continue</Text>
+          </TouchableOpacity>
+        ) : (
+          <TouchableOpacity 
+            style={[styles.continueBtn, { backgroundColor: '#74777f' }]} 
+            onPress={() => {
+              useHomeStore.getState().setActiveService('Food');
+              router.push("/(tabs)");
+            }}
+            activeOpacity={0.9}
+          >
+            <Text style={styles.continueBtnText}>Go back to Food Screen</Text>
+          </TouchableOpacity>
+        )}
       </View>
     </View>
   );

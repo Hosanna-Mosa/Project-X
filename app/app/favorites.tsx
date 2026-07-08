@@ -57,6 +57,10 @@ export default function FavoritesScreen() {
     fetchFavorites();
   };
 
+  const activeFavorites = React.useMemo(() => {
+    return favorites.filter((item) => user?.favorites?.includes(item._id));
+  }, [favorites, user?.favorites]);
+
   return (
     <View style={styles.root}>
       {/* Header */}
@@ -68,13 +72,13 @@ export default function FavoritesScreen() {
       </View>
 
       {/* Content */}
-      {loading && favorites.length === 0 ? (
+      {loading && activeFavorites.length === 0 ? (
         <View style={styles.centerContainer}>
           <ActivityIndicator size="large" color={colors.primary} />
         </View>
       ) : (
         <FlatList
-          data={favorites}
+          data={activeFavorites}
           keyExtractor={(item) => item._id}
           renderItem={({ item }) => (
             <RestaurantListItem

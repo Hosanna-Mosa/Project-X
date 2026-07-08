@@ -22,6 +22,7 @@ import { BottomSheet } from "@/components/BottomSheet";
 import { OrderStatusTimeline } from "@/components/OrderStatusTimeline";
 import { OrderStatus } from "@/contexts/deliveryStore";
 import { customFetch } from "@/utils/api/custom-fetch";
+import { hide } from "expo-router/build/utils/splash";
 
 const STATUS_SEQUENCE: OrderStatus[] = [
   "confirmed",
@@ -135,6 +136,8 @@ export default function TrackingScreen() {
 
   const isRide = ["bike", "auto", "cab", "cab_prime"].includes(serviceType?.toLowerCase() || "");
   const isHelper = serviceType?.toLowerCase() === "helper";
+
+  const [bottomSheetHeight, setBottomSheetHeight] = useState(300);
 
   const normalizeStatus = (backendStatus: string): OrderStatus => {
     const s = backendStatus.toLowerCase();
@@ -285,9 +288,9 @@ export default function TrackingScreen() {
             {isRide
               ? `You have arrived safely at your destination with ${driver?.name || "your captain"}.`
               : (isHelper
-                  ? `Your helper task has been completed successfully by ${driver?.name || "your helper"}.`
-                  : `Your meal has been delivered successfully by ${driver?.name || "our delivery partner"}.`
-                )}
+                ? `Your helper task has been completed successfully by ${driver?.name || "your helper"}.`
+                : `Your meal has been delivered successfully by ${driver?.name || "our delivery partner"}.`
+              )}
           </Text>
         </View>
 
@@ -320,12 +323,12 @@ export default function TrackingScreen() {
                 </Text>
                 {isHelper ? (
                   <View style={{ gap: 8 }}>
-                     <Text style={{ fontSize: 14, color: colors.text }}>
-                       Service: <Text style={{ fontWeight: "700" }}>General Helper & Task Specialist</Text>
-                     </Text>
-                     <Text style={{ fontSize: 14, color: colors.text }}>
-                       Booked Location: <Text style={{ fontWeight: "700" }}>{stops?.[0]?.address || "N/A"}</Text>
-                     </Text>
+                    <Text style={{ fontSize: 14, color: colors.text }}>
+                      Service: <Text style={{ fontWeight: "700" }}>General Helper & Task Specialist</Text>
+                    </Text>
+                    <Text style={{ fontSize: 14, color: colors.text }}>
+                      Booked Location: <Text style={{ fontWeight: "700" }}>{stops?.[0]?.address || "N/A"}</Text>
+                    </Text>
                   </View>
                 ) : (
                   foodItems.map((item: any, idx: number) => (
@@ -375,7 +378,7 @@ export default function TrackingScreen() {
 
   return (
     <View style={styles.root}>
-      <MapBackground 
+      <MapBackground
         ref={mapRef}
         stops={stops}
         polyline={["en_route_delivery", "arrived_delivery"].includes(status) ? route?.polyline : undefined}
@@ -387,7 +390,7 @@ export default function TrackingScreen() {
             : null
         }
         radiusMeters={radius ? radius * 1000 : undefined}
-        style={StyleSheet.absoluteFill} 
+        style={StyleSheet.absoluteFill}
       />
 
       <View
@@ -407,49 +410,54 @@ export default function TrackingScreen() {
           <Text style={styles.etaText}>ETA: {eta} mins away</Text>
         </View>
         {/* Spacer to keep ETA centered */}
-        <View style={styles.backBtn} />
+        <View style={{ width: 44 }} />
       </View>
 
-      <BottomSheet style={styles.bottomSheet}>
-        <ScrollView showsVerticalScrollIndicator={false}>
+      <BottomSheet style={styles.bottomSheet} defaultHeight={bottomSheetHeight} disableExpand={true}>
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          onContentSizeChange={(width, height) => {
+            setBottomSheetHeight(height + 100);
+          }}
+        >
           {!driver ? (
             <View style={styles.findingDriverContainer}>
               <View style={styles.radarContainer}>
-                <Animated.View 
+                <Animated.View
                   style={[
-                    styles.radarCircle, 
-                    { 
-                      borderColor: colors.primary, 
+                    styles.radarCircle,
+                    {
+                      borderColor: colors.primary,
                       transform: [{
                         scale: pulse1.interpolate({
                           inputRange: [0, 1],
                           outputRange: [1, 2.2],
                         })
-                      }], 
+                      }],
                       opacity: pulse1.interpolate({
                         inputRange: [0, 1],
                         outputRange: [0.5, 0],
                       })
                     }
-                  ]} 
+                  ]}
                 />
-                <Animated.View 
+                <Animated.View
                   style={[
-                    styles.radarCircle, 
-                    { 
-                      borderColor: colors.primary, 
+                    styles.radarCircle,
+                    {
+                      borderColor: colors.primary,
                       transform: [{
                         scale: pulse2.interpolate({
                           inputRange: [0, 1],
                           outputRange: [1, 2.2],
                         })
-                      }], 
+                      }],
                       opacity: pulse2.interpolate({
                         inputRange: [0, 1],
                         outputRange: [0.5, 0],
                       })
                     }
-                  ]} 
+                  ]}
                 />
                 <View style={[styles.radarCenter, { backgroundColor: colors.primary }]}>
                   <Feather name="search" size={24} color={colors.background} />
@@ -498,6 +506,7 @@ export default function TrackingScreen() {
                     <Feather name="alert-triangle" size={18} color="#FFFFFF" />
                   </TouchableOpacity>
                   <TouchableOpacity 
+                  <TouchableOpacity
                     style={styles.actionBtn}
                     onPress={() => Linking.openURL(`tel:${driver.phone || "1234567890"}`)}
                   >
@@ -534,7 +543,7 @@ export default function TrackingScreen() {
                   <Feather name="shield" size={20} color={colors.primary} />
                   <View style={styles.otpTextContainer}>
                     <Text style={styles.otpTitle}>End Ride OTP</Text>
-                    <Text style={styles.otpSubtitle}>Share this OTP with your captain only when you reach your destination</Text>
+
                   </View>
                   <View style={styles.otpBadge}>
                     <Text style={styles.otpCode}>{deliveryOtp}</Text>
@@ -805,22 +814,23 @@ const createStyles = (colors: typeof Colors.light) => StyleSheet.create({
     borderWidth: 1,
     borderColor: `${colors.primary}30`,
     borderRadius: 16,
-    padding: 14,
-    marginBottom: 16,
+    padding: 8,
+    marginBottom: 10,
     gap: 12,
   },
   otpTextContainer: {
     flex: 1,
-    gap: 2,
+    gap: 1,
   },
   otpTitle: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: "700",
     color: colors.text,
   },
   otpSubtitle: {
-    fontSize: 11,
+    fontSize: 9,
     color: colors.textMuted,
+
   },
   otpBadge: {
     backgroundColor: colors.primary,

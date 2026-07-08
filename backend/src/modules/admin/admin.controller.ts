@@ -471,7 +471,19 @@ export class AdminController {
       const ticket = await SupportTicket.findById(id);
       if (!ticket) return res.status(404).json({ message: "Ticket not found" });
 
-      if (status !== undefined) ticket.status = status;
+      if (status !== undefined) {
+        if (status === "RESOLVED") {
+          ticket.status = "PENDING_RESOLVE";
+          const nowTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+          ticket.messages.push({
+            sender: "system",
+            time: `RESOLUTION REQUESTED • ${nowTime}`,
+            text: "Support requested to mark this ticket as resolved. Please confirm."
+          });
+        } else {
+          ticket.status = status;
+        }
+      }
 
       if (replyText) {
         const now = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });

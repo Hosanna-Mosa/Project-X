@@ -851,7 +851,17 @@ export default function ProfileScreen() {
 
             <View style={styles.menuCard}>
               {sections.map((item) => (
-                <Pressable key={item.key} style={styles.menuItem} onPress={() => setActiveSection(item.key)}>
+                <Pressable
+                  key={item.key}
+                  style={styles.menuItem}
+                  onPress={() => {
+                    if (item.key === "support") {
+                      router.push("/support");
+                    } else {
+                      setActiveSection(item.key);
+                    }
+                  }}
+                >
                   <View style={styles.menuIconContainer}>
                     <Feather name={item.icon} size={18} color={Colors.primary} />
                   </View>
