@@ -67,7 +67,10 @@ export async function checkCoordinates(req: Request, res: Response, next: NextFu
       return;
     }
 
+    console.log(`[ZONE CHECK] Incoming coordinates check request: lat=${lat}, lng=${lng}, serviceType=${serviceType}`);
     const zone = await zonesService.getZoneForCoordinates(lat, lng, serviceType);
+    console.log(`[ZONE CHECK] Match result: ${zone ? zone.name : "None"}`);
+
     res.status(200).json({
       success: true,
       inZone: zone !== null,

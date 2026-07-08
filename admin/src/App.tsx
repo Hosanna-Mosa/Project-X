@@ -7,7 +7,6 @@ import Dashboard from "./pages/Dashboard";
 import LiveOrders from "./pages/LiveOrders";
 import Drivers from "./pages/Drivers";
 import Analytics from "./pages/Analytics";
-import MultiStopOrders from "./pages/MultiStopOrders";
 import Payments from "./pages/Payments";
 import Support from "./pages/Support";
 import OrderDetail from "./pages/OrderDetail";
@@ -53,7 +52,6 @@ const App = () => (
           <Route path="/live-orders/:id" element={<OrderDetail />} />
           <Route path="/drivers" element={<Drivers />} />
           <Route path="/analytics" element={<Analytics />} />
-          <Route path="/multi-stop" element={<MultiStopOrders />} />
           <Route path="/payments" element={<Payments />} />
           <Route path="/support" element={<Support />} />
           <Route path="/users" element={<Users />} />
