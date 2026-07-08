@@ -65,6 +65,32 @@ export default function ActiveOrderScreen() {
       ]
     );
   };
+
+  const handleCancelOrder = () => {
+    if (!currentOrder) return;
+
+    Alert.alert(
+      "Cancel Delivery",
+      "Are you sure you want to cancel this delivery? The order will be aborted.",
+      [
+        { text: "No", style: "cancel" },
+        {
+          text: "Yes, Cancel",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              await updateOrderStatus("CANCELLED" as any);
+              useDriverStore.setState({ currentOrder: null, currentStep: 0 });
+              Alert.alert("Success", "Delivery has been cancelled.");
+            } catch (err: any) {
+              console.error("Cancel order error:", err);
+              Alert.alert("Error", err.message || "Failed to cancel delivery.");
+            }
+          }
+        }
+      ]
+    );
+  };
   const [driverLocation, setDriverLocation] = useState<{ lat: number; lng: number } | null>(null);
 
   // Map Ref
@@ -992,6 +1018,12 @@ export default function ActiveOrderScreen() {
           <TouchableOpacity style={styles.actionBtn} onPress={handleStatusTransition}>
             <Text style={styles.actionBtnText}>Start Travel to Restaurant</Text>
           </TouchableOpacity>
+          <TouchableOpacity 
+            style={[styles.actionBtn, { backgroundColor: "#EF4444", marginTop: 8 }]} 
+            onPress={handleCancelOrder}
+          >
+            <Text style={styles.actionBtnText}>Cancel Delivery</Text>
+          </TouchableOpacity>
         </View>
       );
     }
@@ -1058,6 +1090,12 @@ export default function ActiveOrderScreen() {
           <TouchableOpacity style={styles.actionBtn} onPress={handleStatusTransition}>
             <Text style={styles.actionBtnText}>Arrived at Restaurant</Text>
           </TouchableOpacity>
+          <TouchableOpacity 
+            style={[styles.actionBtn, { backgroundColor: "#EF4444", marginTop: 8 }]} 
+            onPress={handleCancelOrder}
+          >
+            <Text style={styles.actionBtnText}>Cancel Delivery</Text>
+          </TouchableOpacity>
         </View>
       );
     }
@@ -1086,6 +1124,12 @@ export default function ActiveOrderScreen() {
             disabled={true}
           >
             <Text style={styles.actionBtnText}>Waiting for Restaurant...</Text>
+          </TouchableOpacity>
+          <TouchableOpacity 
+            style={[styles.actionBtn, { backgroundColor: "#EF4444", marginTop: 8 }]} 
+            onPress={handleCancelOrder}
+          >
+            <Text style={styles.actionBtnText}>Cancel Delivery</Text>
           </TouchableOpacity>
         </View>
       );
@@ -1191,6 +1235,12 @@ export default function ActiveOrderScreen() {
               <Text style={styles.actionBtnText}>Confirm Picked Up</Text>
             </TouchableOpacity>
           </View>
+          <TouchableOpacity 
+            style={[styles.actionBtn, { backgroundColor: "#EF4444", marginTop: 8 }]} 
+            onPress={handleCancelOrder}
+          >
+            <Text style={styles.actionBtnText}>Cancel Delivery</Text>
+          </TouchableOpacity>
         </View>
       );
     }
@@ -1260,6 +1310,12 @@ export default function ActiveOrderScreen() {
           <TouchableOpacity style={styles.actionBtn} onPress={handleStatusTransition}>
             <Text style={styles.actionBtnText}>Arrived at Customer</Text>
           </TouchableOpacity>
+          <TouchableOpacity 
+            style={[styles.actionBtn, { backgroundColor: "#EF4444", marginTop: 8 }]} 
+            onPress={handleCancelOrder}
+          >
+            <Text style={styles.actionBtnText}>Cancel Delivery</Text>
+          </TouchableOpacity>
         </View>
       );
     }
@@ -1309,6 +1365,12 @@ export default function ActiveOrderScreen() {
 
           <TouchableOpacity style={styles.actionBtn} onPress={handleStatusTransition}>
             <Text style={styles.actionBtnText}>Verify OTP & Complete Delivery</Text>
+          </TouchableOpacity>
+          <TouchableOpacity 
+            style={[styles.actionBtn, { backgroundColor: "#EF4444", marginTop: 8 }]} 
+            onPress={handleCancelOrder}
+          >
+            <Text style={styles.actionBtnText}>Cancel Delivery</Text>
           </TouchableOpacity>
         </View>
       );

@@ -38,7 +38,7 @@ const STATUS_SEQUENCE: OrderStatus[] = [
 export default function TrackingScreen() {
   const insets = useSafeAreaInsets();
   const params = useLocalSearchParams<{ orderId?: string }>();
-  const { status, setStatus, currentOrderId, setOrderId, serviceType, setServiceType, route, setRoute, stops, setStops, driver, setDriver, unreadCount, incrementUnreadCount } = useDeliveryStore();
+  const { status, setStatus, currentOrderId, setOrderId, serviceType, setServiceType, route, setRoute, stops, setStops, driver, setDriver, unreadCount, incrementUnreadCount, resetDelivery } = useDeliveryStore();
 
   const handleSOS = () => {
     if (!currentOrderId) return;
@@ -67,6 +67,28 @@ export default function TrackingScreen() {
           }
         }
       ]
+    );
+  };
+
+  const cancellationAlerted = React.useRef(false);
+
+  const handleOrderCancelledByDriver = () => {
+    if (cancellationAlerted.current) return;
+    cancellationAlerted.current = true;
+
+    Alert.alert(
+      "Delivery Cancelled",
+      "We are sorry, the driver is unable to complete your delivery. Your order has been cancelled.",
+      [
+        {
+          text: "OK",
+          onPress: () => {
+            resetDelivery();
+            router.replace("/(tabs)");
+          }
+        }
+      ],
+      { cancelable: false }
     );
   };
   const [eta, setEta] = useState(15);
@@ -125,10 +147,17 @@ export default function TrackingScreen() {
   });
 
   useEffect(() => {
+    if (cancellationAlerted.current) return;
     if (params.orderId && params.orderId !== currentOrderId) {
       setOrderId(params.orderId);
     }
   }, [params.orderId, currentOrderId]);
+
+  useEffect(() => {
+    if (status === "cancelled") {
+      handleOrderCancelledByDriver();
+    }
+  }, [status]);
 
   const { theme } = useThemeStore();
   const colors = Colors[theme];
@@ -162,6 +191,8 @@ export default function TrackingScreen() {
       case "delivered":
       case "completed":
         return "delivered";
+      case "cancelled":
+        return "cancelled";
       default:
         return "confirmed";
     }
@@ -176,6 +207,10 @@ export default function TrackingScreen() {
           if (order) {
             console.log("[POLLING] Fetched order details:", order.status);
             if (order.status) {
+              if (order.status.toLowerCase() === "cancelled") {
+                handleOrderCancelledByDriver();
+                return;
+              }
               setStatus(normalizeStatus(order.status));
             }
             if (order.driver) {
@@ -245,6 +280,10 @@ export default function TrackingScreen() {
 
       const onStatusUpdate = (data: any) => {
         if (data.status) {
+          if (data.status.toLowerCase() === "cancelled") {
+            handleOrderCancelledByDriver();
+            return;
+          }
           setStatus(normalizeStatus(data.status));
         }
       };
@@ -506,7 +545,6 @@ export default function TrackingScreen() {
                     <Feather name="alert-triangle" size={18} color="#FFFFFF" />
                   </TouchableOpacity>
                   <TouchableOpacity 
-                  <TouchableOpacity
                     style={styles.actionBtn}
                     onPress={() => Linking.openURL(`tel:${driver.phone || "1234567890"}`)}
                   >
