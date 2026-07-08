@@ -26,5 +26,6 @@ router.get("/vendor/:vendorId", ordersController.getVendorOrders.bind(ordersCont
 router.get("/:id", authenticateToken, ordersController.getOrder.bind(ordersController));
 router.patch("/:id/status", authenticateToken, ordersController.updateStatus.bind(ordersController));
 router.post("/:id/accept", authenticateToken, authorizeRole([UserRole.DRIVER]), ordersController.accept.bind(ordersController));
+router.post("/:id/sos", authenticateToken, ordersController.triggerSOS.bind(ordersController));
 
 export default router;

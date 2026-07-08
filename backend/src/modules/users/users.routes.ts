@@ -22,5 +22,7 @@ router.patch("/booking-preference", authenticateToken, usersController.saveBooki
 router.get("/favorites", authenticateToken, usersController.getFavorites.bind(usersController));
 router.post("/favorites/:vendorId", authenticateToken, usersController.toggleFavorite.bind(usersController));
 
+router.post("/push-token", authenticateToken, usersController.updatePushToken.bind(usersController));
+
 export default router;
 

@@ -249,6 +249,26 @@ export class UsersController {
       return res.status(500).json({ message: "Internal server error" });
     }
   }
+
+  async updatePushToken(req: AuthRequest, res: Response) {
+    try {
+      const { expoPushToken } = req.body;
+      if (!expoPushToken) {
+        return res.status(400).json({ message: "expoPushToken is required" });
+      }
+
+      const user = await User.findById(req.user?.userId);
+      if (!user) return res.status(404).json({ message: "User not found" });
+
+      user.expoPushToken = expoPushToken;
+      await user.save();
+
+      return res.json({ message: "Push token updated successfully", expoPushToken: user.expoPushToken });
+    } catch (error) {
+      console.error("Update push token error:", error);
+      return res.status(500).json({ message: "Internal server error" });
+    }
+  }
 }
 
 

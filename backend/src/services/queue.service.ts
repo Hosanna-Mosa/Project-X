@@ -1,6 +1,7 @@
 import { Queue, Worker, Job } from "bullmq";
 import Order, { OrderStatus } from "../database/models/Order";
 import { SocketManager } from "../sockets/socket.manager";
+import { NotificationService } from "./notification.service";
 
 // Parse Redis URL securely
 const redisUrl = process.env.REDIS_URL || "redis://localhost:6379";
@@ -52,30 +53,60 @@ export class QueueManager {
         order.notified15Min = true;
         await order.save();
 
+        const orderUser = order.user as any;
+        const driverObj = order.driver as any;
+        const driverUser = driverObj?.user as any;
+
+        const payload = {
+          orderId: order._id,
+          isReserved: true,
+          reservedAt: order.reservedAt,
+          serviceType: order.serviceType,
+          customerName: orderUser?.name || "Customer",
+          customerPhone: orderUser?.phone || "",
+          driverName: driverUser?.name || "Driver",
+          driverPhone: driverUser?.phone || "",
+        };
+
         const socketManager = SocketManager.getInstance();
         if (socketManager) {
-          const orderUser = order.user as any;
-          const driverObj = order.driver as any;
-          const driverUser = driverObj?.user as any;
-
-          const payload = {
-            orderId: order._id,
-            isReserved: true,
-            reservedAt: order.reservedAt,
-            serviceType: order.serviceType,
-            customerName: orderUser?.name || "Customer",
-            customerPhone: orderUser?.phone || "",
-            driverName: driverUser?.name || "Driver",
-            driverPhone: driverUser?.phone || "",
-          };
-
           console.log(`[QUEUE WORKER] Dispatching socket notification for reservation order ${order._id}`);
-
           if (orderUser?._id) {
             socketManager.emitToUser(orderUser._id.toString(), "upcoming_reserved_ride", payload);
           }
           if (driverUser?._id) {
             socketManager.emitToUser(driverUser._id.toString(), "upcoming_reserved_ride", payload);
+          }
+        }
+
+        // Send Push & In-app Notifications to both customer and driver
+        const notificationService = NotificationService.getInstance();
+        if (orderUser?._id) {
+          try {
+            await notificationService.sendNotification({
+              userId: orderUser._id.toString(),
+              title: "Upcoming Scheduled Ride ⏰",
+              body: `Your scheduled ${order.serviceType} ride is starting in 15 minutes.`,
+              type: "transactional",
+              category: "order_status",
+              data: { orderId: order._id }
+            });
+          } catch (err) {
+            console.error("[queue.service] Error sending customer reservation notification:", err);
+          }
+        }
+        if (driverUser?._id) {
+          try {
+            await notificationService.sendNotification({
+              userId: driverUser._id.toString(),
+              title: "Upcoming Reserved Job ⏰",
+              body: `Your assigned job starts in 15 minutes. Please head to the customer.`,
+              type: "transactional",
+              category: "order_status",
+              data: { orderId: order._id }
+            });
+          } catch (err) {
+            console.error("[queue.service] Error sending driver reservation notification:", err);
           }
         }
       } else {
