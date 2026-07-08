@@ -339,6 +339,29 @@ export default function ActiveOrderScreen() {
     );
   };
 
+  const handleCancelActiveOrder = () => {
+    Alert.alert(
+      "Cancel Order",
+      "Are you sure you want to cancel this order? This action will cancel the ride/delivery completely.",
+      [
+        { text: "No, Keep Order", style: "cancel" },
+        {
+          text: "Yes, Cancel Order",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              await updateOrderStatus("CANCELLED" as any);
+              Alert.alert("Success", "Order has been cancelled.");
+              router.push("/(tabs)");
+            } catch (err: any) {
+              Alert.alert("Error", err.message || "Failed to cancel order.");
+            }
+          }
+        }
+      ]
+    );
+  };
+
   const openRideNavigation = () => {
     const pickupAddress = pickupStop?.address || (pickupStop ? `${pickupStop.lat},${pickupStop.lng}` : "");
     const destinationAddress = deliveryStop?.address || (deliveryStop ? `${deliveryStop.lat},${deliveryStop.lng}` : "");

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { Phone, MoreVertical, Paperclip, Image, Smile, Send, Package, CreditCard, Users, Box, Plus } from "lucide-react";
 import { toast } from "sonner";
@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { socketService } from "@/lib/socketService";
 
 interface Ticket {
   _id: string;
@@ -79,6 +80,27 @@ export default function Support() {
   if (!activeTicketId && selectedTicket) {
     setActiveTicketId(selectedTicket._id);
   }
+
+  // Connect to Socket.io and listen for support updates
+  useEffect(() => {
+    socketService.connect();
+    
+    const adminData = JSON.parse(localStorage.getItem("admin_data") || "{}");
+    if (adminData._id) {
+      socketService.join(adminData._id, "ADMIN");
+    }
+
+    const handleTicketUpdate = (data: any) => {
+      console.log("[SOCKET] Ticket update received:", data);
+      queryClient.invalidateQueries({ queryKey: ["admin", "tickets"] });
+    };
+
+    socketService.on("ticket_updated", handleTicketUpdate);
+
+    return () => {
+      socketService.off("ticket_updated", handleTicketUpdate);
+    };
+  }, [queryClient]);
 
   const handleSendMessage = () => {
     if (!typedMessage.trim() || !selectedTicket) return;
@@ -180,6 +202,15 @@ export default function Support() {
                             }`}>
                               {ticket.status}
                             </span>
+                            {ticket.userRole && (
+                              <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
+                                ticket.userRole === "DRIVER"
+                                  ? "bg-green-100 text-green-800 border border-green-200"
+                                  : "bg-purple-100 text-purple-800 border border-purple-200"
+                              }`}>
+                                {ticket.userRole}
+                              </span>
+                            )}
                           </div>
                           <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium mt-0.5">{ticket.category}</p>
                         </div>
@@ -192,7 +223,7 @@ export default function Support() {
                           <div className="h-6 w-6 rounded-full bg-muted flex items-center justify-center text-[10px] font-semibold text-foreground">
                             {ticket.user.split(" ").map(n => n[0]).join("")}
                           </div>
-                          <span className="text-xs text-muted-foreground">User: {ticket.user}</span>
+                          <span className="text-xs text-muted-foreground">User: {ticket.user} {ticket.userRole ? `(${ticket.userRole})` : ""}</span>
                         </div>
                         <span className="text-xs text-muted-foreground">{ticket.time}</span>
                       </div>
@@ -217,7 +248,18 @@ export default function Support() {
                       <span className="absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full bg-success border-2 border-card" />
                     </div>
                     <div>
-                      <p className="text-sm font-semibold text-foreground">{selectedTicket.user || "Platform User"}</p>
+                      <div className="flex items-center gap-2">
+                        <p className="text-sm font-semibold text-foreground">{selectedTicket.user || "Platform User"}</p>
+                        {selectedTicket.userRole && (
+                          <span className={`px-1.5 py-0.5 rounded text-[9px] font-bold uppercase tracking-wider ${
+                            selectedTicket.userRole === "DRIVER"
+                              ? "bg-green-100 text-green-800 border border-green-200"
+                              : "bg-purple-100 text-purple-800 border border-purple-200"
+                          }`}>
+                            {selectedTicket.userRole}
+                          </span>
+                        )}
+                      </div>
                       <p className="text-xs text-muted-foreground">{selectedTicket.title} • <span className="text-primary font-medium">{selectedTicket.category}</span></p>
                     </div>
                   </div>

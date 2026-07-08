@@ -33,6 +33,10 @@ export class SocketManager {
     return SocketManager.instance;
   }
 
+  public getIo(): Server {
+    return this.io;
+  }
+
   private async setupRedis() {
     const redisUrl = process.env.REDIS_URL || "redis://localhost:6379";
 
@@ -168,6 +172,11 @@ export class SocketManager {
           `[SOCKET][ROOM][JOIN] source=auto-personal socket=${socket.id} user=${authUser.userId} ` +
           `role=${role} personalRoomSize=${this.getRoomSize(authUser.userId)}`
         );
+        
+        if (role === "ADMIN") {
+          socket.join("support_tickets");
+          console.log(`[SOCKET][ADMIN][JOIN] socket=${socket.id} joined support_tickets room`);
+        }
       }
 
       // Authenticated joining for drivers and vendors

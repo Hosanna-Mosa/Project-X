@@ -6,7 +6,28 @@ dotenv.config();
 
 const DATABASE_URL = process.env.DATABASE_URL || "mongodb+srv://sunandvemavarapu_db_user:h5wPWY3uxifM95Rr@cluster0.tdar1ey.mongodb.net/?appName=Cluster0";
 
-const rajahmundryZones = [
+const allNewZones = [
+  // ── RAJAHMUNDRY ZONES ──────────────────────────────────────────────────────
+  {
+    name: "Rajahmundry Central (Devichowk & Jampeta)",
+    type: ZoneType.POLYGON,
+    pricingMultiplier: 1.1,
+    isActive: true,
+    description: "Central Rajahmundry covering Devichowk, Jampeta, Danavaipeta, and main business markets.",
+    allowedServices: ["bike", "auto", "cab", "cab_prime", "delivery", "helper"],
+    boundary: {
+      type: "Polygon",
+      coordinates: [
+        [
+          [81.760, 16.980],
+          [81.800, 16.980],
+          [81.800, 17.010],
+          [81.760, 17.010],
+          [81.760, 16.980]
+        ]
+      ]
+    }
+  },
   {
     name: "Rajahmundry North (Lalacheruvu)",
     type: ZoneType.POLYGON,
@@ -22,7 +43,7 @@ const rajahmundryZones = [
           [81.800, 17.000],
           [81.800, 17.025],
           [81.770, 17.025],
-          [81.770, 17.000] // closed loop
+          [81.770, 17.000]
         ]
       ]
     }
@@ -42,7 +63,7 @@ const rajahmundryZones = [
           [81.830, 16.980],
           [81.830, 17.010],
           [81.800, 17.010],
-          [81.800, 16.980] // closed loop
+          [81.800, 16.980]
         ]
       ]
     }
@@ -62,7 +83,7 @@ const rajahmundryZones = [
           [81.800, 16.970],
           [81.800, 17.000],
           [81.770, 17.000],
-          [81.770, 16.970] // closed loop
+          [81.770, 16.970]
         ]
       ]
     }
@@ -82,7 +103,129 @@ const rajahmundryZones = [
           [81.780, 16.950],
           [81.780, 16.980],
           [81.750, 16.980],
-          [81.750, 16.950] // closed loop
+          [81.750, 16.950]
+        ]
+      ]
+    }
+  },
+  {
+    name: "Rajahmundry West (Railway Station & Kovvur Bridge)",
+    type: ZoneType.POLYGON,
+    pricingMultiplier: 1.15,
+    isActive: true,
+    description: "Western zone covering Rajahmundry railway station, Kovvur bridge entry and surrounding residential hubs.",
+    allowedServices: ["bike", "auto", "cab", "cab_prime", "delivery", "helper"],
+    boundary: {
+      type: "Polygon",
+      coordinates: [
+        [
+          [81.740, 16.980],
+          [81.770, 16.980],
+          [81.770, 17.015],
+          [81.740, 17.015],
+          [81.740, 16.980]
+        ]
+      ]
+    }
+  },
+  {
+    name: "Rajahmundry North-East (Bomuru & Diwancheruvu)",
+    type: ZoneType.POLYGON,
+    pricingMultiplier: 1.2,
+    isActive: true,
+    description: "Outer north-eastern zone covering Bomuru, Diwancheruvu, NH-16 margins, and educational hubs.",
+    allowedServices: ["bike", "auto", "cab", "cab_prime", "delivery", "helper"],
+    boundary: {
+      type: "Polygon",
+      coordinates: [
+        [
+          [81.800, 17.010],
+          [81.850, 17.010],
+          [81.850, 17.045],
+          [81.800, 17.045],
+          [81.800, 17.010]
+        ]
+      ]
+    }
+  },
+
+  // ── KAKINADA ZONES ─────────────────────────────────────────────────────────
+  {
+    name: "Kakinada Central (Bhanugudi & Main Road)",
+    type: ZoneType.POLYGON,
+    pricingMultiplier: 1.15,
+    isActive: true,
+    description: "Commercial core of Kakinada covering Bhanugudi junction, Main Road, Temple Street and municipal zones.",
+    allowedServices: ["bike", "auto", "cab", "cab_prime", "delivery", "helper"],
+    boundary: {
+      type: "Polygon",
+      coordinates: [
+        [
+          [82.230, 16.980],
+          [82.260, 16.980],
+          [82.260, 17.005],
+          [82.230, 17.005],
+          [82.230, 16.980]
+        ]
+      ]
+    }
+  },
+  {
+    name: "Kakinada North (Sarpavaram & Madhavapatnam)",
+    type: ZoneType.POLYGON,
+    pricingMultiplier: 1.2,
+    isActive: true,
+    description: "Northern Kakinada covering Sarpavaram junction, Madhavapatnam, and surrounding tech/residential zones.",
+    allowedServices: ["bike", "auto", "cab", "cab_prime", "delivery", "helper"],
+    boundary: {
+      type: "Polygon",
+      coordinates: [
+        [
+          [82.220, 17.005],
+          [82.260, 17.005],
+          [82.260, 17.035],
+          [82.220, 17.035],
+          [82.220, 17.005]
+        ]
+      ]
+    }
+  },
+  {
+    name: "Kakinada South (Jagannaickpur & Port Area)",
+    type: ZoneType.POLYGON,
+    pricingMultiplier: 1.25,
+    isActive: true,
+    description: "Southern Kakinada covering Jagannaickpur, Port Road, Kakinada Port, and industrial zones.",
+    allowedServices: ["bike", "auto", "cab", "cab_prime", "delivery", "helper"],
+    boundary: {
+      type: "Polygon",
+      coordinates: [
+        [
+          [82.230, 16.950],
+          [82.270, 16.950],
+          [82.270, 16.980],
+          [82.230, 16.980],
+          [82.230, 16.950]
+        ]
+      ]
+    }
+  },
+  {
+    name: "Kakinada West (Ramanayyapeta & Gangaraju Nagar)",
+    type: ZoneType.POLYGON,
+    pricingMultiplier: 1.1,
+    isActive: true,
+    description: "Western suburban zone covering Ramanayyapeta, Gangaraju Nagar, and railway colony area.",
+    allowedServices: ["bike", "auto", "cab", "cab_prime", "delivery", "helper"],
+    boundary: {
+      type: "Polygon",
+      coordinates: [
+        [
+          [82.200, 16.970],
+          [82.230, 16.970],
+          [82.230, 17.005],
+          [82.200, 17.005],
+          [82.200, 16.970]
         ]
       ]
     }
@@ -91,23 +234,23 @@ const rajahmundryZones = [
 
 async function seedZones() {
   console.log("==================================================");
-  console.log("🌱 SEEDING RAJAHMUNDRY OPERATIONAL ZONES");
+  console.log("🌱 SEEDING OPERATIONAL ZONES (RAJAHMUNDRY & KAKINADA)");
   console.log("==================================================");
   console.log(`Connecting to database...`);
   try {
     await mongoose.connect(DATABASE_URL);
     console.log("Connected successfully to MongoDB.");
 
-    // Remove existing Rajahmundry zones if they exist to prevent duplicate seed entries
-    console.log("Cleaning up previous Rajahmundry zones...");
+    // Remove existing Rajahmundry and Kakinada zones
+    console.log("Cleaning up previous Rajahmundry & Kakinada zones...");
     const cleanupResult = await Zone.deleteMany({
-      name: { $regex: /Rajahmundry/i }
+      name: { $regex: /(Rajahmundry|Kakinada)/i }
     });
-    console.log(`Removed ${cleanupResult.deletedCount} old Rajahmundry zone entries.`);
+    console.log(`Removed ${cleanupResult.deletedCount} old zone entries.`);
 
-    console.log("Inserting 4 Rajahmundry operational zones...");
-    const createdZones = await Zone.create(rajahmundryZones);
-    console.log(`✅ Successfully seeded ${createdZones.length} Rajahmundry zones!`);
+    console.log(`Inserting ${allNewZones.length} operational zones...`);
+    const createdZones = await Zone.create(allNewZones);
+    console.log(`✅ Successfully seeded ${createdZones.length} zones!`);
     
     for (const z of createdZones) {
       console.log(` - ${z.name} (${z.pricingMultiplier}x surge)`);

@@ -56,7 +56,7 @@ export default function SupportScreen() {
 
   const handleContactOption = (type: string) => {
     if (type === "chat") {
-      router.push("/chat");
+      router.push("/support-chat");
     } else if (type === "call") {
       Alert.alert("Calling Support", "Connecting you to our helpline +1 (800) 555-SWIFT...");
     } else if (type === "email") {

@@ -24,6 +24,7 @@ import foodRoutes from "./modules/food/food.routes";
 import meatRoutes from "./modules/meat/meat.routes";
 import onboardingRoutes from "./modules/onboarding/onboarding.routes";
 import zonesRoutes from "./modules/zones/zones.routes";
+import supportRoutes from "./modules/support/support.routes";
 
 dotenv.config();
 
@@ -68,6 +69,7 @@ connectDB().then(async () => {
   app.use("/api/v1/meat", meatRoutes);
   app.use("/api/v1/onboarding", onboardingRoutes);
   app.use("/api/v1/zones", zonesRoutes);
+  app.use("/api/v1/support", supportRoutes);
 
   // Global Error Handler Middleware
   app.use(globalErrorHandler);
