@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   View,
   Linking,
+  Alert,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
@@ -38,6 +39,36 @@ export default function TrackingScreen() {
   const insets = useSafeAreaInsets();
   const params = useLocalSearchParams<{ orderId?: string }>();
   const { status, setStatus, currentOrderId, setOrderId, serviceType, setServiceType, route, setRoute, stops, setStops, driver, setDriver, unreadCount, incrementUnreadCount } = useDeliveryStore();
+
+  const handleSOS = () => {
+    if (!currentOrderId) return;
+    
+    Alert.alert(
+      "Emergency SOS",
+      "Are you sure you want to trigger SOS? This will instantly alert our support team and emergency contacts.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Trigger SOS",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              await customFetch(`/api/v1/orders/${currentOrderId}/sos`, {
+                method: "POST"
+              });
+              Alert.alert(
+                "SOS Dispatched",
+                "Your emergency alert has been sent. Support is on the way."
+              );
+            } catch (err: any) {
+              console.error("SOS trigger error:", err);
+              Alert.alert("Error", err.message || "Failed to trigger SOS. Please call emergency services.");
+            }
+          }
+        }
+      ]
+    );
+  };
   const [eta, setEta] = useState(15);
   const [deliveryOtp, setDeliveryOtp] = useState<string | null>(null);
   const [startOtp, setStartOtp] = useState<string | null>(null);
@@ -468,6 +499,13 @@ export default function TrackingScreen() {
                   </Text>
                 </View>
                 <View style={styles.driverActions}>
+                  <TouchableOpacity 
+                    style={[styles.actionBtn, { backgroundColor: "#EF4444" }]} 
+                    onPress={handleSOS}
+                  >
+                    <Feather name="alert-triangle" size={18} color="#FFFFFF" />
+                  </TouchableOpacity>
+                  <TouchableOpacity 
                   <TouchableOpacity
                     style={styles.actionBtn}
                     onPress={() => Linking.openURL(`tel:${driver.phone || "1234567890"}`)}

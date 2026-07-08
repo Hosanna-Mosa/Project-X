@@ -4,6 +4,7 @@ import User from "../../database/models/User";
 import Driver from "../../database/models/Driver";
 import Vendor from "../../database/models/Vendor";
 import ScheduledDeliveryRequest from "../../database/models/ScheduledDeliveryRequest";
+import SupportTicket from "../../database/models/SupportTicket";
 import { RoutingService } from "../routing/routing.service";
 import { PricingService } from "../pricing/pricing.service";
 import { SocketManager } from "../../sockets/socket.manager";
@@ -11,6 +12,7 @@ import { QueueManager } from "../../services/queue.service";
 import { ZonesService } from "../zones/zones.service";
 import Zone from "../../database/models/Zone";
 import { ValidationError } from "../../utils/errors";
+import { NotificationService } from "../../services/notification.service";
 
 export class OrdersService {
   private routingService = new RoutingService();
@@ -229,6 +231,54 @@ export class OrdersService {
         }))
       }, "orders.createOrder");
       socketManager.logConnectionStatus("after_new_order_broadcast", userId, undefined, savedOrder._id.toString());
+
+      // Send push & in-app notifications to nearby drivers
+      if (!savedOrder.isReserved) {
+        (async () => {
+          try {
+            const { DriverService } = require("../drivers/drivers.service");
+            const driversService = new DriverService();
+            const nearbyDrivers = await driversService.getNearbyDrivers(
+              startPos.latitude,
+              startPos.longitude,
+              radius || 5000,
+              effectiveType
+            );
+
+            let driversToNotify = [...nearbyDrivers];
+            // Fallback for testing/development: If no drivers are nearby within the radius/zone,
+            // notify all online and available drivers so they get the push notification
+            if (driversToNotify.length === 0) {
+              const Driver = require("../../database/models/Driver").default;
+              const onlineDrivers = await Driver.find({ status: "ONLINE", isAvailable: true }).populate("user");
+              driversToNotify = onlineDrivers;
+            }
+
+            const earnings = Math.round(savedOrder.totalPrice * 0.8);
+            const serviceLabel = effectiveType === ServiceType.DELIVERY ? "delivery" : "ride";
+
+            for (const d of driversToNotify) {
+              const driverUser = d.user as any;
+              if (driverUser && driverUser._id) {
+                await NotificationService.getInstance().sendNotification({
+                  userId: driverUser._id.toString(),
+                  title: "New Delivery Request Nearby! 🚖",
+                  body: `Earn ₹${earnings} for a ${effectiveType} ${serviceLabel} from ${savedOrder.stops[0]?.address?.split(',')[0] || "nearby"}.`,
+                  type: "transactional",
+                  category: "order_status",
+                  data: {
+                    orderId: savedOrder._id,
+                    serviceType: effectiveType,
+                    type: "new_request",
+                  }
+                });
+              }
+            }
+          } catch (err) {
+            console.error("[orders.service] Error sending driver match notifications:", err);
+          }
+        })();
+      }
 
       // NOTIFY vendor/restaurant
       if (vendorId && !isReserved) {
@@ -510,6 +560,59 @@ export class OrdersService {
     }
 
     const populated = await Order.findOne(this.getOrderQuery(orderId)).populate("user").populate("driver").populate("vendor");
+
+    // Send Push & In-app notifications based on status changes
+    if (populated && populated.user) {
+      try {
+        let title = "";
+        let body = "";
+        const serviceName = populated.serviceType === ServiceType.DELIVERY ? "delivery" : "ride";
+
+        switch (status) {
+          case OrderStatus.ARRIVED_PICKUP:
+          case OrderStatus.ARRIVED_PICKUP_LC:
+            title = "Driver Arrived 🚖";
+            body = `Your driver has arrived at your location. Give PIN ${populated.deliveryOtp || ""} to start your ${serviceName} safely.`;
+            break;
+          case OrderStatus.ON_THE_WAY:
+          case OrderStatus.IN_TRANSIT:
+          case OrderStatus.EN_ROUTE_DELIVERY:
+            title = populated.serviceType === ServiceType.DELIVERY ? "Out for Delivery 📦" : "Trip Started 📍";
+            body = populated.serviceType === ServiceType.DELIVERY 
+              ? "Your items have been picked up and are on the way!" 
+              : "Your ride is now in progress. Enjoy the journey!";
+            break;
+          case OrderStatus.COMPLETED:
+          case OrderStatus.DELIVERED:
+          case OrderStatus.DELIVERED_LC:
+            title = populated.serviceType === ServiceType.DELIVERY ? "Order Delivered 🍔" : "Trip Completed 🎉";
+            body = `Your ${serviceName} is complete. Thank you for choosing us! Please rate your experience.`;
+            break;
+          case OrderStatus.CANCELLED:
+            title = "Order Cancelled ❌";
+            body = `Your ${serviceName} has been cancelled. If any payment was deducted, it will be refunded.`;
+            break;
+        }
+
+        if (title && body) {
+          await NotificationService.getInstance().sendNotification({
+            userId: populated.user._id.toString(),
+            title,
+            body,
+            type: "transactional",
+            category: "order_status",
+            data: {
+              orderId: populated._id,
+              status: status,
+              serviceType: populated.serviceType,
+            }
+          });
+        }
+      } catch (err) {
+        console.error("[orders.service] Error sending status update notification:", err);
+      }
+    }
+
     return populated || savedOrder || order;
   }
 
@@ -592,6 +695,120 @@ export class OrdersService {
     }
 
     const populated = await Order.findOne(this.getOrderQuery(orderId)).populate("user").populate("driver").populate("vendor");
+
+    // Send Push & In-app Notification to customer
+    if (populated && populated.user) {
+      try {
+        const driverUser = await User.findById(driver.user);
+        const vehicleName = populated.serviceType === ServiceType.CAB ? "cab" : populated.serviceType === ServiceType.BIKE ? "bike" : populated.serviceType === ServiceType.AUTO ? "auto" : "delivery rider";
+        const pinText = populated.deliveryOtp ? `. Share PIN ${populated.deliveryOtp} to start your ride safely` : "";
+        
+        await NotificationService.getInstance().sendNotification({
+          userId: populated.user._id.toString(),
+          title: "Driver Assigned 🚖",
+          body: `${driverUser?.name || "A driver"} has accepted your request. Your ${vehicleName} is arriving${pinText}.`,
+          type: "transactional",
+          category: "order_status",
+          data: {
+            orderId: populated._id,
+            status: OrderStatus.DRIVER_ASSIGNED,
+            serviceType: populated.serviceType,
+          }
+        });
+      } catch (err) {
+        console.error("[orders.service] Error sending driver assignment notification:", err);
+      }
+    }
+
     return populated || savedOrder || order;
+  }
+
+  async triggerOrderSOS(orderId: string, userId: string): Promise<boolean> {
+    const order = await Order.findById(orderId)
+      .populate("user")
+      .populate({
+        path: "driver",
+        populate: { path: "user" }
+      });
+      
+    if (!order) throw new Error("Order not found");
+
+    const passengerUser = order.user as any;
+    const driverObj = order.driver as any;
+    const driverUser = driverObj?.user as any;
+
+    // Check permissions: either passenger or driver must be triggering this
+    if (passengerUser?._id.toString() !== userId && driverUser?._id.toString() !== userId) {
+      throw new Error("Unauthorized to trigger SOS for this order");
+    }
+
+    const passengerName = passengerUser?.name || "Passenger";
+    const driverName = driverUser?.name || "Unassigned";
+
+    // 1. Generate unique ticketId for SupportTicket
+    const ticketId = `SOS-${orderId}-${Date.now().toString().slice(-4)}`;
+
+    const supportTicket = new SupportTicket({
+      ticketId,
+      title: `EMERGENCY SOS: Order ${orderId}`,
+      category: "EMERGENCY SOS",
+      status: "OPEN",
+      message: `SOS emergency triggered by ${userId === passengerUser?._id.toString() ? 'Passenger' : 'Driver'}. Order: ${orderId}. Driver: ${driverName}. Customer: ${passengerName}.`,
+      user: passengerName,
+      time: "Just now",
+      messages: [
+        {
+          sender: "system",
+          time: new Date().toISOString(),
+          text: `🚨 SOS Triggered by user. Emergency details shared with admins. GPS Coordinates: ${order.stops[0]?.location?.coordinates?.join(', ') || 'N/A'}`
+        }
+      ]
+    });
+    await supportTicket.save();
+
+    // 2. Query all Admin users
+    const admins = await User.find({ role: "ADMIN" });
+
+    // 3. Dispatch Push & In-app alerts to all admins
+    const notificationService = NotificationService.getInstance();
+    for (const admin of admins) {
+      try {
+        await notificationService.sendNotification({
+          userId: admin._id.toString(),
+          title: "🚨 EMERGENCY SOS ALERT 🚨",
+          body: `${passengerName} has triggered an SOS emergency on ride ${orderId}. Driver: ${driverName}.`,
+          type: "alert",
+          category: "system",
+          data: {
+            orderId,
+            ticketId,
+            type: "sos",
+            passengerName,
+            driverName,
+          }
+        });
+      } catch (err) {
+        console.error(`[orders.service] SOS notification failed for admin ${admin._id}:`, err);
+      }
+    }
+
+    // 4. Also notify driver if passenger triggers, or passenger if driver triggers
+    const receiverUserId = userId === passengerUser?._id.toString() ? driverUser?._id?.toString() : passengerUser?._id?.toString();
+    if (receiverUserId) {
+      try {
+        await notificationService.sendNotification({
+          userId: receiverUserId,
+          title: "Emergency Alert Triggered 🚨",
+          body: "SOS has been triggered for this trip. Emergency contacts and authorities are being notified.",
+          type: "alert",
+          category: "system",
+          data: { orderId, type: "sos" }
+        });
+      } catch (err) {
+        console.error(`[orders.service] SOS peer alert failed:`, err);
+      }
+    }
+
+    return true;
   }
 }

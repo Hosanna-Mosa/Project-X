@@ -110,6 +110,16 @@ function RootLayoutNav() {
     }
   }, [hydrated, isAuthenticated, token, hasCompletedOnboarding, needsLoginPrompt, segments]);
 
+  // Register push notifications when authenticated
+  useEffect(() => {
+    if (token) {
+      const { registerForPushNotificationsAsync } = require("../utils/notificationRegister");
+      registerForPushNotificationsAsync(token).catch((err: any) => {
+        console.error("Error registering push notifications:", err);
+      });
+    }
+  }, [token]);
+
   if (!hydrated) {
     return null; // Or a custom Loading/Splash view
   }

@@ -45,6 +45,7 @@ export interface IUser extends Document, IUserMethods {
   password?: string;
   favorites?: Types.ObjectId[];
   isBlocked?: boolean;
+  expoPushToken?: string;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -57,6 +58,7 @@ const UserSchema: Schema = new Schema(
     phone: { type: String, required: true, unique: true },
     profilePic: { type: String },
     isBlocked: { type: Boolean, default: false },
+    expoPushToken: { type: String },
     role: {
       type: String,
       enum: Object.values(UserRole),

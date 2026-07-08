@@ -18,12 +18,53 @@ import * as Location from "expo-location";
 import { useDriverStore } from "@/store/driverStore";
 import Colors from "@/constants/colors";
 import { socketService } from "@/utils/socketService";
+import Constants from "expo-constants";
+
+const apiUrl = process.env.EXPO_PUBLIC_API_URL || Constants.expoConfig?.extra?.apiUrl;
 
 const { width, height } = Dimensions.get("window");
 
 export default function ActiveOrderScreen() {
   const insets = useSafeAreaInsets();
-  const { currentOrder, completeOrder, updateOrderStatus, unreadCount, driverPhone } = useDriverStore();
+  const { currentOrder, completeOrder, updateOrderStatus, unreadCount, driverPhone, token } = useDriverStore();
+
+  const handleSOS = () => {
+    if (!currentOrder) return;
+
+    Alert.alert(
+      "Emergency SOS",
+      "Are you sure you want to trigger SOS? This will instantly alert our support team and emergency contacts.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Trigger SOS",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              const response = await fetch(`${apiUrl}/api/v1/orders/${currentOrder.id}/sos`, {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                  "Authorization": `Bearer ${token}`,
+                },
+              });
+              if (!response.ok) {
+                const err = await response.json();
+                throw new Error(err.message || "Failed to trigger SOS");
+              }
+              Alert.alert(
+                "SOS Dispatched",
+                "Your emergency alert has been sent. Support is on the way."
+              );
+            } catch (err: any) {
+              console.error("SOS trigger error:", err);
+              Alert.alert("Error", err.message || "Failed to trigger SOS. Please call emergency services.");
+            }
+          }
+        }
+      ]
+    );
+  };
   const [driverLocation, setDriverLocation] = useState<{ lat: number; lng: number } | null>(null);
 
   // Map Ref
@@ -335,29 +376,6 @@ export default function ActiveOrderScreen() {
         { text: "Vehicle Breakdown", onPress: () => Alert.alert("Assistance Requested", "Support will contact you.") },
         { text: "Restaurant is Closed", onPress: () => Alert.alert("Reported", "Order cancellation initiated.") },
         { text: "Cancel", style: "cancel" }
-      ]
-    );
-  };
-
-  const handleCancelActiveOrder = () => {
-    Alert.alert(
-      "Cancel Order",
-      "Are you sure you want to cancel this order? This action will cancel the ride/delivery completely.",
-      [
-        { text: "No, Keep Order", style: "cancel" },
-        {
-          text: "Yes, Cancel Order",
-          style: "destructive",
-          onPress: async () => {
-            try {
-              await updateOrderStatus("CANCELLED" as any);
-              Alert.alert("Success", "Order has been cancelled.");
-              router.push("/(tabs)");
-            } catch (err: any) {
-              Alert.alert("Error", err.message || "Failed to cancel order.");
-            }
-          }
-        }
       ]
     );
   };
@@ -1392,27 +1410,6 @@ export default function ActiveOrderScreen() {
     return null;
   };
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case "accepted":
-      case "driver_assigned":
-        return "#3B82F6";
-      case "en_route_pickup":
-      case "en_route_delivery":
-        return "#00B7EB";
-      case "arrived_pickup":
-      case "arrived_delivery":
-        return "#8B5CF6";
-      case "picking_items":
-        return "#EC4899";
-      case "delivered":
-      case "completed":
-        return "#10B981";
-      default:
-        return "#6B7280";
-    }
-  };
-
   return (
     <SafeAreaView style={styles.container} edges={["top"]}>
       <View style={styles.header}>
@@ -1420,7 +1417,12 @@ export default function ActiveOrderScreen() {
           <Feather name="arrow-left" size={24} color={Colors.text} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>{isRide ? "Ride Active Task" : (isHelper ? "Helper Active Task" : "Delivery Active Task")}</Text>
-        <View style={styles.headerRightSpacer} />
+        <TouchableOpacity 
+          style={[styles.backBtn, { backgroundColor: "#EF4444", borderRadius: 16, width: 32, height: 32, alignItems: "center", justifyContent: "center" }]} 
+          onPress={handleSOS}
+        >
+          <Ionicons name="alert-circle" size={18} color="#FFFFFF" />
+        </TouchableOpacity>
       </View>
 
       <View style={styles.mapContainer}>

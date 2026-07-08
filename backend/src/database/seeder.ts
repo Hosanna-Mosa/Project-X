@@ -139,7 +139,7 @@ export async function seedDatabase() {
           user: "Alex Rivera",
           time: "2 mins ago",
           messages: [
-            { sender: "system" as const, time: "TICKET OPENED • 10:45 AM", text: "" },
+            { sender: "system" as const, time: "TICKET OPENED • 10:45 AM", text: "Ticket opened" },
             { sender: "user" as const, time: "10:46 AM", text: "I've been monitoring the GPS for Order #ORD-9921. The driver has been at the Terminal 4 gate for 3 hours without moving. This cargo contains temperature-sensitive medical supplies." },
             { sender: "admin" as const, time: "10:48 AM", text: "Hello Alex, I'm checking the gate manifest now. It looks like there's a localized strike at Terminal 4 affecting heavy haulage. Let me contact the fleet lead directly." }
           ]
@@ -153,7 +153,7 @@ export async function seedDatabase() {
           user: "Sarah Jenkins",
           time: "15 mins ago",
           messages: [
-            { sender: "system" as const, time: "TICKET OPENED • 10:30 AM", text: "" },
+            { sender: "system" as const, time: "TICKET OPENED • 10:30 AM", text: "Ticket opened" },
             { sender: "user" as const, time: "10:31 AM", text: "The automated billing for the third stop didn't include the waiting time surcharge as per our fleet contract." }
           ]
         },
@@ -166,7 +166,7 @@ export async function seedDatabase() {
           user: "David Chen",
           time: "1 hour ago",
           messages: [
-            { sender: "system" as const, time: "TICKET OPENED • 9:45 AM", text: "" },
+            { sender: "system" as const, time: "TICKET OPENED • 9:45 AM", text: "Ticket opened" },
             { sender: "user" as const, time: "9:46 AM", text: "Pallet arriving at warehouse B-12 shows signs of water damage. See attached photos for claim." }
           ]
         }

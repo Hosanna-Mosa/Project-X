@@ -9,6 +9,7 @@ import { connectDB } from "./database/db";
 import { SocketManager } from "./sockets/socket.manager";
 import { globalErrorHandler } from "./middleware/error.middleware";
 import { QueueManager } from "./services/queue.service";
+import { SchedulerService } from "./services/scheduler.service";
 
 // Routes
 import authRoutes from "./modules/auth/auth.routes";
@@ -24,6 +25,7 @@ import foodRoutes from "./modules/food/food.routes";
 import meatRoutes from "./modules/meat/meat.routes";
 import onboardingRoutes from "./modules/onboarding/onboarding.routes";
 import zonesRoutes from "./modules/zones/zones.routes";
+import notificationsRoutes from "./modules/notifications/notifications.routes";
 import supportRoutes from "./modules/support/support.routes";
 
 dotenv.config();
@@ -69,6 +71,7 @@ connectDB().then(async () => {
   app.use("/api/v1/meat", meatRoutes);
   app.use("/api/v1/onboarding", onboardingRoutes);
   app.use("/api/v1/zones", zonesRoutes);
+  app.use("/api/v1/notifications", notificationsRoutes);
   app.use("/api/v1/support", supportRoutes);
 
   // Global Error Handler Middleware
@@ -79,6 +82,9 @@ connectDB().then(async () => {
     
     // Initialize BullMQ worker
     QueueManager.getInstance().startWorker();
+
+    // Initialize periodic scheduler
+    SchedulerService.getInstance().startScheduler();
   });
 }).catch((error) => {
   console.error("Database initialization failed", error);
