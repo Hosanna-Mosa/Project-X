@@ -76,20 +76,23 @@ export default function TrackingScreen() {
     if (cancellationAlerted.current) return;
     cancellationAlerted.current = true;
 
-    Alert.alert(
-      "Delivery Cancelled",
-      "We are sorry, the driver is unable to complete your delivery. Your order has been cancelled.",
-      [
-        {
-          text: "OK",
-          onPress: () => {
-            resetDelivery();
-            router.replace("/(tabs)");
+    // Redirect immediately to clear the stuck map screen
+    resetDelivery();
+    router.replace("/(tabs)");
+
+    setTimeout(() => {
+      Alert.alert(
+        "Delivery Cancelled",
+        "We are sorry, the driver is unable to complete your delivery. Your order has been cancelled.",
+        [
+          {
+            text: "OK",
+            onPress: () => {}
           }
-        }
-      ],
-      { cancelable: false }
-    );
+        ],
+        { cancelable: true }
+      );
+    }, 500);
   };
   const [eta, setEta] = useState(15);
   const [deliveryOtp, setDeliveryOtp] = useState<string | null>(null);
@@ -207,7 +210,8 @@ export default function TrackingScreen() {
           if (order) {
             console.log("[POLLING] Fetched order details:", order.status);
             if (order.status) {
-              if (order.status.toLowerCase() === "cancelled") {
+              const statusStr = String(order.status).toLowerCase();
+              if (statusStr === "cancelled" || statusStr === "cancelled_by_driver") {
                 handleOrderCancelledByDriver();
                 return;
               }
@@ -279,8 +283,10 @@ export default function TrackingScreen() {
       };
 
       const onStatusUpdate = (data: any) => {
+        console.log("[SOCKET] Status update received:", data);
         if (data.status) {
-          if (data.status.toLowerCase() === "cancelled") {
+          const statusStr = String(data.status).toLowerCase();
+          if (statusStr === "cancelled" || statusStr === "cancelled_by_driver") {
             handleOrderCancelledByDriver();
             return;
           }
@@ -288,9 +294,15 @@ export default function TrackingScreen() {
         }
       };
 
+      const onOrderCancelled = (data: any) => {
+        console.log("[SOCKET] Order cancelled received:", data);
+        handleOrderCancelledByDriver();
+      };
+
       socketService.on("order_accepted", onOrderAccepted);
       socketService.on("driver_location_update", onLocationUpdate);
       socketService.on("order_status_update", onStatusUpdate);
+      socketService.on("order_cancelled", onOrderCancelled);
 
       const timer = setInterval(() => {
         setEta((prev) => Math.max(1, prev - 1));
@@ -301,6 +313,7 @@ export default function TrackingScreen() {
         socketService.off("order_accepted", onOrderAccepted);
         socketService.off("driver_location_update", onLocationUpdate);
         socketService.off("order_status_update", onStatusUpdate);
+        socketService.off("order_cancelled", onOrderCancelled);
       };
     }
   }, [currentOrderId]);

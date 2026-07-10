@@ -6,6 +6,7 @@ import {
   TextInput,
   TouchableOpacity,
   View,
+  ActivityIndicator,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
@@ -96,13 +97,19 @@ export default function OTPScreen() {
       </View>
 
       <TouchableOpacity
-        style={[styles.verifyBtn, !isFilled && styles.verifyBtnDisabled]}
+        style={[styles.verifyBtn, (!isFilled || loading) && styles.verifyBtnDisabled]}
         onPress={handleVerify}
-        disabled={!isFilled}
+        disabled={!isFilled || loading}
         activeOpacity={0.85}
       >
-        <Text style={styles.verifyBtnText}>Verify &amp; Continue</Text>
-        <Feather name="arrow-right" size={18} color="#fff" />
+        {loading ? (
+          <ActivityIndicator size="small" color="#fff" />
+        ) : (
+          <>
+            <Text style={styles.verifyBtnText}>Verify &amp; Continue</Text>
+            <Feather name="arrow-right" size={18} color="#fff" />
+          </>
+        )}
       </TouchableOpacity>
 
       <TouchableOpacity style={styles.resendBtn}>

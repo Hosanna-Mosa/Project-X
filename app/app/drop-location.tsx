@@ -70,6 +70,7 @@ export default function LocationSelectionScreen() {
   const [bookingFor, setBookingFor] = useState<"myself" | "someone_else">("myself");
   const [someoneContact, setSomeoneContact] = useState("");
   const [recentPlaces, setRecentPlaces] = useState<RecentPlace[]>([]);
+  const [savingPreference, setSavingPreference] = useState(false);
 
   useEffect(() => {
     if (!user?.id) return;
@@ -468,6 +469,7 @@ export default function LocationSelectionScreen() {
             textInputProps={{
               onChangeText: (text) => handleSearch(text, 'pickup'),
               onFocus: () => setFocusedInput({ type: 'pickup' }),
+              placeholderTextColor: colors.textSecondary,
             }}
             styles={{
               container: { flex: 0, zIndex: 2000 },
@@ -507,6 +509,7 @@ export default function LocationSelectionScreen() {
                   textInputProps={{
                     onChangeText: (text) => handleSearch(text, 'stop', stop.id),
                     onFocus: () => setFocusedInput({ type: 'stop', id: stop.id }),
+                    placeholderTextColor: colors.textSecondary,
                   }}
                   styles={{
                     container: { flex: 1, zIndex: 1500 - index },
@@ -541,6 +544,7 @@ export default function LocationSelectionScreen() {
             textInputProps={{
               onChangeText: (text) => handleSearch(text, 'drop'),
               onFocus: () => setFocusedInput({ type: 'drop' }),
+              placeholderTextColor: colors.textSecondary,
             }}
             styles={{
               container: { flex: 0, zIndex: 1000 },
@@ -694,7 +698,7 @@ export default function LocationSelectionScreen() {
           </View>
 
           <TouchableOpacity
-            style={styles.doneButton}
+            style={[styles.doneButton, savingPreference && { opacity: 0.7 }]}
             onPress={async () => {
               if (bookingFor === "someone_else" && someoneContact.trim().length < 10) {
                 Alert.alert("Contact required", "Please enter a valid contact number for the rider.");
@@ -702,6 +706,7 @@ export default function LocationSelectionScreen() {
               }
               if (user?.id) {
                 try {
+                  setSavingPreference(true);
                   await customFetch("/api/v1/users/booking-preference", {
                     method: "PATCH",
                     body: JSON.stringify({
@@ -712,13 +717,20 @@ export default function LocationSelectionScreen() {
                 } catch (error: any) {
                   Alert.alert("Save failed", error.message || "Could not save booking preference.");
                   return;
+                } finally {
+                  setSavingPreference(false);
                 }
               }
               setShowBookingForSheet(false);
             }}
+            disabled={savingPreference}
             activeOpacity={0.9}
           >
-            <Text style={styles.doneButtonText}>Done</Text>
+            {savingPreference ? (
+              <ActivityIndicator size="small" color="#fff" />
+            ) : (
+              <Text style={styles.doneButtonText}>Done</Text>
+            )}
           </TouchableOpacity>
         </View>
       </View>

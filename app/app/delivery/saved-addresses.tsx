@@ -55,6 +55,7 @@ export default function SavedAddressesScreen() {
   const [addresses, setAddresses] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectingId, setSelectingId] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
 
   // Recent Locations
   const [recentLocations, setRecentLocations] = useState<any[]>([
@@ -136,7 +137,7 @@ export default function SavedAddressesScreen() {
   };
 
   const handleSelectRecentLocation = (item: any) => {
-    if (selectingId) return;
+    if (selectingId || deletingId) return;
     router.push({
       pathname: "/delivery/add-address",
       params: {
@@ -149,7 +150,7 @@ export default function SavedAddressesScreen() {
   };
 
   const handleSelectAddress = async (addr: any) => {
-    if (selectingId) return;
+    if (selectingId || deletingId) return;
     
     const addressWithCoords = { ...addr };
     const lat = addr.coordinates?.lat ?? addr.location?.coordinates?.[1] ?? 17.4447;
@@ -184,7 +185,7 @@ export default function SavedAddressesScreen() {
   };
 
   const handleEditAddress = (item: any) => {
-    if (selectingId) return;
+    if (selectingId || deletingId) return;
     const lat = item.location?.coordinates?.[1] ?? item.coordinates?.lat ?? "";
     const lng = item.location?.coordinates?.[0] ?? item.coordinates?.lng ?? "";
     const qs = `editId=${encodeURIComponent(item._id || "")}&label=${encodeURIComponent(item.label || "")}&addressLine=${encodeURIComponent(item.addressLine || "")}&phone=${encodeURIComponent(item.phone || "")}&receiverName=${encodeURIComponent(item.receiverName || "")}&lat=${encodeURIComponent(String(lat))}&lng=${encodeURIComponent(String(lng))}`;
@@ -192,7 +193,7 @@ export default function SavedAddressesScreen() {
   };
 
   const handleDeleteAddress = (id: string) => {
-    if (selectingId) return;
+    if (selectingId || deletingId) return;
     Alert.alert("Delete Address", "Are you sure you want to remove this address?", [
       { text: "Cancel", style: "cancel" },
       {
@@ -200,7 +201,7 @@ export default function SavedAddressesScreen() {
         style: "destructive",
         onPress: async () => {
           try {
-            setLoading(true);
+            setDeletingId(id);
             const updatedAddresses = await customFetch<any[]>(`/api/v1/users/addresses/${id}`, {
               method: "DELETE",
             });
@@ -210,7 +211,7 @@ export default function SavedAddressesScreen() {
             console.error("Delete error:", err);
             Alert.alert("Error", err.message || "Failed to delete address");
           } finally {
-            setLoading(false);
+            setDeletingId(null);
           }
         },
       },
@@ -298,11 +299,15 @@ export default function SavedAddressesScreen() {
                         </View>
                       </TouchableOpacity>
                       <View style={styles.addressActions}>
-                        <TouchableOpacity style={styles.actionBtn} onPress={() => handleEditAddress(addr)} disabled={selectingId !== null}>
+                        <TouchableOpacity style={styles.actionBtn} onPress={() => handleEditAddress(addr)} disabled={selectingId !== null || deletingId !== null}>
                           <Feather name="edit-2" size={16} color={COLORS.outline} />
                         </TouchableOpacity>
-                        <TouchableOpacity style={styles.actionBtn} onPress={() => handleDeleteAddress(addr._id)} disabled={selectingId !== null}>
-                          <Feather name="trash-2" size={16} color={COLORS.error} />
+                        <TouchableOpacity style={styles.actionBtn} onPress={() => handleDeleteAddress(addr._id)} disabled={selectingId !== null || deletingId !== null}>
+                          {deletingId === addr._id ? (
+                            <ActivityIndicator size="small" color={COLORS.error} />
+                          ) : (
+                            <Feather name="trash-2" size={16} color={COLORS.error} />
+                          )}
                         </TouchableOpacity>
                       </View>
                     </View>
