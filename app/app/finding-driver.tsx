@@ -150,6 +150,31 @@ export default function FindingDriverScreen() {
       }
     };
 
+    const handleOrderCancelled = () => {
+      if (isTransitioned) return;
+      isTransitioned = true;
+
+      if (pollIntervalId) clearInterval(pollIntervalId);
+      if (timeoutTimer) clearTimeout(timeoutTimer);
+
+      // Redirect immediately to clear the stuck screen
+      router.replace("/(tabs)");
+
+      setTimeout(() => {
+        Alert.alert(
+          "Order Cancelled",
+          "Driver is unavailable.",
+          [
+            {
+              text: "OK",
+              onPress: () => {}
+            }
+          ],
+          { cancelable: true }
+        );
+      }, 500);
+    };
+
     const checkOrderStatus = async () => {
       if (isTransitioned) return;
       try {
@@ -165,6 +190,10 @@ export default function FindingDriverScreen() {
               items: s.items?.lines || [],
             }));
             setStops(mappedStops);
+          }
+          if (orderData.status && orderData.status.toUpperCase() === "CANCELLED") {
+            handleOrderCancelled();
+            return;
           }
           if (orderData.status && orderData.status.toUpperCase() === "DRIVER_ASSIGNED") {
             console.log("Order was accepted:", orderData);
@@ -189,7 +218,17 @@ export default function FindingDriverScreen() {
       }
     };
 
+    const handleStatusUpdate = (data: any) => {
+      console.log("Order status update socket event:", data);
+      if (data && (data.orderId === orderId || String(data.orderId) === String(orderId))) {
+        if (data.status && data.status.toUpperCase() === "CANCELLED") {
+          handleOrderCancelled();
+        }
+      }
+    };
+
     socketService.on("order_accepted", handleOrderAccepted);
+    socketService.on("order_status_update", handleStatusUpdate);
 
     let timeoutTimer: any;
     if (isReservedVal) {
@@ -226,6 +265,7 @@ export default function FindingDriverScreen() {
 
     return () => {
       socketService.off("order_accepted", handleOrderAccepted);
+      socketService.off("order_status_update", handleStatusUpdate);
       if (timeoutTimer) clearTimeout(timeoutTimer);
       if (pollIntervalId) clearInterval(pollIntervalId);
     };

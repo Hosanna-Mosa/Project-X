@@ -11,6 +11,7 @@ import {
   Share,
   Alert,
   Modal,
+  ActivityIndicator,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons, Feather, MaterialCommunityIcons } from "@expo/vector-icons";
@@ -830,7 +831,8 @@ export default function RideConfirmationScreen() {
 
           <View style={styles.actionRow}>
             <TouchableOpacity
-              style={styles.bookBtn}
+              style={[styles.bookBtn, fareLoading && { opacity: 0.7 }]}
+              disabled={fareLoading}
               onPress={async () => {
                 if (fareLoading) return;
                 
@@ -876,13 +878,15 @@ export default function RideConfirmationScreen() {
                 }
               }}
             >
-              <Text style={styles.bookBtnText}>
-                {fareLoading 
-                  ? "Loading..." 
-                  : selectedRide.id.includes("reserve")
+              {fareLoading ? (
+                <ActivityIndicator size="small" color="#fff" />
+              ) : (
+                <Text style={styles.bookBtnText}>
+                  {selectedRide.id.includes("reserve")
                     ? (selectedDateTime ? `Confirm ${selectedRide.name}` : `Schedule ${selectedRide.name}`)
                     : `Choose ${selectedRide.name}`}
-              </Text>
+                </Text>
+              )}
             </TouchableOpacity>
 
             <TouchableOpacity 
