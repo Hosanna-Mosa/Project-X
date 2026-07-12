@@ -1,11 +1,11 @@
 export default {
   "expo": {
-    "name": "Driver App",
-    "slug": "driver-app",
+    "name": "Flavour Driver",
+    "slug": "flavour-driver",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "driver-app",
+    "scheme": "flavour-driver",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "splash": {
@@ -15,13 +15,13 @@ export default {
     },
     "ios": {
       "supportsTablet": false,
-      "bundleIdentifier": "com.hosanna.triozen.driver",
+      "bundleIdentifier": "com.flavour.driver",
       "config": {
         "googleMapsApiKey": process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY
       }
     },
     "android": {
-      "package": "com.hosanna.triozen.driver",
+      "package": "com.flavour.driver",
       "config": {
         "googleMaps": {
           "apiKey": process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY
@@ -60,8 +60,8 @@ export default {
     },
     "extra": {
       "apiUrl": process.env.EXPO_PUBLIC_API_URL,
-      "eas": {
-        "projectId": "596ad599-818e-435b-8cb5-a280a81fbc83"
+     "eas": {
+        "projectId": "3d9d3cae-588c-4cdf-b0bf-ff91b95497a4"
       }
     }
   }
