@@ -22,6 +22,11 @@ export default {
     },
     "android": {
       "package": "com.flavour.driver",
+      "googleServicesFile": "./google-services.json",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/images/icon.png",
+        "backgroundColor": "#ffffff"
+      },
       "config": {
         "googleMaps": {
           "apiKey": process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY
@@ -30,8 +35,14 @@ export default {
       "permissions": [
         "ACCESS_COARSE_LOCATION",
         "ACCESS_FINE_LOCATION",
-        "ACCESS_BACKGROUND_LOCATION"
+        "ACCESS_BACKGROUND_LOCATION",
+        "android.permission.POST_NOTIFICATIONS",
+        "android.permission.RECEIVE_BOOT_COMPLETED"
       ]
+    },
+    "notification": {
+      "icon": "./assets/images/icon.png",
+      "color": "#ffffff"
     },
     "web": {
       "favicon": "./assets/images/icon.png"
@@ -52,7 +63,14 @@ export default {
         }
       ],
       "expo-font",
-      "expo-web-browser"
+      "expo-web-browser",
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/images/icon.png",
+          "color": "#ffffff"
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,
@@ -60,9 +78,10 @@ export default {
     },
     "extra": {
       "apiUrl": process.env.EXPO_PUBLIC_API_URL,
-     "eas": {
+      "eas": {
         "projectId": "3d9d3cae-588c-4cdf-b0bf-ff91b95497a4"
       }
-    }
+    },
+    "owner": "hosanna4189"
   }
 }
