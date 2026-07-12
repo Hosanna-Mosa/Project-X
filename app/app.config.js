@@ -1,11 +1,11 @@
 export default {
   "expo": {
-    "name": "ProjectX",
-    "slug": "mobile",
+    "name": "Flavour",
+    "slug": "flavour",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "mobile",
+    "scheme": "flavour",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "splash": {
@@ -15,7 +15,7 @@ export default {
     },
     "ios": {
       "supportsTablet": false,
-      "bundleIdentifier": "com.hosanna.triozen.x",
+      "bundleIdentifier": "com.flavour.customer",
       "config": {
         "googleMapsApiKey": process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY
       },
@@ -24,7 +24,7 @@ export default {
       }
     },
     "android": {
-      "package": "com.hosanna.triozen.x",
+      "package": "com.flavour.customer",
       "usesCleartextTraffic": true,
       "navigationBar": {
         "backgroundColor": "#FFFFFF",
@@ -60,8 +60,8 @@ export default {
     },
     "extra": {
        "apiUrl": process.env.EXPO_PUBLIC_API_URL,
-      "eas": {
-        "projectId": "7f0826d6-97a5-4c59-9eb9-46f51993f3cf"
+       "eas": {
+        "projectId": "a59a7934-9b67-4dc2-b01c-0958cdc8f819"
       }
     }
   }
