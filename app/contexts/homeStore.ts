@@ -107,7 +107,7 @@ export const useHomeStore = create<HomeState>((set, get) => ({
         ]);
       }
 
-      await Promise.all([driversPromise, servicePromise]);
+      await Promise.all([servicePromise]);
       set({ lastFetchedCoords: { lat, lng }, lastFetchedService: activeService });
     } catch (err) {
       console.error("fetchHomeData error:", err);

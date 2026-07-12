@@ -254,108 +254,154 @@ export const MapBackground = forwardRef<MapBackgroundRef, Props>(({
     };
   }, [polyline, validRouteStops]);
 
+  // Auto-zoom to fit the radius circle when it changes
+  useEffect(() => {
+    if (radiusCenter && radiusMeters && internalMapRef.current) {
+      // 1 degree is approximately 111.32 km. We multiply by a padding factor (~2.5) to ensure the circle fits nicely.
+      const latDelta = (radiusMeters / 111320) * 2.5;
+      const lngDelta = (radiusMeters / (111320 * Math.cos(radiusCenter.lat * (Math.PI / 180)))) * 2.5;
+      
+      const regionForCircle = {
+        latitude: radiusCenter.lat,
+        longitude: radiusCenter.lng,
+        latitudeDelta: latDelta,
+        longitudeDelta: lngDelta,
+      };
+      
+      internalMapRef.current.animateToRegion(regionForCircle, 800);
+    }
+  }, [radiusCenter, radiusMeters]);
+
   return (
     <View style={[styles.container, style]} pointerEvents="box-none">
       <MapView
-          ref={internalMapRef}
-          provider={PROVIDER_GOOGLE}
-          style={StyleSheet.absoluteFill}
-          initialRegion={region}
-          mapType={mapType}
-          showsUserLocation={!userLocation}
-          showsPointsOfInterest={false}
-          showsCompass={false}
-          showsMyLocationButton={false}
-          pointerEvents="auto"
-          onMapReady={() => {
-            if (userLocation && internalMapRef.current) {
-              const regionForUser = getRegionForLocation(userLocation.lat, userLocation.lng, 0.015, 0.015);
-              internalMapRef.current.animateToRegion(regionForUser, 500);
-            }
-          }}
-        >
-          {radiusCenter && radiusMeters && (
+        ref={internalMapRef}
+        provider={PROVIDER_GOOGLE}
+        style={StyleSheet.absoluteFill}
+        initialRegion={region}
+        mapType={mapType}
+        showsUserLocation={!userLocation}
+        showsPointsOfInterest={false}
+        showsCompass={false}
+        showsMyLocationButton={false}
+        pointerEvents="auto"
+        onMapReady={() => {
+          if (userLocation && internalMapRef.current) {
+            const regionForUser = getRegionForLocation(userLocation.lat, userLocation.lng, 0.015, 0.015);
+            internalMapRef.current.animateToRegion(regionForUser, 500);
+          }
+        }}
+      >
+        {radiusCenter && radiusMeters && (
+          <>
             <Circle
               center={{ latitude: radiusCenter.lat, longitude: radiusCenter.lng }}
               radius={radiusMeters}
-              fillColor="rgba(16, 185, 129, 0.1)"
-              strokeColor="rgba(16, 185, 129, 0.5)"
+              fillColor="rgba(79, 70, 229, 0.15)"
+              strokeColor="rgba(79, 70, 229, 0.6)"
               strokeWidth={2}
             />
-          )}
-
-          {markers.map((item) => (
             <Marker
-              key={item.id}
-              coordinate={{ latitude: item.lat, longitude: item.lng }}
-              onPress={() => onMarkerPress?.(item)}
-              pinColor="#EF4444" // Standard red color for reliability
-              tracksViewChanges={true}
-            />
-          ))}
-
-          {driverMarkers.map((driver) => {
-            const vehicleType = driver.vehicleType || driver.vehicle || "car";
-            const iconName = vehicleType === "bike" ? "navigation" : vehicleType === "auto" ? "truck" : "briefcase";
-            return (
-              <Marker
-                key={driver.id || driver._id}
-                coordinate={{ latitude: driver.lat, longitude: driver.lng }}
-                anchor={{ x: 0.5, y: 0.5 }}
-                tracksViewChanges={false}
-              >
-                <View style={styles.vehicleMarker}>
-                  <Feather name={iconName as any} size={12} color="#111827" />
-                </View>
-              </Marker>
-            );
-          })}
-
-          {stops.map((stop, index) => (
-            stop.lat && stop.lng && (
-              <Marker
-                key={stop.id}
-                coordinate={{ latitude: stop.lat, longitude: stop.lng }}
-                title={stop.storeName || `Pickup ${index + 1}`}
-                description={stop.address}
-              />
-            )
-          ))}
-          
-          {userLocation && (
-            <Marker
-              key="user-location-pin"
-              coordinate={{ latitude: Number(userLocation.lat), longitude: Number(userLocation.lng) }}
+              key="radius-badge"
+              coordinate={{ 
+                latitude: radiusCenter.lat - (radiusMeters / 111320), 
+                longitude: radiusCenter.lng 
+              }}
               anchor={{ x: 0.5, y: 0.5 }}
+              tracksViewChanges={false}
             >
-              <View style={styles.userMarkerWrap}>
-                <View style={styles.userMarkerBadge} />
+              <View style={{
+                backgroundColor: '#4F46E5',
+                paddingHorizontal: 12,
+                paddingVertical: 6,
+                borderRadius: 12,
+                borderWidth: 2,
+                borderColor: '#ffffff',
+                shadowColor: '#000',
+                shadowOffset: { width: 0, height: 2 },
+                shadowOpacity: 0.25,
+                shadowRadius: 4,
+                elevation: 5,
+              }}>
+                <Text style={{ color: '#ffffff', fontWeight: 'bold', fontSize: 12 }}>
+                  {radiusMeters >= 1000 ? `${radiusMeters / 1000} KM` : `${radiusMeters} M`}
+                </Text>
               </View>
             </Marker>
-          )}
+          </>
+        )}
 
-          {driverLocation && (
+        {markers.map((item) => (
+          <Marker
+            key={item.id}
+            coordinate={{ latitude: item.lat, longitude: item.lng }}
+            onPress={() => onMarkerPress?.(item)}
+            pinColor="#EF4444"
+            tracksViewChanges={true}
+          />
+        ))}
+
+        {driverMarkers.map((driver) => {
+          const vehicleType = driver.vehicleType || driver.vehicle || "car";
+          const iconName = vehicleType === "bike" ? "navigation" : vehicleType === "auto" ? "truck" : "briefcase";
+          return (
             <Marker
-              key="driver-location-pin"
-              coordinate={{ latitude: Number(driverLocation.lat), longitude: Number(driverLocation.lng) }}
-              title="Driver"
-              image={DRIVER_MARKER_IMAGE}
-              anchor={{ x: 0.5, y: 1 }}
+              key={driver.id || driver._id}
+              coordinate={{ latitude: driver.lat, longitude: driver.lng }}
+              anchor={{ x: 0.5, y: 0.5 }}
               tracksViewChanges={false}
-            />
-          )}
+            >
+              <View style={styles.vehicleMarker}>
+                <Feather name={iconName as any} size={12} color="#111827" />
+              </View>
+            </Marker>
+          );
+        })}
 
-          {(polyline || autoRoutePolyline) && (
-            <Polyline
-              coordinates={decodePolyline(polyline || autoRoutePolyline || "")}
-              strokeWidth={4}
-              strokeColor="#16A34A"
+        {stops.map((stop, index) => (
+          stop.lat && stop.lng && (
+            <Marker
+              key={stop.id}
+              coordinate={{ latitude: stop.lat, longitude: stop.lng }}
+              title={stop.storeName || `Pickup ${index + 1}`}
+              description={stop.address}
             />
-          )}
-        </MapView>
+          )
+        ))}
+          
+        {userLocation && (
+          <Marker
+            key="user-location-pin"
+            coordinate={{ latitude: Number(userLocation.lat), longitude: Number(userLocation.lng) }}
+            anchor={{ x: 0.5, y: 0.5 }}
+          >
+            <View style={styles.userMarkerWrap}>
+              <View style={styles.userMarkerBadge} />
+            </View>
+          </Marker>
+        )}
+
+        {driverLocation && (
+          <Marker
+            key="driver-location-pin"
+            coordinate={{ latitude: Number(driverLocation.lat), longitude: Number(driverLocation.lng) }}
+            title="Driver"
+            image={DRIVER_MARKER_IMAGE}
+            anchor={{ x: 0.5, y: 1 }}
+            tracksViewChanges={false}
+          />
+        )}
+
+        {(polyline || autoRoutePolyline) && (
+          <Polyline
+            coordinates={decodePolyline(polyline || autoRoutePolyline || "")}
+            strokeWidth={4}
+            strokeColor="#16A34A"
+          />
+        )}
+      </MapView>
       {children}
     </View>
-
   );
 });
 
@@ -490,5 +536,3 @@ const styles = StyleSheet.create({
     shadowRadius: 3,
   }
 });
-
-

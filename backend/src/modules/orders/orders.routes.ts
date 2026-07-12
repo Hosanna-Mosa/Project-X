@@ -14,6 +14,7 @@ const router = Router();
 const ordersController = new OrdersController();
 
 // Create order - simplifying route to / for easier frontend integration
+router.post("/validate-coupon", authenticateToken, ordersController.validateCoupon.bind(ordersController));
 router.post("/", authenticateToken, validateRequest(createOrderSchema), ordersController.create.bind(ordersController));
 router.post("/scheduled-delivery-request", authenticateToken, validateRequest(requestScheduledDeliverySchema), ordersController.requestScheduledDelivery.bind(ordersController));
 router.get("/scheduled-delivery/vendor/:vendorId", ordersController.getVendorScheduledDeliveries.bind(ordersController));

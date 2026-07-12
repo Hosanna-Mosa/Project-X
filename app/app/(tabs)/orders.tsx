@@ -13,6 +13,7 @@ import { useThemeStore } from "@/contexts/themeStore";
 import { ScreenWrapper } from "@/components/ScreenWrapper";
 import { customFetch } from "@/utils/api/custom-fetch";
 import { useDeliveryStore } from "@/contexts/deliveryStore";
+import { useCartStore } from "@/contexts/cartStore";
 import { ActivityIndicator } from "react-native";
 
 type FilterType = "all" | "active" | "past";
@@ -83,6 +84,68 @@ export default function OrdersScreen() {
     if (filter === "past") return !isActive;
     return true;
   });
+
+  const handleReorder = (order: any) => {
+    if (order.serviceType === "delivery") {
+      const { clearCart, addItem, updateQuantity } = useCartStore.getState();
+      clearCart();
+      const vendorId = typeof order.vendor === "object" ? order.vendor._id : order.vendor;
+      
+      const dropStop = order.stops?.find((s: any) => s.type === "drop");
+      if (dropStop && Array.isArray(dropStop.items)) {
+        dropStop.items.forEach((item: any) => {
+          addItem({ 
+            _id: item.id || item._id, 
+            name: item.name, 
+            price: item.price, 
+            description: "", 
+            category: "", 
+            isVeg: true, 
+            images: [] 
+          }, vendorId);
+          updateQuantity(item.id || item._id, item.quantity);
+        });
+      }
+      
+      const { getTotalPrice } = useCartStore.getState();
+      const subtotal = getTotalPrice() || order.totalPrice;
+      const deliveryFee = 0.99;
+      const taxes = subtotal * 0.05;
+      const total = subtotal + deliveryFee + taxes;
+      
+      router.push({
+        pathname: "/checkout",
+        params: { subtotal, deliveryFee, taxes, total }
+      });
+    } else {
+      const pickup = order.stops?.find((s: any) => s.type === "pickup") || order.stops?.[0];
+      const drop = order.stops?.find((s: any) => s.type === "drop") || order.stops?.[order.stops.length - 1];
+      const middleStops = order.stops?.filter((s: any) => s.type === "stop") || [];
+
+      if (!pickup || !drop) {
+        console.warn("Invalid stops for reordering ride", order.stops);
+        return;
+      }
+
+      router.push({
+        pathname: "/ride-confirmation",
+        params: {
+          serviceId: order.serviceType,
+          pickupName: pickup.address || "Pickup",
+          pickupLat: pickup.location?.coordinates?.[1] || 0,
+          pickupLng: pickup.location?.coordinates?.[0] || 0,
+          dropName: drop.address || "Drop",
+          dropLat: drop.location?.coordinates?.[1] || 0,
+          dropLng: drop.location?.coordinates?.[0] || 0,
+          stops: JSON.stringify(middleStops.map((s: any) => ({
+            name: s.address || "Stop",
+            lat: s.location?.coordinates?.[1] || 0,
+            lng: s.location?.coordinates?.[0] || 0
+          })))
+        }
+      });
+    }
+  };
 
   return (
     <ScreenWrapper>
@@ -238,6 +301,15 @@ export default function OrdersScreen() {
                     >
                       <Text style={styles.trackBtnText}>Track Order</Text>
                       <Feather name="arrow-right" size={12} color={colors.primary} />
+                    </TouchableOpacity>
+                  )}
+                  {!isActive && (
+                    <TouchableOpacity
+                      style={styles.trackBtn}
+                      onPress={() => handleReorder(order)}
+                    >
+                      <Text style={styles.trackBtnText}>Reorder</Text>
+                      <Feather name="refresh-cw" size={12} color={colors.primary} />
                     </TouchableOpacity>
                   )}
                 </View>

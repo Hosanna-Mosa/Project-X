@@ -569,16 +569,33 @@ export default function HomeScreen() {
         setPage(1);
         setHasMore(true);
         setLoading(true);
+        setLoadingDrivers(true); // Force true here as well
         // Wait for all initial fetches to complete
-        await Promise.all([
-          checkNearbyDrivers(lat, lng),
-          activeService === 'Meat'
-            ? fetchMeatCenters(lat, lng, 1)
-            : Promise.all([
-              fetchVendors(lat, lng, 1),
-              fetch149StoreItems(lat, lng)
-            ])
-        ]);
+        try {
+          // Add a 5 second timeout so we don't hang on skeletons forever
+          const fetchPromise = Promise.all([
+            // checkNearbyDrivers(lat, lng), // Temporarily disabled to check if this is hanging
+            activeService === 'Meat' 
+              ? fetchMeatCenters(lat, lng, 1) 
+              : Promise.all([
+                  fetchVendors(lat, lng, 1),
+                  fetch149StoreItems(lat, lng)
+                ])
+          ]);
+          
+          const timeoutPromise = new Promise((_, reject) => {
+            setTimeout(() => reject(new Error("Timeout after 15 seconds")), 15000);
+          });
+          
+          await Promise.race([fetchPromise, timeoutPromise]);
+        } catch (e) {
+          console.warn("Home Screen: Initial fetches timed out or failed (likely slow dev server):", e);
+        } finally {
+          // FORCE SET FALSE REGARDLESS OF INDIVIDUAL CATCH BLOCKS OR TIMEOUT
+          setLoading(false);
+          setLoadingDrivers(false);
+        }
+        
         // Cache the coordinates and service in the shared store
         useHomeStore.setState({
           lastFetchedCoords: { lat, lng },
