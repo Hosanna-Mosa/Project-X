@@ -105,7 +105,7 @@ export const getNearbyVendors = async (req: Request, res: Response) => {
       return res.json([]);
     }
 
-    const radiusInMeters = radius ? Math.max(1000, Number(radius) || 0) : 25000;
+    const radiusInMeters = radius ? Math.max(1000, Number(radius) || 0) : 20000000;
     const skip = (Number(page) - 1) * Number(limit);
 
     console.log(`[API] Fetching nearby vendors - Lat: ${userLat}, Lng: ${userLng}, Page: ${page} (Zone: ${activeZone.name})`);

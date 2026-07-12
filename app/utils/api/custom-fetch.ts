@@ -235,17 +235,18 @@ async function parseJsonBody(
   response: Response,
   requestInfo: { method: string; url: string },
 ): Promise<unknown> {
-  const raw = await response.text();
-  const normalized = stripBom(raw);
-
-  if (normalized.trim() === "") {
-    return null;
-  }
-
   try {
-    return JSON.parse(normalized);
-  } catch (cause) {
-    throw new ResponseParseError(response, raw, cause, requestInfo);
+    const data = await response.json();
+    return data;
+  } catch (err: any) {
+    if (err.name === "SyntaxError") {
+      throw new ResponseParseError(
+        response,
+        "json",
+        `Failed to parse response body as JSON. Method: ${requestInfo.method}. URL: ${requestInfo.url}. Error: ${err.message}`,
+      );
+    }
+    throw err;
   }
 }
 

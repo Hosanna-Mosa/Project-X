@@ -22,10 +22,13 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as Location from "expo-location";
 import { useThemeStore } from "@/contexts/themeStore";
 import Colors from "@/constants/colors";
+import { LinearGradient } from "expo-linear-gradient";
 import { MapBackground, MapBackgroundRef } from "@/components/MapBackground";
 import { BottomSheet } from "@/components/BottomSheet";
 import { customFetch } from "@/utils/api/custom-fetch";
 import { LocationPickerSheet } from "@/components/LocationPickerSheet";
+import { SlideToConfirm } from "@/components/SlideToConfirm";
+import { RollingNumber } from "@/components/RollingNumber";
 import { socketService } from "@/utils/socketService";
 import { useDeliveryStore } from "@/contexts/deliveryStore";
 
@@ -488,134 +491,203 @@ export default function ServiceSelectionScreen() {
 
     return (
       <View style={styles.root}>
-        {/* Background Map - visible in booking and success states */}
-        {bookingState !== "idle" && (
-          <View style={StyleSheet.absoluteFill}>
-            <MapBackground 
-              ref={mapRef}
-              style={StyleSheet.absoluteFill} 
-              driverLocation={driverLocation}
-              userLocation={selectedCoords}
-              driverMarkers={nearbyDrivers}
-              radiusCenter={selectedCoords}
-              radiusMeters={fareDetails.radius * 1000}
-              initialRegion={selectedCoords ? {
-                latitude: selectedCoords.lat - 0.003, // offset slightly for bottom sheet layout
-                longitude: selectedCoords.lng,
-                latitudeDelta: 0.015,
-                longitudeDelta: 0.015,
-              } : undefined}
-            />
-          </View>
-        )}
-
-        {/* Clean Background when map is hidden (idle state) */}
-        {bookingState === "idle" && (
-          <View style={[StyleSheet.absoluteFill, { backgroundColor: '#fbf8ff' }]} />
-        )}
-
-        {/* Top Header */}
-        <View style={[styles.taskHeader, { 
-          position: 'absolute',
-          top: 0,
-          left: 0,
-          right: 0,
-          zIndex: 10,
-          paddingTop: insets.top + (Platform.OS === 'web' ? 20 : 16),
-          borderBottomWidth: 1,
-          borderColor: '#E4E4E7',
-          backgroundColor: '#ffffff',
-          flexDirection: 'row',
-          alignItems: 'center',
-        }]}>
-          <TouchableOpacity 
-            style={styles.backBtn} 
-            onPress={() => {
-              if (bookingState === "booking") {
-                handleCancelBooking();
-              } else if (bookingState === "success") {
-                handleReset();
-              } else {
-                router.back();
-              }
-            }}
-          >
-            <Feather name="arrow-left" size={24} color={'#000000'} />
-          </TouchableOpacity>
-          <View style={styles.headerTitleContainer}>
-            <Text style={styles.headerTitle}>RESERVATION</Text>
-          </View>
-          <View style={styles.headerSpacer} />
+        {/* Background Map - ALWAYS visible */}
+        <View style={StyleSheet.absoluteFill}>
+          <MapBackground 
+            ref={mapRef}
+            style={StyleSheet.absoluteFill} 
+            driverLocation={driverLocation}
+            userLocation={selectedCoords}
+            driverMarkers={nearbyDrivers}
+            radiusCenter={selectedCoords}
+            radiusMeters={fareDetails.radius * 1000}
+            initialRegion={selectedCoords ? {
+              latitude: selectedCoords.lat - 0.003,
+              longitude: selectedCoords.lng,
+              latitudeDelta: 0.015,
+              longitudeDelta: 0.015,
+            } : undefined}
+          />
         </View>
 
-        {/* First Phase: Idle Configuration Form */}
         {bookingState === "idle" ? (
-          <View style={{ flex: 1, backgroundColor: '#fbf8ff' }}>
+          <View style={[StyleSheet.absoluteFill, { backgroundColor: '#F8FAFC', zIndex: 20 }]}>
+            {/* Header */}
+            <View style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              paddingHorizontal: 20,
+              paddingTop: insets.top + (Platform.OS === 'web' ? 20 : 16),
+              paddingBottom: 16,
+              backgroundColor: '#F8FAFC',
+            }}>
+              <TouchableOpacity
+                style={{
+                  width: 44,
+                  height: 44,
+                  borderRadius: 22,
+                  backgroundColor: '#FFFFFF',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  shadowColor: '#000',
+                  shadowOffset: { width: 0, height: 2 },
+                  shadowOpacity: 0.05,
+                  shadowRadius: 4,
+                  elevation: 2,
+                  borderWidth: 1,
+                  borderColor: '#F1F5F9',
+                }}
+                onPress={() => router.back()}
+              >
+                <Feather name="arrow-left" size={20} color="#1E293B" />
+              </TouchableOpacity>
+              <View style={{ alignItems: 'center' }}>
+                <Text style={{ fontSize: 16, fontWeight: '800', color: '#1E293B', letterSpacing: 0.5 }}>
+                  RESERVE SHOPPING SLOT
+                </Text>
+                <Text style={{ fontSize: 12, color: '#64748B', marginTop: 2 }}>
+                  Book your time. Shop stress-free.
+                </Text>
+              </View>
+              <View style={{ width: 44 }} />
+            </View>
+
             <ScrollView 
-              style={{ marginTop: insets.top + 72, flex: 1 }}
-              contentContainerStyle={[styles.taskScrollContent, { paddingBottom: 20 }]} 
+              style={{ flex: 1 }} 
+              contentContainerStyle={{ padding: 20, paddingBottom: 120 }}
               showsVerticalScrollIndicator={false}
             >
-              {/* Collection Point Section */}
-              <View style={styles.collectionPointCard}>
-                <Text style={styles.sectionHeading}>COLLECTION POINT</Text>
-                <TouchableOpacity 
-                  style={styles.collectionInputBox} 
-                  onPress={() => router.push("/delivery/saved-addresses")}
-                  activeOpacity={0.8}
-                >
-                  <Text 
-                    style={[
-                      styles.collectionInputText, 
-                      !selectedAddress && styles.collectionInputPlaceholder
-                    ]}
-                    numberOfLines={1}
-                  >
-                    {selectedAddress?.addressLine || "Enter delivery address"}
+              {/* Banner Card */}
+              <View style={{
+                backgroundColor: '#EEF2FF',
+                borderRadius: 16,
+                padding: 20,
+                marginBottom: 16,
+                flexDirection: 'row',
+                overflow: 'hidden',
+                shadowColor: '#4F46E5',
+                shadowOffset: { width: 0, height: 4 },
+                shadowOpacity: 0.05,
+                shadowRadius: 8,
+                elevation: 2,
+              }}>
+                <View style={{ flex: 1, zIndex: 2 }}>
+                  <Text style={{ fontSize: 20, fontWeight: '800', color: '#1E293B' }}>Pick your time.</Text>
+                  <Text style={{ fontSize: 20, fontWeight: '800', color: '#4F46E5', marginBottom: 8 }}>Enjoy your shopping!</Text>
+                  <Text style={{ fontSize: 13, color: '#475569', lineHeight: 20, paddingRight: 20 }}>
+                    Reserve a personal slot and shop at your convenience.
                   </Text>
+                </View>
+                {/* Simulated Image Placeholder */}
+                <View style={{ position: 'absolute', right: -20, bottom: -10, opacity: 0.8 }}>
+                  <Ionicons name="cart" size={100} color="#C7D2FE" />
+                </View>
+              </View>
+
+              {/* Store Location Card */}
+              <View style={{
+                backgroundColor: '#FFFFFF',
+                borderRadius: 16,
+                padding: 16,
+                marginBottom: 16,
+                flexDirection: 'row',
+                alignItems: 'center',
+                shadowColor: '#000',
+                shadowOffset: { width: 0, height: 2 },
+                shadowOpacity: 0.03,
+                shadowRadius: 6,
+                elevation: 1,
+                borderWidth: 1,
+                borderColor: '#F1F5F9'
+              }}>
+                <View style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: '#EEF2FF', alignItems: 'center', justifyContent: 'center', marginRight: 16 }}>
+                  <Feather name="map-pin" size={20} color="#4F46E5" />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontSize: 12, fontWeight: '700', color: '#64748B', marginBottom: 4, textTransform: 'uppercase' }}>Store Location</Text>
+                  <Text style={{ fontSize: 14, fontWeight: '600', color: '#1E293B', lineHeight: 20 }} numberOfLines={2}>
+                    {selectedAddress?.addressLine || "Select store location"}
+                  </Text>
+                </View>
+                <TouchableOpacity onPress={() => router.push("/delivery/saved-addresses")} style={{ flexDirection: 'row', alignItems: 'center', paddingLeft: 12 }}>
+                  <Text style={{ color: '#4F46E5', fontWeight: '600', fontSize: 14, marginRight: 4 }}>Change</Text>
+                  <Feather name="chevron-right" size={16} color="#4F46E5" />
                 </TouchableOpacity>
               </View>
 
-              {/* Time Duration Section */}
-              <View style={styles.collectionPointCard}>
-                <Text style={styles.sectionHeading}>DURATION</Text>
-                <View style={styles.presetRow}>
+              {/* Duration Card */}
+              <View style={{
+                backgroundColor: '#FFFFFF',
+                borderRadius: 16,
+                padding: 16,
+                marginBottom: 16,
+                shadowColor: '#000',
+                shadowOffset: { width: 0, height: 2 },
+                shadowOpacity: 0.03,
+                shadowRadius: 6,
+                elevation: 1,
+                borderWidth: 1,
+                borderColor: '#F1F5F9'
+              }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 16 }}>
+                  <View style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: '#EEF2FF', alignItems: 'center', justifyContent: 'center', marginRight: 12 }}>
+                    <Feather name="clock" size={18} color="#4F46E5" />
+                  </View>
+                  <View>
+                    <Text style={{ fontSize: 13, fontWeight: '700', color: '#64748B', marginBottom: 2, textTransform: 'uppercase' }}>Duration</Text>
+                    <Text style={{ fontSize: 12, color: '#94A3B8' }}>Choose how long you want to shop</Text>
+                  </View>
+                </View>
+
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', gap: 10 }}>
                   {[
-                    { label: "1 HOUR", value: "1" },
-                    { label: "2 HOURS", value: "2" },
-                    { label: "CUSTOM", value: "custom" },
+                    { label: "1 HOUR", value: "1", icon: "clock" },
+                    { label: "2 HOURS", value: "2", icon: "clock" },
+                    { label: "CUSTOM", value: "custom", icon: "calendar" },
                   ].map((opt) => {
                     const isActive = durationOption === opt.value;
                     return (
                       <TouchableOpacity
                         key={opt.value}
-                        style={[
-                          styles.presetButton,
-                          isActive && styles.presetButtonActive
-                        ]}
+                        style={{
+                          flex: 1,
+                          height: 60,
+                          borderRadius: 8,
+                          borderWidth: 1,
+                          borderColor: isActive ? '#4F46E5' : '#E2E8F0',
+                          backgroundColor: isActive ? '#4F46E5' : '#FFFFFF',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          position: 'relative'
+                        }}
                         onPress={() => {
                           setDurationOption(opt.value);
-                          if (opt.value !== "custom") {
-                            setCustomDuration("");
-                          }
+                          if (opt.value !== "custom") setCustomDuration("");
                         }}
                       >
-                        <Text style={[
-                          styles.presetButtonText,
-                          isActive && styles.presetButtonTextActive
-                        ]}>
+                        {isActive && (
+                          <View style={{ position: 'absolute', top: 6, right: 6, backgroundColor: '#FFF', borderRadius: 8, padding: 2 }}>
+                            <Feather name="check" size={10} color="#4F46E5" />
+                          </View>
+                        )}
+                        <Feather name={opt.icon as any} size={16} color={isActive ? '#FFFFFF' : '#475569'} style={{ marginBottom: 4 }} />
+                        <Text style={{
+                          fontSize: 12,
+                          fontWeight: isActive ? '700' : '600',
+                          color: isActive ? '#FFFFFF' : '#1E293B'
+                        }}>
                           {opt.label}
                         </Text>
                       </TouchableOpacity>
                     );
                   })}
                 </View>
-
                 {durationOption === "custom" && (
-                  <View style={styles.customTextInputWrapper}>
+                  <View style={{ marginTop: 12 }}>
                     <TextInput
-                      style={styles.customUnderlineInput}
-                      placeholder="Enter custom duration in hours (e.g., 6)"
+                      style={[styles.modernCustomInput, { height: 44 }]}
+                      placeholder="Enter hours (e.g. 3)"
                       placeholderTextColor="#A1A1AA"
                       keyboardType="numeric"
                       value={customDuration}
@@ -625,46 +697,78 @@ export default function ServiceSelectionScreen() {
                 )}
               </View>
 
-              {/* Distance Radius Section */}
-              <View style={styles.collectionPointCard}>
-                <Text style={styles.sectionHeading}>RADIUS PREFERENCE</Text>
-                <View style={styles.presetRow}>
+              {/* Shopping Area (Radius) Card */}
+              <View style={{
+                backgroundColor: '#FFFFFF',
+                borderRadius: 16,
+                padding: 16,
+                marginBottom: 16,
+                shadowColor: '#000',
+                shadowOffset: { width: 0, height: 2 },
+                shadowOpacity: 0.03,
+                shadowRadius: 6,
+                elevation: 1,
+                borderWidth: 1,
+                borderColor: '#F1F5F9'
+              }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 16 }}>
+                  <View style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: '#EEF2FF', alignItems: 'center', justifyContent: 'center', marginRight: 12 }}>
+                    <Feather name="target" size={18} color="#4F46E5" />
+                  </View>
+                  <View>
+                    <Text style={{ fontSize: 13, fontWeight: '700', color: '#64748B', marginBottom: 2, textTransform: 'uppercase' }}>Shopping Area (Radius)</Text>
+                    <Text style={{ fontSize: 12, color: '#94A3B8' }}>Select the area you want to shop in</Text>
+                  </View>
+                </View>
+
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', gap: 10 }}>
                   {[
-                    { label: "2 KM", value: "2" },
-                    { label: "5 KM", value: "5" },
-                    { label: "CUSTOM", value: "custom" },
+                    { label: "2 KM", value: "2", icon: "disc" },
+                    { label: "5 KM", value: "5", icon: "disc" },
+                    { label: "CUSTOM", value: "custom", icon: "edit-2" },
                   ].map((opt) => {
                     const isActive = radiusOption === opt.value;
                     return (
                       <TouchableOpacity
                         key={opt.value}
-                        style={[
-                          styles.presetButton,
-                          isActive && styles.presetButtonActive
-                        ]}
+                        style={{
+                          flex: 1,
+                          height: 60,
+                          borderRadius: 8,
+                          borderWidth: 1,
+                          borderColor: isActive ? '#4F46E5' : '#E2E8F0',
+                          backgroundColor: isActive ? '#4F46E5' : '#FFFFFF',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          position: 'relative'
+                        }}
                         onPress={() => {
                           setRadiusOption(opt.value);
-                          if (opt.value !== "custom") {
-                            setCustomRadius("");
-                          }
+                          if (opt.value !== "custom") setCustomRadius("");
                         }}
                       >
-                        <Text style={[
-                          styles.presetButtonText,
-                          isActive && styles.presetButtonTextActive
-                        ]}>
+                        {isActive && (
+                          <View style={{ position: 'absolute', top: 6, right: 6, backgroundColor: '#FFF', borderRadius: 8, padding: 2 }}>
+                            <Feather name="check" size={10} color="#4F46E5" />
+                          </View>
+                        )}
+                        <Feather name={opt.icon as any} size={16} color={isActive ? '#FFFFFF' : '#475569'} style={{ marginBottom: 4 }} />
+                        <Text style={{
+                          fontSize: 12,
+                          fontWeight: isActive ? '700' : '600',
+                          color: isActive ? '#FFFFFF' : '#1E293B'
+                        }}>
                           {opt.label}
                         </Text>
                       </TouchableOpacity>
                     );
                   })}
                 </View>
-
                 {radiusOption === "custom" && (
-                  <View style={styles.customTextInputWrapper}>
+                  <View style={{ marginTop: 12 }}>
                     <TextInput
-                      style={styles.customUnderlineInput}
-                      placeholder="Enter custom distance in km (e.g., 25)"
+                      style={[styles.modernCustomInput, { height: 44 }]}
+                      placeholder="Enter distance (e.g. 10)"
                       placeholderTextColor="#A1A1AA"
                       keyboardType="numeric"
                       value={customRadius}
@@ -672,45 +776,115 @@ export default function ServiceSelectionScreen() {
                     />
                   </View>
                 )}
+                
+                {/* Info Box */}
+                <View style={{ 
+                  marginTop: 16, 
+                  backgroundColor: '#F5F3FF', 
+                  borderRadius: 8, 
+                  padding: 10,
+                  flexDirection: 'row',
+                  alignItems: 'center'
+                }}>
+                  <Feather name="info" size={14} color="#8B5CF6" style={{ marginRight: 8 }} />
+                  <Text style={{ fontSize: 11, color: '#6D28D9', flex: 1 }}>
+                    We will show stores within the selected radius of your location.
+                  </Text>
+                </View>
+              </View>
+
+              {/* Total Price Card */}
+              <View style={{
+                backgroundColor: '#FFFFFF',
+                borderRadius: 16,
+                padding: 20,
+                marginBottom: 20,
+                shadowColor: '#000',
+                shadowOffset: { width: 0, height: 2 },
+                shadowOpacity: 0.03,
+                shadowRadius: 6,
+                elevation: 1,
+                borderWidth: 1,
+                borderColor: '#F1F5F9',
+                flexDirection: 'row',
+                justifyContent: 'space-between',
+                alignItems: 'center'
+              }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                  <View style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: '#EEF2FF', alignItems: 'center', justifyContent: 'center', marginRight: 16 }}>
+                    <Feather name="tag" size={20} color="#4F46E5" />
+                  </View>
+                  <View>
+                    <Text style={{ fontSize: 11, fontWeight: '700', color: '#64748B', marginBottom: 2, textTransform: 'uppercase' }}>Total Price</Text>
+                    <TouchableOpacity onPress={openPriceSheet} style={{ flexDirection: 'row', alignItems: 'center' }} activeOpacity={0.7}>
+                      <Text style={{ fontSize: 24, fontWeight: '800', color: '#1E293B' }}>₹{activeFare}</Text>
+                      <View style={{ marginLeft: 8, backgroundColor: '#F1F5F9', width: 24, height: 24, borderRadius: 12, alignItems: 'center', justifyContent: 'center' }}>
+                        <Feather name="edit-2" size={12} color="#64748B" />
+                      </View>
+                    </TouchableOpacity>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 2 }}>
+                      <Feather name="check-circle" size={12} color="#10B981" style={{ marginRight: 4 }} />
+                      <Text style={{ fontSize: 11, color: '#64748B' }}>Inclusive of all taxes & fees</Text>
+                    </View>
+                  </View>
+                </View>
+                <View style={{ alignItems: 'center', flexDirection: 'row' }}>
+                  <Feather name="shield" size={14} color="#4F46E5" style={{ marginRight: 4 }} />
+                  <Text style={{ fontSize: 12, color: '#64748B', fontWeight: '500' }}>Secure Booking</Text>
+                </View>
               </View>
             </ScrollView>
 
-            {/* Sticky Bottom Price & Confirm Reservation Panel */}
-            <View style={[styles.bottomPanel, { paddingBottom: insets.bottom + 16 }]}>
-              <View style={styles.bottomPriceRow}>
-                <View style={styles.priceCol}>
-                  <Text style={styles.priceHeading}>TOTAL PRICE</Text>
-                  <TouchableOpacity 
-                    style={styles.priceOutlineBox} 
-                    onPress={openPriceSheet}
-                    activeOpacity={0.85}
-                  >
-                    <Text style={styles.priceValueText}>₹{activeFare}</Text>
-                    <Feather name="edit-2" size={14} color="#000000" style={{ marginLeft: 8 }} />
-                  </TouchableOpacity>
-                </View>
-                <View style={styles.taxesCol}>
-                  <Text style={styles.taxesText}>INCLUSIVE</Text>
-                  <Text style={styles.taxesText}>OF ALL TAXES & FEES</Text>
-                </View>
-              </View>
-
-              <TouchableOpacity
-                style={styles.confirmButton}
-                onPress={handleBook}
-                activeOpacity={0.8}
-              >
-                <Text style={styles.confirmButtonText}>CONFIRM RESERVATION</Text>
-                <Feather name="arrow-right" size={18} color="#ffffff" style={{ marginLeft: 8 }} />
-              </TouchableOpacity>
+            {/* Bottom Button */}
+            <View style={{
+              position: 'absolute',
+              bottom: 0,
+              left: 0,
+              right: 0,
+              padding: 20,
+              paddingBottom: insets.bottom + 20,
+              backgroundColor: '#F8FAFC',
+              borderTopWidth: 1,
+              borderTopColor: '#F1F5F9',
+              alignItems: 'center',
+            }}>
+              <SlideToConfirm
+                onConfirm={handleBook}
+                title={`CONFIRM RESERVATION • ₹${activeFare}`}
+                colors={colors}
+              />
             </View>
           </View>
         ) : (
-          /* Second & Third Phase: Bottom Sheet overlays map for finding and success states */
-          <BottomSheet 
-            style={styles.bottomSheet}
-            defaultHeight={bookingState === "success" ? 395 : 240}
-          >
+          /* Second & Third Phase: Map & Bottom Sheet overlays map for finding and success states */
+          <>
+            {/* Top Header for Booking/Success State */}
+            <View style={[styles.modernHeader, { 
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              right: 0,
+              zIndex: 10,
+              paddingTop: insets.top + (Platform.OS === 'web' ? 20 : 16),
+              backgroundColor: 'transparent'
+            }]}>
+              <TouchableOpacity 
+                style={styles.modernBackBtn} 
+                onPress={() => {
+                  if (bookingState === "booking") handleCancelBooking();
+                  else if (bookingState === "success") handleReset();
+                }}
+              >
+                <View style={styles.glassCircle}>
+                  <Feather name="arrow-left" size={22} color={colors.text} />
+                </View>
+              </TouchableOpacity>
+            </View>
+
+            <BottomSheet 
+              style={styles.bottomSheet}
+              defaultHeight={bookingState === "success" ? 395 : 240}
+            >
             {bookingState === "booking" && (
               <View style={styles.sheetBookingContainer}>
                 <View style={styles.sheetRadarRow}>
@@ -803,11 +977,12 @@ export default function ServiceSelectionScreen() {
                   <TouchableOpacity 
                     style={[styles.successCallBtn, { flex: 1, marginBottom: 10 }]}
                     onPress={() => {
-                      router.push("/tracking");
+                      const rad = radiusOption === "custom" ? customRadius : radiusOption;
+                      router.push({ pathname: "/helper-task", params: { radius: rad } });
                     }}
                   >
-                    <Feather name="map-pin" size={18} color={colors.text} style={{ marginRight: 6 }} />
-                    <Text style={styles.successCallBtnText}>Track Order</Text>
+                    <Feather name="clipboard" size={18} color={colors.text} style={{ marginRight: 6 }} />
+                    <Text style={styles.successCallBtnText}>Assign Task</Text>
                   </TouchableOpacity>
 
                   <TouchableOpacity 
@@ -842,6 +1017,7 @@ export default function ServiceSelectionScreen() {
               </View>
             )}
           </BottomSheet>
+          </>
         )}
         <Modal
           visible={showPriceSheet}
@@ -850,102 +1026,116 @@ export default function ServiceSelectionScreen() {
           onRequestClose={() => setShowPriceSheet(false)}
         >
           <KeyboardAvoidingView
-            style={styles.priceSheetOverlay}
+            style={styles.modernPriceSheetOverlay}
             behavior={Platform.OS === "ios" ? "padding" : "height"}
           >
-            <TouchableOpacity style={styles.priceSheetScrim} activeOpacity={1} onPress={() => setShowPriceSheet(false)} />
-            <View style={[styles.priceSheet, { paddingBottom: insets.bottom + 24 }]}>
-              <View style={styles.sheetHandle} />
+            <TouchableOpacity style={styles.modernPriceSheetScrim} activeOpacity={1} onPress={() => setShowPriceSheet(false)} />
+            <View style={[styles.modernPriceSheet, { paddingBottom: insets.bottom + 24 }]}>
+              <View style={styles.modernSheetHandle} />
               
-              <Text style={styles.priceSheetTitle}>Now you can set a price that works for you</Text>
+              <Text style={styles.modernPriceSheetTitle}>Set your custom price</Text>
+              
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginVertical: 24, gap: 16 }}>
+                <TouchableOpacity 
+                  onPress={() => {
+                    const current = parseInt(priceInputText) || baseFare;
+                    if (current > baseFare) {
+                      setPriceInputText(String(current - 1));
+                    }
+                  }}
+                  style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: '#F1F5F9', alignItems: 'center', justifyContent: 'center' }}
+                >
+                  <Feather name="minus" size={24} color="#475569" />
+                </TouchableOpacity>
 
-              <View style={styles.largePriceBox}>
-                <Text style={styles.largePriceText}>₹{priceInputText}</Text>
-              </View>
-
-              <View style={styles.priceTipRow}>
-                <Ionicons name="bulb-outline" size={16} color="#7e7576" style={{ marginRight: 8 }} />
-                <Text style={styles.priceTipText}>Higher the price, higher the chance of getting a ride</Text>
-              </View>
-
-              <View style={styles.sliderContainer}>
-                {/* Horizontal centered step labels */}
-                <View style={styles.sliderLabelsContainer}>
-                  {PRICE_SLIDER_STEPS.map((step, idx) => {
-                    const isActive = sliderIndex === idx;
-                    return (
-                      <TouchableOpacity 
-                        key={idx} 
-                        style={[
-                          styles.sliderLabelWrapper,
-                          { left: `${(idx / (PRICE_SLIDER_STEPS.length - 1)) * 100}%` }
-                        ]} 
-                        onPress={() => selectStep(idx)}
-                        activeOpacity={0.7}
-                      >
-                        <Text style={[
-                          styles.sliderLabelText,
-                          isActive && styles.sliderLabelTextActive
-                        ]}>
-                          {step.label}
-                        </Text>
-                      </TouchableOpacity>
-                    );
-                  })}
-                </View>
-
-                {/* Custom slider track */}
-                <View style={styles.sliderTrackContainer}>
-                  {/* Underlay track background */}
-                  <View style={styles.sliderTrackLineBackground} />
-                  
-                  {/* Underlay active track progress */}
-                  <View style={[
-                    styles.sliderTrackLineActive,
-                    { width: `${(sliderIndex / (PRICE_SLIDER_STEPS.length - 1)) * 100}%` }
-                  ]} />
-
-                  {/* Underlay step dots */}
-                  <View style={styles.sliderDotsContainer}>
-                    {PRICE_SLIDER_STEPS.map((_, idx) => (
-                      <View
-                        key={idx}
-                        style={[
-                          styles.sliderDot,
-                          idx <= sliderIndex ? styles.sliderDotActive : styles.sliderDotInactive
-                        ]}
-                      />
-                    ))}
-                  </View>
-
-                  {/* Underlay slider thumb */}
-                  <View 
-                    style={[
-                      styles.sliderThumb,
-                      { left: `${(sliderIndex / (PRICE_SLIDER_STEPS.length - 1)) * 100}%` }
-                    ]}
+                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingHorizontal: 10 }}>
+                  <Text style={{ fontSize: 32, fontWeight: '800', color: '#1E293B', marginRight: 4 }}>₹</Text>
+                  <TextInput
+                    style={{ fontSize: 40, fontWeight: '800', color: '#1E293B', minWidth: 80, textAlign: 'center', padding: 0 }}
+                    keyboardType="numeric"
+                    value={priceInputText}
+                    onChangeText={setPriceInputText}
+                    selectionColor="#4F46E5"
                   />
+                </View>
 
-                  {/* Overlay interactive segments to capture touches across the entire track width */}
-                  <View style={styles.sliderTouchOverlay}>
-                    {PRICE_SLIDER_STEPS.map((_, idx) => (
+                <TouchableOpacity 
+                  onPress={() => {
+                    const current = parseInt(priceInputText) || baseFare;
+                    setPriceInputText(String(current + 1));
+                  }}
+                  style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: '#EEF2FF', alignItems: 'center', justifyContent: 'center' }}
+                >
+                  <Feather name="plus" size={24} color="#4F46E5" />
+                </TouchableOpacity>
+              </View>
+
+              <View style={styles.modernPriceTipRow}>
+                <View style={styles.modernTipIconBox}>
+                  <Ionicons name="bulb" size={14} color="#F59E0B" />
+                </View>
+                <Text style={styles.modernPriceTipText}>Higher the price, faster the matching process</Text>
+              </View>
+
+              {/* Custom Bar with -20 -10 0 10 20 */}
+              <View style={{ marginHorizontal: 20, marginTop: 10, marginBottom: 30 }}>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8, paddingHorizontal: 4 }}>
+                  {[-20, -10, 0, 10, 20].map(val => (
+                    <Text key={val} style={{ fontSize: 12, color: '#64748B', fontWeight: '700' }}>
+                      {val > 0 ? `+${val}` : val === 0 ? '0' : val}
+                    </Text>
+                  ))}
+                </View>
+                <View style={{ height: 30, justifyContent: 'center' }}>
+                  <View style={{ position: 'absolute', left: 10, right: 10, height: 4, backgroundColor: '#E2E8F0', borderRadius: 2 }} />
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                    {[-20, -10, 0, 10, 20].map((val) => (
                       <TouchableOpacity
-                        key={idx}
-                        style={styles.sliderTouchSegment}
-                        onPress={() => selectStep(idx)}
-                        activeOpacity={1}
-                      />
+                        key={val}
+                        onPress={() => {
+                          if (val === 0) {
+                            setPriceInputText(String(baseFare));
+                          } else {
+                            const current = parseInt(priceInputText) || baseFare;
+                            setPriceInputText(String(Math.max(baseFare, current + val)));
+                          }
+                        }}
+                        style={{
+                          width: 24,
+                          height: 24,
+                          borderRadius: 12,
+                          backgroundColor: '#FFF',
+                          borderWidth: 2,
+                          borderColor: '#4F46E5',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          shadowColor: '#4F46E5',
+                          shadowOffset: { width: 0, height: 2 },
+                          shadowOpacity: 0.2,
+                          shadowRadius: 4,
+                          elevation: 3,
+                        }}
+                      >
+                        <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: '#4F46E5' }} />
+                      </TouchableOpacity>
                     ))}
                   </View>
                 </View>
               </View>
 
-              <TouchableOpacity style={styles.priceSheetBookButton} onPress={applyPriceInput} activeOpacity={0.9}>
-                <Text style={styles.priceSheetBookText}>Set price to ₹{priceInputText}</Text>
+              <TouchableOpacity onPress={applyPriceInput} activeOpacity={0.85}>
+                <LinearGradient
+                  colors={[colors.primary, '#8B5CF6']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={styles.modernPriceSheetBookButton}
+                >
+                  <Text style={styles.modernPriceSheetBookText}>Set price to ₹{priceInputText}</Text>
+                </LinearGradient>
               </TouchableOpacity>
               
               <TouchableOpacity
-                style={styles.priceSheetRemoveButton}
+                style={styles.modernPriceSheetRemoveButton}
                 onPress={() => {
                   setCustomPrice(null);
                   setPriceInputText(String(baseFare));
@@ -953,7 +1143,7 @@ export default function ServiceSelectionScreen() {
                 }}
                 activeOpacity={0.85}
               >
-                <Text style={styles.priceSheetRemoveText}>✕ Remove</Text>
+                <Text style={styles.modernPriceSheetRemoveText}>✕ Remove custom price</Text>
               </TouchableOpacity>
             </View>
           </KeyboardAvoidingView>
@@ -1106,6 +1296,429 @@ const createStyles = (colors: typeof Colors.light) => StyleSheet.create({
     flex: 1,
     backgroundColor: colors.background,
   },
+  // --- Modern Redesign Styles ---
+  modernHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingBottom: 20,
+    backgroundColor: 'transparent',
+  },
+  modernBackBtn: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  glassCircle: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: 'rgba(255, 255, 255, 0.8)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
+    elevation: 4,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.6)',
+  },
+  modernHeaderTitleContainer: {
+    flex: 1,
+    marginLeft: 16,
+    flexDirection: 'row',
+    alignItems: 'baseline',
+  },
+  modernHeaderTitle: {
+    fontSize: 24,
+    fontWeight: '900',
+    color: '#0F172A',
+    letterSpacing: -0.5,
+  },
+  modernHeaderDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: colors.primary,
+    marginLeft: 4,
+  },
+  modernScrollContent: {
+    paddingHorizontal: 20,
+    gap: 20,
+  },
+  modernCard: {
+    backgroundColor: '#ffffff',
+    borderRadius: 24,
+    padding: 20,
+    shadowColor: '#64748B',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.06,
+    shadowRadius: 24,
+    elevation: 6,
+    borderWidth: 1,
+    borderColor: 'rgba(226, 232, 240, 0.5)',
+  },
+  modernCardHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 16,
+    gap: 12,
+  },
+  iconContainerBox: {
+    width: 32,
+    height: 32,
+    borderRadius: 10,
+    backgroundColor: 'rgba(139, 92, 246, 0.1)', // Light purple/primary tint
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  modernSectionHeading: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: '#64748B',
+    letterSpacing: 1.2,
+  },
+  modernInputBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F8FAFC',
+    borderRadius: 16,
+    paddingHorizontal: 16,
+    height: 56,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  modernInputText: {
+    flex: 1,
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#0F172A',
+  },
+  modernInputPlaceholder: {
+    color: '#94A3B8',
+    fontWeight: '500',
+  },
+  modernPresetRow: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  modernPresetButton: {
+    flex: 1,
+    height: 72,
+    backgroundColor: '#F8FAFC',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  modernPresetButtonActive: {
+    borderColor: 'transparent',
+    shadowColor: colors.primary,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.25,
+    shadowRadius: 12,
+    elevation: 8,
+  },
+  modernPresetLabel: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: '#334155',
+  },
+  modernPresetLabelActive: {
+    color: '#ffffff',
+  },
+  modernPresetSubtext: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#94A3B8',
+    marginTop: 2,
+  },
+  modernPresetSubtextActive: {
+    color: 'rgba(255, 255, 255, 0.8)',
+  },
+  modernCustomTextInputWrapper: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 16,
+    backgroundColor: '#F8FAFC',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    paddingHorizontal: 16,
+    height: 56,
+  },
+  modernCustomInput: {
+    flex: 1,
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#0F172A',
+  },
+  modernCustomSuffix: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#94A3B8',
+    marginLeft: 8,
+  },
+  modernFloatingBottom: {
+    position: 'absolute',
+    left: 20,
+    right: 20,
+    zIndex: 20,
+  },
+  modernBottomCard: {
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    borderRadius: 28,
+    padding: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 12 },
+    shadowOpacity: 0.1,
+    shadowRadius: 32,
+    elevation: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.5)',
+  },
+  modernPriceRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-end',
+    marginBottom: 20,
+  },
+  modernPriceCol: {
+    gap: 4,
+  },
+  modernPriceHeading: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#64748B',
+  },
+  modernPriceEditBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  modernPriceValue: {
+    fontSize: 28,
+    fontWeight: '900',
+    color: '#0F172A',
+    letterSpacing: -0.5,
+  },
+  modernPriceEditBadge: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: 'rgba(139, 92, 246, 0.1)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  modernTaxesCol: {
+    alignItems: 'flex-end',
+  },
+  modernTaxesText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#94A3B8',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  modernConfirmButton: {
+    height: 60,
+    borderRadius: 20,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 12,
+    shadowColor: colors.primary,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.3,
+    shadowRadius: 16,
+    elevation: 8,
+  },
+  modernConfirmButtonText: {
+    color: '#ffffff',
+    fontSize: 16,
+    fontWeight: '800',
+    letterSpacing: 0.5,
+  },
+  modernConfirmArrow: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  
+  // Modern Price Sheet Modal Styles
+  modernPriceSheetOverlay: {
+    flex: 1,
+    justifyContent: 'flex-end',
+  },
+  modernPriceSheetScrim: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(15, 23, 42, 0.65)',
+  },
+  modernPriceSheet: {
+    backgroundColor: '#ffffff',
+    borderTopLeftRadius: 32,
+    borderTopRightRadius: 32,
+    paddingTop: 12,
+    paddingHorizontal: 24,
+    gap: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -10 },
+    shadowOpacity: 0.1,
+    shadowRadius: 20,
+    elevation: 24,
+  },
+  modernSheetHandle: {
+    alignSelf: 'center',
+    width: 48,
+    height: 5,
+    borderRadius: 3,
+    backgroundColor: '#E2E8F0',
+    marginBottom: 8,
+  },
+  modernPriceSheetTitle: {
+    color: '#0F172A',
+    fontSize: 22,
+    fontWeight: '900',
+    textAlign: 'center',
+    letterSpacing: -0.5,
+  },
+  modernLargePriceBox: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'center',
+    backgroundColor: '#F8FAFC',
+    borderRadius: 24,
+    paddingVertical: 24,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    marginTop: 4,
+  },
+  modernLargePricePrefix: {
+    fontSize: 24,
+    fontWeight: '800',
+    color: colors.primary,
+    marginTop: 6,
+    marginRight: 4,
+  },
+  modernLargePriceText: {
+    fontSize: 48,
+    fontWeight: '900',
+    color: '#0F172A',
+    letterSpacing: -1,
+  },
+  modernPriceTipRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(245, 158, 11, 0.1)',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 16,
+    gap: 12,
+  },
+  modernTipIconBox: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: 'rgba(245, 158, 11, 0.2)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  modernPriceTipText: {
+    flex: 1,
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#B45309',
+  },
+  modernSliderLabelTextActive: {
+    color: colors.primary,
+    fontWeight: '900',
+    transform: [{ scale: 1.1 }],
+  },
+  modernSliderTrackLineBackground: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    height: 6,
+    backgroundColor: '#E2E8F0',
+    borderRadius: 3,
+  },
+  modernSliderTrackLineActive: {
+    position: 'absolute',
+    left: 0,
+    height: 6,
+    backgroundColor: colors.primary,
+    borderRadius: 3,
+  },
+  modernSliderDot: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    backgroundColor: '#ffffff',
+    borderWidth: 2,
+    transform: [{ translateY: -3 }],
+  },
+  modernSliderDotActive: {
+    borderColor: colors.primary,
+  },
+  modernSliderDotInactive: {
+    borderColor: '#E2E8F0',
+  },
+  modernSliderThumb: {
+    position: 'absolute',
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: '#ffffff',
+    borderWidth: 3,
+    borderColor: colors.primary,
+    transform: [{ translateX: -14 }, { translateY: -11 }],
+    shadowColor: colors.primary,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 6,
+  },
+  modernPriceSheetBookButton: {
+    height: 60,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: colors.primary,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.3,
+    shadowRadius: 16,
+    elevation: 8,
+    marginTop: 8,
+  },
+  modernPriceSheetBookText: {
+    color: '#ffffff',
+    fontSize: 16,
+    fontWeight: '800',
+    letterSpacing: 0.5,
+  },
+  modernPriceSheetRemoveButton: {
+    alignSelf: 'center',
+    height: 50,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 24,
+    width: '100%',
+    marginBottom: 8,
+  },
+  modernPriceSheetRemoveText: {
+    color: '#64748B',
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  // --- End Modern Redesign Styles ---
   topBar: {
     flexDirection: "row",
     alignItems: "center",

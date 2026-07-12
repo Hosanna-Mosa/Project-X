@@ -3,11 +3,49 @@ import { OrdersService } from "./orders.service";
 import { AuthRequest } from "../../middleware/auth.middleware";
 import Order, { OrderStatus, ServiceType } from "../../database/models/Order";
 import Driver from "../../database/models/Driver";
+import Coupon from "../../database/models/Coupon";
 import { ValidationError, NotFoundError, UnauthorizedError, ConflictError } from "../../utils/errors";
 
 const ordersService = new OrdersService();
 
 export class OrdersController {
+  async validateCoupon(req: Request, res: Response, next: NextFunction) {
+    try {
+      const { code, cartTotal } = req.body;
+      if (!code) {
+        throw new ValidationError("Promo code is required");
+      }
+
+      const coupon = await Coupon.findOne({ code: code.toUpperCase() });
+      if (!coupon) {
+        throw new NotFoundError("Invalid promo code");
+      }
+
+      if (!coupon.isActive) {
+        throw new ValidationError("This promo code is no longer active");
+      }
+
+      if (coupon.expiryDate && new Date(coupon.expiryDate) < new Date()) {
+        throw new ValidationError("This promo code has expired");
+      }
+
+      const orderTotal = Number(cartTotal) || 0;
+      if (coupon.minOrderValue && orderTotal < coupon.minOrderValue) {
+        throw new ValidationError(`This promo code requires a minimum order of ₹${coupon.minOrderValue}`);
+      }
+
+      return res.json({
+        code: coupon.code,
+        discountType: coupon.discountType,
+        discountValue: coupon.discountValue,
+        maxDiscount: coupon.maxDiscount,
+        minOrderValue: coupon.minOrderValue,
+      });
+    } catch (error: any) {
+      next(error);
+    }
+  }
+
   async estimateFare(req: Request, res: Response, next: NextFunction) {
     try {
       const { pickupLat, pickupLng, dropLat, dropLng, serviceType } = req.query;

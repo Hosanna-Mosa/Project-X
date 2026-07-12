@@ -31,10 +31,13 @@ export function GoOnlineModal({ visible, onClose, onGoOnline }: GoOnlineModalPro
 
   const handleGoOnline = () => {
     if (selectedServices.length === 0) return;
+    
+    // Update the parent's online status immediately so the background changes instantly
+    onGoOnline(selectedServices);
     setShowSuccess(true);
+    
     setTimeout(() => {
       setShowSuccess(false);
-      onGoOnline(selectedServices);
       onClose();
     }, 1500);
   };

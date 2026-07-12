@@ -214,6 +214,7 @@ export const useDriverStore = create<DriverState>()(
       orderHistory: [],
 
       goOnline: async (services) => {
+        set({ isOnline: true, activeServices: services });
         const { token, driverUserId } = get();
         if (token) {
           try {
@@ -317,10 +318,9 @@ export const useDriverStore = create<DriverState>()(
             );
           });
         });
-
-        set({ isOnline: true, activeServices: services });
       },
       goOffline: async () => {
+        set({ isOnline: false, homeMode: false });
         const { token } = get();
         if (token) {
           try {
@@ -343,8 +343,6 @@ export const useDriverStore = create<DriverState>()(
           socketService.off("upcoming_reserved_ride", () => {}); // Remove listener
           socketService.disconnect();
         });
-
-        set({ isOnline: false, homeMode: false });
       },
       toggleHomeMode: () => set((state) => ({ homeMode: !state.homeMode })),
 
