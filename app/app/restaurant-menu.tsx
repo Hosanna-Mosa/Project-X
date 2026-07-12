@@ -49,6 +49,26 @@ export default function RestaurantMenu() {
   const [selectedDishDetail, setSelectedDishDetail] = useState<any | null>(null);
   const scrollViewRef = useRef<ScrollView>(null);
   
+  const [loadingItems, setLoadingItems] = useState<Record<string, boolean>>({});
+
+  const handleAddToCart = (item: FoodItem) => {
+    if (loadingItems[item._id]) return;
+    setLoadingItems(prev => ({ ...prev, [item._id]: true }));
+    setTimeout(() => {
+      addItem(item, id as string);
+      setLoadingItems(prev => ({ ...prev, [item._id]: false }));
+    }, 450);
+  };
+
+  const handleUpdateQuantity = (itemId: string, newQty: number) => {
+    if (loadingItems[itemId]) return;
+    setLoadingItems(prev => ({ ...prev, [itemId]: true }));
+    setTimeout(() => {
+      updateQuantity(itemId, newQty);
+      setLoadingItems(prev => ({ ...prev, [itemId]: false }));
+    }, 450);
+  };
+  
   const pulseAnim = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
@@ -450,28 +470,39 @@ export default function RestaurantMenu() {
                               {cartItem ? (
                                 <View style={styles.recQuantityPill}>
                                   <TouchableOpacity 
-                                    onPress={() => updateQuantity(item._id, cartItem.quantity - 1)}
+                                    onPress={() => handleUpdateQuantity(item._id, cartItem.quantity - 1)}
                                     style={styles.recQtyActionBtn}
                                     activeOpacity={0.7}
+                                    disabled={loadingItems[item._id]}
                                   >
                                     <Feather name="minus" size={12} color="#002045" />
                                   </TouchableOpacity>
-                                  <Text style={styles.recQtyText}>{cartItem.quantity}</Text>
+                                  {loadingItems[item._id] ? (
+                                    <ActivityIndicator size="small" color="#002045" style={{ marginHorizontal: 4 }} />
+                                  ) : (
+                                    <Text style={styles.recQtyText}>{cartItem.quantity}</Text>
+                                  )}
                                   <TouchableOpacity 
-                                    onPress={() => addItem(item, id as string)}
+                                    onPress={() => handleAddToCart(item)}
                                     style={styles.recQtyActionBtn}
                                     activeOpacity={0.7}
+                                    disabled={loadingItems[item._id]}
                                   >
                                     <Feather name="plus" size={12} color="#002045" />
                                   </TouchableOpacity>
                                 </View>
                               ) : (
                                 <TouchableOpacity 
-                                  onPress={() => addItem(item, id as string)}
+                                  onPress={() => handleAddToCart(item)}
                                   style={styles.recAddPill}
                                   activeOpacity={0.85}
+                                  disabled={loadingItems[item._id]}
                                 >
-                                  <Text style={styles.recAddPillText}>ADD</Text>
+                                  {loadingItems[item._id] ? (
+                                    <ActivityIndicator size="small" color="#002045" />
+                                  ) : (
+                                    <Text style={styles.recAddPillText}>ADD</Text>
+                                  )}
                                 </TouchableOpacity>
                               )}
                             </View>
@@ -540,28 +571,39 @@ export default function RestaurantMenu() {
                             {cartItem ? (
                               <View style={styles.quantityPill}>
                                 <TouchableOpacity 
-                                  onPress={() => updateQuantity(item._id, cartItem.quantity - 1)}
+                                  onPress={() => handleUpdateQuantity(item._id, cartItem.quantity - 1)}
                                   style={styles.qtyActionBtn}
                                   activeOpacity={0.7}
+                                  disabled={loadingItems[item._id]}
                                 >
                                   <Feather name="minus" size={14} color="#002045" />
                                 </TouchableOpacity>
-                                <Text style={styles.qtyText}>{cartItem.quantity}</Text>
+                                {loadingItems[item._id] ? (
+                                  <ActivityIndicator size="small" color="#002045" style={{ marginHorizontal: 4 }} />
+                                ) : (
+                                  <Text style={styles.qtyText}>{cartItem.quantity}</Text>
+                                )}
                                 <TouchableOpacity 
-                                  onPress={() => addItem(item, id as string)}
+                                  onPress={() => handleAddToCart(item)}
                                   style={styles.qtyActionBtn}
                                   activeOpacity={0.7}
+                                  disabled={loadingItems[item._id]}
                                 >
                                   <Feather name="plus" size={14} color="#002045" />
                                 </TouchableOpacity>
                               </View>
                             ) : (
                               <TouchableOpacity 
-                                onPress={() => addItem(item, id as string)}
+                                onPress={() => handleAddToCart(item)}
                                 style={styles.addPill}
                                 activeOpacity={0.85}
+                                disabled={loadingItems[item._id]}
                               >
-                                <Text style={styles.addPillText}>ADD</Text>
+                                {loadingItems[item._id] ? (
+                                  <ActivityIndicator size="small" color="#002045" />
+                                ) : (
+                                  <Text style={styles.addPillText}>ADD</Text>
+                                )}
                               </TouchableOpacity>
                             )}
                           </View>
@@ -606,28 +648,39 @@ export default function RestaurantMenu() {
                       {items.find(i => i._id === selectedDishDetail._id) ? (
                         <View style={[styles.recQuantityPill, { width: 100, height: 36, borderRadius: 18, paddingHorizontal: 12 }]}>
                           <TouchableOpacity 
-                            onPress={() => updateQuantity(selectedDishDetail._id, (items.find(i => i._id === selectedDishDetail._id)?.quantity || 1) - 1)}
+                            onPress={() => handleUpdateQuantity(selectedDishDetail._id, (items.find(i => i._id === selectedDishDetail._id)?.quantity || 1) - 1)}
                             style={[styles.recQtyActionBtn, { width: 24, height: 24 }]}
                             activeOpacity={0.7}
+                            disabled={loadingItems[selectedDishDetail._id]}
                           >
                             <Feather name="minus" size={16} color="#002045" />
                           </TouchableOpacity>
-                          <Text style={[styles.recQtyText, { fontSize: 16 }]}>{items.find(i => i._id === selectedDishDetail._id)?.quantity}</Text>
+                          {loadingItems[selectedDishDetail._id] ? (
+                            <ActivityIndicator size="small" color="#002045" />
+                          ) : (
+                            <Text style={[styles.recQtyText, { fontSize: 16 }]}>{items.find(i => i._id === selectedDishDetail._id)?.quantity}</Text>
+                          )}
                           <TouchableOpacity 
-                            onPress={() => addItem(selectedDishDetail, id as string)}
+                            onPress={() => handleAddToCart(selectedDishDetail)}
                             style={[styles.recQtyActionBtn, { width: 24, height: 24 }]}
                             activeOpacity={0.7}
+                            disabled={loadingItems[selectedDishDetail._id]}
                           >
                             <Feather name="plus" size={16} color="#002045" />
                           </TouchableOpacity>
                         </View>
                       ) : (
                         <TouchableOpacity 
-                          onPress={() => addItem(selectedDishDetail, id as string)}
+                          onPress={() => handleAddToCart(selectedDishDetail)}
                           style={[styles.recAddPill, { width: 100, height: 36, borderRadius: 18 }]}
                           activeOpacity={0.85}
+                          disabled={loadingItems[selectedDishDetail._id]}
                         >
-                          <Text style={[styles.recAddPillText, { fontSize: 16 }]}>ADD</Text>
+                          {loadingItems[selectedDishDetail._id] ? (
+                            <ActivityIndicator size="small" color="#002045" />
+                          ) : (
+                            <Text style={[styles.recAddPillText, { fontSize: 16 }]}>ADD</Text>
+                          )}
                         </TouchableOpacity>
                       )}
                     </View>

@@ -37,7 +37,8 @@ export type OrderStatus =
   | "en_route_delivery"
   | "arrived_delivery"
   | "delivered"
-  | "completed";
+  | "completed"
+  | "CANCELLED";
 
 export interface Order {
   id: string;

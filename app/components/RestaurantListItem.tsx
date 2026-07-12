@@ -125,23 +125,21 @@ export function RestaurantListItem({
           </TouchableOpacity>
         </View>
 
-        {/* Rating, Distance, and Delivery Time Metadata Row */}
-        <View style={styles.statsRow}>
-          <Text style={styles.statsText}>{rating}</Text>
-          <MaterialIcons name="star" size={14} color={colors.textSecondary} style={styles.starIcon} />
-          <Text style={styles.statsText}>({reviews})</Text>
-          <Text style={styles.bullet}>•</Text>
-          <Text style={styles.statsText}>
-            {distance.replace(" metres", " m").replace(" km", " km")}
-          </Text>
-          <Text style={styles.bullet}>•</Text>
-          <Text style={styles.statsText}>
-            {time.replace(" mins", " min").replace(" min", " min")}
-          </Text>
-        </View>
-
-        {/* Delivery Fee Row */}
-        <View style={styles.feeRow}>
+        {/* Rating, Distance, Delivery Time, and Delivery Fee Row (Combined) */}
+        <View style={styles.metadataRow}>
+          <View style={styles.statsRow}>
+            <Text style={styles.statsText}>{rating}</Text>
+            <MaterialIcons name="star" size={12} color={colors.textSecondary} style={styles.starIcon} />
+            <Text style={styles.statsText}>({reviews})</Text>
+            <Text style={styles.bullet}>•</Text>
+            <Text style={styles.statsText}>
+              {distance.replace(" metres", " m").replace(" km", " km")}
+            </Text>
+            <Text style={styles.bullet}>•</Text>
+            <Text style={styles.statsText}>
+              {time.replace(" mins", " min").replace(" min", " min")}
+            </Text>
+          </View>
           <Text style={styles.feeText}>₹{deliveryFee || 25} delivery fee</Text>
         </View>
 
@@ -230,30 +228,32 @@ const createStyles = (colors: typeof Colors.light) => StyleSheet.create({
     color: colors.text,
     flex: 1,
   },
+  metadataRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginTop: 4,
+  },
   statsRow: {
     flexDirection: "row",
     alignItems: "center",
-    marginBottom: 2,
   },
   starIcon: {
     marginHorizontal: 2,
     marginTop: -1,
   },
   statsText: {
-    fontSize: 14,
+    fontSize: 11,
     color: colors.textSecondary,
     fontWeight: "500",
   },
   bullet: {
-    fontSize: 14,
+    fontSize: 11,
     color: colors.textMuted,
-    marginHorizontal: 6,
-  },
-  feeRow: {
-    marginTop: 2,
+    marginHorizontal: 4,
   },
   feeText: {
-    fontSize: 13,
+    fontSize: 11,
     color: colors.textSecondary,
     fontWeight: "500",
   },

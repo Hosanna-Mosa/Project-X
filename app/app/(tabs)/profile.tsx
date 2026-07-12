@@ -385,12 +385,19 @@ export default function ProfileScreen() {
             </TouchableOpacity>
           ) : (
             <TouchableOpacity 
-              style={[styles.actionButtonError, { backgroundColor: `${colors.error}15` }]} 
+              style={[styles.actionButtonError, { backgroundColor: `${colors.error}15` }, loading && { opacity: 0.7 }]} 
               onPress={handleLogout} 
               activeOpacity={0.8}
+              disabled={loading}
             >
-              <Feather name="log-out" size={16} color={colors.error} />
-              <Text style={[styles.actionButtonErrorText, { color: colors.error }]}>Sign Out</Text>
+              {loading ? (
+                <ActivityIndicator size="small" color={colors.error} />
+              ) : (
+                <>
+                  <Feather name="log-out" size={16} color={colors.error} />
+                  <Text style={[styles.actionButtonErrorText, { color: colors.error }]}>Sign Out</Text>
+                </>
+              )}
             </TouchableOpacity>
           )}
         </View>

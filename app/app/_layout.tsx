@@ -177,6 +177,16 @@ export default function RootLayout() {
       }
   }, [isInitialized, token, fontsLoaded, fontError, segments]);
 
+  // Register push notifications when authenticated
+  useEffect(() => {
+    if (token) {
+      const { registerForPushNotificationsAsync } = require("@/utils/notificationRegister");
+      registerForPushNotificationsAsync().catch((err: any) => {
+        console.error("Error registering push notifications:", err);
+      });
+    }
+  }, [token]);
+
   if (!fontsLoaded && !fontError) return null;
 
   return (

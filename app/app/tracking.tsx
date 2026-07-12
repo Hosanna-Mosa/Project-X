@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   View,
   Linking,
+  Alert,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
@@ -21,6 +22,7 @@ import { BottomSheet } from "@/components/BottomSheet";
 import { OrderStatusTimeline } from "@/components/OrderStatusTimeline";
 import { OrderStatus } from "@/contexts/deliveryStore";
 import { customFetch } from "@/utils/api/custom-fetch";
+import { hide } from "expo-router/build/utils/splash";
 
 const STATUS_SEQUENCE: OrderStatus[] = [
   "confirmed",
@@ -36,7 +38,62 @@ const STATUS_SEQUENCE: OrderStatus[] = [
 export default function TrackingScreen() {
   const insets = useSafeAreaInsets();
   const params = useLocalSearchParams<{ orderId?: string }>();
-  const { status, setStatus, currentOrderId, setOrderId, serviceType, setServiceType, route, setRoute, stops, setStops, driver, setDriver, unreadCount, incrementUnreadCount } = useDeliveryStore();
+  const { status, setStatus, currentOrderId, setOrderId, serviceType, setServiceType, route, setRoute, stops, setStops, driver, setDriver, unreadCount, incrementUnreadCount, resetDelivery } = useDeliveryStore();
+
+  const handleSOS = () => {
+    if (!currentOrderId) return;
+    
+    Alert.alert(
+      "Emergency SOS",
+      "Are you sure you want to trigger SOS? This will instantly alert our support team and emergency contacts.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Trigger SOS",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              await customFetch(`/api/v1/orders/${currentOrderId}/sos`, {
+                method: "POST"
+              });
+              Alert.alert(
+                "SOS Dispatched",
+                "Your emergency alert has been sent. Support is on the way."
+              );
+            } catch (err: any) {
+              console.error("SOS trigger error:", err);
+              Alert.alert("Error", err.message || "Failed to trigger SOS. Please call emergency services.");
+            }
+          }
+        }
+      ]
+    );
+  };
+
+  const cancellationAlerted = React.useRef(false);
+
+  const handleOrderCancelledByDriver = () => {
+    if (cancellationAlerted.current) return;
+    cancellationAlerted.current = true;
+
+    // Redirect immediately to clear the stuck map screen
+    resetDelivery();
+    router.replace("/(tabs)");
+
+    setTimeout(() => {
+      Alert.alert(
+        "Delivery Cancelled",
+        "We are sorry, the driver is unable to complete your delivery. Your order has been cancelled.",
+        [
+          {
+            text: "OK",
+            onPress: () => {}
+          }
+        ],
+        { cancelable: true }
+      );
+    }, 500);
+  };
   const [eta, setEta] = useState(15);
   const [deliveryOtp, setDeliveryOtp] = useState<string | null>(null);
   const [startOtp, setStartOtp] = useState<string | null>(null);
@@ -93,10 +150,17 @@ export default function TrackingScreen() {
   });
 
   useEffect(() => {
+    if (cancellationAlerted.current) return;
     if (params.orderId && params.orderId !== currentOrderId) {
       setOrderId(params.orderId);
     }
   }, [params.orderId, currentOrderId]);
+
+  useEffect(() => {
+    if (status === "cancelled") {
+      handleOrderCancelledByDriver();
+    }
+  }, [status]);
 
   const { theme } = useThemeStore();
   const colors = Colors[theme];
@@ -104,6 +168,8 @@ export default function TrackingScreen() {
 
   const isRide = ["bike", "auto", "cab", "cab_prime"].includes(serviceType?.toLowerCase() || "");
   const isHelper = serviceType?.toLowerCase() === "helper";
+
+  const [bottomSheetHeight, setBottomSheetHeight] = useState(300);
 
   const normalizeStatus = (backendStatus: string): OrderStatus => {
     const s = backendStatus.toLowerCase();
@@ -128,6 +194,8 @@ export default function TrackingScreen() {
       case "delivered":
       case "completed":
         return "delivered";
+      case "cancelled":
+        return "cancelled";
       default:
         return "confirmed";
     }
@@ -142,6 +210,11 @@ export default function TrackingScreen() {
           if (order) {
             console.log("[POLLING] Fetched order details:", order.status);
             if (order.status) {
+              const statusStr = String(order.status).toLowerCase();
+              if (statusStr === "cancelled" || statusStr === "cancelled_by_driver") {
+                handleOrderCancelledByDriver();
+                return;
+              }
               setStatus(normalizeStatus(order.status));
             }
             if (order.driver) {
@@ -210,14 +283,26 @@ export default function TrackingScreen() {
       };
 
       const onStatusUpdate = (data: any) => {
+        console.log("[SOCKET] Status update received:", data);
         if (data.status) {
+          const statusStr = String(data.status).toLowerCase();
+          if (statusStr === "cancelled" || statusStr === "cancelled_by_driver") {
+            handleOrderCancelledByDriver();
+            return;
+          }
           setStatus(normalizeStatus(data.status));
         }
+      };
+
+      const onOrderCancelled = (data: any) => {
+        console.log("[SOCKET] Order cancelled received:", data);
+        handleOrderCancelledByDriver();
       };
 
       socketService.on("order_accepted", onOrderAccepted);
       socketService.on("driver_location_update", onLocationUpdate);
       socketService.on("order_status_update", onStatusUpdate);
+      socketService.on("order_cancelled", onOrderCancelled);
 
       const timer = setInterval(() => {
         setEta((prev) => Math.max(1, prev - 1));
@@ -228,6 +313,7 @@ export default function TrackingScreen() {
         socketService.off("order_accepted", onOrderAccepted);
         socketService.off("driver_location_update", onLocationUpdate);
         socketService.off("order_status_update", onStatusUpdate);
+        socketService.off("order_cancelled", onOrderCancelled);
       };
     }
   }, [currentOrderId]);
@@ -254,9 +340,9 @@ export default function TrackingScreen() {
             {isRide
               ? `You have arrived safely at your destination with ${driver?.name || "your captain"}.`
               : (isHelper
-                  ? `Your helper task has been completed successfully by ${driver?.name || "your helper"}.`
-                  : `Your meal has been delivered successfully by ${driver?.name || "our delivery partner"}.`
-                )}
+                ? `Your helper task has been completed successfully by ${driver?.name || "your helper"}.`
+                : `Your meal has been delivered successfully by ${driver?.name || "our delivery partner"}.`
+              )}
           </Text>
         </View>
 
@@ -289,12 +375,12 @@ export default function TrackingScreen() {
                 </Text>
                 {isHelper ? (
                   <View style={{ gap: 8 }}>
-                     <Text style={{ fontSize: 14, color: colors.text }}>
-                       Service: <Text style={{ fontWeight: "700" }}>General Helper & Task Specialist</Text>
-                     </Text>
-                     <Text style={{ fontSize: 14, color: colors.text }}>
-                       Booked Location: <Text style={{ fontWeight: "700" }}>{stops?.[0]?.address || "N/A"}</Text>
-                     </Text>
+                    <Text style={{ fontSize: 14, color: colors.text }}>
+                      Service: <Text style={{ fontWeight: "700" }}>General Helper & Task Specialist</Text>
+                    </Text>
+                    <Text style={{ fontSize: 14, color: colors.text }}>
+                      Booked Location: <Text style={{ fontWeight: "700" }}>{stops?.[0]?.address || "N/A"}</Text>
+                    </Text>
                   </View>
                 ) : (
                   foodItems.map((item: any, idx: number) => (
@@ -344,7 +430,7 @@ export default function TrackingScreen() {
 
   return (
     <View style={styles.root}>
-      <MapBackground 
+      <MapBackground
         ref={mapRef}
         stops={stops}
         polyline={["en_route_delivery", "arrived_delivery"].includes(status) ? route?.polyline : undefined}
@@ -356,7 +442,7 @@ export default function TrackingScreen() {
             : null
         }
         radiusMeters={radius ? radius * 1000 : undefined}
-        style={StyleSheet.absoluteFill} 
+        style={StyleSheet.absoluteFill}
       />
 
       <View
@@ -376,49 +462,54 @@ export default function TrackingScreen() {
           <Text style={styles.etaText}>ETA: {eta} mins away</Text>
         </View>
         {/* Spacer to keep ETA centered */}
-        <View style={styles.backBtn} />
+        <View style={{ width: 44 }} />
       </View>
 
-      <BottomSheet style={styles.bottomSheet}>
-        <ScrollView showsVerticalScrollIndicator={false}>
+      <BottomSheet style={styles.bottomSheet} defaultHeight={bottomSheetHeight} disableExpand={true}>
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          onContentSizeChange={(width, height) => {
+            setBottomSheetHeight(height + 100);
+          }}
+        >
           {!driver ? (
             <View style={styles.findingDriverContainer}>
               <View style={styles.radarContainer}>
-                <Animated.View 
+                <Animated.View
                   style={[
-                    styles.radarCircle, 
-                    { 
-                      borderColor: colors.primary, 
+                    styles.radarCircle,
+                    {
+                      borderColor: colors.primary,
                       transform: [{
                         scale: pulse1.interpolate({
                           inputRange: [0, 1],
                           outputRange: [1, 2.2],
                         })
-                      }], 
+                      }],
                       opacity: pulse1.interpolate({
                         inputRange: [0, 1],
                         outputRange: [0.5, 0],
                       })
                     }
-                  ]} 
+                  ]}
                 />
-                <Animated.View 
+                <Animated.View
                   style={[
-                    styles.radarCircle, 
-                    { 
-                      borderColor: colors.primary, 
+                    styles.radarCircle,
+                    {
+                      borderColor: colors.primary,
                       transform: [{
                         scale: pulse2.interpolate({
                           inputRange: [0, 1],
                           outputRange: [1, 2.2],
                         })
-                      }], 
+                      }],
                       opacity: pulse2.interpolate({
                         inputRange: [0, 1],
                         outputRange: [0.5, 0],
                       })
                     }
-                  ]} 
+                  ]}
                 />
                 <View style={[styles.radarCenter, { backgroundColor: colors.primary }]}>
                   <Feather name="search" size={24} color={colors.background} />
@@ -461,6 +552,12 @@ export default function TrackingScreen() {
                 </View>
                 <View style={styles.driverActions}>
                   <TouchableOpacity 
+                    style={[styles.actionBtn, { backgroundColor: "#EF4444" }]} 
+                    onPress={handleSOS}
+                  >
+                    <Feather name="alert-triangle" size={18} color="#FFFFFF" />
+                  </TouchableOpacity>
+                  <TouchableOpacity 
                     style={styles.actionBtn}
                     onPress={() => Linking.openURL(`tel:${driver.phone || "1234567890"}`)}
                   >
@@ -497,7 +594,7 @@ export default function TrackingScreen() {
                   <Feather name="shield" size={20} color={colors.primary} />
                   <View style={styles.otpTextContainer}>
                     <Text style={styles.otpTitle}>End Ride OTP</Text>
-                    <Text style={styles.otpSubtitle}>Share this OTP with your captain only when you reach your destination</Text>
+
                   </View>
                   <View style={styles.otpBadge}>
                     <Text style={styles.otpCode}>{deliveryOtp}</Text>
@@ -768,22 +865,23 @@ const createStyles = (colors: typeof Colors.light) => StyleSheet.create({
     borderWidth: 1,
     borderColor: `${colors.primary}30`,
     borderRadius: 16,
-    padding: 14,
-    marginBottom: 16,
+    padding: 8,
+    marginBottom: 10,
     gap: 12,
   },
   otpTextContainer: {
     flex: 1,
-    gap: 2,
+    gap: 1,
   },
   otpTitle: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: "700",
     color: colors.text,
   },
   otpSubtitle: {
-    fontSize: 11,
+    fontSize: 9,
     color: colors.textMuted,
+
   },
   otpBadge: {
     backgroundColor: colors.primary,

@@ -283,4 +283,20 @@ export class OrdersController {
       next(error);
     }
   }
+
+  async triggerSOS(req: AuthRequest, res: Response, next: NextFunction) {
+    try {
+      const userId = req.user?.userId;
+      const { id: orderId } = req.params;
+
+      if (!userId) {
+        throw new UnauthorizedError("User is not authenticated");
+      }
+
+      const success = await ordersService.triggerOrderSOS(orderId as string, userId);
+      return res.json({ success, message: "SOS emergency triggered. Authorities and fleet admins notified." });
+    } catch (error) {
+      next(error);
+    }
+  }
 }

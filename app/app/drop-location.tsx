@@ -70,6 +70,7 @@ export default function LocationSelectionScreen() {
   const [bookingFor, setBookingFor] = useState<"myself" | "someone_else">("myself");
   const [someoneContact, setSomeoneContact] = useState("");
   const [recentPlaces, setRecentPlaces] = useState<RecentPlace[]>([]);
+  const [savingPreference, setSavingPreference] = useState(false);
 
   useEffect(() => {
     if (!user?.id) return;
@@ -268,12 +269,31 @@ export default function LocationSelectionScreen() {
     }
   };
 
-  const handleSelection = (type: 'pickup' | 'drop', data: any, details: any = null) => {
+  const handleSelection = async (type: 'pickup' | 'drop', data: any, details: any = null) => {
     const lat = details?.geometry?.location?.lat || data.lat;
     const lng = details?.geometry?.location?.lng || data.lng;
     const addrName = data.description || data.name;
     const placeId = data.place_id || data.id || details?.place_id;
     const placeName = data.structured_formatting?.main_text || data.name || addrName?.split(",")?.[0]?.trim();
+
+    if (lat && lng) {
+      try {
+        const checkRes = await customFetch<any>(`/api/v1/zones/check?lat=${lat}&lng=${lng}`);
+        if (!checkRes || !checkRes.inZone) {
+          Alert.alert("No Service", `No service at current ${type} location.`);
+          if (type === 'pickup') {
+            pickupRef.current?.setAddressText("");
+            setPickup(null);
+          } else {
+            dropRef.current?.setAddressText("");
+            setDrop(null);
+          }
+          return;
+        }
+      } catch (err) {
+        console.error("Zone check failed:", err);
+      }
+    }
 
     saveRecentPlace({
       id: placeId || addrName,
@@ -347,6 +367,20 @@ export default function LocationSelectionScreen() {
         return;
       }
       const location = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
+      
+      // Check zone for current location
+      try {
+        const checkRes = await customFetch<any>(`/api/v1/zones/check?lat=${location.coords.latitude}&lng=${location.coords.longitude}`);
+        if (!checkRes || !checkRes.inZone) {
+          Alert.alert("No Service", "No service at current pickup location.");
+          pickupRef.current?.setAddressText("");
+          setPickup(null);
+          return;
+        }
+      } catch (err) {
+        console.error("Zone check failed:", err);
+      }
+
       const geocode = await Location.reverseGeocodeAsync({
         latitude: location.coords.latitude,
         longitude: location.coords.longitude,
@@ -435,6 +469,7 @@ export default function LocationSelectionScreen() {
             textInputProps={{
               onChangeText: (text) => handleSearch(text, 'pickup'),
               onFocus: () => setFocusedInput({ type: 'pickup' }),
+              placeholderTextColor: colors.textSecondary,
             }}
             styles={{
               container: { flex: 0, zIndex: 2000 },
@@ -474,6 +509,7 @@ export default function LocationSelectionScreen() {
                   textInputProps={{
                     onChangeText: (text) => handleSearch(text, 'stop', stop.id),
                     onFocus: () => setFocusedInput({ type: 'stop', id: stop.id }),
+                    placeholderTextColor: colors.textSecondary,
                   }}
                   styles={{
                     container: { flex: 1, zIndex: 1500 - index },
@@ -508,6 +544,7 @@ export default function LocationSelectionScreen() {
             textInputProps={{
               onChangeText: (text) => handleSearch(text, 'drop'),
               onFocus: () => setFocusedInput({ type: 'drop' }),
+              placeholderTextColor: colors.textSecondary,
             }}
             styles={{
               container: { flex: 0, zIndex: 1000 },
@@ -592,7 +629,7 @@ export default function LocationSelectionScreen() {
               <Text style={styles.placeName}>{place.name}</Text>
               <Text style={styles.placeAddress} numberOfLines={1}>{place.address}</Text>
             </View>
-            {!isSearching && <Ionicons name="heart-outline" size={20} color={colors.textSecondary} />}
+            
           </TouchableOpacity>
         ))}
       </ScrollView>
@@ -661,7 +698,7 @@ export default function LocationSelectionScreen() {
           </View>
 
           <TouchableOpacity
-            style={styles.doneButton}
+            style={[styles.doneButton, savingPreference && { opacity: 0.7 }]}
             onPress={async () => {
               if (bookingFor === "someone_else" && someoneContact.trim().length < 10) {
                 Alert.alert("Contact required", "Please enter a valid contact number for the rider.");
@@ -669,6 +706,7 @@ export default function LocationSelectionScreen() {
               }
               if (user?.id) {
                 try {
+                  setSavingPreference(true);
                   await customFetch("/api/v1/users/booking-preference", {
                     method: "PATCH",
                     body: JSON.stringify({
@@ -679,13 +717,20 @@ export default function LocationSelectionScreen() {
                 } catch (error: any) {
                   Alert.alert("Save failed", error.message || "Could not save booking preference.");
                   return;
+                } finally {
+                  setSavingPreference(false);
                 }
               }
               setShowBookingForSheet(false);
             }}
+            disabled={savingPreference}
             activeOpacity={0.9}
           >
-            <Text style={styles.doneButtonText}>Done</Text>
+            {savingPreference ? (
+              <ActivityIndicator size="small" color="#fff" />
+            ) : (
+              <Text style={styles.doneButtonText}>Done</Text>
+            )}
           </TouchableOpacity>
         </View>
       </View>
@@ -790,6 +835,8 @@ const createStyles = (colors: typeof Colors.light) =>
       marginVertical: 2,
     },
     locationInput: {
+      flex: 1,
+      width: "100%",
       height: 40,
       fontSize: 15,
       fontWeight: "600",

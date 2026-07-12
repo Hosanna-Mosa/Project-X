@@ -55,7 +55,7 @@ const getGreeting = (name: string) => {
   const month = String(today.getMonth() + 1).padStart(2, "0");
   const date = String(today.getDate()).padStart(2, "0");
   const key = `${month}-${date}`;
-  
+
   let greetingPrefix = "";
   if (FESTIVALS[key]) {
     greetingPrefix = `Happy ${FESTIVALS[key]}`;
@@ -64,7 +64,7 @@ const getGreeting = (name: string) => {
     const dayName = days[today.getDay()];
     greetingPrefix = `Happy ${dayName}`;
   }
-  
+
   return `${greetingPrefix}, ${name}!`;
 };
 
@@ -366,7 +366,7 @@ export default function HomeScreen() {
   useFocusEffect(
     useCallback(() => {
       startSearchGlow();
-      
+
       // Load selected address from AsyncStorage on screen focus
       (async () => {
         try {
@@ -391,7 +391,7 @@ export default function HomeScreen() {
     if (selectedAddress) {
       const lat = selectedAddress.coordinates?.lat ?? selectedAddress.location?.coordinates?.[1];
       const lng = selectedAddress.coordinates?.lng ?? selectedAddress.location?.coordinates?.[0];
-      
+
       if (lat != null && lng != null) {
         useDeliveryStore.getState().setCurrentCoords({ lat, lng });
         if (selectedAddress.addressLine) {
@@ -412,7 +412,7 @@ export default function HomeScreen() {
           const { status: newStatus } = await Location.requestForegroundPermissionsAsync();
           status = newStatus;
         }
-        
+
         if (status === 'granted') {
           const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
           const coords = { lat: loc.coords.latitude, lng: loc.coords.longitude };
@@ -607,7 +607,7 @@ export default function HomeScreen() {
         setHasMore(true);
         setLoading(false);
         setLoadingDrivers(false);
-        
+
         if (!hasRedirectedRef.current) {
           hasRedirectedRef.current = true;
           router.push("/delivery/saved-addresses");
@@ -685,252 +685,252 @@ export default function HomeScreen() {
     if (!showCategories) return null;
     return (
       <>
-      {activeService === 'Food' && (
-        <>
-          {showHomeSkeleton ? (
-            <GreetingSectionSkeleton colors={colors} styles={styles} />
-          ) : (
-            <View style={styles.greetingSection}>
-              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-                <Text style={[styles.greetingTitle, { marginBottom: 0, flex: 1, marginRight: 10 }]}>
-                  {getGreeting(userName)}
-                </Text>
-                
-                <TouchableOpacity 
-                  activeOpacity={0.85}
-                  onPress={() => setFoodFilter(foodFilter === 'veg' ? 'all' : 'veg')}
-                >
-                  <Animated.View style={[
-                    styles.vegMorphBadge,
-                    {
-                      width: vegAnim.interpolate({ inputRange: [0, 1], outputRange: [38, 85] }),
-                      backgroundColor: vegAnim.interpolate({
-                        inputRange: [0, 1],
-                        outputRange: [colors.surface, '#16A34A']
-                      }),
-                      borderColor: vegAnim.interpolate({
-                        inputRange: [0, 1],
-                        outputRange: [colors.border, '#15803D']
-                      }),
-                    }
-                  ]}>
-                    <View style={styles.vegMorphIconWrap}>
-                      <Ionicons 
-                        name="leaf" 
-                        size={14} 
-                        color={foodFilter === 'veg' ? '#FFFFFF' : '#16A34A'} 
-                      />
-                    </View>
-                    <Animated.Text 
-                      numberOfLines={1}
-                      style={[
-                        styles.vegMorphText,
-                        {
-                          opacity: vegAnim,
-                          transform: [{
-                            translateX: vegAnim.interpolate({
-                              inputRange: [0, 1],
-                              outputRange: [-10, 0]
-                            })
-                          }]
-                        }
-                      ]}
-                    >
-                      VEG
-                    </Animated.Text>
-                  </Animated.View>
-                </TouchableOpacity>
-              </View>
+        {activeService === 'Food' && (
+          <>
+            {showHomeSkeleton ? (
+              <GreetingSectionSkeleton colors={colors} styles={styles} />
+            ) : (
+              <View style={styles.greetingSection}>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+                  <Text style={[styles.greetingTitle, { marginBottom: 0, flex: 1, marginRight: 10 }]}>
+                    {getGreeting(userName)}
+                  </Text>
 
-              <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={styles.dishesScrollContent}
-                style={styles.dishesScroll}
-              >
-                <View style={styles.dishesRowsContainer}>
-                  <View style={styles.dishesRow}>
-                    {popularTags.slice(0, 7).map((tag, index) => (
-                      <TouchableOpacity 
-                        key={index} 
-                        style={styles.dishChip} 
-                        activeOpacity={0.8}
-                        onPress={() => {
-                          setSearchText(tag.name);
-                          setIsSearchActive(true);
-                        }}
-                      >
-                        <View style={[styles.dishIconCircle, { backgroundColor: tag.color + '15' }]}>
-                          {renderTagIcon(tag)}
-                        </View>
-                        <Text style={styles.dishChipText}>{tag.name}</Text>
-                      </TouchableOpacity>
-                    ))}
-                  </View>
-                  <View style={styles.dishesRow}>
-                    {popularTags.slice(7, 14).map((tag, index) => (
-                      <TouchableOpacity 
-                        key={index} 
-                        style={styles.dishChip} 
-                        activeOpacity={0.8}
-                        onPress={() => {
-                          setSearchText(tag.name);
-                          setIsSearchActive(true);
-                        }}
-                      >
-                        <View style={[styles.dishIconCircle, { backgroundColor: tag.color + '15' }]}>
-                          {renderTagIcon(tag)}
-                        </View>
-                        <Text style={styles.dishChipText}>{tag.name}</Text>
-                      </TouchableOpacity>
-                    ))}
-                  </View>
-                </View>
-              </ScrollView>
-            </View>
-          )}
-
-          {showHomeSkeleton ? (
-            activeService === 'Food' && (
-              <Store149Skeleton colors={colors} theme={theme} styles={styles} />
-            )
-          ) : (
-            store149Items.length > 0 && (
-              <LinearGradient
-                colors={theme === 'light' ? ['#F5F3FF', '#EDE9FE', '#F5F3FF'] : ['#2E1065', '#4C1D95', '#2E1065']}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-                style={styles.store149Container}
-              >
-                <View style={styles.store149Header}>
-                  <View style={{ flex: 1 }}>
-                    <View style={styles.store149LogoContainer}>
-                      <View style={styles.store149LogoCircle}>
-                        <Text style={styles.store149LogoText}>149</Text>
+                  <TouchableOpacity
+                    activeOpacity={0.85}
+                    onPress={() => setFoodFilter(foodFilter === 'veg' ? 'all' : 'veg')}
+                  >
+                    <Animated.View style={[
+                      styles.vegMorphBadge,
+                      {
+                        width: vegAnim.interpolate({ inputRange: [0, 1], outputRange: [38, 85] }),
+                        backgroundColor: vegAnim.interpolate({
+                          inputRange: [0, 1],
+                          outputRange: [colors.surface, '#16A34A']
+                        }),
+                        borderColor: vegAnim.interpolate({
+                          inputRange: [0, 1],
+                          outputRange: [colors.border, '#15803D']
+                        }),
+                      }
+                    ]}>
+                      <View style={styles.vegMorphIconWrap}>
+                        <Ionicons
+                          name="leaf"
+                          size={14}
+                          color={foodFilter === 'veg' ? '#FFFFFF' : '#16A34A'}
+                        />
                       </View>
-                      <Text style={styles.store149BrandText}>store</Text>
-                    </View>
-                    <View style={styles.store149Subheader}>
-                      <Ionicons name="checkmark-circle" size={14} color={theme === 'light' ? '#7C3AED' : '#C4B5FD'} />
-                      <Text style={[styles.store149SubText, { color: theme === 'light' ? '#6D28D9' : '#C4B5FD' }]}>Meals at ₹149 + Free Delivery</Text>
-                    </View>
-                  </View>
-                  <TouchableOpacity style={styles.store149ViewAllBtn} activeOpacity={0.7}>
-                    <Text style={styles.store149ViewAllText}>View All</Text>
-                    <Ionicons name="chevron-forward" size={12} color="#0284C7" />
+                      <Animated.Text
+                        numberOfLines={1}
+                        style={[
+                          styles.vegMorphText,
+                          {
+                            opacity: vegAnim,
+                            transform: [{
+                              translateX: vegAnim.interpolate({
+                                inputRange: [0, 1],
+                                outputRange: [-10, 0]
+                              })
+                            }]
+                          }
+                        ]}
+                      >
+                        VEG
+                      </Animated.Text>
+                    </Animated.View>
                   </TouchableOpacity>
                 </View>
 
                 <ScrollView
                   horizontal
                   showsHorizontalScrollIndicator={false}
-                  contentContainerStyle={styles.store149ScrollContent}
+                  contentContainerStyle={styles.dishesScrollContent}
+                  style={styles.dishesScroll}
                 >
-                  {store149Items.map((item) => {
-                    const cartItem = cartItems.find((i) => i._id === item._id);
-                    
-                    const handleAdd = () => {
-                      const foodItem = {
-                        _id: item._id,
-                        name: item.name,
-                        description: item.description || "",
-                        price: item.price,
-                        category: item.category || "149 Store",
-                        isVeg: item.isVeg,
-                        images: item.images && item.images.length > 0 ? item.images : ["https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=400"]
+                  <View style={styles.dishesRowsContainer}>
+                    <View style={styles.dishesRow}>
+                      {popularTags.slice(0, 7).map((tag, index) => (
+                        <TouchableOpacity
+                          key={index}
+                          style={styles.dishChip}
+                          activeOpacity={0.8}
+                          onPress={() => {
+                            setSearchText(tag.name);
+                            setIsSearchActive(true);
+                          }}
+                        >
+                          <View style={[styles.dishIconCircle, { backgroundColor: tag.color + '15' }]}>
+                            {renderTagIcon(tag)}
+                          </View>
+                          <Text style={styles.dishChipText}>{tag.name}</Text>
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+                    <View style={styles.dishesRow}>
+                      {popularTags.slice(7, 14).map((tag, index) => (
+                        <TouchableOpacity
+                          key={index}
+                          style={styles.dishChip}
+                          activeOpacity={0.8}
+                          onPress={() => {
+                            setSearchText(tag.name);
+                            setIsSearchActive(true);
+                          }}
+                        >
+                          <View style={[styles.dishIconCircle, { backgroundColor: tag.color + '15' }]}>
+                            {renderTagIcon(tag)}
+                          </View>
+                          <Text style={styles.dishChipText}>{tag.name}</Text>
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+                  </View>
+                </ScrollView>
+              </View>
+            )}
+
+            {showHomeSkeleton ? (
+              activeService === 'Food' && (
+                <Store149Skeleton colors={colors} theme={theme} styles={styles} />
+              )
+            ) : (
+              store149Items.length > 0 && (
+                <LinearGradient
+                  colors={theme === 'light' ? ['#F5F3FF', '#EDE9FE', '#F5F3FF'] : ['#2E1065', '#4C1D95', '#2E1065']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={styles.store149Container}
+                >
+                  <View style={styles.store149Header}>
+                    <View style={{ flex: 1 }}>
+                      <View style={styles.store149LogoContainer}>
+                        <View style={styles.store149LogoCircle}>
+                          <Text style={styles.store149LogoText}>149</Text>
+                        </View>
+                        <Text style={styles.store149BrandText}>store</Text>
+                      </View>
+                      <View style={styles.store149Subheader}>
+                        <Ionicons name="checkmark-circle" size={14} color={theme === 'light' ? '#7C3AED' : '#C4B5FD'} />
+                        <Text style={[styles.store149SubText, { color: theme === 'light' ? '#6D28D9' : '#C4B5FD' }]}>Meals at ₹149 + Free Delivery</Text>
+                      </View>
+                    </View>
+                    <TouchableOpacity style={styles.store149ViewAllBtn} activeOpacity={0.7}>
+                      <Text style={styles.store149ViewAllText}>View All</Text>
+                      <Ionicons name="chevron-forward" size={12} color="#0284C7" />
+                    </TouchableOpacity>
+                  </View>
+
+                  <ScrollView
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
+                    contentContainerStyle={styles.store149ScrollContent}
+                  >
+                    {store149Items.map((item) => {
+                      const cartItem = cartItems.find((i) => i._id === item._id);
+
+                      const handleAdd = () => {
+                        const foodItem = {
+                          _id: item._id,
+                          name: item.name,
+                          description: item.description || "",
+                          price: item.price,
+                          category: item.category || "149 Store",
+                          isVeg: item.isVeg,
+                          images: item.images && item.images.length > 0 ? item.images : ["https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=400"]
+                        };
+                        addCartItem(foodItem, item.vendorId);
                       };
-                      addCartItem(foodItem, item.vendorId);
-                    };
 
-                    return (
-                      <View key={item._id} style={styles.store149Card}>
-                        <View style={styles.store149ImageContainer}>
-                          <Image
-                            source={{ uri: item.images && item.images.length > 0 ? item.images[0] : "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=400" }}
-                            style={styles.store149Image}
-                          />
-                          
-                          {/* Diet overlay (top-left) */}
-                          <View style={styles.store149DietOverlay}>
-                            <View style={[styles.store149DietIcon, { borderColor: item.isVeg ? "#16A34A" : "#E11D48" }]}>
-                              <View style={[styles.store149DietDot, { backgroundColor: item.isVeg ? "#16A34A" : "#E11D48" }]} />
+                      return (
+                        <View key={item._id} style={styles.store149Card}>
+                          <View style={styles.store149ImageContainer}>
+                            <Image
+                              source={{ uri: item.images && item.images.length > 0 ? item.images[0] : "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=400" }}
+                              style={styles.store149Image}
+                            />
+
+                            {/* Diet overlay (top-left) */}
+                            <View style={styles.store149DietOverlay}>
+                              <View style={[styles.store149DietIcon, { borderColor: item.isVeg ? "#16A34A" : "#E11D48" }]}>
+                                <View style={[styles.store149DietDot, { backgroundColor: item.isVeg ? "#16A34A" : "#E11D48" }]} />
+                              </View>
                             </View>
-                          </View>
 
-                          {/* Rating overlay (top-right) */}
-                          <View style={styles.store149RatingOverlay}>
-                            <Ionicons name="star" size={9} color="#F59E0B" />
-                            <Text style={styles.store149RatingOverlayText}>{item.rating || "4.2"}</Text>
-                          </View>
+                            {/* Rating overlay (top-right) */}
+                            <View style={styles.store149RatingOverlay}>
+                              <Ionicons name="star" size={9} color="#F59E0B" />
+                              <Text style={styles.store149RatingOverlayText}>{item.rating || "4.2"}</Text>
+                            </View>
 
-                          {/* Add button overlay */}
-                          <View style={styles.store149AddButtonOverlay}>
-                            {cartItem ? (
-                              <View style={styles.store149QtyPill}>
-                                <TouchableOpacity
-                                  onPress={() => updateCartQuantity(item._id, cartItem.quantity - 1)}
-                                  style={styles.store149QtyBtn}
-                                  activeOpacity={0.7}
-                                >
-                                  <Feather name="minus" size={11} color="#002045" />
-                                </TouchableOpacity>
-                                <Text style={styles.store149QtyText}>{cartItem.quantity}</Text>
+                            {/* Add button overlay */}
+                            <View style={styles.store149AddButtonOverlay}>
+                              {cartItem ? (
+                                <View style={styles.store149QtyPill}>
+                                  <TouchableOpacity
+                                    onPress={() => updateCartQuantity(item._id, cartItem.quantity - 1)}
+                                    style={styles.store149QtyBtn}
+                                    activeOpacity={0.7}
+                                  >
+                                    <Feather name="minus" size={11} color="#002045" />
+                                  </TouchableOpacity>
+                                  <Text style={styles.store149QtyText}>{cartItem.quantity}</Text>
+                                  <TouchableOpacity
+                                    onPress={handleAdd}
+                                    style={styles.store149QtyBtn}
+                                    activeOpacity={0.7}
+                                  >
+                                    <Feather name="plus" size={11} color="#002045" />
+                                  </TouchableOpacity>
+                                </View>
+                              ) : (
                                 <TouchableOpacity
                                   onPress={handleAdd}
-                                  style={styles.store149QtyBtn}
-                                  activeOpacity={0.7}
+                                  style={styles.store149AddPill}
+                                  activeOpacity={0.85}
                                 >
-                                  <Feather name="plus" size={11} color="#002045" />
+                                  <Text style={styles.store149AddText}>ADD</Text>
+                                  <Feather name="plus" size={10} color="#16A34A" style={{ marginLeft: 2 }} />
                                 </TouchableOpacity>
-                              </View>
-                            ) : (
-                              <TouchableOpacity
-                                onPress={handleAdd}
-                                style={styles.store149AddPill}
-                                activeOpacity={0.85}
-                              >
-                                <Text style={styles.store149AddText}>ADD</Text>
-                                <Feather name="plus" size={10} color="#16A34A" style={{ marginLeft: 2 }} />
-                              </TouchableOpacity>
-                            )}
-                          </View>
-                        </View>
-
-                        <View style={styles.store149Details}>
-                          <Text style={styles.store149Name} numberOfLines={1}>
-                            {item.name}
-                          </Text>
-
-                          <View style={styles.store149PriceRow}>
-                            <Text style={styles.store149OriginalPrice}>₹{item.originalPrice}</Text>
-                            <View style={styles.store149PriceHighlight}>
-                              <Text style={styles.store149DealPrice}>₹{item.price}</Text>
+                              )}
                             </View>
                           </View>
 
-                          <Text style={styles.store149Brand} numberOfLines={1}>
-                            {item.brand || "KFC"}
-                          </Text>
+                          <View style={styles.store149Details}>
+                            <Text style={styles.store149Name} numberOfLines={1}>
+                              {item.name}
+                            </Text>
+
+                            <View style={styles.store149PriceRow}>
+                              <Text style={styles.store149OriginalPrice}>₹{item.originalPrice}</Text>
+                              <View style={styles.store149PriceHighlight}>
+                                <Text style={styles.store149DealPrice}>₹{item.price}</Text>
+                              </View>
+                            </View>
+
+                            <Text style={styles.store149Brand} numberOfLines={1}>
+                              {item.brand || "KFC"}
+                            </Text>
+                          </View>
                         </View>
-                      </View>
-                    );
-                  })}
-                </ScrollView>
-              </LinearGradient>
-            )
-          )}
-        </>
-      )}
+                      );
+                    })}
+                  </ScrollView>
+                </LinearGradient>
+              )
+            )}
+          </>
+        )}
 
-      {activeService === 'Meat' && (
-        <View style={styles.meatBannerRow}>
-          <Text style={styles.meatBannerTitle}>🥩 Nearby Meat Centers</Text>
-          <Text style={styles.meatBannerSubtitle}>Fresh meat delivered to your door</Text>
-        </View>
-      )}
+        {activeService === 'Meat' && (
+          <View style={styles.meatBannerRow}>
+            <Text style={styles.meatBannerTitle}>🥩 Nearby Meat Centers</Text>
+            <Text style={styles.meatBannerSubtitle}>Fresh meat delivered to your door</Text>
+          </View>
+        )}
 
-     
-    </>
+
+      </>
     );
   };
 
@@ -1014,7 +1014,7 @@ export default function HomeScreen() {
         ListHeaderComponent={renderHeader}
         ListEmptyComponent={() => {
           if (showHomeSkeleton || loadingDrivers) return null;
-          
+
           if (hasNoLocation) {
             return (
               <View style={styles.noServiceContainer}>
@@ -1023,7 +1023,7 @@ export default function HomeScreen() {
                 <Text style={[styles.noServiceSubtitle, { color: colors.textSecondary }]}>
                   Please select your delivery location or enable device GPS to view available restaurants and services near you.
                 </Text>
-                <TouchableOpacity 
+                <TouchableOpacity
                   style={[styles.noServiceButton, { backgroundColor: colors.primary }]}
                   onPress={() => router.push("/delivery/saved-addresses")}
                 >
@@ -1054,7 +1054,7 @@ export default function HomeScreen() {
                 <Text style={[styles.noServiceSubtitle, { color: colors.textSecondary }]}>
                   We don't have {serviceName} delivery services in this location. Please try changing your location.
                 </Text>
-                <TouchableOpacity 
+                <TouchableOpacity
                   style={[styles.noServiceButton, { backgroundColor: colors.primary }]}
                   onPress={() => router.push("/delivery/saved-addresses")}
                 >
@@ -1072,7 +1072,7 @@ export default function HomeScreen() {
                 <Text style={[styles.noServiceSubtitle, { color: colors.textSecondary }]}>
                   We don't have riders in this location to deliver your orders. Please try changing your location.
                 </Text>
-                <TouchableOpacity 
+                <TouchableOpacity
                   style={[styles.noServiceButton, { backgroundColor: colors.primary }]}
                   onPress={() => router.push("/delivery/saved-addresses")}
                 >
@@ -1081,7 +1081,7 @@ export default function HomeScreen() {
               </View>
             );
           }
-          
+
           return null;
         }}
         ListFooterComponent={() => (
@@ -1090,8 +1090,8 @@ export default function HomeScreen() {
         onEndReached={loadMore}
         onEndReachedThreshold={0.5}
         contentContainerStyle={[
-          styles.mainScrollContent, 
-          { 
+          styles.mainScrollContent,
+          {
             flexGrow: showCategories ? undefined : 1,
             paddingTop: showCategories ? topPadding + 175 : topPadding + 60,
             paddingBottom: keyboardHeight > 0 ? keyboardHeight + 100 : 120
@@ -1119,25 +1119,25 @@ export default function HomeScreen() {
 
       <View style={styles.overlay} pointerEvents="box-none">
         <Animated.View style={[
-          styles.flushHeader, 
-          { 
+          styles.flushHeader,
+          {
             paddingTop: topPadding + 8,
-            transform: [{ translateY: headerTranslateY }] 
+            transform: [{ translateY: headerTranslateY }]
           }
         ]}>
           <Animated.View style={[styles.headerTopRow, { opacity: topRowOpacity, transform: [{ translateY: headerTopRowTranslateY }] }]}>
             <View style={styles.locationInfoBox}>
-              <TouchableOpacity 
-                style={styles.addressSelector} 
+              <TouchableOpacity
+                style={styles.addressSelector}
                 activeOpacity={0.7}
                 onPress={() => router.push("/delivery/saved-addresses")}
               >
                 <View style={{ flexDirection: "row", alignItems: "center", flexShrink: 1 }}>
                   <Text style={styles.addressHeaderText}>
-                    {selectedAddress 
+                    {selectedAddress
                       ? (selectedAddress.label === "Home" || selectedAddress.label === "Work"
-                          ? selectedAddress.label.toUpperCase()
-                          : (selectedAddress.label && selectedAddress.label !== "Other" ? selectedAddress.label.toUpperCase() : "ADDRESS"))
+                        ? selectedAddress.label.toUpperCase()
+                        : (selectedAddress.label && selectedAddress.label !== "Other" ? selectedAddress.label.toUpperCase() : "ADDRESS"))
                       : "ADDRESS"}
                   </Text>
                   <Ionicons name="chevron-down" size={14} color={colors.textMuted} style={{ marginLeft: 4 }} />
@@ -1145,12 +1145,12 @@ export default function HomeScreen() {
               </TouchableOpacity>
             </View>
             {showCategories && (
-              <View style={{flexDirection: 'row', gap: 12, alignItems: 'center'}}>
+              <View style={{ flexDirection: 'row', gap: 12, alignItems: 'center' }}>
                 <TouchableOpacity style={styles.iconBtn} onPress={() => setIsDistanceSheetOpen(true)}>
-                    <MaterialCommunityIcons name="radius-outline" size={24} color={colors.primary} />
+                  <MaterialCommunityIcons name="radius-outline" size={24} color={colors.primary} />
                 </TouchableOpacity>
                 <TouchableOpacity style={styles.iconBtn} onPress={() => router.push("/(tabs)/profile")}>
-                    <Ionicons name="person-outline" size={24} color={colors.primary} />
+                  <Ionicons name="person-outline" size={24} color={colors.primary} />
                 </TouchableOpacity>
               </View>
             )}
@@ -1222,9 +1222,9 @@ export default function HomeScreen() {
         <View
           style={[
             styles.bottomSearchOverlay,
-            { 
-              bottom: keyboardHeight > 0 
-                ? keyboardHeight + (Platform.OS === "ios" ? 10 : 12) 
+            {
+              bottom: keyboardHeight > 0
+                ? keyboardHeight + (Platform.OS === "ios" ? 10 : 12)
                 : insets.bottom + 18
             }
           ]}
@@ -1260,9 +1260,9 @@ export default function HomeScreen() {
                   style={StyleSheet.absoluteFill}
                 />
               </Animated.View>
-              <TouchableOpacity 
-                style={styles.searchBar} 
-                activeOpacity={0.9} 
+              <TouchableOpacity
+                style={styles.searchBar}
+                activeOpacity={0.9}
                 onPress={() => setIsSearchActive(true)}
               >
                 <Ionicons name="search" size={18} color={colors.primary} />
@@ -1285,7 +1285,7 @@ export default function HomeScreen() {
         <View style={[styles.ddSearchRoot, { paddingTop: insets.top }]}>
           {/* Header Row */}
           <View style={styles.ddSearchHeader}>
-            <TouchableOpacity 
+            <TouchableOpacity
               onPress={() => {
                 setIsSearchActive(false);
                 setSearchText("");
@@ -1294,7 +1294,7 @@ export default function HomeScreen() {
             >
               <Ionicons name="close" size={26} color={colors.text} />
             </TouchableOpacity>
-            
+
             <View style={styles.ddSearchInputWrapper}>
               <Ionicons name="search" size={20} color={colors.textSecondary} style={{ marginRight: 8 }} />
               <TextInput
@@ -1317,8 +1317,8 @@ export default function HomeScreen() {
 
           {/* Body Content */}
           {!searchText ? (
-            <ScrollView 
-              showsVerticalScrollIndicator={false} 
+            <ScrollView
+              showsVerticalScrollIndicator={false}
               contentContainerStyle={styles.ddSearchBody}
               keyboardShouldPersistTaps="handled"
             >
@@ -1333,8 +1333,8 @@ export default function HomeScreen() {
                   </View>
                   <View style={styles.ddRecentList}>
                     {recentSearches.map((query, index) => (
-                      <TouchableOpacity 
-                        key={index} 
+                      <TouchableOpacity
+                        key={index}
                         style={styles.ddRecentItem}
                         onPress={() => setSearchText(query)}
                       >
@@ -1351,8 +1351,8 @@ export default function HomeScreen() {
                 <Text style={styles.ddSectionTitle}>Recommended</Text>
                 <View style={styles.ddRecommendedGrid}>
                   {["Ice cream", "Grocery", "Cat food", "Cookie", "Soda", "Tacos", "Burger", "Pizza"].map((rec, i) => (
-                    <TouchableOpacity 
-                      key={i} 
+                    <TouchableOpacity
+                      key={i}
                       style={styles.ddRecChip}
                       onPress={() => setSearchText(rec)}
                     >
@@ -1374,8 +1374,8 @@ export default function HomeScreen() {
                     { name: "Desserts", emoji: "🍰", query: "Waffles" },
                     { name: "Chinese", emoji: "🍜", query: "Noodles" }
                   ].map((item, i) => (
-                    <TouchableOpacity 
-                      key={i} 
+                    <TouchableOpacity
+                      key={i}
                       style={styles.ddCuisineCard}
                       onPress={() => setSearchText(item.query)}
                     >
@@ -1602,15 +1602,15 @@ function CategorySkeleton({ colors }: { colors: typeof Colors.light }) {
     <View style={{ flexDirection: 'row', gap: 16, paddingLeft: 16, paddingVertical: 10 }}>
       {[1, 2, 3, 4, 5, 6].map((i) => (
         <View key={i} style={{ alignItems: 'center' }}>
-          <SkeletonBlock 
-            style={{ width: 56, height: 56, borderRadius: 28, backgroundColor: colors.border }} 
-            shimmer={shimmer} 
-            shimmerHighlight={shimmerHighlight} 
+          <SkeletonBlock
+            style={{ width: 56, height: 56, borderRadius: 28, backgroundColor: colors.border }}
+            shimmer={shimmer}
+            shimmerHighlight={shimmerHighlight}
           />
-          <SkeletonBlock 
-            style={{ width: 44, height: 10, borderRadius: 3, backgroundColor: colors.border, marginTop: 8 }} 
-            shimmer={shimmer} 
-            shimmerHighlight={shimmerHighlight} 
+          <SkeletonBlock
+            style={{ width: 44, height: 10, borderRadius: 3, backgroundColor: colors.border, marginTop: 8 }}
+            shimmer={shimmer}
+            shimmerHighlight={shimmerHighlight}
           />
         </View>
       ))}
@@ -1639,10 +1639,10 @@ function SearchBarSkeleton({ colors }: { colors: typeof Colors.light }) {
 
   return (
     <View style={{ width: '92%', alignSelf: 'center', height: 56, borderRadius: 28, backgroundColor: colors.border, padding: 2, overflow: 'hidden', shadowColor: "#000", shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.15, shadowRadius: 10, elevation: 6 }}>
-      <SkeletonBlock 
-        style={{ width: '100%', height: '100%', borderRadius: 26, backgroundColor: colors.surface }} 
-        shimmer={shimmer} 
-        shimmerHighlight={shimmerHighlight} 
+      <SkeletonBlock
+        style={{ width: '100%', height: '100%', borderRadius: 26, backgroundColor: colors.surface }}
+        shimmer={shimmer}
+        shimmerHighlight={shimmerHighlight}
       />
     </View>
   );
@@ -1677,15 +1677,15 @@ function Store149Skeleton({ colors, theme, styles }: { colors: typeof Colors.lig
       <View style={styles.store149Header}>
         <View style={{ flex: 1 }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-            <SkeletonBlock 
-              style={{ width: 80, height: 24, borderRadius: 12, backgroundColor: colors.border }} 
-              shimmer={shimmer} 
-              shimmerHighlight={shimmerHighlight} 
+            <SkeletonBlock
+              style={{ width: 80, height: 24, borderRadius: 12, backgroundColor: colors.border }}
+              shimmer={shimmer}
+              shimmerHighlight={shimmerHighlight}
             />
-            <SkeletonBlock 
-              style={{ width: 120, height: 14, borderRadius: 7, backgroundColor: colors.border }} 
-              shimmer={shimmer} 
-              shimmerHighlight={shimmerHighlight} 
+            <SkeletonBlock
+              style={{ width: 120, height: 14, borderRadius: 7, backgroundColor: colors.border }}
+              shimmer={shimmer}
+              shimmerHighlight={shimmerHighlight}
             />
           </View>
         </View>
@@ -1694,31 +1694,31 @@ function Store149Skeleton({ colors, theme, styles }: { colors: typeof Colors.lig
       <View style={{ flexDirection: 'row', gap: 12, paddingLeft: 16 }}>
         {[1, 2, 3].map((i) => (
           <View key={i} style={[styles.store149Card, { backgroundColor: colors.surface, width: 140, height: 200, padding: 8, borderRadius: 12 }]}>
-            <SkeletonBlock 
-              style={{ width: '100%', height: 100, borderRadius: 8, backgroundColor: colors.border }} 
-              shimmer={shimmer} 
-              shimmerHighlight={shimmerHighlight} 
+            <SkeletonBlock
+              style={{ width: '100%', height: 100, borderRadius: 8, backgroundColor: colors.border }}
+              shimmer={shimmer}
+              shimmerHighlight={shimmerHighlight}
             />
-            <SkeletonBlock 
-              style={{ width: '80%', height: 12, borderRadius: 3, backgroundColor: colors.border, marginTop: 12 }} 
-              shimmer={shimmer} 
-              shimmerHighlight={shimmerHighlight} 
+            <SkeletonBlock
+              style={{ width: '80%', height: 12, borderRadius: 3, backgroundColor: colors.border, marginTop: 12 }}
+              shimmer={shimmer}
+              shimmerHighlight={shimmerHighlight}
             />
-            <SkeletonBlock 
-              style={{ width: '50%', height: 10, borderRadius: 3, backgroundColor: colors.border, marginTop: 8 }} 
-              shimmer={shimmer} 
-              shimmerHighlight={shimmerHighlight} 
+            <SkeletonBlock
+              style={{ width: '50%', height: 10, borderRadius: 3, backgroundColor: colors.border, marginTop: 8 }}
+              shimmer={shimmer}
+              shimmerHighlight={shimmerHighlight}
             />
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 12 }}>
-              <SkeletonBlock 
-                style={{ width: 40, height: 14, borderRadius: 3, backgroundColor: colors.border }} 
-                shimmer={shimmer} 
-                shimmerHighlight={shimmerHighlight} 
+              <SkeletonBlock
+                style={{ width: 40, height: 14, borderRadius: 3, backgroundColor: colors.border }}
+                shimmer={shimmer}
+                shimmerHighlight={shimmerHighlight}
               />
-              <SkeletonBlock 
-                style={{ width: 48, height: 24, borderRadius: 12, backgroundColor: colors.border }} 
-                shimmer={shimmer} 
-                shimmerHighlight={shimmerHighlight} 
+              <SkeletonBlock
+                style={{ width: 48, height: 24, borderRadius: 12, backgroundColor: colors.border }}
+                shimmer={shimmer}
+                shimmerHighlight={shimmerHighlight}
               />
             </View>
           </View>
@@ -1750,30 +1750,30 @@ function GreetingSectionSkeleton({ colors, styles }: { colors: typeof Colors.lig
   return (
     <View style={styles.greetingSection}>
       <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-        <SkeletonBlock 
-          style={{ width: 180, height: 24, borderRadius: 12, backgroundColor: colors.border }} 
-          shimmer={shimmer} 
-          shimmerHighlight={shimmerHighlight} 
+        <SkeletonBlock
+          style={{ width: 180, height: 24, borderRadius: 12, backgroundColor: colors.border }}
+          shimmer={shimmer}
+          shimmerHighlight={shimmerHighlight}
         />
-        <SkeletonBlock 
-          style={{ width: 64, height: 32, borderRadius: 16, backgroundColor: colors.border }} 
-          shimmer={shimmer} 
-          shimmerHighlight={shimmerHighlight} 
+        <SkeletonBlock
+          style={{ width: 64, height: 32, borderRadius: 16, backgroundColor: colors.border }}
+          shimmer={shimmer}
+          shimmerHighlight={shimmerHighlight}
         />
       </View>
 
       <View style={{ flexDirection: 'row', gap: 12, paddingBottom: 10 }}>
         {[1, 2, 3, 4].map((i) => (
           <View key={i} style={[styles.dishChip, { width: 90, height: 36, paddingHorizontal: 8, borderRadius: 18, flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: colors.surface, borderHeight: 1, borderColor: colors.border }]}>
-            <SkeletonBlock 
-              style={{ width: 20, height: 20, borderRadius: 10, backgroundColor: colors.border }} 
-              shimmer={shimmer} 
-              shimmerHighlight={shimmerHighlight} 
+            <SkeletonBlock
+              style={{ width: 20, height: 20, borderRadius: 10, backgroundColor: colors.border }}
+              shimmer={shimmer}
+              shimmerHighlight={shimmerHighlight}
             />
-            <SkeletonBlock 
-              style={{ width: 44, height: 10, borderRadius: 3, backgroundColor: colors.border }} 
-              shimmer={shimmer} 
-              shimmerHighlight={shimmerHighlight} 
+            <SkeletonBlock
+              style={{ width: 44, height: 10, borderRadius: 3, backgroundColor: colors.border }}
+              shimmer={shimmer}
+              shimmerHighlight={shimmerHighlight}
             />
           </View>
         ))}
@@ -1819,9 +1819,9 @@ function DishSearchResultItem({ item, colors, styles }: DishSearchResultItemProp
   return (
     <View style={styles.dishMenuItem}>
       {/* Clickable details section */}
-      <TouchableOpacity 
-        style={styles.dishItemInfo} 
-        activeOpacity={0.7} 
+      <TouchableOpacity
+        style={styles.dishItemInfo}
+        activeOpacity={0.7}
         onPress={handleNavigateToMenu}
       >
         <View style={styles.dishItemTitleRow}>
@@ -1849,15 +1849,15 @@ function DishSearchResultItem({ item, colors, styles }: DishSearchResultItemProp
       {/* Clickable image container */}
       <View style={styles.dishItemImageContainer}>
         <TouchableOpacity activeOpacity={0.8} onPress={handleNavigateToMenu}>
-          <Image 
-            source={{ uri: item.images && item.images.length > 0 ? item.images[0] : "https://images.unsplash.com/photo-1587593810167-a84920ea0781?w=400" }} 
-            style={styles.dishItemImage} 
+          <Image
+            source={{ uri: item.images && item.images.length > 0 ? item.images[0] : "https://images.unsplash.com/photo-1587593810167-a84920ea0781?w=400" }}
+            style={styles.dishItemImage}
           />
         </TouchableOpacity>
         <View style={styles.dishAddButtonOverlay}>
           {cartItem ? (
             <View style={styles.dishQuantityPill}>
-              <TouchableOpacity 
+              <TouchableOpacity
                 onPress={() => updateQuantity(item._id, cartItem.quantity - 1)}
                 style={styles.dishQtyActionBtn}
                 activeOpacity={0.7}
@@ -1865,7 +1865,7 @@ function DishSearchResultItem({ item, colors, styles }: DishSearchResultItemProp
                 <Feather name="minus" size={12} color="#002045" />
               </TouchableOpacity>
               <Text style={styles.dishQtyText}>{cartItem.quantity}</Text>
-              <TouchableOpacity 
+              <TouchableOpacity
                 onPress={handleAdd}
                 style={styles.dishQtyActionBtn}
                 activeOpacity={0.7}
@@ -1874,7 +1874,7 @@ function DishSearchResultItem({ item, colors, styles }: DishSearchResultItemProp
               </TouchableOpacity>
             </View>
           ) : (
-            <TouchableOpacity 
+            <TouchableOpacity
               onPress={handleAdd}
               style={styles.dishAddPill}
               activeOpacity={0.85}
@@ -2428,7 +2428,7 @@ const createStyles = (colors: typeof Colors.light) => StyleSheet.create({
     alignItems: "center",
     backgroundColor: colors.surface,
     paddingHorizontal: 16,
-    paddingVertical: Platform.OS === 'ios' ? 15 : 8,
+    height: 55,
     borderRadius: 30,
     width: "100%",
   },
