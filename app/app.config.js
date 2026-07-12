@@ -25,6 +25,11 @@ export default {
     },
     "android": {
       "package": "com.flavour.customer",
+      "googleServicesFile": "./google-services.json",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/images/icon.png",
+        "backgroundColor": "#ffffff"
+      },
       "usesCleartextTraffic": true,
       "navigationBar": {
         "backgroundColor": "#FFFFFF",
@@ -37,8 +42,14 @@ export default {
       },
       "permissions": [
         "ACCESS_COARSE_LOCATION",
-        "ACCESS_FINE_LOCATION"
+        "ACCESS_FINE_LOCATION",
+        "android.permission.POST_NOTIFICATIONS",
+        "android.permission.RECEIVE_BOOT_COMPLETED"
       ]
+    },
+    "notification": {
+      "icon": "./assets/images/icon.png",
+      "color": "#ffffff"
     },
     "web": {
       "favicon": "./assets/images/icon.png"
@@ -52,17 +63,25 @@ export default {
       ],
       "expo-font",
       "expo-web-browser",
-      "@react-native-community/datetimepicker"
+      "@react-native-community/datetimepicker",
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/images/icon.png",
+          "color": "#ffffff"
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
     },
     "extra": {
-       "apiUrl": process.env.EXPO_PUBLIC_API_URL,
-       "eas": {
+      "apiUrl": process.env.EXPO_PUBLIC_API_URL,
+      "eas": {
         "projectId": "a59a7934-9b67-4dc2-b01c-0958cdc8f819"
       }
-    }
+    },
+    "owner": "hosanna4189"
   }
 }

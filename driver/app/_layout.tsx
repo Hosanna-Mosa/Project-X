@@ -21,6 +21,7 @@ import { GlobalSocketHandler } from "@/components/GlobalSocketHandler";
 import UpdateModal from "@/components/UpdateModal";
 import Constants from "expo-constants";
 import { Platform } from "react-native";
+import * as Notifications from "expo-notifications";
 import "@/utils/networkLogger";
 
 SplashScreen.preventAutoHideAsync();
@@ -110,14 +111,58 @@ function RootLayoutNav() {
     }
   }, [hydrated, isAuthenticated, token, hasCompletedOnboarding, needsLoginPrompt, segments]);
 
-  // Register push notifications when authenticated
+  // Register push notifications when authenticated, and listen for tokens & taps (Priority 3 & 4)
   useEffect(() => {
-    if (token) {
-      const { registerForPushNotificationsAsync } = require("../utils/notificationRegister");
-      registerForPushNotificationsAsync(token).catch((err: any) => {
-        console.error("Error registering push notifications:", err);
-      });
-    }
+    if (!token) return;
+
+    const { registerForPushNotificationsAsync } = require("../utils/notificationRegister");
+    const apiUrl = process.env.EXPO_PUBLIC_API_URL || Constants.expoConfig?.extra?.apiUrl;
+
+    // 1. Initial Registration
+    registerForPushNotificationsAsync(token).catch((err: any) => {
+      console.error("Error registering push notifications:", err);
+    });
+
+    // 2. Token Refresh Listener (Priority 3)
+    const tokenSubscription = Notifications.addPushTokenListener(async (tokenData) => {
+      console.log("[PushNotifications] Token refreshed (Driver):", tokenData.data);
+      try {
+        const response = await fetch(`${apiUrl}/api/v1/users/push-token`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${token}`,
+          },
+          body: JSON.stringify({ expoPushToken: tokenData.data }),
+        });
+        if (response.ok) {
+          console.log("[PushNotifications] Refreshed token updated on backend successfully (Driver)!");
+        } else {
+          console.error("[PushNotifications] Failed to sync refreshed token on backend (Driver):", await response.text());
+        }
+      } catch (err) {
+        console.error("[PushNotifications] Failed to sync refreshed token on backend (Driver):", err);
+      }
+    });
+
+    // 3. Notification Tap / Response Listener (Priority 4)
+    const responseSubscription = Notifications.addNotificationResponseReceivedListener((response) => {
+      const data = response.notification.request.content.data;
+      console.log("[PushNotifications] Notification tapped (Driver). Payload data:", data);
+      
+      if (data && data.orderId) {
+        // Deep link to the active order screen
+        router.push({
+          pathname: "/active-order",
+          params: { orderId: data.orderId }
+        });
+      }
+    });
+
+    return () => {
+      tokenSubscription.remove();
+      responseSubscription.remove();
+    };
   }, [token]);
 
   if (!hydrated) {

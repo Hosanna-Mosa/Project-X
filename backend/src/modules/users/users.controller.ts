@@ -260,6 +260,12 @@ export class UsersController {
       const user = await User.findById(req.user?.userId);
       if (!user) return res.status(404).json({ message: "User not found" });
 
+      // Unset this push token if it's already registered on any other user (Priority 2)
+      await User.updateMany(
+        { expoPushToken, _id: { $ne: req.user?.userId } },
+        { $unset: { expoPushToken: "" } }
+      );
+
       user.expoPushToken = expoPushToken;
       await user.save();
 
