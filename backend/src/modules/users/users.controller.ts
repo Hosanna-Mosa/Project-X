@@ -72,13 +72,16 @@ export class UsersController {
       const user = await User.findById(req.user?.userId);
       if (!user) return res.status(404).json({ message: "User not found" });
 
+      const lng = coordinates?.lng ?? 0;
+      const lat = coordinates?.lat ?? 0;
+
       const newAddress = {
         label,
         addressLine,
-        phone,
+        phone: phone || user.phone,
         location: {
           type: "Point",
-          coordinates: [coordinates.lng, coordinates.lat],
+          coordinates: [lng, lat],
         },
       };
 

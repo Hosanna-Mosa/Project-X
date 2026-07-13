@@ -238,6 +238,71 @@ export class DriverService {
     return driver.save();
   }
 
+  async updateHomeMode(driverId: string, homeMode: boolean) {
+    const driver = await Driver.findById(driverId);
+    if (!driver) throw new Error("Driver not found");
+
+    driver.homeMode = homeMode;
+    return driver.save();
+  }
+
+  async isOrderOnTheWayToHome(driverId: string, orderPickupCoords: number[], orderDropoffCoords: number[]): Promise<boolean> {
+    const driver = await Driver.findById(driverId).populate("user");
+    if (!driver || !driver.user) return false;
+
+    const user = driver.user as any;
+    const homeAddress = user.addresses?.find(
+      (addr: any) => addr.label && addr.label.trim().toLowerCase() === "home"
+    );
+
+    if (!homeAddress || !homeAddress.location?.coordinates || homeAddress.location.coordinates.length < 2) {
+      return false;
+    }
+
+    const driverCoords = driver.currentLocation?.coordinates;
+    if (!driverCoords || driverCoords.length < 2) return false;
+
+    const driverLng = driverCoords[0];
+    const driverLat = driverCoords[1];
+    const homeLng = homeAddress.location.coordinates[0];
+    const homeLat = homeAddress.location.coordinates[1];
+    const pickupLng = orderPickupCoords[0];
+    const pickupLat = orderPickupCoords[1];
+    const dropoffLng = orderDropoffCoords[0];
+    const dropoffLat = orderDropoffCoords[1];
+
+    const d_h = this.haversineDistance(driverLat, driverLng, homeLat, homeLng);
+    const d_p = this.haversineDistance(driverLat, driverLng, pickupLat, pickupLng);
+    const p_d = this.haversineDistance(pickupLat, pickupLng, dropoffLat, dropoffLng);
+    const drop_h = this.haversineDistance(dropoffLat, dropoffLng, homeLat, homeLng);
+
+    const fs = require("fs");
+    const path = require("path");
+    const logPath = path.join(__dirname, "../../../debug.log");
+    fs.appendFileSync(logPath, `[DETOUR CHECK] Driver: ${driverId}\n` +
+      `  Driver: [${driverLng}, ${driverLat}]\n` +
+      `  Home: [${homeLng}, ${homeLat}]\n` +
+      `  Pickup: [${pickupLng}, ${pickupLat}]\n` +
+      `  Dropoff: [${dropoffLng}, ${dropoffLat}]\n` +
+      `  Distances: d_h = ${d_h.toFixed(1)}m, d_p = ${d_p.toFixed(1)}m, p_d = ${p_d.toFixed(1)}m, drop_h = ${drop_h.toFixed(1)}m\n`);
+
+    if (d_h < 3000) {
+      fs.appendFileSync(logPath, `  -> MATCHED: Driver is already within 3km of home.\n`);
+      return true;
+    }
+
+    if (drop_h >= d_h) {
+      fs.appendFileSync(logPath, `  -> FILTERED OUT: Dropoff is further from home than driver starting point (drop_h: ${drop_h.toFixed(1)}m >= d_h: ${d_h.toFixed(1)}m)\n`);
+      return false;
+    }
+
+    const detourOverhead = (d_p + p_d + drop_h) - d_h;
+    const maxAllowedDetour = Math.max(10000, 0.3 * d_h);
+    const result = detourOverhead <= maxAllowedDetour;
+    fs.appendFileSync(logPath, `  -> Detour overhead: ${detourOverhead.toFixed(1)}m, Max allowed detour: ${maxAllowedDetour.toFixed(1)}m. Result: ${result}\n`);
+    return result;
+  }
+
   async getHighDemandAreas(limit: number = 6): Promise<HighDemandArea[]> {
     const since = new Date(Date.now() - 2 * 60 * 60 * 1000);
     const activeDemandStatuses = [

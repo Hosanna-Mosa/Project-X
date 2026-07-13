@@ -1,6 +1,6 @@
 import { Feather } from "@expo/vector-icons";
-import { router } from "expo-router";
-import React, { useEffect, useState } from "react";
+import { router, useFocusEffect } from "expo-router";
+import React, { useEffect, useState, useCallback } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -23,9 +23,11 @@ export default function SavedAddressesScreen() {
   const [addresses, setAddresses] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    fetchAddresses();
-  }, []);
+  useFocusEffect(
+    useCallback(() => {
+      fetchAddresses();
+    }, [])
+  );
 
   const fetchAddresses = async () => {
     try {

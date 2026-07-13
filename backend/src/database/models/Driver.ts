@@ -44,6 +44,7 @@ export interface IDriver extends Document {
   }[];
   selfieImage?: string;
   onboardingCompletedAt?: Date;
+  homeMode: boolean;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -57,6 +58,7 @@ const DriverSchema: Schema = new Schema(
       default: DriverStatus.OFFLINE,
     },
     isAvailable: { type: Boolean, default: true },
+    homeMode: { type: Boolean, default: false },
     currentLocation: {
       type: {
         type: String,

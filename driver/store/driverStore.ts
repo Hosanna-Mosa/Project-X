@@ -345,7 +345,32 @@ export const useDriverStore = create<DriverState>()(
           socketService.disconnect();
         });
       },
-      toggleHomeMode: () => set((state) => ({ homeMode: !state.homeMode })),
+      toggleHomeMode: async () => {
+        const nextMode = !get().homeMode;
+        const { token } = get();
+        if (token) {
+          try {
+            const res = await fetch(`${apiUrl}/api/v1/drivers/home-mode`, {
+              method: "PATCH",
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${token}`
+              },
+              body: JSON.stringify({ homeMode: nextMode })
+            });
+            if (!res.ok) {
+              const data = await res.json();
+              Alert.alert("Home Mode Error", data.message || "Failed to update home mode.");
+              return;
+            }
+          } catch (e: any) {
+            console.error("Failed to update home mode on backend:", e);
+            Alert.alert("Home Mode Error", "Connection failed. Please try again.");
+            return;
+          }
+        }
+        set({ homeMode: nextMode });
+      },
 
       startReservedRide: async (orderId: string) => {
         const { token } = get();
