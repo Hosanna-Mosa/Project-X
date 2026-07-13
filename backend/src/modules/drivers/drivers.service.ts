@@ -158,6 +158,8 @@ export class DriverService {
       }
     }
 
+    let results: any[] = [];
+
     // Attempt Geospatial lookup in Redis first
     if (redisClient) {
       try {
@@ -181,39 +183,68 @@ export class DriverService {
 
           // Keep distance order as returned by Redis geoSearch
           const driverMap = new Map(drivers.map((d: any) => [d._id.toString(), d]));
-          const sortedDrivers = nearbyDriverIds
+          results = nearbyDriverIds
             .map((id: any) => driverMap.get(id))
             .filter(Boolean);
 
-          console.log(`[REDIS] Found ${sortedDrivers.length} matching drivers near coordinates`);
-          return sortedDrivers;
+          console.log(`[REDIS] Found ${results.length} matching drivers near coordinates`);
         }
       } catch (err: any) {
         console.warn(`[REDIS] geoSearch lookup failed, falling back to MongoDB:`, err.message);
       }
     }
 
-    // MongoDB Fallback Proximity Query
-    const query: any = {
-      status: DriverStatus.ONLINE,
-      isAvailable: true,
-      preferredZone: activeZone._id, // Filter strictly by activeZone
-      currentLocation: {
-        $near: {
-          $geometry: {
-            type: "Point",
-            coordinates: [lng, lat],
+    if (results.length === 0) {
+      // MongoDB Fallback Proximity Query
+      const query: any = {
+        status: DriverStatus.ONLINE,
+        isAvailable: true,
+        preferredZone: activeZone._id, // Filter strictly by activeZone
+        currentLocation: {
+          $near: {
+            $geometry: {
+              type: "Point",
+              coordinates: [lng, lat],
+            },
+            $maxDistance: radiusInMeters,
           },
-          $maxDistance: radiusInMeters,
         },
-      },
-    };
+      };
 
-    if (vehicleType && ["bike", "auto", "car"].includes(vehicleType)) {
-      query.vehicleType = vehicleType;
+      if (vehicleType && ["bike", "auto", "car"].includes(vehicleType)) {
+        query.vehicleType = vehicleType;
+      }
+
+      results = await Driver.find(query).populate("user");
     }
 
-    return Driver.find(query).populate("user");
+    // Force include online dev drivers (check1 to check10) for testing
+    try {
+      const devUsers = await User.find({ name: /^check\d+$/i });
+      const devUserIds = devUsers.map(u => u._id);
+      const devDriversQuery: any = {
+        user: { $in: devUserIds },
+        status: DriverStatus.ONLINE
+      };
+      if (vehicleType && ["bike", "auto", "car"].includes(vehicleType)) {
+        devDriversQuery.vehicleType = vehicleType;
+      }
+      const devDrivers = await Driver.find(devDriversQuery).populate("user");
+      for (const dd of devDrivers) {
+        if (!results.some(d => d._id.toString() === dd._id.toString())) {
+          results.push(dd);
+        }
+      }
+    } catch (devErr) {
+      console.warn("[DEV DRIVERS SEARCH FETCH] Error loading dev drivers:", devErr);
+    }
+
+    console.log(`[DRIVER SEARCH RESULTS] Total: ${results.length}, vehicleType: ${vehicleType}`);
+    results.forEach((d) => {
+      console.log(` -> ID: ${d._id}, Name: ${d.user?.name}, Phone: ${d.user?.phone}, status: ${d.status}, vehicleType: ${d.vehicleType}, coords: ${JSON.stringify(d.currentLocation?.coordinates)}`);
+    });
+
+    return results;
   }
 
   async updateLocation(driverId: string, lat: number, lng: number) {
@@ -224,6 +255,18 @@ export class DriverService {
       type: "Point",
       coordinates: [lng, lat],
     };
+
+    try {
+      const { ZonesService } = require("../zones/zones.service");
+      const zonesService = new ZonesService();
+      const activeZone = await zonesService.getZoneForCoordinates(lat, lng);
+      if (activeZone) {
+        driver.preferredZone = activeZone._id;
+      }
+    } catch (zoneErr) {
+      console.warn("[HTTP LOCATION UPDATE] Error resolving zone for driver:", zoneErr);
+    }
+
     return driver.save();
   }
 

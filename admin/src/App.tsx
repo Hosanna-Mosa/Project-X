@@ -27,6 +27,7 @@ import UserDetail from "./pages/UserDetail";
 import DriverDetail from "./pages/DriverDetail";
 import NotFound from "./pages/NotFound";
 import AppVersions from "./pages/AppVersions";
+import DevDrivers from "./pages/DevDrivers";
 
 const RootRedirect = () => {
   const adminToken = localStorage.getItem("admin_token");
@@ -51,6 +52,7 @@ const App = () => (
           <Route path="/live-orders" element={<LiveOrders />} />
           <Route path="/live-orders/:id" element={<OrderDetail />} />
           <Route path="/drivers" element={<Drivers />} />
+          <Route path="/dev-drivers" element={<DevDrivers />} />
           <Route path="/analytics" element={<Analytics />} />
           <Route path="/payments" element={<Payments />} />
           <Route path="/support" element={<Support />} />
