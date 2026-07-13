@@ -21,12 +21,6 @@ const MENU_ITEMS = [
     items: [
       { icon: "user" as const, label: "Personal Info", color: Colors.primary },
       {
-        icon: "map-pin" as const,
-        label: "Saved Addresses",
-        color: Colors.tertiary,
-        action: "saved-addresses" as const,
-      },
-      {
         icon: "credit-card" as const,
         label: "Payment Details",
         color: "#8B5CF6",
@@ -35,6 +29,17 @@ const MENU_ITEMS = [
         icon: "file-text" as const,
         label: "Documents",
         color: Colors.warning,
+      },
+    ],
+  },
+  {
+    section: "Address",
+    items: [
+      {
+        icon: "map-pin" as const,
+        label: "Saved Addresses",
+        color: Colors.tertiary,
+        action: "saved-addresses" as const,
       },
     ],
   },

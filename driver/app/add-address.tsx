@@ -1,6 +1,7 @@
 import { Feather } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
 import React, { useState } from "react";
+import * as Location from "expo-location";
 import {
   ActivityIndicator,
   Alert,
@@ -33,6 +34,74 @@ export default function AddAddressScreen() {
   const [phone, setPhone] = useState(String(params.phone || ""));
   const [receiverName, setReceiverName] = useState(String(params.receiverName || ""));
   const [loading, setLoading] = useState(false);
+  const [addressLat, setAddressLat] = useState<number | null>(params.lat ? Number(params.lat) : null);
+  const [addressLng, setAddressLng] = useState<number | null>(params.lng ? Number(params.lng) : null);
+  const [fetchingLoc, setFetchingLoc] = useState(false);
+  const [suggestions, setSuggestions] = useState<any[]>([]);
+
+  const fetchSuggestions = async (query: string) => {
+    if (!query.trim()) {
+      setSuggestions([]);
+      return;
+    }
+    try {
+      const headers: Record<string, string> = {};
+      if (token) headers["Authorization"] = `Bearer ${token}`;
+
+      const res = await fetch(`${apiUrl}/api/v1/places/autocomplete?input=${encodeURIComponent(query)}`, { headers });
+      if (res.ok) {
+        const data = await res.json();
+        setSuggestions(Array.isArray(data) ? data : []);
+      }
+    } catch (err) {
+      console.warn("Failed to fetch autocomplete suggestions:", err);
+    }
+  };
+
+  const handleGetCurrentLocation = async () => {
+    try {
+      setFetchingLoc(true);
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== "granted") {
+        Alert.alert("Permission Denied", "Location permissions are required to fetch your current location.");
+        return;
+      }
+
+      const loc = await Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.Balanced
+      });
+
+      const { latitude, longitude } = loc.coords;
+      setAddressLat(latitude);
+      setAddressLng(longitude);
+
+      const [geocode] = await Location.reverseGeocodeAsync({
+        latitude,
+        longitude
+      });
+
+      if (geocode) {
+        const parts = [
+          geocode.name,
+          geocode.street,
+          geocode.district,
+          geocode.city,
+          geocode.subregion,
+          geocode.region,
+          geocode.postalCode,
+          geocode.country
+        ].filter(Boolean);
+
+        setAddressLine(parts.join(", "));
+      } else {
+        setAddressLine(`Coords: ${latitude.toFixed(6)}, ${longitude.toFixed(6)}`);
+      }
+    } catch (error: any) {
+      Alert.alert("Error", error.message || "Failed to fetch current location.");
+    } finally {
+      setFetchingLoc(false);
+    }
+  };
 
   const handleSave = async () => {
     if (!addressLine.trim()) {
@@ -54,7 +123,9 @@ export default function AddAddressScreen() {
       if (isEditMode && params.editId) {
         body.editId = String(params.editId);
       }
-      if (params.lat && params.lng) {
+      if (addressLat !== null && addressLng !== null) {
+        body.coordinates = { lat: addressLat, lng: addressLng };
+      } else if (params.lat && params.lng) {
         body.coordinates = { lat: Number(params.lat), lng: Number(params.lng) };
       }
 
@@ -125,15 +196,98 @@ export default function AddAddressScreen() {
           <Text style={styles.sectionTitle}>Address Details</Text>
 
           <View style={styles.inputGroup}>
-            <Text style={styles.inputLabel}>Full Address *</Text>
+            <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
+              <Text style={styles.inputLabel}>Full Address *</Text>
+              <TouchableOpacity
+                onPress={handleGetCurrentLocation}
+                disabled={fetchingLoc}
+                style={{ flexDirection: "row", alignItems: "center", gap: 6 }}
+              >
+                {fetchingLoc ? (
+                  <ActivityIndicator size="small" color={Colors.primary} />
+                ) : (
+                  <Feather name="target" size={16} color={Colors.primary} />
+                )}
+                <Text style={{ fontSize: 13, fontWeight: "600", color: Colors.primary }}>
+                  {fetchingLoc ? "Locating..." : "Use Current Location"}
+                </Text>
+              </TouchableOpacity>
+            </View>
             <TextInput
               style={styles.input}
               placeholder="e.g. 12, MG Road, Koramangala, Bangalore"
               placeholderTextColor={Colors.textMuted}
               value={addressLine}
-              onChangeText={setAddressLine}
+              onChangeText={(text) => {
+                setAddressLine(text);
+                fetchSuggestions(text);
+              }}
               multiline
             />
+
+            {suggestions.length > 0 && (
+              <View style={{
+                borderWidth: 1,
+                borderColor: Colors.border || "#e2e8f0",
+                borderRadius: 12,
+                backgroundColor: "#ffffff",
+                maxHeight: 180,
+                overflow: "hidden",
+                marginTop: 4,
+                shadowColor: "#000",
+                shadowOffset: { width: 0, height: 2 },
+                shadowOpacity: 0.1,
+                shadowRadius: 4,
+                elevation: 3,
+                zIndex: 999
+              }}>
+                <ScrollView nestedScrollEnabled={true} style={{ maxHeight: 180 }}>
+                  {suggestions.map((item) => (
+                    <TouchableOpacity
+                      key={item.id}
+                      onPress={() => {
+                        setAddressLine(item.address);
+                        setAddressLat(item.lat);
+                        setAddressLng(item.lng);
+                        setSuggestions([]);
+                      }}
+                      style={{
+                        padding: 12,
+                        borderBottomWidth: 1,
+                        borderBottomColor: "#f1f5f9"
+                      }}
+                    >
+                      <Text style={{ fontSize: 14, color: "#1e293b", fontWeight: "600" }}>{item.name}</Text>
+                      <Text style={{ fontSize: 12, color: "#64748b" }}>{item.address}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+              </View>
+            )}
+
+            {addressLat !== null && addressLng !== null && (
+              <View style={{
+                flexDirection: "row",
+                alignItems: "center",
+                backgroundColor: "#f0fdf4",
+                borderWidth: 1.5,
+                borderColor: Colors.success || "#22c55e",
+                borderRadius: 12,
+                padding: 12,
+                gap: 10,
+                marginTop: 8
+              }}>
+                <Feather name="check-circle" size={18} color="#22c55e" />
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontSize: 13, fontWeight: "600", color: "#166534" }}>
+                    Location Coordinates Resolved
+                  </Text>
+                  <Text style={{ fontSize: 11, color: "#15803d", marginTop: 2 }}>
+                    Coords: [{addressLng.toFixed(4)}, {addressLat.toFixed(4)}]
+                  </Text>
+                </View>
+              </View>
+            )}
           </View>
         </View>
 

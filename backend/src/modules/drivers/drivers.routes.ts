@@ -7,6 +7,7 @@ const router = Router();
 const driversController = new DriversController();
 
 router.patch("/status", authenticateToken, authorizeRole([UserRole.DRIVER]), driversController.updateStatus.bind(driversController));
+router.patch("/home-mode", authenticateToken, authorizeRole([UserRole.DRIVER]), driversController.updateHomeMode.bind(driversController));
 router.patch("/location", authenticateToken, authorizeRole([UserRole.DRIVER]), driversController.updateLocation.bind(driversController));
 router.get("/profile", authenticateToken, authorizeRole([UserRole.DRIVER]), driversController.profile.bind(driversController));
 router.patch("/profile", authenticateToken, authorizeRole([UserRole.DRIVER]), driversController.updateProfile.bind(driversController));

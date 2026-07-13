@@ -200,8 +200,67 @@ export class OrdersService {
         `[ORDER][SOCKET][REQUEST_FROM_USER] order=${savedOrder._id} customerUser=${userId} ` +
         `serviceType=${effectiveType} isReserved=${Boolean(savedOrder.isReserved)} status=${savedOrder.status}`
       );
-      socketManager.logConnectionStatus("before_new_order_broadcast", userId, undefined, savedOrder._id.toString());
-      socketManager.broadcastToDrivers("new_order", {
+      // 1. Find nearby/matching drivers
+      const { DriverService } = require("../drivers/drivers.service");
+      const driversService = new DriverService();
+      
+      let nearbyDrivers = [];
+      try {
+        nearbyDrivers = await driversService.getNearbyDrivers(
+          startPos.latitude,
+          startPos.longitude,
+          radius || 5000,
+          effectiveType
+        );
+      } catch (err) {
+        console.error("Error getting nearby drivers in createOrder:", err);
+      }
+
+      let driversToNotify = [...nearbyDrivers];
+      // Fallback: If no drivers nearby, get all online and available drivers
+      if (driversToNotify.length === 0) {
+        try {
+          const Driver = require("../../database/models/Driver").default;
+          const onlineDrivers = await Driver.find({ status: "ONLINE", isAvailable: true }).populate("user");
+          driversToNotify = onlineDrivers;
+        } catch (err) {
+          console.error("Error fetching fallback online drivers:", err);
+        }
+      }
+
+      // 2. Filter drivers in homeMode
+      const filteredDrivers: any[] = [];
+      const pickupCoords = savedOrder.stops[0]?.location?.coordinates;
+      const dropoffCoords = savedOrder.stops[savedOrder.stops.length - 1]?.location?.coordinates;
+
+      if (pickupCoords && dropoffCoords) {
+        const fs = require("fs");
+        const path = require("path");
+        const logPath = path.join(__dirname, "../../../debug.log");
+        fs.appendFileSync(logPath, `\n[${new Date().toISOString()}] Order ${savedOrder._id} created. Stops: pickup: ${pickupCoords}, dropoff: ${dropoffCoords}. Candidates: ${driversToNotify.length}\n`);
+
+        for (const d of driversToNotify) {
+          fs.appendFileSync(logPath, `Checking driver ${d._id} (User: ${d.user?._id}). homeMode = ${d.homeMode}\n`);
+          if (d.homeMode === true) {
+            const onTheWay = await driversService.isOrderOnTheWayToHome(
+              (d._id as any).toString(),
+              pickupCoords,
+              dropoffCoords
+            );
+            fs.appendFileSync(logPath, `Driver ${d._id} onTheWay result: ${onTheWay}\n`);
+            if (onTheWay) {
+              filteredDrivers.push(d);
+            }
+          } else {
+            fs.appendFileSync(logPath, `Driver ${d._id} has homeMode OFF. Adding unconditionally.\n`);
+            filteredDrivers.push(d);
+          }
+        }
+        driversToNotify = filteredDrivers;
+      }
+
+      // 3. Emit real-time WebSocket events specifically to the matched/filtered drivers
+      const orderPayload = {
         id: savedOrder._id,
         serviceType: effectiveType,
         distance: `${optimizationResult.totalDistance} km`,
@@ -229,31 +288,23 @@ export class OrdersService {
           lng: s.location.coordinates[0],
           items: s.items,
         }))
-      }, "orders.createOrder");
-      socketManager.logConnectionStatus("after_new_order_broadcast", userId, undefined, savedOrder._id.toString());
+      };
 
-      // Send push & in-app notifications to nearby drivers
+      socketManager.logConnectionStatus("before_new_order_selective_emit", userId, undefined, savedOrder._id.toString());
+      
+      for (const d of driversToNotify) {
+        const driverUser = d.user as any;
+        if (driverUser && driverUser._id) {
+          socketManager.emitToDriver(driverUser._id.toString(), "new_order", orderPayload, "orders.createOrder");
+        }
+      }
+      
+      socketManager.logConnectionStatus("after_new_order_selective_emit", userId, undefined, savedOrder._id.toString());
+
+      // 4. Send push & in-app notifications to matched/filtered drivers
       if (!savedOrder.isReserved) {
         (async () => {
           try {
-            const { DriverService } = require("../drivers/drivers.service");
-            const driversService = new DriverService();
-            const nearbyDrivers = await driversService.getNearbyDrivers(
-              startPos.latitude,
-              startPos.longitude,
-              radius || 5000,
-              effectiveType
-            );
-
-            let driversToNotify = [...nearbyDrivers];
-            // Fallback for testing/development: If no drivers are nearby within the radius/zone,
-            // notify all online and available drivers so they get the push notification
-            if (driversToNotify.length === 0) {
-              const Driver = require("../../database/models/Driver").default;
-              const onlineDrivers = await Driver.find({ status: "ONLINE", isAvailable: true }).populate("user");
-              driversToNotify = onlineDrivers;
-            }
-
             const earnings = Math.round(savedOrder.totalPrice * 0.8);
             const serviceLabel = effectiveType === ServiceType.DELIVERY ? "delivery" : "ride";
 
