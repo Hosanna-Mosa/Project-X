@@ -18,14 +18,22 @@ export const LocationHandler = () => {
       // 1. Get Initial Location Fast (LastKnown)
       const lastKnown = await Location.getLastKnownPositionAsync();
       if (lastKnown && isMounted) {
-        updateLocalOnly(lastKnown.coords.latitude, lastKnown.coords.longitude);
+        if (isOnline) {
+          updateAndBroadcast(lastKnown.coords.latitude, lastKnown.coords.longitude);
+        } else {
+          updateLocalOnly(lastKnown.coords.latitude, lastKnown.coords.longitude);
+        }
       }
 
       // 2. Get Current Location (Balanced)
       try {
         const current = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
         if (current && isMounted) {
-          updateLocalOnly(current.coords.latitude, current.coords.longitude);
+          if (isOnline) {
+            updateAndBroadcast(current.coords.latitude, current.coords.longitude);
+          } else {
+            updateLocalOnly(current.coords.latitude, current.coords.longitude);
+          }
         }
       } catch (e) {}
 

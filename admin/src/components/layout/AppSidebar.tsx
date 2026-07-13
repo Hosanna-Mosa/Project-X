@@ -16,12 +16,14 @@ import {
   Map,
   Ticket,
   RefreshCw,
+  SlidersHorizontal,
 } from "lucide-react";
 
 const navItems = [
   { title: "Dashboard", url: "/", icon: LayoutDashboard },
   { title: "Live Orders", url: "/live-orders", icon: ShoppingCart },
   { title: "Drivers", url: "/drivers", icon: Truck },
+  { title: "Dev Drivers", url: "/dev-drivers", icon: SlidersHorizontal },
   { title: "Users", url: "/users", icon: Users },
   { title: "Vendors", url: "/vendors", icon: Store },
   { title: "Meat Centers", url: "/meat-centers", icon: Drumstick },

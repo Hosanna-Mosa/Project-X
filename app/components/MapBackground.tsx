@@ -1,8 +1,8 @@
 import React, { useEffect, useMemo, useState, forwardRef, useImperativeHandle, useRef } from 'react';
-import { StyleSheet, View, Platform, ViewStyle, Text } from 'react-native';
+import { StyleSheet, View, Platform, ViewStyle, Text, TouchableOpacity } from 'react-native';
 import MapView, { PROVIDER_GOOGLE, Region, MapType, Marker, Polyline, Circle } from 'react-native-maps';
 import * as Location from 'expo-location';
-import { Feather } from '@expo/vector-icons';
+import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
 import { DeliveryStop } from '@/contexts/deliveryStore';
 import Colors from '@/constants/colors';
 import { customFetch } from '@/utils/api/custom-fetch';
@@ -59,6 +59,18 @@ export const MapBackground = forwardRef<MapBackgroundRef, Props>(({
 }, ref) => {
   const [region, setRegion] = useState<Region>(initialRegion || FALLBACK_REGION);
   const [autoRoutePolyline, setAutoRoutePolyline] = useState<string | null>(null);
+
+  const handleZoom = (factor: number) => {
+    if (!internalMapRef.current || !region) return;
+    const newRegion: Region = {
+      latitude: region.latitude,
+      longitude: region.longitude,
+      latitudeDelta: Math.max(0.0005, Math.min(20, region.latitudeDelta * factor)),
+      longitudeDelta: Math.max(0.0005, Math.min(20, region.longitudeDelta * factor)),
+    };
+    setRegion(newRegion);
+    internalMapRef.current.animateToRegion(newRegion, 300);
+  };
   const internalMapRef = useRef<MapView>(null);
   const locationRef = useRef<{lat: number, lng: number} | null>(null);
   const validRouteStops = useMemo(
@@ -190,12 +202,6 @@ export const MapBackground = forwardRef<MapBackgroundRef, Props>(({
       }
     });
 
-    driverMarkers.forEach((driver) => {
-      if (driver.lat && driver.lng) {
-        coords.push({ latitude: driver.lat, longitude: driver.lng });
-      }
-    });
-
     if (coords.length > 1) {
       internalMapRef.current.fitToCoordinates(coords, {
         edgePadding: { top: 110, right: 60, bottom: 340, left: 60 },
@@ -207,7 +213,7 @@ export const MapBackground = forwardRef<MapBackgroundRef, Props>(({
         600,
       );
     }
-  }, [stops, driverMarkers, userLocation, driverLocation]);
+  }, [stops]);
 
   useEffect(() => {
     if (polyline || validRouteStops.length < 2) {
@@ -279,6 +285,7 @@ export const MapBackground = forwardRef<MapBackgroundRef, Props>(({
         provider={PROVIDER_GOOGLE}
         style={StyleSheet.absoluteFill}
         initialRegion={region}
+        onRegionChangeComplete={(r) => setRegion(r)}
         mapType={mapType}
         showsUserLocation={!userLocation}
         showsPointsOfInterest={false}
@@ -342,17 +349,18 @@ export const MapBackground = forwardRef<MapBackgroundRef, Props>(({
         ))}
 
         {driverMarkers.map((driver) => {
-          const vehicleType = driver.vehicleType || driver.vehicle || "car";
-          const iconName = vehicleType === "bike" ? "navigation" : vehicleType === "auto" ? "truck" : "briefcase";
+          const vehicleType = driver.vehicleType || driver.vehicle || "bike";
+          const iconName = vehicleType === "auto" ? "taxi" : vehicleType === "car" ? "car" : "motorbike";
           return (
             <Marker
               key={driver.id || driver._id}
               coordinate={{ latitude: driver.lat, longitude: driver.lng }}
               anchor={{ x: 0.5, y: 0.5 }}
-              tracksViewChanges={false}
+              title={driver.name || "Driver"}
+              tracksViewChanges={true}
             >
               <View style={styles.vehicleMarker}>
-                <Feather name={iconName as any} size={12} color="#111827" />
+                <MaterialCommunityIcons name={iconName as any} size={16} color="#FFFFFF" />
               </View>
             </Marker>
           );
@@ -400,6 +408,25 @@ export const MapBackground = forwardRef<MapBackgroundRef, Props>(({
           />
         )}
       </MapView>
+
+      {/* Clean Zoom Controls */}
+      <View style={styles.zoomControlsContainer}>
+        <TouchableOpacity 
+          style={styles.zoomButton} 
+          onPress={() => handleZoom(0.5)}
+          activeOpacity={0.7}
+        >
+          <Feather name="plus" size={18} color="#111827" />
+        </TouchableOpacity>
+        <TouchableOpacity 
+          style={styles.zoomButton} 
+          onPress={() => handleZoom(2.0)}
+          activeOpacity={0.7}
+        >
+          <Feather name="minus" size={18} color="#111827" />
+        </TouchableOpacity>
+      </View>
+
       {children}
     </View>
   );
@@ -521,18 +548,42 @@ const styles = StyleSheet.create({
     shadowRadius: 3,
   },
   vehicleMarker: {
-    width: 26,
-    height: 26,
-    borderRadius: 13,
-    backgroundColor: '#FFFFFF',
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: Colors.light.primary,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 2,
-    borderColor: '#111827',
+    borderColor: '#FFFFFF',
     elevation: 5,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.18,
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+  },
+  zoomControlsContainer: {
+    position: 'absolute',
+    right: 16,
+    top: '30%',
+    backgroundColor: 'transparent',
+    alignItems: 'center',
+    gap: 8,
+    zIndex: 1000,
+  },
+  zoomButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    elevation: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
     shadowRadius: 3,
   }
 });

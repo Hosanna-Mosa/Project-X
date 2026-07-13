@@ -120,6 +120,47 @@ export default function RideSearchingScreen() {
   const [cancelConfirmVisible, setCancelConfirmVisible] = React.useState(false);
   const [selectedCancelReason, setSelectedCancelReason] = React.useState("");
 
+  interface OnlineDriver {
+    _id: string;
+    currentLocation?: {
+      coordinates: [number, number];
+    };
+    vehicleType?: "bike" | "auto" | "car";
+  }
+
+  const [onlineDrivers, setOnlineDrivers] = React.useState<OnlineDriver[]>([]);
+
+  React.useEffect(() => {
+    let active = true;
+    const fetchOnlineDrivers = async () => {
+      try {
+        const service = normalizeServiceType(params.serviceId);
+        console.log(`[CLIENT DRIVER SEARCH] Request coordinates: [lat: ${pickupCoords.latitude}, lng: ${pickupCoords.longitude}], vehicleType: ${service}`);
+        const queryParams = new URLSearchParams({
+          latitude: String(pickupCoords.latitude),
+          longitude: String(pickupCoords.longitude),
+          radius: "5000",
+          vehicleType: service,
+        });
+        const res = await customFetch<OnlineDriver[]>(`/api/v1/drivers/nearby?${queryParams.toString()}`);
+        console.log(`[CLIENT DRIVER SEARCH RESPONSE] Returned count: ${res ? res.length : 0}, data: ${JSON.stringify(res)}`);
+        if (active && Array.isArray(res)) {
+          setOnlineDrivers(res);
+        }
+      } catch (error) {
+        console.error("Failed to fetch nearby drivers:", error);
+      }
+    };
+
+    fetchOnlineDrivers();
+    const interval = setInterval(fetchOnlineDrivers, 10000);
+
+    return () => {
+      active = false;
+      clearInterval(interval);
+    };
+  }, [pickupCoords.latitude, pickupCoords.longitude, params.serviceId]);
+
   const pickupCoords = React.useMemo(
     () => ({
       latitude: parseFloat(params.pickupLat || "0"),
@@ -317,6 +358,38 @@ export default function RideSearchingScreen() {
               <View style={styles.dropMarkerInner} />
             </View>
           </Marker>
+          {onlineDrivers.map((drv) => {
+            const coords = drv.currentLocation?.coordinates;
+            if (
+              !coords ||
+              coords.length < 2 ||
+              typeof coords[0] !== "number" ||
+              typeof coords[1] !== "number" ||
+              Number.isNaN(coords[0]) ||
+              Number.isNaN(coords[1]) ||
+              (coords[0] === 0 && coords[1] === 0)
+            ) {
+              return null;
+            }
+            return (
+              <Marker
+                key={drv._id}
+                coordinate={{
+                  latitude: coords[1],
+                  longitude: coords[0],
+                }}
+                anchor={{ x: 0.5, y: 0.5 }}
+              >
+                <View style={styles.driverMarker}>
+                  <MaterialCommunityIcons
+                    name={drv.vehicleType === "auto" ? "taxi" : drv.vehicleType === "car" ? "car" : "motorbike"}
+                    size={18}
+                    color="#FFFFFF"
+                  />
+                </View>
+              </Marker>
+            );
+          })}
           <Marker coordinate={pickupCoords} anchor={{ x: 0.5, y: 0.5 }}>
             <View style={styles.pickupMarkerWrap}>
               <View style={styles.pickupMarker}>
@@ -640,6 +713,21 @@ const createStyles = (colors: typeof Colors.light, insets: any) =>
       shadowOffset: { width: 0, height: 2 },
       shadowOpacity: 0.2,
       shadowRadius: 4,
+      elevation: 5,
+    },
+    driverMarker: {
+      width: 32,
+      height: 32,
+      borderRadius: 16,
+      backgroundColor: colors.primary,
+      alignItems: "center",
+      justifyContent: "center",
+      borderWidth: 2,
+      borderColor: colors.surface,
+      shadowColor: "#000",
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.25,
+      shadowRadius: 3.84,
       elevation: 5,
     },
     dropMarkerInner: {
