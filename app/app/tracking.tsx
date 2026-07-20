@@ -95,6 +95,8 @@ export default function TrackingScreen() {
     }, 500);
   };
   const [eta, setEta] = useState(15);
+
+  const [helperStatus, setHelperStatus] = useState<string>("");
   const [deliveryOtp, setDeliveryOtp] = useState<string | null>(null);
   const [startOtp, setStartOtp] = useState<string | null>(null);
   const [driverLocation, setDriverLocation] = useState<{ lat: number, lng: number } | null>(null);
@@ -299,10 +301,16 @@ export default function TrackingScreen() {
         handleOrderCancelledByDriver();
       };
 
+      const onHelperStatusUpdate = (data: { text: string }) => {
+        console.log("[SOCKET] Helper status update:", data);
+        if (data.text) setHelperStatus(data.text);
+      };
+
       socketService.on("order_accepted", onOrderAccepted);
       socketService.on("driver_location_update", onLocationUpdate);
       socketService.on("order_status_update", onStatusUpdate);
       socketService.on("order_cancelled", onOrderCancelled);
+      socketService.on("helper_status_update", onHelperStatusUpdate);
 
       const timer = setInterval(() => {
         setEta((prev) => Math.max(1, prev - 1));
@@ -314,6 +322,7 @@ export default function TrackingScreen() {
         socketService.off("driver_location_update", onLocationUpdate);
         socketService.off("order_status_update", onStatusUpdate);
         socketService.off("order_cancelled", onOrderCancelled);
+        socketService.off("helper_status_update", onHelperStatusUpdate);
       };
     }
   }, [currentOrderId]);
@@ -614,6 +623,13 @@ export default function TrackingScreen() {
                   </View>
                 </View>
               )}
+
+              {isHelper && helperStatus ? (
+                <View style={{ backgroundColor: '#E0E7FF', padding: 12, borderRadius: 12, marginVertical: 10, borderWidth: 1, borderColor: '#C7D2FE' }}>
+                  <Text style={{ fontSize: 12, color: '#4F46E5', fontWeight: '700', marginBottom: 4 }}>HELPER UPDATE</Text>
+                  <Text style={{ fontSize: 15, color: '#312E81', fontWeight: '500' }}>{helperStatus}</Text>
+                </View>
+              ) : null}
 
               <OrderStatusTimeline currentStatus={status} serviceType={serviceType || undefined} />
             </>

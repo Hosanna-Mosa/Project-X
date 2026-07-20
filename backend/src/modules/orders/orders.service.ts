@@ -568,6 +568,121 @@ export class OrdersService {
       .populate("vendor");
   }
 
+  async increaseOrderPrice(orderId: string, amount: number, userId: string) {
+    const order = await Order.findOne(this.getOrderQuery(orderId));
+    if (!order) throw new Error("Order not found");
+
+    if (order.user.toString() !== userId) {
+      throw new Error("Unauthorized to modify this order");
+    }
+
+    if (order.status !== OrderStatus.SEARCHING_DRIVER && order.status !== OrderStatus.CREATED) {
+      throw new Error("Cannot increase price for a non-pending order");
+    }
+
+    const session = await mongoose.startSession();
+    session.startTransaction();
+    try {
+      const currentPrice = order.customerPrice || order.totalPrice;
+      const newPrice = currentPrice + amount;
+
+      order.customerPrice = newPrice;
+      order.totalPrice = newPrice;
+      
+      if (order.priceBreakdown) {
+        const bd = order.priceBreakdown as any;
+        bd.baseFare = (bd.baseFare || bd.total) + amount;
+        bd.total = newPrice;
+        order.priceBreakdown = bd;
+      }
+
+      await order.save({ session });
+      await session.commitTransaction();
+
+      await order.populate("user");
+      await order.populate("vendor");
+
+      const vendor = order.vendor as any;
+      const user = order.user as any;
+
+      // Emit to drivers so they see the new price popup again
+      const socketManager = SocketManager.getInstance();
+      if (socketManager) {
+        const payload = {
+          id: order._id,
+          serviceType: order.serviceType,
+          distance: "Updated Price",
+          duration: "ASAP",
+          radius: 5000,
+          earnings: Math.round(newPrice * 0.8),
+          customerPrice: newPrice,
+          bookingFor: order.bookingFor,
+          scheduledDelivery: order.scheduledDelivery,
+          customerName: user?.name || "Customer",
+          customerPhone: user?.phone || "N/A",
+          vendorName: vendor?.name || "Restaurant",
+          vendorPhone: vendor?.phone || "",
+          status: "pending",
+          timestamp: new Date(),
+          restaurantPickupCode: (order as any).restaurantPickupCode,
+          isReserved: order.isReserved,
+          reservedAt: order.reservedAt,
+          stops: order.stops.map((s: any) => ({
+            id: s._id,
+            type: s.type.toLowerCase(),
+            locationName: s.address?.split(',')[0],
+            address: s.address,
+            lat: s.location.coordinates[1],
+            lng: s.location.coordinates[0],
+            items: s.items,
+          }))
+        };
+        socketManager.broadcastToDrivers("new_order", payload, "orders.increasePrice");
+      }
+
+      // Send push notifications to notify them of the price bump
+      (async () => {
+        try {
+          const { DriverService } = require("../drivers/drivers.service");
+          const driversService = new DriverService();
+          const startPos = order.stops[0].location.coordinates; // [lng, lat]
+          const nearbyDrivers = await driversService.getNearbyDrivers(
+            startPos[1], // lat
+            startPos[0], // lng
+            5000,
+            order.serviceType
+          );
+
+          let driversToNotify = [...nearbyDrivers];
+          if (driversToNotify.length === 0) {
+            driversToNotify = await Driver.find({ status: "online", activeServices: order.serviceType }).populate("user");
+          }
+
+          const notificationService = NotificationService.getInstance();
+          for (const d of driversToNotify) {
+            if (d.user && (d.user as any).fcmToken) {
+              await notificationService.sendPushNotification(
+                (d.user as any).fcmToken,
+                "Task Price Increased! 💰",
+                `Customer added a tip! New task price: ₹${newPrice}`,
+                { type: "new_order", orderId: order._id.toString() }
+              );
+            }
+          }
+        } catch (err) {
+          console.error("Error sending push notifications for price increase:", err);
+        }
+      })();
+
+      return order;
+    } catch (error) {
+      await session.abortTransaction();
+      throw error;
+    } finally {
+      session.endSession();
+    }
+  }
+
   async updateOrderStatus(orderId: string, status: OrderStatus) {
     const order = await Order.findOne(this.getOrderQuery(orderId));
     if (!order) throw new Error("Order not found");
@@ -695,6 +810,57 @@ export class OrdersService {
     return Order.find({ vendor: vendorId })
       .populate("user")
       .sort({ createdAt: -1 });
+  }
+
+  async declineOrder(orderId: string, driverUserId: string, reason: string) {
+    const order = await Order.findOne(this.getOrderQuery(orderId));
+    if (!order) throw new Error("Order not found");
+
+    const driver = await Driver.findOne({ user: driverUserId });
+    if (!driver) throw new Error("Driver profile not found");
+
+    // Push the reason
+    if (!order.declineReasons) {
+      order.declineReasons = [];
+    }
+    
+    // Prevent duplicate declining from the same driver
+    const alreadyDeclined = order.declineReasons.some(r => r.driverId === driver._id.toString());
+    if (!alreadyDeclined) {
+      order.declineReasons.push({ driverId: driver._id.toString(), reason });
+      await order.save();
+    }
+
+    // Average of all drivers or helpers opinion
+    // E.g., if 2 or more drivers declined, find the most common reason
+    if (order.declineReasons.length >= 2) {
+      const reasonCounts = order.declineReasons.reduce((acc, r) => {
+        acc[r.reason] = (acc[r.reason] || 0) + 1;
+        return acc;
+      }, {} as Record<string, number>);
+      
+      let mostCommonReason = "";
+      let maxCount = 0;
+      for (const [r, count] of Object.entries(reasonCounts)) {
+        if (count > maxCount) {
+          maxCount = count;
+          mostCommonReason = r;
+        }
+      }
+
+      if (maxCount >= 2) { // At least 2 drivers agree on the exact same reason
+        // Send a socket event to the customer
+        const socketManager = SocketManager.getInstance();
+        if (socketManager) {
+          socketManager.emitToUser(order.user.toString(), "order_delayed_reason", {
+            orderId: order._id,
+            reason: mostCommonReason
+          });
+        }
+      }
+    }
+
+    return order;
   }
 
   async acceptOrder(orderId: string, driverUserId: string) {

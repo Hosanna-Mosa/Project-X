@@ -29,6 +29,13 @@ export default function DriverChatScreen() {
   const { currentOrder, driverUserId, activeChat, addChatMessage, setUnreadCount, setIsChatActive } = useDriverStore();
   const [inputText, setInputText] = useState("");
   const flatListRef = useRef<FlatList>(null);
+  const [canStartTask, setCanStartTask] = useState(false);
+  const isHelper = currentOrder?.serviceType?.toLowerCase() === "helper";
+
+  const handleStartTask = () => {
+    socketService.emit("task_started", { orderId: currentOrder?.id });
+    router.push("/active-order");
+  };
 
   useEffect(() => {
     setUnreadCount?.(0);
@@ -49,9 +56,16 @@ export default function DriverChatScreen() {
       }
     };
 
+    const handleAssignTaskConfirmed = () => {
+      setCanStartTask(true);
+    };
+
     socketService.on("receive_message", handleReceiveMessage);
+    socketService.on("assign_task_confirmed", handleAssignTaskConfirmed);
+
     return () => {
       socketService.off("receive_message", handleReceiveMessage);
+      socketService.off("assign_task_confirmed", handleAssignTaskConfirmed);
       setIsChatActive?.(false);
     };
   }, [currentOrder?.id]);
@@ -136,6 +150,22 @@ export default function DriverChatScreen() {
           <Feather name="phone" size={20} color="#0EA5E9" />
         </TouchableOpacity>
       </View>
+
+      {isHelper && (
+        <View style={{ backgroundColor: '#F0FDF4', padding: 12, borderBottomWidth: 1, borderBottomColor: '#DCFCE7', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+          <View style={{ flex: 1, paddingRight: 10 }}>
+            <Text style={{ fontSize: 13, fontWeight: '700', color: '#166534' }}>Discuss Task Details</Text>
+            <Text style={{ fontSize: 11, color: '#15803D' }}>{canStartTask ? "Customer has assigned the task! You can start now." : "Wait for the customer to assign the task."}</Text>
+          </View>
+          <TouchableOpacity 
+            style={{ backgroundColor: canStartTask ? '#16A34A' : '#9CA3AF', paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20 }}
+            disabled={!canStartTask}
+            onPress={handleStartTask}
+          >
+            <Text style={{ color: '#fff', fontSize: 12, fontWeight: '700' }}>Start Task</Text>
+          </TouchableOpacity>
+        </View>
+      )}
 
       <FlatList
         ref={flatListRef}

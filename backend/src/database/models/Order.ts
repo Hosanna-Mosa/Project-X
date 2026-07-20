@@ -15,6 +15,7 @@ export enum OrderStatus {
   DRIVER_ASSIGNED = "DRIVER_ASSIGNED",
   PICKING_ITEMS = "PICKING_ITEMS",
   ON_THE_WAY = "ON_THE_WAY",
+  IN_PROGRESS = "IN_PROGRESS", // Helper specific status for ongoing tasks
   // Ride-specific statuses
   ARRIVED_PICKUP = "ARRIVED_PICKUP",
   IN_TRANSIT = "IN_TRANSIT",
@@ -28,6 +29,7 @@ export enum OrderStatus {
   EN_ROUTE_PICKUP = "en_route_pickup",
   ARRIVED_PICKUP_LC = "arrived_pickup",
   PICKING_ITEMS_LC = "picking_items",
+  IN_PROGRESS_LC = "in_progress", // Helper specific
   EN_ROUTE_DELIVERY = "en_route_delivery",
   ARRIVED_DELIVERY_LC = "arrived_delivery",
   DELIVERED_LC = "delivered",
@@ -86,6 +88,7 @@ export interface IOrder extends Omit<Document, "_id"> {
   restaurantPickupCode?: string;
   polyline?: string;
   notified15Min?: boolean;
+  declineReasons?: { driverId: string; reason: string }[];
   createdAt: Date;
   updatedAt: Date;
 }
@@ -138,6 +141,12 @@ const OrderSchema: Schema = new Schema(
       total: { type: Number, default: 0 },
     },
     stops: [StopSchema],
+    declineReasons: [
+      {
+        driverId: { type: String, required: true },
+        reason: { type: String, required: true },
+      },
+    ],
     radius: { type: Number },
     duration: { type: Number },
     customerPrice: { type: Number },
