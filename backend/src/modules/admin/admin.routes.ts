@@ -35,17 +35,17 @@ router.post("/coupons", authenticateToken, authorizeRole([UserRole.ADMIN]), admi
 router.put("/coupons/:id/toggle", authenticateToken, authorizeRole([UserRole.ADMIN]), adminController.toggleCouponStatus.bind(adminController));
 router.delete("/coupons/:id", authenticateToken, authorizeRole([UserRole.ADMIN]), adminController.deleteCoupon.bind(adminController));
 
+// Dev Drivers seeding and control routes
+router.post("/dev-drivers/seed", authenticateToken, authorizeRole([UserRole.ADMIN]), adminController.seedDevDrivers.bind(adminController));
+router.get("/dev-drivers", authenticateToken, authorizeRole([UserRole.ADMIN]), adminController.getDevDrivers.bind(adminController));
+router.put("/dev-drivers/:id", authenticateToken, authorizeRole([UserRole.ADMIN]), adminController.updateDevDriver.bind(adminController));
+router.delete("/dev-drivers", authenticateToken, authorizeRole([UserRole.ADMIN]), adminController.deleteDevDrivers.bind(adminController));
+
 // User and Driver details routes
 router.get("/users/:id", authenticateToken, authorizeRole([UserRole.ADMIN]), adminController.getUserDetail.bind(adminController));
 router.get("/drivers/:id", authenticateToken, authorizeRole([UserRole.ADMIN]), adminController.getDriverDetail.bind(adminController));
 router.get("/orders/:orderId/chat", authenticateToken, authorizeRole([UserRole.ADMIN]), adminController.getOrderChat.bind(adminController));
 router.get("/app-versions", authenticateToken, authorizeRole([UserRole.ADMIN]), adminController.getAppVersions.bind(adminController));
 router.put("/app-versions", authenticateToken, authorizeRole([UserRole.ADMIN]), adminController.updateAppVersion.bind(adminController));
-
-// Dev Drivers seeding and control routes
-router.post("/dev-drivers/seed", authenticateToken, authorizeRole([UserRole.ADMIN]), adminController.seedDevDrivers.bind(adminController));
-router.get("/dev-drivers", authenticateToken, authorizeRole([UserRole.ADMIN]), adminController.getDevDrivers.bind(adminController));
-router.put("/dev-drivers/:id", authenticateToken, authorizeRole([UserRole.ADMIN]), adminController.updateDevDriver.bind(adminController));
-router.delete("/dev-drivers", authenticateToken, authorizeRole([UserRole.ADMIN]), adminController.deleteDevDrivers.bind(adminController));
 
 export default router;

@@ -792,8 +792,21 @@ export class AdminController {
 
   async seedDevDrivers(req: Request, res: Response) {
     try {
-      // 1. Clean existing check users/drivers
-      const devUsers = await User.find({ name: /^check/i });
+      // 1. Clean existing check users/drivers (robust check by name, email, or phone)
+      const checkEmails = [];
+      const checkPhones = [];
+      for (let i = 1; i <= 10; i++) {
+        checkEmails.push(`check${i}@example.com`);
+        checkPhones.push(`+999999000${i}`);
+      }
+
+      const devUsers = await User.find({
+        $or: [
+          { name: /^check/i },
+          { email: { $in: checkEmails } },
+          { phone: { $in: checkPhones } }
+        ]
+      });
       const devUserIds = devUsers.map((u) => u._id);
       await Driver.deleteMany({ user: { $in: devUserIds } });
       await User.deleteMany({ _id: { $in: devUserIds } });

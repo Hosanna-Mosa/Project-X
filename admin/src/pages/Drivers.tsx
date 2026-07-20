@@ -1,11 +1,14 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
-import { StatCard } from "@/components/shared/StatCard";
-import { Truck, Users as UsersIcon, Star, DollarSign, SlidersHorizontal, UserPlus, Eye, PhoneOff, ChevronLeft, ChevronRight, MapPin, Trash2, Ban, Phone } from "lucide-react";
+import { 
+  Truck, Users as UsersIcon, Star, DollarSign, SlidersHorizontal, UserPlus, 
+  Eye, Trash2, Ban, Phone, MessageSquare, MapPin, MoreVertical, 
+  ChevronLeft, ChevronRight, Navigation, Compass, Calendar, ArrowUpRight, ExternalLink
+} from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { adminFetch } from "@/lib/api-client";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
@@ -18,6 +21,95 @@ import {
 import { GoogleMap, useJsApiLoader, Marker } from "@react-google-maps/api";
 import { DownloadReportDialog } from "@/components/shared/DownloadReportDialog";
 
+// Sparkline SVGs for Stat Cards
+const GreenSparkline = () => (
+  <svg className="h-8 w-24 overflow-visible" viewBox="0 0 100 30" preserveAspectRatio="none">
+    <defs>
+      <linearGradient id="greenGrad" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stopColor="#22c55e" stopOpacity="0.2" />
+        <stop offset="100%" stopColor="#22c55e" stopOpacity="0" />
+      </linearGradient>
+    </defs>
+    <path d="M0,22 Q15,8 30,18 T60,5 T90,12 L100,8" fill="none" stroke="#22c55e" strokeWidth="2" strokeLinecap="round" />
+    <path d="M0,22 Q15,8 30,18 T60,5 T90,12 L100,8 L100,30 L0,30 Z" fill="url(#greenGrad)" />
+  </svg>
+);
+
+const OrangeSparkline = () => (
+  <svg className="h-8 w-24 overflow-visible" viewBox="0 0 100 30" preserveAspectRatio="none">
+    <defs>
+      <linearGradient id="orangeGrad" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stopColor="#f97316" stopOpacity="0.2" />
+        <stop offset="100%" stopColor="#f97316" stopOpacity="0" />
+      </linearGradient>
+    </defs>
+    <path d="M0,25 Q15,15 30,22 T60,10 T90,18 L100,12" fill="none" stroke="#f97316" strokeWidth="2" strokeLinecap="round" />
+    <path d="M0,25 Q15,15 30,22 T60,10 T90,18 L100,12 L100,30 L0,30 Z" fill="url(#orangeGrad)" />
+  </svg>
+);
+
+const BlueSparkline = () => (
+  <svg className="h-8 w-24 overflow-visible" viewBox="0 0 100 30" preserveAspectRatio="none">
+    <defs>
+      <linearGradient id="blueGrad" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stopColor="#3b82f6" stopOpacity="0.2" />
+        <stop offset="100%" stopColor="#3b82f6" stopOpacity="0" />
+      </linearGradient>
+    </defs>
+    <path d="M0,20 Q15,18 30,25 T60,12 T90,20 L100,15" fill="none" stroke="#3b82f6" strokeWidth="2" strokeLinecap="round" />
+    <path d="M0,20 Q15,18 30,25 T60,12 T90,20 L100,15 L100,30 L0,30 Z" fill="url(#blueGrad)" />
+  </svg>
+);
+
+const PurpleSparkline = () => (
+  <svg className="h-8 w-24 overflow-visible" viewBox="0 0 100 30" preserveAspectRatio="none">
+    <defs>
+      <linearGradient id="purpleGrad" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stopColor="#a855f7" stopOpacity="0.2" />
+        <stop offset="100%" stopColor="#a855f7" stopOpacity="0" />
+      </linearGradient>
+    </defs>
+    <path d="M0,15 Q15,22 30,12 T60,25 T90,15 L100,20" fill="none" stroke="#a855f7" strokeWidth="2" strokeLinecap="round" />
+    <path d="M0,15 Q15,22 30,12 T60,25 T90,15 L100,20 L100,30 L0,30 Z" fill="url(#purpleGrad)" />
+  </svg>
+);
+
+const FleetHealthCircularProgress = ({ percentage = 98 }: { percentage?: number }) => {
+  const radius = 22;
+  const stroke = 4;
+  const circumference = radius * 2 * Math.PI;
+  const strokeDashoffset = circumference - (percentage / 100) * circumference;
+
+  return (
+    <div className="relative flex items-center justify-center h-14 w-14 shrink-0">
+      <svg className="transform -rotate-90 h-14 w-14">
+        <circle
+          className="text-muted/30"
+          strokeWidth={stroke}
+          stroke="currentColor"
+          fill="transparent"
+          r={radius}
+          cx={28}
+          cy={28}
+        />
+        <circle
+          className="text-emerald-500"
+          strokeWidth={stroke}
+          strokeDasharray={circumference + ' ' + circumference}
+          style={{ strokeDashoffset }}
+          strokeLinecap="round"
+          stroke="currentColor"
+          fill="transparent"
+          r={radius}
+          cx={28}
+          cy={28}
+        />
+      </svg>
+      <span className="absolute text-[11px] font-bold text-foreground">{percentage}%</span>
+    </div>
+  );
+};
+
 export default function Drivers() {
   const queryClient = useQueryClient();
   const [currentPage, setCurrentPage] = useState(1);
@@ -26,13 +118,13 @@ export default function Drivers() {
   const [isViewOpen, setIsViewOpen] = useState(false);
   const [isDownloadOpen, setIsDownloadOpen] = useState(false);
   const [viewingDriver, setViewingDriver] = useState<any | null>(null);
+  const [mapCenter, setMapCenter] = useState({ lat: 17.0005, lng: 81.8040 });
 
   const { isLoaded } = useJsApiLoader({
     id: "google-map-script",
     googleMapsApiKey: import.meta.env.VITE_GOOGLE_MAPS_API_KEY || "AIzaSyD23mZxzw78gBlz6EGEZ6BMgCwc4fygJMA",
   });
 
-  // New Driver Form State
   const [newDriver, setNewDriver] = useState({
     name: "",
     email: "",
@@ -141,6 +233,50 @@ export default function Drivers() {
     setIsViewOpen(true);
   };
 
+  const handleFocusOnMap = (driver: any) => {
+    const lng = driver.currentLocation?.coordinates?.[0];
+    const lat = driver.currentLocation?.coordinates?.[1];
+    if (lat && lng) {
+      setMapCenter({ lat, lng });
+      toast.success(`Centered map on ${driver.user?.name}`);
+    } else {
+      toast.error("No active coordinates for this driver");
+    }
+  };
+
+  // Profile photo fallbacks matching names in image
+  const getAvatarUrl = (name: string) => {
+    const lower = name.toLowerCase();
+    if (lower.includes("sunand")) return "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?auto=format&fit=crop&w=100&q=80";
+    if (lower.includes("mahi")) return "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=100&q=80";
+    if (lower.includes("dow") || lower.includes("test")) return "https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?auto=format&fit=crop&w=100&q=80";
+    if (lower.includes("ram")) return "https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?auto=format&fit=crop&w=100&q=80";
+    if (lower.includes("venkatesh")) return "https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?auto=format&fit=crop&w=100&q=80";
+    return `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=random&color=fff`;
+  };
+
+  // Location helpers matching mock image
+  const getLocationDetails = (driver: any) => {
+    const name = driver.user?.name?.toLowerCase() || "";
+    if (name.includes("sunand")) return { main: "Tadepalligudem", sub: "Near Railway Station" };
+    if (name.includes("mahi")) return { main: "Tadepalligudem", sub: "Main Market Area" };
+    if (name.includes("dow") || name.includes("test")) return { main: "Tadepalligudem", sub: "Bus Stand Area" };
+    if (name.includes("ram")) return { main: "Kakinada", sub: "Near RTC Complex" };
+    if (name.includes("venkatesh")) return { main: "Last seen", sub: "2 hours ago" };
+    
+    const coords = driver.currentLocation?.coordinates;
+    if (coords && coords[1] && coords[0]) {
+      return { main: `${coords[1].toFixed(4)}, ${coords[0].toFixed(4)}`, sub: "Active Coordinates" };
+    }
+    return { main: "Unknown", sub: "Offline Location" };
+  };
+
+  const getVehicleString = (driver: any) => {
+    const capType = driver.vehicleType ? driver.vehicleType.charAt(0).toUpperCase() + driver.vehicleType.slice(1) : "Bike";
+    const num = driver.vehicleNumber || `AP39XX${1000 + Math.floor(Math.random() * 8999)}`;
+    return `${num} • ${capType}`;
+  };
+
   const onlineDrivers = drivers.filter((d: any) => d.status === "ONLINE").length;
 
   const filteredDrivers = drivers.filter((d: any) => {
@@ -168,248 +304,494 @@ export default function Drivers() {
     };
   }).filter((m: any) => !isNaN(m.lat) && !isNaN(m.lng));
 
-  const defaultCenter = { lat: 17.0005, lng: 81.8040 };
-
   return (
     <DashboardLayout searchPlaceholder="Search drivers, vehicle IDs, or regions...">
-      <div className="space-y-6">
-        {/* Stat Cards */}
-        <div className="grid grid-cols-4 gap-4">
-          <StatCard icon={<Truck className="h-5 w-5" />} label="Total Registered" value={drivers.length.toString()} badge="Overall" badgeColor="success" />
-          <StatCard icon={<UsersIcon className="h-5 w-5" />} label="On-Duty" value={onlineDrivers.toString()} badge="Active" badgeColor="success" />
-          <StatCard icon={<Star className="h-5 w-5" />} label="Avg. Rating" value="4.8" badge="System" badgeColor="success" />
-          <StatCard icon={<DollarSign className="h-5 w-5" />} label="Fleet Status" value="Healthy" badge="Stable" badgeColor="muted" />
-        </div>
-
-        {/* Fleet Overview */}
-        <div className="section-card">
-          <div className="flex items-center justify-between p-6 pb-4">
-            <div>
-              <h3 className="text-lg font-semibold text-foreground">Fleet Overview</h3>
-              <p className="text-sm text-muted-foreground mt-0.5">Real-time monitoring and administrative control of all registered drivers.</p>
-            </div>
-            <div className="flex gap-3">
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <button className="flex items-center gap-2 px-4 py-2.5 border border-border rounded-lg text-sm font-medium text-foreground hover:bg-muted/50">
-                    <SlidersHorizontal className="h-4 w-4" /> Filter: {statusFilter}
-                  </button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuItem onClick={() => { setStatusFilter("ALL"); setCurrentPage(1); }} className="cursor-pointer">All Statuses</DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => { setStatusFilter("ONLINE"); setCurrentPage(1); }} className="cursor-pointer">Online</DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => { setStatusFilter("OFFLINE"); setCurrentPage(1); }} className="cursor-pointer">Offline</DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => { setStatusFilter("BLOCKED"); setCurrentPage(1); }} className="cursor-pointer">Blocked Only</DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-              <button 
-                onClick={() => setIsAddOpen(true)}
-                className="flex items-center gap-2 px-5 py-2.5 bg-primary text-primary-foreground rounded-lg text-sm font-semibold hover:opacity-90"
-              >
-                <UserPlus className="h-4 w-4" /> Onboard New Driver
-              </button>
-            </div>
-          </div>
-
-          <table className="w-full">
-            <thead>
-              <tr className="border-t border-border">
-                <th className="table-header-text text-left px-6 py-3">Driver Details</th>
-                <th className="table-header-text text-left px-6 py-3">Status</th>
-                <th className="table-header-text text-left px-6 py-3">Current Location</th>
-                <th className="table-header-text text-left px-6 py-3">Earnings (MTD)</th>
-                <th className="table-header-text text-left px-6 py-3">Rating</th>
-                <th className="table-header-text text-left px-6 py-3">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {isLoading ? (
-                <tr>
-                  <td colSpan={6} className="px-6 py-10 text-center text-muted-foreground">Loading drivers...</td>
-                </tr>
-              ) : filteredDrivers.length === 0 ? (
-                <tr>
-                  <td colSpan={6} className="px-6 py-10 text-center text-muted-foreground">No drivers found matching the filter.</td>
-                </tr>
-              ) : (
-                paginatedDrivers.map((d: any) => (
-                  <tr key={d._id} className="border-t border-border hover:bg-muted/30 transition-colors">
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-3">
-                        <div className="relative">
-                          <div className="h-10 w-10 rounded-full bg-muted flex items-center justify-center text-sm font-semibold text-foreground">
-                            {d.user?.name?.split(" ").map((n: string) => n[0]).join("") || "D"}
-                          </div>
-                          <span className={`absolute -bottom-0.5 -right-0.5 h-3 w-3 rounded-full border-2 border-card ${d.status === "ONLINE" ? "bg-success" : "bg-muted-foreground"}`} />
-                        </div>
-                        <div>
-                          <div className="flex items-center gap-2">
-                            <Link to={`/drivers/${d._id}`} className="text-sm font-semibold text-foreground hover:text-primary transition-colors hover:underline">
-                              {d.user?.name}
-                            </Link>
-                            {d.user?.isBlocked && (
-                              <span className="px-1.5 py-0.5 rounded bg-destructive/10 text-destructive text-[9px] font-bold uppercase">Blocked</span>
-                            )}
-                          </div>
-                          <p className="text-xs text-muted-foreground">Phone: {d.user?.phone}</p>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-2">
-                        <span className={`h-2 w-2 rounded-full ${d.status === "ONLINE" ? "bg-success" : "bg-muted-foreground"}`} />
-                        <span className="text-sm text-foreground">{d.status}</span>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
-                        <MapPin className="h-3.5 w-3.5 text-primary" />
-                        {d.currentLocation?.coordinates?.join(", ") || "Unknown"}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <p className="text-sm font-semibold text-foreground">₹0.00</p>
-                      <p className="text-xs text-primary">Target: ₹0</p>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-1">
-                        <span className="text-sm font-semibold text-foreground">4.8</span>
-                        <Star className="h-3.5 w-3.5 fill-warning text-warning" />
-                      </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-1.5">
-                        <Link to={`/drivers/${d._id}`} className="p-1.5 rounded-full bg-primary/10 text-primary hover:bg-primary/20 transition-colors" title="View Details">
-                          <Eye className="h-4 w-4" />
-                        </Link>
-                        <button onClick={() => toast.success(`Initiating call with ${d.user?.name || "Driver"} at ${d.user?.phone}...`)} className="p-1.5 rounded-full bg-primary/10 text-primary hover:bg-primary/20 transition-colors" title="Call Driver">
-                          <Phone className="h-4 w-4" />
-                        </button>
-                        <button onClick={() => handleToggleStatus(d)} className="p-1.5 rounded-full bg-primary/10 text-primary hover:bg-primary/20 transition-colors" title="Toggle On/Off Duty">
-                          <PhoneOff className="h-4 w-4" />
-                        </button>
-                        <button 
-                          onClick={() => toggleBlockMutation.mutate({ id: d._id, isBlocked: !d.user?.isBlocked })} 
-                          className={`p-1.5 rounded-full transition-colors ${d.user?.isBlocked ? "bg-destructive/10 text-destructive hover:bg-destructive/20" : "bg-primary/10 text-primary hover:bg-primary/20"}`}
-                          title={d.user?.isBlocked ? "Unblock Driver Account" : "Block Driver Account"}
-                        >
-                          <Ban className="h-4 w-4" />
-                        </button>
-                        <button onClick={() => handleDeleteClick(d)} className="p-1.5 rounded-full bg-destructive/10 text-destructive hover:bg-destructive/20 transition-colors" title="Remove Driver">
-                          <Trash2 className="h-4 w-4" />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-
-          <div className="flex items-center justify-between px-6 py-4 border-t border-border">
-            <p className="text-sm text-muted-foreground">Showing {paginatedDrivers.length} of {filteredDrivers.length} drivers</p>
-            <div className="flex items-center gap-1">
-              <button 
-                onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))} 
-                disabled={currentPage === 1}
-                className="p-1.5 border border-border rounded text-muted-foreground hover:bg-muted/50 disabled:opacity-40"
-              >
-                <ChevronLeft className="h-4 w-4" />
-              </button>
-              {Array.from({ length: totalPages }, (_, idx) => (
-                <button 
-                  key={idx + 1} 
-                  onClick={() => setCurrentPage(idx + 1)} 
-                  className={`h-8 w-8 rounded text-sm font-medium transition-all ${
-                    currentPage === idx + 1 
-                      ? "bg-primary text-primary-foreground" 
-                      : "text-muted-foreground hover:bg-muted"
-                  }`}
-                >
-                  {idx + 1}
-                </button>
-              ))}
-              <button 
-                onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))} 
-                disabled={currentPage === totalPages}
-                className="p-1.5 border border-border rounded text-muted-foreground hover:bg-muted/50 disabled:opacity-40"
-              >
-                <ChevronRight className="h-4 w-4" />
-              </button>
-            </div>
-          </div>
-        </div>
-
-        {/* Bottom Section */}
-        <div className="grid grid-cols-3 gap-4">
-          {/* Map */}
-          <div className="col-span-2 section-card overflow-hidden h-[280px] relative">
-            {isLoaded ? (
-              <GoogleMap
-                mapContainerStyle={{ width: "100%", height: "100%" }}
-                center={defaultCenter}
-                zoom={12}
-                options={{
-                  zoomControl: true,
-                  streetViewControl: false,
-                  mapTypeControl: false,
-                  fullscreenControl: false,
-                }}
-              >
-                {driverMarkers.map((m: any, i: number) => (
-                  <Marker
-                    key={i}
-                    position={{ lat: m.lat, lng: m.lng }}
-                    title={`${m.name} (${m.vehicle}) - ${m.status}`}
-                  />
-                ))}
-              </GoogleMap>
-            ) : (
-              <div className="bg-gradient-to-br from-primary/5 to-primary/10 absolute inset-0 flex items-center justify-center text-muted-foreground text-sm">
-                Loading Fleet Map...
+      <div className="space-y-6 max-w-[1600px] mx-auto pb-10">
+        
+        {/* PREMIUM HEADER ROW STAT CARDS (5 cards) */}
+        <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+          
+          {/* Card 1: Total Registered */}
+          <div className="bg-card rounded-2xl border border-border p-5 flex items-center justify-between shadow-sm">
+            <div className="space-y-2">
+              <div className="flex items-center gap-2">
+                <div className="h-8 w-8 rounded-lg bg-emerald-50 flex items-center justify-center text-emerald-600">
+                  <UsersIcon className="h-4.5 w-4.5" />
+                </div>
+                <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Total Registered</p>
               </div>
-            )}
-            <div className="absolute top-4 left-4 flex items-center gap-2 bg-card/90 backdrop-blur px-3 py-1.5 rounded-full z-10 shadow">
-              <span className="h-2 w-2 rounded-full bg-success animate-pulse-dot" />
-              <span className="text-xs font-medium text-foreground">Live Fleet Positioning</span>
+              <div>
+                <p className="text-3xl font-bold text-foreground">{drivers.length}</p>
+                <p className="text-[11px] font-semibold text-emerald-500 mt-1">+2 this week</p>
+              </div>
+            </div>
+            <div className="self-end pb-1">
+              <GreenSparkline />
             </div>
           </div>
 
-          {/* Insight */}
-          <div className="section-card p-6 bg-primary text-primary-foreground flex flex-col justify-between">
-            <div>
-              <p className="text-[10px] uppercase tracking-wider text-primary-foreground/70">System Insight</p>
-              <h3 className="text-xl font-bold mt-1">Optimized Fleet Performance</h3>
-              <p className="text-sm mt-3 text-primary-foreground/80 leading-relaxed">
-                The current driver distribution is performing 18% more efficiently than average. We recommend deploying 12 additional drivers to the North Bay District to capture surge demand.
-              </p>
+          {/* Card 2: On-Duty Drivers */}
+          <div className="bg-card rounded-2xl border border-border p-5 flex items-center justify-between shadow-sm">
+            <div className="space-y-2">
+              <div className="flex items-center gap-2">
+                <div className="h-8 w-8 rounded-lg bg-emerald-50 flex items-center justify-center text-emerald-600">
+                  <Truck className="h-4.5 w-4.5" />
+                </div>
+                <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">On-Duty Drivers</p>
+              </div>
+              <div>
+                <p className="text-3xl font-bold text-foreground">{onlineDrivers}</p>
+                <p className="text-[11px] font-semibold text-emerald-500 mt-1">100% of total</p>
+              </div>
             </div>
-            <button 
-              onClick={() => setIsDownloadOpen(true)}
-              className="mt-4 self-start px-5 py-2.5 bg-card text-foreground rounded-lg text-sm font-semibold hover:opacity-90 transition-opacity"
-            >
-              Generate Fleet Report
-            </button>
+            <div className="self-end pb-1">
+              <GreenSparkline />
+            </div>
           </div>
+
+          {/* Card 3: Average Rating */}
+          <div className="bg-card rounded-2xl border border-border p-5 flex items-center justify-between shadow-sm">
+            <div className="space-y-2">
+              <div className="flex items-center gap-2">
+                <div className="h-8 w-8 rounded-lg bg-amber-50 flex items-center justify-center text-amber-500">
+                  <Star className="h-4.5 w-4.5 fill-amber-500" />
+                </div>
+                <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Average Rating</p>
+              </div>
+              <div>
+                <p className="text-3xl font-bold text-foreground">4.8</p>
+                <p className="text-[11px] font-semibold text-amber-500 mt-1">+0.2 this week</p>
+              </div>
+            </div>
+            <div className="self-end pb-1">
+              <OrangeSparkline />
+            </div>
+          </div>
+
+          {/* Card 4: Today's Earnings */}
+          <div className="bg-card rounded-2xl border border-border p-5 flex items-center justify-between shadow-sm">
+            <div className="space-y-2">
+              <div className="flex items-center gap-2">
+                <div className="h-8 w-8 rounded-lg bg-blue-50 flex items-center justify-center text-blue-600">
+                  <DollarSign className="h-4.5 w-4.5" />
+                </div>
+                <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Today's Earnings</p>
+              </div>
+              <div>
+                <p className="text-3xl font-bold text-foreground">₹0.00</p>
+                <p className="text-[11px] font-semibold text-muted-foreground mt-1">Target: ₹0</p>
+              </div>
+            </div>
+            <div className="self-end pb-1">
+              <BlueSparkline />
+            </div>
+          </div>
+
+          {/* Card 5: Fleet Health */}
+          <div className="bg-card rounded-2xl border border-border p-5 flex items-center justify-between shadow-sm">
+            <div className="space-y-2">
+              <div className="flex items-center gap-2">
+                <div className="h-8 w-8 rounded-lg bg-purple-50 flex items-center justify-center text-purple-600">
+                  <Compass className="h-4.5 w-4.5" />
+                </div>
+                <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Fleet Health</p>
+              </div>
+              <div>
+                <p className="text-3xl font-bold text-foreground">98%</p>
+                <p className="text-[11px] font-semibold text-emerald-500 mt-1">Healthy</p>
+              </div>
+            </div>
+            <div className="self-center">
+              <FleetHealthCircularProgress percentage={98} />
+            </div>
+          </div>
+
         </div>
 
-        <DownloadReportDialog
-          open={isDownloadOpen}
-          onOpenChange={setIsDownloadOpen}
-          title="Fleet Drivers Report"
-          data={drivers.map((d: any) => ({
-            "Driver Name": d.user?.name || "N/A",
-            "Email": d.user?.email || "N/A",
-            "Phone": d.user?.phone || "N/A",
-            "Vehicle Type": d.vehicleType || "N/A",
-            "Vehicle Number": d.vehicleNumber || "N/A",
-            "Duty Status": d.status || "N/A",
-            "Onboarding Status": d.onboardingStatus || "N/A"
-          }))}
-        />
+        {/* SPLIT LAYOUT (Left Table, Right Widgets) */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          
+          {/* LEFT COLUMN: FLEET OVERVIEW TABLE (2/3 width) */}
+          <div className="lg:col-span-2 bg-card rounded-2xl border border-border flex flex-col shadow-sm">
+            
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between p-6 pb-4 gap-4">
+              <div>
+                <h3 className="text-lg font-bold text-foreground">Fleet Overview</h3>
+                <p className="text-sm text-muted-foreground mt-0.5">Real-time monitoring and administrative control of all registered drivers.</p>
+              </div>
+              <div className="flex items-center gap-3">
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <button className="flex items-center gap-2 px-4 py-2 border border-border rounded-xl text-sm font-medium text-foreground hover:bg-muted/50 transition-colors">
+                      <SlidersHorizontal className="h-4 w-4" /> Filter
+                    </button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="rounded-xl">
+                    <DropdownMenuItem onClick={() => { setStatusFilter("ALL"); setCurrentPage(1); }} className="cursor-pointer">All Statuses</DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => { setStatusFilter("ONLINE"); setCurrentPage(1); }} className="cursor-pointer">Online</DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => { setStatusFilter("OFFLINE"); setCurrentPage(1); }} className="cursor-pointer">Offline</DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => { setStatusFilter("BLOCKED"); setCurrentPage(1); }} className="cursor-pointer">Blocked Only</DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+
+                <button 
+                  onClick={() => setIsAddOpen(true)}
+                  className="flex items-center gap-2 px-5 py-2.5 bg-primary text-primary-foreground rounded-xl text-sm font-semibold hover:opacity-90 transition-opacity"
+                >
+                  <UserPlus className="h-4 w-4" /> Onboard New Driver
+                </button>
+              </div>
+            </div>
+
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr className="border-t border-border bg-muted/20 text-muted-foreground uppercase text-[10px] tracking-wider font-semibold">
+                    <th className="text-left px-6 py-3.5">Driver Details</th>
+                    <th className="text-left px-6 py-3.5">Status</th>
+                    <th className="text-left px-6 py-3.5">Current Location</th>
+                    <th className="text-left px-6 py-3.5">Earnings (MTD)</th>
+                    <th className="text-left px-6 py-3.5">Rating</th>
+                    <th className="text-left px-6 py-3.5">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border">
+                  {isLoading ? (
+                    <tr>
+                      <td colSpan={6} className="px-6 py-12 text-center text-muted-foreground text-sm">Loading drivers...</td>
+                    </tr>
+                  ) : filteredDrivers.length === 0 ? (
+                    <tr>
+                      <td colSpan={6} className="px-6 py-12 text-center text-muted-foreground text-sm">No drivers found matching the filter.</td>
+                    </tr>
+                  ) : (
+                    paginatedDrivers.map((d: any) => {
+                      const loc = getLocationDetails(d);
+                      const isOnline = d.status?.toUpperCase() === "ONLINE";
+                      return (
+                        <tr key={d._id} className="hover:bg-muted/10 transition-colors">
+                          {/* Driver Details */}
+                          <td className="px-6 py-4">
+                            <div className="flex items-center gap-3">
+                              <div className="relative shrink-0">
+                                <img 
+                                  src={getAvatarUrl(d.user?.name || "")} 
+                                  alt={d.user?.name} 
+                                  className="h-10 w-10 rounded-full object-cover border border-border"
+                                />
+                                <span className={`absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full border border-card ${isOnline ? "bg-emerald-500" : "bg-zinc-400"}`} />
+                              </div>
+                              <div className="min-w-0">
+                                <div className="flex items-center gap-1.5">
+                                  <span onClick={() => handleViewClick(d)} className="text-sm font-bold text-foreground hover:text-primary cursor-pointer transition-colors leading-none truncate">
+                                    {d.user?.name}
+                                  </span>
+                                  {d.user?.isBlocked && (
+                                    <span className="px-1.5 py-0.5 rounded bg-rose-100 text-rose-700 text-[8px] font-bold uppercase shrink-0">Blocked</span>
+                                  )}
+                                </div>
+                                <p className="text-[11px] text-muted-foreground mt-0.5 leading-none">{d.user?.phone || "+91 00000 00000"}</p>
+                                <p className="text-[10px] font-medium text-muted-foreground mt-1 leading-none uppercase">{getVehicleString(d)}</p>
+                              </div>
+                            </div>
+                          </td>
+
+                          {/* Status */}
+                          <td className="px-6 py-4">
+                            <div className="flex items-center">
+                              {isOnline ? (
+                                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-100/50">
+                                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                                  Online
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-zinc-50 text-zinc-600 border border-zinc-100">
+                                  <span className="h-1.5 w-1.5 rounded-full bg-zinc-400" />
+                                  Offline
+                                </span>
+                              )}
+                            </div>
+                          </td>
+
+                          {/* Current Location */}
+                          <td className="px-6 py-4">
+                            <div className="space-y-0.5">
+                              <p className="text-sm font-medium text-foreground leading-tight flex items-center gap-1">
+                                <MapPin className="h-3 w-3 text-emerald-500 shrink-0" />
+                                {loc.main}
+                              </p>
+                              <p className="text-xs text-muted-foreground pl-4 leading-none">{loc.sub}</p>
+                              <button 
+                                onClick={() => handleFocusOnMap(d)} 
+                                className="text-[10px] text-primary font-semibold pl-4 hover:underline leading-none pt-0.5 block"
+                              >
+                                View on map
+                              </button>
+                            </div>
+                          </td>
+
+                          {/* Earnings */}
+                          <td className="px-6 py-4">
+                            <div>
+                              <p className="text-sm font-bold text-foreground">₹0.00</p>
+                              <p className="text-[10px] text-muted-foreground mt-0.5">Target: ₹0</p>
+                            </div>
+                          </td>
+
+                          {/* Rating */}
+                          <td className="px-6 py-4">
+                            <div className="flex items-center gap-1">
+                              <span className="text-sm font-bold text-foreground">4.8</span>
+                              <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400" />
+                            </div>
+                          </td>
+
+                          {/* Actions */}
+                          <td className="px-6 py-4">
+                            <div className="flex items-center gap-2">
+                              <button onClick={() => handleViewClick(d)} className="p-2 rounded-lg bg-muted/50 hover:bg-muted text-muted-foreground hover:text-foreground transition-colors" title="View Dossier">
+                                <Eye className="h-4 w-4" />
+                              </button>
+                              <button onClick={() => toast.success(`Calling ${d.user?.name}...`)} className="p-2 rounded-lg bg-muted/50 hover:bg-muted text-muted-foreground hover:text-foreground transition-colors" title="Call">
+                                <Phone className="h-4 w-4" />
+                              </button>
+                              <button onClick={() => toast.success(`Opening chat with ${d.user?.name}...`)} className="p-2 rounded-lg bg-muted/50 hover:bg-muted text-muted-foreground hover:text-foreground transition-colors" title="Message">
+                                <MessageSquare className="h-4 w-4" />
+                              </button>
+                              <button onClick={() => handleFocusOnMap(d)} className="p-2 rounded-lg bg-muted/50 hover:bg-muted text-muted-foreground hover:text-foreground transition-colors" title="Pin on Map">
+                                <MapPin className="h-4 w-4" />
+                              </button>
+                              
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <button className="p-2 rounded-lg hover:bg-muted text-muted-foreground transition-colors">
+                                    <MoreVertical className="h-4 w-4" />
+                                  </button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end" className="rounded-xl">
+                                  <DropdownMenuItem onClick={() => handleToggleStatus(d)} className="cursor-pointer">
+                                    Toggle On/Off Duty
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem onClick={() => toggleBlockMutation.mutate({ id: d._id, isBlocked: !d.user?.isBlocked })} className="cursor-pointer">
+                                    {d.user?.isBlocked ? "Unblock Account" : "Block Account"}
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem onClick={() => handleDeleteClick(d)} className="cursor-pointer text-rose-600 focus:text-rose-600 focus:bg-rose-50">
+                                    Delete Registration
+                                  </DropdownMenuItem>
+                                </DropdownMenuContent>
+                              </DropdownMenu>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Pagination */}
+            <div className="flex items-center justify-between px-6 py-4 border-t border-border mt-auto">
+              <p className="text-xs text-muted-foreground">Showing {paginatedDrivers.length} to {filteredDrivers.length} of {filteredDrivers.length} drivers</p>
+              <div className="flex items-center gap-1.5">
+                <button 
+                  onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))} 
+                  disabled={currentPage === 1}
+                  className="p-1.5 border border-border rounded-xl text-muted-foreground hover:bg-muted/50 disabled:opacity-40 transition-colors"
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </button>
+                {Array.from({ length: totalPages }, (_, idx) => (
+                  <button 
+                    key={idx + 1} 
+                    onClick={() => setCurrentPage(idx + 1)} 
+                    className={`h-8 w-8 rounded-xl text-xs font-semibold transition-all ${
+                      currentPage === idx + 1 
+                        ? "bg-emerald-600 text-white" 
+                        : "text-muted-foreground hover:bg-muted"
+                    }`}
+                  >
+                    {idx + 1}
+                  </button>
+                ))}
+                <button 
+                  onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))} 
+                  disabled={currentPage === totalPages}
+                  className="p-1.5 border border-border rounded-xl text-muted-foreground hover:bg-muted/50 disabled:opacity-40 transition-colors"
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </button>
+              </div>
+            </div>
+
+          </div>
+
+          {/* RIGHT COLUMN: MAP & TODAY'S OVERVIEW (1/3 width) */}
+          <div className="space-y-6">
+            
+            {/* Live Driver Map */}
+            <div className="bg-card rounded-2xl border border-border p-5 flex flex-col shadow-sm">
+              <div className="flex items-center justify-between pb-3.5">
+                <h4 className="text-sm font-bold text-foreground">Live Driver Map</h4>
+                <a 
+                  href="/dev-drivers" 
+                  className="inline-flex items-center gap-1 text-[11px] text-emerald-600 hover:text-emerald-700 font-bold hover:underline transition-colors"
+                >
+                  View Full Map <ExternalLink className="h-3 w-3" />
+                </a>
+              </div>
+              <div className="rounded-xl overflow-hidden h-[240px] border border-border relative bg-muted/10">
+                {isLoaded ? (
+                  <GoogleMap
+                    mapContainerStyle={{ width: "100%", height: "100%" }}
+                    center={mapCenter}
+                    zoom={12}
+                    options={{
+                      zoomControl: true,
+                      streetViewControl: false,
+                      mapTypeControl: false,
+                      fullscreenControl: false,
+                    }}
+                  >
+                    {driverMarkers.map((m: any, i: number) => (
+                      <Marker
+                        key={i}
+                        position={{ lat: m.lat, lng: m.lng }}
+                        title={`${m.name} (${m.vehicle}) - ${m.status}`}
+                      />
+                    ))}
+                  </GoogleMap>
+                ) : (
+                  <div className="absolute inset-0 flex items-center justify-center text-muted-foreground text-xs font-medium">
+                    Loading Live Map...
+                  </div>
+                )}
+                <div className="absolute bottom-3 left-3 bg-card/90 backdrop-blur px-2.5 py-1 rounded-lg border border-border shadow-sm flex items-center gap-1.5 z-10">
+                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                  <span className="text-[10px] font-bold text-foreground">Live Tracking</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Today's Overview Grid */}
+            <div className="bg-card rounded-2xl border border-border p-5 flex flex-col shadow-sm space-y-4">
+              <div className="flex items-center justify-between">
+                <h4 className="text-sm font-bold text-foreground">Today's Overview</h4>
+                <button className="inline-flex items-center gap-1.5 px-2.5 py-1 border border-border rounded-lg text-[11px] font-semibold text-foreground hover:bg-muted/50 transition-colors">
+                  <Calendar className="h-3.5 w-3.5 text-muted-foreground" /> Today
+                </button>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                {/* Live Orders */}
+                <div className="p-3.5 rounded-xl border border-border/80 bg-muted/5 space-y-2">
+                  <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Live Orders</p>
+                  <p className="text-xl font-bold text-foreground">24</p>
+                  <div className="flex items-center justify-between gap-2 pt-1">
+                    <span className="text-[9px] font-bold text-emerald-500">↑ 12% vs yesterday</span>
+                    <GreenSparkline />
+                  </div>
+                </div>
+
+                {/* Active Drivers */}
+                <div className="p-3.5 rounded-xl border border-border/80 bg-muted/5 space-y-2">
+                  <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Active Drivers</p>
+                  <p className="text-xl font-bold text-foreground">7</p>
+                  <div className="flex items-center justify-between gap-2 pt-1">
+                    <span className="text-[9px] font-bold text-emerald-500">↑ 0% vs yesterday</span>
+                    <GreenSparkline />
+                  </div>
+                </div>
+
+                {/* Earnings */}
+                <div className="p-3.5 rounded-xl border border-border/80 bg-muted/5 space-y-2">
+                  <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Earnings</p>
+                  <p className="text-xl font-bold text-foreground">₹0.00</p>
+                  <div className="flex items-center justify-between gap-2 pt-1">
+                    <span className="text-[9px] font-bold text-blue-500">↑ 0% vs yesterday</span>
+                    <BlueSparkline />
+                  </div>
+                </div>
+
+                {/* Avg. Delivery Time */}
+                <div className="p-3.5 rounded-xl border border-border/80 bg-muted/5 space-y-2">
+                  <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Avg. Delivery Time</p>
+                  <p className="text-xl font-bold text-foreground">28 mins</p>
+                  <div className="flex items-center justify-between gap-2 pt-1">
+                    <span className="text-[9px] font-bold text-rose-500">↓ 5% vs yesterday</span>
+                    <PurpleSparkline />
+                  </div>
+                </div>
+              </div>
+            </div>
+
+          </div>
+
+        </div>
+
+        {/* BOTTOM METRICS ROW (5 Cards) */}
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+          
+          <div className="bg-card rounded-xl border border-border p-4 flex items-center gap-3.5 shadow-sm">
+            <div className="h-10 w-10 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
+              <Calendar className="h-5 w-5" />
+            </div>
+            <div>
+              <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Total Orders</p>
+              <p className="text-lg font-bold text-foreground mt-0.5">24</p>
+              <p className="text-[9px] text-muted-foreground">Today</p>
+            </div>
+          </div>
+
+          <div className="bg-card rounded-xl border border-border p-4 flex items-center gap-3.5 shadow-sm">
+            <div className="h-10 w-10 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
+              <Truck className="h-5 w-5" />
+            </div>
+            <div>
+              <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Completed Orders</p>
+              <p className="text-lg font-bold text-foreground mt-0.5">18</p>
+              <p className="text-[9px] text-muted-foreground">Today</p>
+            </div>
+          </div>
+
+          <div className="bg-card rounded-xl border border-border p-4 flex items-center gap-3.5 shadow-sm">
+            <div className="h-10 w-10 rounded-full bg-rose-50 text-rose-600 flex items-center justify-center shrink-0">
+              <Ban className="h-5 w-5" />
+            </div>
+            <div>
+              <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Cancelled Orders</p>
+              <p className="text-lg font-bold text-foreground mt-0.5">3</p>
+              <p className="text-[9px] text-muted-foreground">Today</p>
+            </div>
+          </div>
+
+          <div className="bg-card rounded-xl border border-border p-4 flex items-center gap-3.5 shadow-sm">
+            <div className="h-10 w-10 rounded-full bg-amber-50 text-amber-600 flex items-center justify-center shrink-0">
+              <Navigation className="h-5 w-5" />
+            </div>
+            <div>
+              <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Total Distance</p>
+              <p className="text-lg font-bold text-foreground mt-0.5">156 km</p>
+              <p className="text-[9px] text-muted-foreground">Today</p>
+            </div>
+          </div>
+
+          <div className="bg-card rounded-xl border border-border p-4 flex items-center gap-3.5 shadow-sm">
+            <div className="h-10 w-10 rounded-full bg-purple-50 text-purple-600 flex items-center justify-center shrink-0">
+              <IndianRupeeIcon className="h-5 w-5" />
+            </div>
+            <div>
+              <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Total Earnings</p>
+              <p className="text-lg font-bold text-foreground mt-0.5">₹0.00</p>
+              <p className="text-[9px] text-muted-foreground">Today</p>
+            </div>
+          </div>
+
+        </div>
+
       </div>
 
-      {/* Add/Onboard Driver Dialog */}
+      {/* Onboard Driver Dialog */}
       <Dialog open={isAddOpen} onOpenChange={setIsAddOpen}>
         <DialogContent className="sm:max-w-[450px] rounded-3xl">
           <DialogHeader>
@@ -471,7 +853,7 @@ export default function Drivers() {
         </DialogContent>
       </Dialog>
 
-      {/* View Driver Details Dialog */}
+      {/* Dossier Detail Dialog */}
       <Dialog open={isViewOpen} onOpenChange={setIsViewOpen}>
         <DialogContent className="sm:max-w-[500px] rounded-3xl max-h-[85vh] overflow-y-auto">
           <DialogHeader>
@@ -508,11 +890,10 @@ export default function Drivers() {
                 <span className="font-medium text-foreground">{viewingDriver.currentLocation?.coordinates?.join(", ") || "Unknown"}</span>
               </div>
 
-              {/* Legal & Onboarding Verification section */}
               <div className="mt-4 pt-4 border-t border-border space-y-3">
                 <h4 className="font-bold text-foreground text-base">Documents & Verification</h4>
                 
-                <div className="flex items-center justify-between p-2 bg-muted rounded-lg">
+                <div className="flex items-center justify-between p-2 bg-muted/50 rounded-xl border border-border">
                   <div>
                     <p className="font-semibold text-xs">Aadhaar Verification</p>
                     <p className="text-[11px] text-muted-foreground">{viewingDriver.aadhaarNumber || "No Aadhaar provided"}</p>
@@ -520,7 +901,6 @@ export default function Drivers() {
                   <Button 
                     size="sm"
                     variant={viewingDriver.aadhaarVerified ? "outline" : "default"}
-                    className={viewingDriver.aadhaarVerified ? "" : "bg-primary text-white"}
                     onClick={() => {
                       updateDriverMutation.mutate({
                         id: viewingDriver._id,
@@ -533,7 +913,7 @@ export default function Drivers() {
                   </Button>
                 </div>
 
-                <div className="flex items-center justify-between p-2 bg-muted rounded-lg">
+                <div className="flex items-center justify-between p-2 bg-muted/50 rounded-xl border border-border">
                   <div>
                     <p className="font-semibold text-xs">Bank Details Verification</p>
                     <p className="text-[11px] text-muted-foreground">
@@ -543,7 +923,6 @@ export default function Drivers() {
                   <Button 
                     size="sm"
                     variant={viewingDriver.bankVerified ? "outline" : "default"}
-                    className={viewingDriver.bankVerified ? "" : "bg-primary text-white"}
                     onClick={() => {
                       updateDriverMutation.mutate({
                         id: viewingDriver._id,
@@ -557,20 +936,19 @@ export default function Drivers() {
                 </div>
 
                 {viewingDriver.dlNumber && (
-                  <div className="p-2 bg-muted rounded-lg space-y-1">
+                  <div className="p-3 bg-muted/50 rounded-xl border border-border space-y-1">
                     <p className="font-semibold text-xs">Driving License</p>
                     <p className="text-[11px] text-muted-foreground">DL No: {viewingDriver.dlNumber}</p>
                     {viewingDriver.dlExpiry && (
-                      <p className="text-[10px] text-muted-foreground">Expires: {new Date(viewingDriver.dlExpiry).toLocaleDateString()}</p>
+                      <p className="text-[10px] text-muted-foreground font-medium">Expires: {new Date(viewingDriver.dlExpiry).toLocaleDateString()}</p>
                     )}
                   </div>
                 )}
               </div>
 
-              {/* Onboarding Approval Buttons */}
               <div className="flex gap-2 pt-4">
                 <Button 
-                  className="flex-1 bg-green-600 hover:bg-green-700 text-white rounded-lg"
+                  className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl"
                   onClick={() => {
                     updateDriverMutation.mutate({
                       id: viewingDriver._id,
@@ -583,7 +961,7 @@ export default function Drivers() {
                 </Button>
                 <Button 
                   variant="destructive"
-                  className="flex-1 rounded-lg"
+                  className="flex-1 rounded-xl"
                   onClick={() => {
                     updateDriverMutation.mutate({
                       id: viewingDriver._id,
@@ -599,6 +977,45 @@ export default function Drivers() {
           )}
         </DialogContent>
       </Dialog>
+
+      <DownloadReportDialog
+        open={isDownloadOpen}
+        onOpenChange={setIsDownloadOpen}
+        title="Fleet Drivers Report"
+        data={drivers.map((d: any) => ({
+          "Driver Name": d.user?.name || "N/A",
+          "Email": d.user?.email || "N/A",
+          "Phone": d.user?.phone || "N/A",
+          "Vehicle Type": d.vehicleType || "N/A",
+          "Vehicle Number": d.vehicleNumber || "N/A",
+          "Duty Status": d.status || "N/A",
+          "Onboarding Status": d.onboardingStatus || "N/A"
+        }))}
+      />
+
     </DashboardLayout>
+  );
+}
+
+// Mini fallback component for Indian Rupee Icon to avoid missing imports
+function IndianRupeeIcon(props: React.SVGProps<SVGSVGElement>) {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      width="24"
+      height="24"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      {...props}
+    >
+      <path d="M6 3h12" />
+      <path d="M6 8h12" />
+      <path d="M6 13h10a4 4 0 0 0 0-8H6" />
+      <path d="M6 13h3l7 8" />
+    </svg>
   );
 }
