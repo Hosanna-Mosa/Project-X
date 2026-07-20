@@ -733,7 +733,8 @@ export const useDriverStore = create<DriverState>()(
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ phone, password, role: "DRIVER" }),
           });
-          const data = await response.json();
+          const text = await response.text();
+          const data = text ? JSON.parse(text) : {};
           if (!response.ok) throw new Error(data.message || "Login failed");
 
           set({

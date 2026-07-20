@@ -196,20 +196,34 @@ export class OrdersService {
     // BROADCAST to drivers
     const socketManager = SocketManager.getInstance();
     if (socketManager) {
-      console.log(
-        `[ORDER][SOCKET][REQUEST_FROM_USER] order=${savedOrder._id} customerUser=${userId} ` +
-        `serviceType=${effectiveType} isReserved=${Boolean(savedOrder.isReserved)} status=${savedOrder.status}`
-      );
+      const { ZonesService } = require("../zones/zones.service");
+      const zonesService = new ZonesService();
+      const pickupZone = await zonesService.getZoneForCoordinates(startPos.latitude, startPos.longitude);
+      const pickupZoneName = pickupZone ? pickupZone.name : "Unknown Pickup Zone";
+
+      // Load Zone map for human-readable driver zone names
+      const ZoneModel = require("../../database/models/Zone").default;
+      const allZones = await ZoneModel.find().lean();
+      const zoneNameMap = new Map<string, string>();
+      allZones.forEach((z: any) => zoneNameMap.set(z._id.toString(), z.name));
+
+      console.log("\n============================================================");
+      console.log("🛒 [NEW ORDER BOOKED]");
+      console.log(`Order ID: ${savedOrder._id}`);
+      console.log(`👤 Customer: ${user.name || "N/A"} (${user.phone || "N/A"})`);
+      console.log(`📍 Booked Pickup Zone: "${pickupZoneName}"`);
+      console.log(`Service Type: ${effectiveType}`);
+
       // 1. Find nearby/matching drivers
       const { DriverService } = require("../drivers/drivers.service");
       const driversService = new DriverService();
       
-      let nearbyDrivers = [];
+      let nearbyDrivers: any[] = [];
       try {
         nearbyDrivers = await driversService.getNearbyDrivers(
           startPos.latitude,
           startPos.longitude,
-          radius || 5000,
+          undefined, // Let 3-Stage Dynamic Expansion drive search radius per vehicle type
           effectiveType
         );
       } catch (err) {
@@ -217,12 +231,17 @@ export class OrdersService {
       }
 
       let driversToNotify = [...nearbyDrivers];
-      // Fallback: If no drivers nearby, get all online and available drivers
+      // Fallback: If no drivers within immediate radius, check online drivers in the same zone
       if (driversToNotify.length === 0) {
         try {
           const Driver = require("../../database/models/Driver").default;
-          const onlineDrivers = await Driver.find({ status: "ONLINE", isAvailable: true }).populate("user");
-          driversToNotify = onlineDrivers;
+          const zoneQuery: any = { status: "ONLINE", isAvailable: true };
+          if (pickupZone) {
+            zoneQuery.preferredZone = pickupZone._id;
+          }
+
+          const onlineZoneDrivers = await Driver.find(zoneQuery).populate("user");
+          driversToNotify = onlineZoneDrivers;
         } catch (err) {
           console.error("Error fetching fallback online drivers:", err);
         }
@@ -234,30 +253,31 @@ export class OrdersService {
       const dropoffCoords = savedOrder.stops[savedOrder.stops.length - 1]?.location?.coordinates;
 
       if (pickupCoords && dropoffCoords) {
-        const fs = require("fs");
-        const path = require("path");
-        const logPath = path.join(__dirname, "../../../debug.log");
-        fs.appendFileSync(logPath, `\n[${new Date().toISOString()}] Order ${savedOrder._id} created. Stops: pickup: ${pickupCoords}, dropoff: ${dropoffCoords}. Candidates: ${driversToNotify.length}\n`);
-
         for (const d of driversToNotify) {
-          fs.appendFileSync(logPath, `Checking driver ${d._id} (User: ${d.user?._id}). homeMode = ${d.homeMode}\n`);
           if (d.homeMode === true) {
             const onTheWay = await driversService.isOrderOnTheWayToHome(
               (d._id as any).toString(),
               pickupCoords,
               dropoffCoords
             );
-            fs.appendFileSync(logPath, `Driver ${d._id} onTheWay result: ${onTheWay}\n`);
             if (onTheWay) {
               filteredDrivers.push(d);
             }
           } else {
-            fs.appendFileSync(logPath, `Driver ${d._id} has homeMode OFF. Adding unconditionally.\n`);
             filteredDrivers.push(d);
           }
         }
         driversToNotify = filteredDrivers;
       }
+
+      console.log(`\n📢 [NOTIFIED DRIVERS]: ${driversToNotify.length} drivers selected`);
+      driversToNotify.forEach((d: any) => {
+        const uName = (d.user as any)?.name || "Unknown";
+        const uPhone = (d.user as any)?.phone || "No Phone";
+        const dZoneName = d.preferredZone ? (zoneNameMap.get(d.preferredZone.toString()) || "Unknown Zone") : "No Zone";
+        console.log(`   🚗 Driver: ${uName} (${uPhone}) | Driver ID: ${d._id} | Assigned Zone: "${dZoneName}"`);
+      });
+      console.log("============================================================\n");
 
       // 3. Emit real-time WebSocket events specifically to the matched/filtered drivers
       const orderPayload = {
