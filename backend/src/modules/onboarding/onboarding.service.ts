@@ -1,5 +1,6 @@
 import Driver, { OnboardingStatus, IDriver } from "../../database/models/Driver";
 import { surepassService } from "../../services/surepass.service";
+import { digilockerService } from "../../services/digilocker.service";
 
 export class OnboardingService {
   /**
@@ -195,6 +196,48 @@ export class OnboardingService {
     return {
       message: "Onboarding completed successfully",
       onboardingStatus: OnboardingStatus.COMPLETED,
+    };
+  }
+
+  /**
+   * Get DigiLocker authorization URL.
+   */
+  async getDigilockerAuthUrl(state: string) {
+    const authUrl = digilockerService.getAuthUrl(state);
+    return { authUrl };
+  }
+
+  /**
+   * Verify documents via DigiLocker callback code.
+   */
+  async verifyDigilocker(userId: string, code: string) {
+    const driver = await this.getOrCreateDriver(userId);
+    
+    // Exchange OAuth authorization code for Access Token
+    const token = await digilockerService.getAccessToken(code);
+    
+    // Fetch Aadhaar & PAN details from DigiLocker
+    const aadhaarResult = await digilockerService.verifyAadhaar(token);
+    const panResult = await digilockerService.verifyPAN(token);
+    
+    if (aadhaarResult.verified && aadhaarResult.data) {
+      driver.aadhaarNumber = aadhaarResult.data.aadhaarNumber;
+      driver.aadhaarVerified = true;
+    }
+    
+    if (panResult.verified && panResult.data) {
+      driver.panNumber = panResult.data.panNumber;
+    }
+    
+    await driver.save();
+    
+    return {
+      success: true,
+      message: "DigiLocker verification completed successfully",
+      data: {
+        aadhaar: aadhaarResult.data,
+        pan: panResult.data
+      }
     };
   }
 }

@@ -93,4 +93,38 @@ export class OnboardingController {
       return res.status(500).json({ message: error.message || "Internal server error" });
     }
   }
+
+  /**
+   * GET /api/v1/onboarding/digilocker/auth-url
+   */
+  async getDigilockerAuthUrl(req: AuthRequest, res: Response) {
+    try {
+      const state = (req.query.state as string) || Math.random().toString(36).substring(7);
+      const result = await onboardingService.getDigilockerAuthUrl(state);
+      return res.json(result);
+    } catch (error: any) {
+      console.error("[ONBOARDING] Get DigiLocker auth URL error:", error);
+      return res.status(500).json({ message: error.message || "Internal server error" });
+    }
+  }
+
+  /**
+   * POST /api/v1/onboarding/verify-digilocker
+   */
+  async verifyDigilocker(req: AuthRequest, res: Response) {
+    try {
+      const { userId } = req.user!;
+      const { code } = req.body;
+
+      if (!code) {
+        return res.status(400).json({ message: "Authorization code is required" });
+      }
+
+      const result = await onboardingService.verifyDigilocker(userId, code);
+      return res.json(result);
+    } catch (error: any) {
+      console.error("[ONBOARDING] Verify DigiLocker error:", error);
+      return res.status(500).json({ message: error.message || "Internal server error" });
+    }
+  }
 }
