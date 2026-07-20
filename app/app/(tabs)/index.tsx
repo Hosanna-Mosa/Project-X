@@ -694,7 +694,7 @@ export default function HomeScreen() {
       ? filteredItems
       : filteredItems.filter(r => foodFilter === 'veg' ? r.isPureVeg : !r.isPureVeg);
 
-  const showCategories = !hasNoLocation;
+  const showCategories = !hasNoLocation && (showHomeSkeleton || loadingDrivers || nearbyDriversCount > 0);
 
   const renderHeader = () => {
     if (!showCategories || (!showHomeSkeleton && visibleItems.length === 0)) return null;
@@ -1060,14 +1060,13 @@ export default function HomeScreen() {
             );
           }
 
-          if (visibleItems.length === 0) {
-            const serviceName = activeService === "Meat" ? "meat" : "food";
+          if (nearbyDriversCount === 0) {
             return (
               <View style={styles.noServiceContainer}>
-                <Ionicons name="location-outline" size={80} color={colors.error} />
-                <Text style={[styles.noServiceTitle, { color: colors.text }]}>Services are not available in this location</Text>
+                <Ionicons name="bicycle-outline" size={80} color={colors.error} />
+                <Text style={[styles.noServiceTitle, { color: colors.text }]}>No Riders Available</Text>
                 <Text style={[styles.noServiceSubtitle, { color: colors.textSecondary }]}>
-                  We don't have outlets or delivery services available in this location. Please try changing your location.
+                  We don't have riders in this location to deliver your orders. Please try changing your location.
                 </Text>
                 <TouchableOpacity
                   style={[styles.noServiceButton, { backgroundColor: colors.primary }]}
@@ -1079,13 +1078,14 @@ export default function HomeScreen() {
             );
           }
 
-          if (nearbyDriversCount === 0) {
+          if (visibleItems.length === 0) {
+            const serviceName = activeService === "Meat" ? "meat" : "food";
             return (
               <View style={styles.noServiceContainer}>
-                <Ionicons name="bicycle-outline" size={80} color={colors.error} />
-                <Text style={[styles.noServiceTitle, { color: colors.text }]}>No Riders Available</Text>
+                <Ionicons name="location-outline" size={80} color={colors.error} />
+                <Text style={[styles.noServiceTitle, { color: colors.text }]}>Services are not available in this location</Text>
                 <Text style={[styles.noServiceSubtitle, { color: colors.textSecondary }]}>
-                  We don't have riders in this location to deliver your orders. Please try changing your location.
+                  We don't have {serviceName} outlets or delivery services available in this location. Please try changing your location.
                 </Text>
                 <TouchableOpacity
                   style={[styles.noServiceButton, { backgroundColor: colors.primary }]}

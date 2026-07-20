@@ -5,6 +5,9 @@ import {
   Text,
   TouchableOpacity,
   View,
+  Modal,
+  TextInput,
+  Alert,
 } from "react-native";
 import { Feather } from "@expo/vector-icons";
 import { router, useFocusEffect } from "expo-router";
@@ -59,6 +62,62 @@ export default function OrdersScreen() {
   const [filter, setFilter] = useState<FilterType>("all");
   const [orders, setOrders] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // Review Modal state
+  const [selectedOrderForReview, setSelectedOrderForReview] = useState<any | null>(null);
+  const [reviewModalVisible, setReviewModalVisible] = useState(false);
+  const [reviewRating, setReviewRating] = useState(5);
+  const [reviewComment, setReviewComment] = useState("");
+  const [reviewSelectedTags, setReviewSelectedTags] = useState<string[]>([]);
+  const [submittingReview, setSubmittingReview] = useState(false);
+
+  const handleOpenReviewModal = (order: any) => {
+    setSelectedOrderForReview(order);
+    setReviewRating(5);
+    setReviewComment("");
+    setReviewSelectedTags([]);
+    setReviewModalVisible(true);
+  };
+
+  const handleToggleReviewTag = (tag: string) => {
+    if (reviewSelectedTags.includes(tag)) {
+      setReviewSelectedTags(reviewSelectedTags.filter((t) => t !== tag));
+    } else {
+      setReviewSelectedTags([...reviewSelectedTags, tag]);
+    }
+  };
+
+  const handleSubmitReviewFromModal = async () => {
+    if (!selectedOrderForReview) return;
+    try {
+      setSubmittingReview(true);
+      const res = await customFetch<any>("/api/v1/reviews", {
+        method: "POST",
+        body: JSON.stringify({
+          orderId: selectedOrderForReview._id,
+          rating: reviewRating,
+          comment: reviewComment,
+          tags: reviewSelectedTags,
+        }),
+      });
+
+      if (res) {
+        Alert.alert("Thank You!", "Your rating has been submitted.");
+        setOrders((prevOrders) =>
+          prevOrders.map((o) =>
+            o._id === selectedOrderForReview._id ? { ...o, isReviewed: true } : o
+          )
+        );
+        setReviewModalVisible(false);
+        setSelectedOrderForReview(null);
+      }
+    } catch (err: any) {
+      console.error("Submit review modal error:", err);
+      Alert.alert("Error", err.message || "Failed to submit review. Please try again.");
+    } finally {
+      setSubmittingReview(false);
+    }
+  };
 
   useFocusEffect(
     React.useCallback(() => {
@@ -304,13 +363,31 @@ export default function OrdersScreen() {
                     </TouchableOpacity>
                   )}
                   {!isActive && (
-                    <TouchableOpacity
-                      style={styles.trackBtn}
-                      onPress={() => handleReorder(order)}
-                    >
-                      <Text style={styles.trackBtnText}>Reorder</Text>
-                      <Feather name="refresh-cw" size={12} color={colors.primary} />
-                    </TouchableOpacity>
+                    <View style={{ flexDirection: "row", gap: 8, alignItems: "center" }}>
+                      {["DELIVERED", "COMPLETED", "delivered", "completed"].includes(order.status) && (
+                        order.isReviewed ? (
+                          <View style={[styles.reviewedBadge, { backgroundColor: "#F59E0B15" }]}>
+                            <Feather name="star" size={12} color="#F59E0B" />
+                            <Text style={[styles.reviewedText, { color: "#F59E0B" }]}>Rated</Text>
+                          </View>
+                        ) : (
+                          <TouchableOpacity
+                            style={[styles.rateBtn, { borderColor: colors.primary, backgroundColor: colors.primary + "10" }]}
+                            onPress={() => handleOpenReviewModal(order)}
+                          >
+                            <Feather name="star" size={12} color={colors.primary} />
+                            <Text style={[styles.rateBtnText, { color: colors.primary }]}>Rate</Text>
+                          </TouchableOpacity>
+                        )
+                      )}
+                      <TouchableOpacity
+                        style={styles.trackBtn}
+                        onPress={() => handleReorder(order)}
+                      >
+                        <Text style={styles.trackBtnText}>Reorder</Text>
+                        <Feather name="refresh-cw" size={12} color={colors.primary} />
+                      </TouchableOpacity>
+                    </View>
                   )}
                 </View>
               </TouchableOpacity>
@@ -318,6 +395,100 @@ export default function OrdersScreen() {
           })
         )}
       </ScrollView>
+
+      <Modal
+        visible={reviewModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setReviewModalVisible(false)}
+      >
+        <View style={styles.modalBackdrop}>
+          <View style={[styles.modalCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+            <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", width: "100%", marginBottom: 12 }}>
+              <Text style={[styles.modalTitle, { color: colors.text }]}>Rate Your Order</Text>
+              <TouchableOpacity onPress={() => setReviewModalVisible(false)}>
+                <Feather name="x" size={20} color={colors.textMuted} />
+              </TouchableOpacity>
+            </View>
+
+            <Text style={{ fontSize: 13, color: colors.textSecondary, marginBottom: 12 }}>
+              How was your experience with order #{selectedOrderForReview?._id?.slice(-8).toUpperCase()}?
+            </Text>
+
+            {/* Star Rating */}
+            <View style={{ flexDirection: "row", gap: 10, marginVertical: 8, justifyContent: "center", width: "100%" }}>
+              {[1, 2, 3, 4, 5].map((star) => (
+                <TouchableOpacity key={star} onPress={() => setReviewRating(star)}>
+                  <Feather
+                    name="star"
+                    size={32}
+                    color={star <= reviewRating ? "#F59E0B" : colors.border}
+                  />
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            {/* Quick Feedback Tags */}
+            <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6, marginVertical: 10, justifyContent: "center" }}>
+              {(["⚡ On Time", "😊 Polite Partner", "🍱 Great Quality", "📦 Well Packaged", "🚗 Safe Trip"] as string[]).map((tag) => {
+                const isSelected = reviewSelectedTags.includes(tag);
+                return (
+                  <TouchableOpacity
+                    key={tag}
+                    style={[
+                      styles.modalTagChip,
+                      {
+                        backgroundColor: isSelected ? colors.primary : colors.background,
+                        borderColor: isSelected ? colors.primary : colors.border,
+                      },
+                    ]}
+                    onPress={() => handleToggleReviewTag(tag)}
+                  >
+                    <Text style={{ fontSize: 12, fontWeight: "500", color: isSelected ? "#FFFFFF" : colors.text }}>
+                      {tag}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+
+            {/* Comment */}
+            <TextInput
+              style={[
+                styles.modalCommentInput,
+                { backgroundColor: colors.background, borderColor: colors.border, color: colors.text },
+              ]}
+              placeholder="Add feedback comment (optional)..."
+              placeholderTextColor={colors.textMuted}
+              value={reviewComment}
+              onChangeText={setReviewComment}
+              multiline
+              numberOfLines={2}
+            />
+
+            {/* Modal Actions */}
+            <View style={{ flexDirection: "row", gap: 10, marginTop: 16, width: "100%" }}>
+              <TouchableOpacity
+                style={[styles.modalCancelBtn, { borderColor: colors.border }]}
+                onPress={() => setReviewModalVisible(false)}
+              >
+                <Text style={{ fontSize: 14, fontWeight: "600", color: colors.textSecondary }}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalSubmitBtn, { backgroundColor: colors.primary, opacity: submittingReview ? 0.7 : 1 }]}
+                onPress={handleSubmitReviewFromModal}
+                disabled={submittingReview}
+              >
+                {submittingReview ? (
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                ) : (
+                  <Text style={{ fontSize: 14, fontWeight: "700", color: "#FFFFFF" }}>Submit Review</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </ScreenWrapper>
   );
 }
@@ -512,5 +683,79 @@ const createStyles = (colors: typeof Colors.light) => StyleSheet.create({
     fontSize: 11,
     fontWeight: "700",
     color: colors.primary,
+  },
+  rateBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+    borderWidth: 1,
+  },
+  rateBtnText: {
+    fontSize: 11,
+    fontWeight: "700",
+  },
+  reviewedBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+  reviewedText: {
+    fontSize: 11,
+    fontWeight: "700",
+  },
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 20,
+  },
+  modalCard: {
+    width: "100%",
+    borderRadius: 16,
+    borderWidth: 1,
+    padding: 20,
+    alignItems: "center",
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: "700",
+  },
+  modalTagChip: {
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 14,
+    borderWidth: 1,
+  },
+  modalCommentInput: {
+    width: "100%",
+    borderRadius: 10,
+    borderWidth: 1,
+    padding: 10,
+    fontSize: 13,
+    marginTop: 6,
+    textAlignVertical: "top",
+    minHeight: 50,
+  },
+  modalCancelBtn: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 10,
+    borderWidth: 1,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  modalSubmitBtn: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 10,
+    alignItems: "center",
+    justifyContent: "center",
   },
 });
