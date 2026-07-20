@@ -414,7 +414,23 @@ export default function HomeScreen() {
         }
 
         if (status === 'granted') {
-          const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
+          let loc = null;
+          try {
+            const locPromise = Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
+            const timeoutPromise = new Promise<any>((_, reject) => 
+              setTimeout(() => reject(new Error("Location fetch timeout")), 8000)
+            );
+            loc = await Promise.race([locPromise, timeoutPromise]);
+          } catch (e) {
+            console.warn("Home Screen: High accuracy location failed/timed out, trying last known...", e);
+            loc = await Location.getLastKnownPositionAsync();
+          }
+
+          if (!loc) {
+            console.warn("Home Screen: Could not get any location");
+            return { lat: null, lng: null };
+          }
+
           const coords = { lat: loc.coords.latitude, lng: loc.coords.longitude };
           useDeliveryStore.getState().setCurrentCoords(coords);
 
@@ -1174,7 +1190,7 @@ export default function HomeScreen() {
                   <ServiceCategory
                     icon="bag-outline"
                     label="Task"
-                    onPress={() => router.push({ pathname: "/service-selection", params: { label: "Task" } })}
+                    onPress={() => router.push({ pathname: "/helper-task" })}
                   />
                   <ServiceCategory
                     icon="car-outline"

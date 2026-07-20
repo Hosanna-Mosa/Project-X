@@ -26,9 +26,15 @@ const QUICK_REPLIES = [
 
 export default function ChatScreen() {
   const insets = useSafeAreaInsets();
-  const { currentOrderId, driver, activeChat, addChatMessage, setUnreadCount, setIsChatActive } = useDeliveryStore();
+  const { currentOrderId, driver, activeChat, addChatMessage, setUnreadCount, setIsChatActive, serviceType } = useDeliveryStore();
   const [inputText, setInputText] = useState("");
   const flatListRef = useRef<FlatList>(null);
+  const [taskAssigned, setTaskAssigned] = useState(false);
+
+  const handleAssignTask = () => {
+    socketService.emit("assign_task_confirmed", { orderId: currentOrderId });
+    setTaskAssigned(true);
+  };
 
   useEffect(() => {
     if (!currentOrderId) return;
@@ -57,10 +63,16 @@ export default function ChatScreen() {
       }
     };
 
+    const onTaskStarted = () => {
+      router.push("/tracking");
+    };
+
     socketService.on("receive_message", onMessage);
+    socketService.on("task_started", onTaskStarted);
 
     return () => {
       socketService.off("receive_message", onMessage);
+      socketService.off("task_started", onTaskStarted);
       setIsChatActive(false);
     };
   }, [currentOrderId]);
@@ -151,6 +163,22 @@ export default function ChatScreen() {
         </TouchableOpacity>
       </View>
 
+      {/* Helper Task Assignment Banner */}
+      {serviceType === "helper" && !taskAssigned && (
+        <View style={{ backgroundColor: '#F0FDF4', padding: 12, borderBottomWidth: 1, borderBottomColor: '#DCFCE7', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+          <View style={{ flex: 1, paddingRight: 10 }}>
+            <Text style={{ fontSize: 13, fontWeight: '700', color: '#166534' }}>Discuss Task Details</Text>
+            <Text style={{ fontSize: 11, color: '#15803D' }}>When you are ready, assign the task to start the clock.</Text>
+          </View>
+          <TouchableOpacity 
+            style={{ backgroundColor: '#16A34A', paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20 }}
+            onPress={handleAssignTask}
+          >
+            <Text style={{ color: '#fff', fontSize: 12, fontWeight: '700' }}>Assign Task</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+      
       {/* Messages */}
       <FlatList
         ref={flatListRef}

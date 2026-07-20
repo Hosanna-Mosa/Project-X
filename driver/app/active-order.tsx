@@ -9,6 +9,7 @@ import {
   TextInput,
   Alert,
   Linking,
+  Platform,
 } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import MapView, { Marker, Polyline, Circle, PROVIDER_GOOGLE } from "react-native-maps";
@@ -101,12 +102,19 @@ export default function ActiveOrderScreen() {
   const [simSpeed, setSimSpeed] = useState(0);
   const [simRemainingDist, setSimRemainingDist] = useState(0);
   const [simETA, setSimETA] = useState(0);
+
+  const isHelper = currentOrder?.serviceType?.toLowerCase() === "helper";
+  const isRide = ["bike", "auto", "cab", "cab_prime"].includes(currentOrder?.serviceType?.toLowerCase() || "");
+  
   const simInterval = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // Waiting Compensation States
   const [prepTimeRemaining, setPrepTimeRemaining] = useState(180); // 3 mins prep time
   const [waitTimerSeconds, setWaitTimerSeconds] = useState(0);
   const [waitingComp, setWaitingComp] = useState(0);
+
+  // Helper Task State
+  const [taskTimerSeconds, setTaskTimerSeconds] = useState(0);
 
   // Verification Checklist States
   const [checkedItems, setCheckedItems] = useState<Record<string, boolean>>({});
@@ -198,10 +206,18 @@ export default function ActiveOrderScreen() {
     return () => clearInterval(timer);
   }, [currentOrder?.status]);
 
-  if (!currentOrder) return null;
+  // Helper Task Timer Effect
+  useEffect(() => {
+    let timer: ReturnType<typeof setInterval>;
+    if (isHelper && currentOrder?.status !== "delivered" && currentOrder?.status !== "completed") {
+      timer = setInterval(() => {
+        setTaskTimerSeconds((prev) => prev + 1);
+      }, 1000);
+    }
+    return () => clearInterval(timer);
+  }, [currentOrder?.status, isHelper]);
 
-  const isHelper = currentOrder.serviceType?.toLowerCase() === "helper";
-  const isRide = ["bike", "auto", "cab", "cab_prime"].includes(currentOrder.serviceType?.toLowerCase() || "");
+  if (!currentOrder) return null;
 
   // Simulate movement towards targeted latitude/longitude
   const startGPSSimulator = (targetLat: number, targetLng: number) => {
@@ -274,15 +290,7 @@ export default function ActiveOrderScreen() {
     const status = currentOrder?.status?.toLowerCase() || "";
 
     if (isHelper) {
-      if (status === "accepted" || status === "driver_assigned") {
-        await updateOrderStatus("en_route_pickup");
-      } else if (status === "en_route_pickup") {
-        if (simInterval.current) clearInterval(simInterval.current);
-        setIsSimulating(false);
-        await updateOrderStatus("arrived_pickup");
-      } else if (status === "arrived_pickup") {
-        await updateOrderStatus("picking_items");
-      } else if (status === "picking_items") {
+      if (status !== "delivered" && status !== "completed") {
         try {
           const expectedOTP = currentOrder.deliveryOtp || currentOrder.id.slice(-4).toLowerCase();
           if (customerOTP.toLowerCase() !== expectedOTP.toLowerCase() && customerOTP !== "9999") {
@@ -297,10 +305,11 @@ export default function ActiveOrderScreen() {
           Alert.alert("Verification Failed", err.message || "Invalid OTP code. Please verify with the customer.");
           return;
         }
-      } else if (status === "delivered") {
+      } else if (status === "delivered" || status === "completed") {
         completeOrder?.();
         router.push("/(tabs)");
       }
+      return;
     } else if (isRide) {
       if (status === "accepted" || status === "driver_assigned") {
         await updateOrderStatus("en_route_pickup");
@@ -433,244 +442,124 @@ export default function ActiveOrderScreen() {
     const status = currentOrder?.status?.toLowerCase() || "";
 
     if (isHelper) {
-      if (status === "accepted" || status === "driver_assigned") {
-        return (
-          <View style={styles.stepContainer}>
-            <Text style={styles.stepTitle}>Task Accepted</Text>
-            <View style={styles.infoBox}>
-              <View style={styles.infoItem}>
-                <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
-                  <View style={{ flex: 1, marginRight: 8 }}>
-                    <Text style={styles.infoLabel}>Task Location</Text>
-                    <Text style={styles.infoText}>{currentOrder.customerName || "Customer"}</Text>
-                    <Text style={styles.subText}>{pickupStop?.address || "Address not available"}</Text>
-                  </View>
-                  <View style={{ flexDirection: "row", gap: 12, alignItems: "center" }}>
-                    <TouchableOpacity
-                      style={styles.roundCommBtn}
-                      onPress={() => Linking.openURL(`tel:${currentOrder.customerPhone || "1234567890"}`)}
-                    >
-                      <Ionicons name="call" size={18} color="#00B7EB" />
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      style={styles.roundCommBtn}
-                      onPress={() => router.push({ pathname: "/chat", params: { orderId: currentOrder.id } })}
-                    >
-                      <Ionicons name="chatbubble-ellipses" size={18} color="#00B7EB" />
-                    </TouchableOpacity>
-                  </View>
-                </View>
-              </View>
-              <View style={styles.divider} />
-              <View style={styles.infoItem}>
-                <Text style={styles.infoLabel}>Booked Duration</Text>
-                <Text style={styles.infoText}>{currentOrder.duration || "N/A"} Hours</Text>
-              </View>
-            </View>
-
-            <TouchableOpacity style={styles.actionBtn} onPress={handleStatusTransition}>
-              <Text style={styles.actionBtnText}>Start Travel to Task Location</Text>
-            </TouchableOpacity>
-          </View>
-        );
-      }
-
-      if (status === "en_route_pickup") {
-        return (
-          <View style={styles.stepContainer}>
-            <View style={styles.stepHeaderRow}>
-              <Text style={styles.stepTitle}>Travel to Task Location</Text>
-              {isSimulating && <View style={styles.pulseDot} />}
-            </View>
-
-            {/* GPS Simulation Panel */}
-            <View style={styles.simPanel}>
-              <View style={styles.simStatsRow}>
-                <View style={styles.simStatItem}>
-                  <Text style={styles.simStatLabel}>Speed</Text>
-                  <Text style={styles.simStatValue}>{isSimulating ? `${simSpeed} km/h` : "0 km/h"}</Text>
-                </View>
-                <View style={styles.simStatItem}>
-                  <Text style={styles.simStatLabel}>ETA</Text>
-                  <Text style={styles.simStatValue}>{isSimulating ? `${simETA} min` : currentOrder.duration}</Text>
-                </View>
-                <View style={styles.simStatItem}>
-                  <Text style={styles.simStatLabel}>Distance</Text>
-                  <Text style={styles.simStatValue}>{isSimulating ? `${simRemainingDist} km` : currentOrder.distance}</Text>
-                </View>
-              </View>
-              <TouchableOpacity
-                style={[styles.simToggleBtn, isSimulating && styles.simToggleBtnActive]}
-                onPress={() => pickupStop && startGPSSimulator(pickupStop.lat, pickupStop.lng)}
-              >
-                <Ionicons name={isSimulating ? "pause" : "navigate"} size={16} color="#fff" />
-                <Text style={styles.simToggleText}>{isSimulating ? "Stop GPS Simulator" : "Simulate Travel Coordinates"}</Text>
-              </TouchableOpacity>
-            </View>
-
-            <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-              <View style={{ flex: 1, marginRight: 8 }}>
-                <Text style={styles.restaurantName}>Customer: {currentOrder.customerName || "Customer"}</Text>
-                <Text style={styles.addressText}>{pickupStop?.address}</Text>
-              </View>
-              <View style={{ flexDirection: "row", gap: 12, alignItems: "center" }}>
-                <TouchableOpacity
-                  style={styles.roundCommBtn}
-                  onPress={() => Linking.openURL(`tel:${currentOrder.customerPhone || "1234567890"}`)}
-                >
-                  <Ionicons name="call" size={18} color="#00B7EB" />
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={styles.roundCommBtn}
-                  onPress={() => router.push({ pathname: "/chat", params: { orderId: currentOrder.id } })}
-                >
-                  <Ionicons name="chatbubble-ellipses" size={18} color="#00B7EB" />
-                </TouchableOpacity>
-              </View>
-            </View>
-
-            <TouchableOpacity style={styles.actionBtn} onPress={handleStatusTransition}>
-              <Text style={styles.actionBtnText}>Arrived at Task Location</Text>
-            </TouchableOpacity>
-          </View>
-        );
-      }
-
-      if (status === "arrived_pickup") {
-        return (
-          <View style={styles.stepContainer}>
-            <Text style={styles.stepTitle}>Arrived at Task Location</Text>
-            
-            <View style={styles.gpsVerifiedBox}>
-              <Ionicons name="checkmark-circle" size={24} color="#10B981" />
-              <View style={{ marginLeft: 10 }}>
-                <Text style={styles.gpsVerifiedTitle}>GPS Check: Arrived</Text>
-                <Text style={styles.gpsVerifiedDesc}>You have reached the customer's task location.</Text>
-              </View>
-            </View>
-
-            <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginVertical: 20 }}>
-              <View style={{ flex: 1, marginRight: 8 }}>
-                <Text style={styles.restaurantName}>Customer: {currentOrder.customerName || "Customer"}</Text>
-                <Text style={styles.addressText}>{pickupStop?.address}</Text>
-              </View>
-              <View style={{ flexDirection: "row", gap: 12, alignItems: "center" }}>
-                <TouchableOpacity
-                  style={styles.roundCommBtn}
-                  onPress={() => Linking.openURL(`tel:${currentOrder.customerPhone || "1234567890"}`)}
-                >
-                  <Ionicons name="call" size={18} color="#00B7EB" />
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={styles.roundCommBtn}
-                  onPress={() => router.push({ pathname: "/chat", params: { orderId: currentOrder.id } })}
-                >
-                  <Ionicons name="chatbubble-ellipses" size={18} color="#00B7EB" />
-                </TouchableOpacity>
-              </View>
-            </View>
-
-            <TouchableOpacity style={styles.actionBtn} onPress={handleStatusTransition}>
-              <Text style={styles.actionBtnText}>Start Task / Work</Text>
-            </TouchableOpacity>
-          </View>
-        );
-      }
-
-      if (status === "picking_items") {
-        return (
-          <View style={styles.stepContainer}>
-            <Text style={styles.stepTitle}>Performing Helper Task</Text>
-
-            <View style={styles.infoBox}>
-              <View style={styles.infoItem}>
-                <Text style={styles.infoLabel}>Task Details</Text>
-                <Text style={styles.infoText}>Booked Duration: {currentOrder.duration || "N/A"} Hours</Text>
-                <Text style={styles.subText}>{pickupStop?.address}</Text>
-              </View>
-            </View>
-
-            <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-              <View style={{ flex: 1, marginRight: 8 }}>
-                <Text style={styles.restaurantName}>Customer: {currentOrder.customerName || "Customer"}</Text>
-              </View>
-              <View style={{ flexDirection: "row", gap: 12, alignItems: "center" }}>
-                <TouchableOpacity
-                  style={styles.roundCommBtn}
-                  onPress={() => Linking.openURL(`tel:${currentOrder.customerPhone || "1234567890"}`)}
-                >
-                  <Ionicons name="call" size={18} color="#00B7EB" />
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={styles.roundCommBtn}
-                  onPress={() => router.push({ pathname: "/chat", params: { orderId: currentOrder.id } })}
-                >
-                  <Ionicons name="chatbubble-ellipses" size={18} color="#00B7EB" />
-                </TouchableOpacity>
-              </View>
-            </View>
-
-            {/* Verification OTP */}
-            <View style={[styles.otpSection, { marginBottom: 20 }]}>
-              <Text style={styles.otpLabel}>ENTER CUSTOMER COMPLETION OTP</Text>
-              <TextInput
-                style={[styles.otpInput, customerOTPError && styles.otpInputError]}
-                placeholder="Enter 4-Digit OTP"
-                placeholderTextColor="#9CA3AF"
-                keyboardType="number-pad"
-                maxLength={4}
-                value={customerOTP}
-                onChangeText={(val) => {
-                  setCustomerOTP(val);
-                  setCustomerOTPError(false);
-                }}
-              />
-              {customerOTPError && (
-                <Text style={styles.errorText}>Invalid OTP code. Please ask the customer for their task completion OTP.</Text>
-              )}
-            </View>
-
-            <TouchableOpacity style={styles.actionBtn} onPress={handleStatusTransition}>
-              <Text style={styles.actionBtnText}>Verify OTP & Complete Task</Text>
-            </TouchableOpacity>
-          </View>
-        );
-      }
-
       if (status === "delivered" || status === "completed") {
         return (
-          <View style={styles.deliveredScroll}>
-            <View style={styles.successHeader}>
-              <Ionicons name="checkmark-circle" size={48} color="#10B981" />
-              <Text style={styles.successTitle}>Task Completed!</Text>
-              <Text style={styles.successSubtitle}>Earnings have been added to your wallet.</Text>
-            </View>
-
-            {/* Payout Breakdown */}
-            <View style={styles.earningsBreakdown}>
-              <Text style={styles.breakdownHeader}>EARNINGS BREAKDOWN</Text>
-              <View style={styles.breakdownRow}>
-                <Text style={styles.breakdownLabel}>Base Payout</Text>
-                <Text style={styles.breakdownVal}>₹{baseFare.toFixed(2)}</Text>
+          <View style={styles.stepContainer}>
+            <Text style={[styles.stepTitle, { color: "#10B981" }]}>Task Complete!</Text>
+            <View style={styles.infoBox}>
+              <View style={styles.infoItem}>
+                <Text style={styles.infoLabel}>Time Logged</Text>
+                <Text style={styles.infoText}>{Math.floor(taskTimerSeconds / 60)} Mins</Text>
               </View>
-              <View style={styles.breakdownRow}>
-                <Text style={styles.breakdownLabel}>Task Duration ({currentOrder.duration || "1"} Hours)</Text>
-                <Text style={styles.breakdownVal}>₹{(currentOrder.earnings || 85).toFixed(2)}</Text>
-              </View>
-              <View style={styles.breakdownTotalRow}>
-                <Text style={styles.breakdownTotalLabel}>TOTAL PAYOUT</Text>
-                <Text style={styles.breakdownTotalVal}>₹{(baseFare + (currentOrder.earnings || 85)).toFixed(2)}</Text>
+              <View style={styles.infoItem}>
+                <Text style={styles.infoLabel}>Total Payout</Text>
+                <Text style={[styles.infoText, { color: "#10B981", fontWeight: "900" }]}>₹{(currentOrder as any).totalPrice || 0}</Text>
               </View>
             </View>
-
-            <TouchableOpacity style={[styles.actionBtn, { marginVertical: 16 }]} onPress={handleStatusTransition}>
+            <TouchableOpacity style={styles.actionBtn} onPress={handleStatusTransition}>
               <Text style={styles.actionBtnText}>Finish & Return to Home</Text>
             </TouchableOpacity>
           </View>
         );
       }
 
-      return null;
+      // Simplified Helper Dashboard
+      const formatTime = (totalSeconds: number) => {
+        const hrs = Math.floor(totalSeconds / 3600);
+        const mins = Math.floor((totalSeconds % 3600) / 60);
+        const secs = totalSeconds % 60;
+        return `${hrs.toString().padStart(2, '0')}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+      };
+
+      const bookedHours = parseFloat(currentOrder.duration || "1") || 1;
+      const bookedSeconds = bookedHours * 3600;
+      const rawProgress = (taskTimerSeconds / bookedSeconds) * 100;
+      const progress = isNaN(rawProgress) ? 0 : Math.min(rawProgress, 100);
+      const isOvertime = taskTimerSeconds > bookedSeconds;
+      
+      const openGoogleDirections = () => {
+        if (!pickupStop) return;
+        const scheme = Platform.select({ ios: 'maps://0,0?q=', android: 'geo:0,0?q=' });
+        const latLng = `${pickupStop.lat},${pickupStop.lng}`;
+        const label = 'Customer Location';
+        const url = Platform.select({
+          ios: `${scheme}${label}@${latLng}`,
+          android: `${scheme}${latLng}(${label})`
+        });
+        if (url) Linking.openURL(url);
+      };
+
+      const sendHelperUpdate = (text: string) => {
+        socketService.emit("helper_status_update", { orderId: currentOrder.id, text });
+        Alert.alert("Update Sent", `Sent "${text}" to the customer.`);
+      };
+
+      return (
+        <View style={styles.stepContainer}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 20, alignSelf: 'center' }}>
+            <Ionicons name="time" size={28} color={isOvertime ? "#EF4444" : "#10B981"} />
+            <Text style={{ fontSize: 24, fontWeight: '900', color: isOvertime ? "#EF4444" : "#111827", marginLeft: 8 }}>
+              {formatTime(taskTimerSeconds)}
+            </Text>
+          </View>
+
+          {/* Progress Bar */}
+          <View style={{ height: 8, backgroundColor: '#E5E7EB', borderRadius: 4, marginBottom: 8, overflow: 'hidden', flexDirection: 'row' }}>
+            <View style={{ flex: Math.round(progress), backgroundColor: isOvertime ? '#EF4444' : '#10B981' }} />
+            <View style={{ flex: Math.max(0, 100 - Math.round(progress)), backgroundColor: 'transparent' }} />
+          </View>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 24 }}>
+            <Text style={{ fontSize: 12, color: '#6B7280', fontWeight: '600' }}>{isOvertime ? "Overtime" : "Elapsed"}</Text>
+            <Text style={{ fontSize: 12, color: '#6B7280', fontWeight: '600' }}>{currentOrder.duration || "1"} Hours Booked</Text>
+          </View>
+
+          {/* Quick Status Updates */}
+          <Text style={{ fontSize: 12, color: '#4B5563', fontWeight: '700', marginBottom: 8, textTransform: 'uppercase' }}>Send Quick Update to Customer</Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 20 }}>
+            {["Heading to you", "Working on task", "Shopping for items", "Running slightly late", "Almost done"].map((updateTxt, idx) => (
+              <TouchableOpacity
+                key={idx}
+                style={{ backgroundColor: '#EEF2FF', paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, marginRight: 8, borderWidth: 1, borderColor: '#C7D2FE' }}
+                onPress={() => sendHelperUpdate(updateTxt)}
+              >
+                <Text style={{ color: '#4F46E5', fontSize: 13, fontWeight: '600' }}>{updateTxt}</Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+          
+          <TouchableOpacity 
+            style={[styles.actionBtn, { backgroundColor: '#3B82F6', marginBottom: 16 }]} 
+            onPress={openGoogleDirections}
+          >
+            <Ionicons name="navigate" size={18} color="#fff" style={{ marginRight: 8 }} />
+            <Text style={styles.actionBtnText}>Google Directions</Text>
+          </TouchableOpacity>
+
+          {/* Verification OTP */}
+          <View style={[styles.otpSection, { marginBottom: 20 }]}>
+            <Text style={styles.otpLabel}>ENTER CUSTOMER COMPLETION OTP</Text>
+            <TextInput
+              style={[styles.otpInput, customerOTPError ? styles.otpInputError : null]}
+              placeholder="Enter 4-Digit OTP"
+              placeholderTextColor="#9CA3AF"
+              keyboardType="number-pad"
+              maxLength={4}
+              value={customerOTP}
+              onChangeText={(val) => {
+                setCustomerOTP(val);
+                setCustomerOTPError(false);
+              }}
+            />
+            {customerOTPError && (
+              <Text style={styles.errorText}>Invalid OTP code. Please ask the customer for their task completion OTP.</Text>
+            )}
+          </View>
+
+          <TouchableOpacity style={[styles.actionBtn, isOvertime ? { backgroundColor: '#EF4444' } : null]} onPress={handleStatusTransition}>
+            <Text style={styles.actionBtnText}>Verify OTP & Complete Task</Text>
+          </TouchableOpacity>
+        </View>
+      );
     }
 
     if (isRide) {
@@ -753,7 +642,7 @@ export default function ActiveOrderScreen() {
                 </View>
               </View>
               <TouchableOpacity
-                style={[styles.simToggleBtn, isSimulating && styles.simToggleBtnActive]}
+                style={[styles.simToggleBtn, isSimulating ? styles.simToggleBtnActive : null]}
                 onPress={() => pickupStop && startGPSSimulator(pickupStop.lat, pickupStop.lng)}
               >
                 <Ionicons name={isSimulating ? "pause" : "navigate"} size={16} color="#fff" />
@@ -800,7 +689,7 @@ export default function ActiveOrderScreen() {
             <View style={[styles.otpSection, { marginTop: 16, marginBottom: 20 }]}>
               <Text style={styles.otpLabel}>ENTER START RIDE OTP</Text>
               <TextInput
-                style={[styles.otpInput, restaurantOTPError && styles.otpInputError]}
+                style={[styles.otpInput, restaurantOTPError ? styles.otpInputError : null]}
                 placeholder="Enter 4-digit Ride OTP"
                 placeholderTextColor="#9CA3AF"
                 keyboardType="number-pad"
@@ -848,7 +737,7 @@ export default function ActiveOrderScreen() {
                 </View>
               </View>
               <TouchableOpacity
-                style={[styles.simToggleBtn, isSimulating && styles.simToggleBtnActive]}
+                style={[styles.simToggleBtn, isSimulating ? styles.simToggleBtnActive : null]}
                 onPress={() => deliveryStop && startGPSSimulator(deliveryStop.lat, deliveryStop.lng)}
               >
                 <Ionicons name={isSimulating ? "pause" : "navigate"} size={16} color="#fff" />
@@ -893,7 +782,7 @@ export default function ActiveOrderScreen() {
             <View style={[styles.otpSection, { marginTop: 16, marginBottom: 20 }]}>
               <Text style={styles.otpLabel}>ENTER END RIDE OTP</Text>
               <TextInput
-                style={[styles.otpInput, customerOTPError && styles.otpInputError]}
+                style={[styles.otpInput, customerOTPError ? styles.otpInputError : null]}
                 placeholder="Enter 4-Digit OTP"
                 placeholderTextColor="#9CA3AF"
                 keyboardType="number-pad"
@@ -1053,7 +942,7 @@ export default function ActiveOrderScreen() {
               </View>
             </View>
             <TouchableOpacity
-              style={[styles.simToggleBtn, isSimulating && styles.simToggleBtnActive]}
+              style={[styles.simToggleBtn, isSimulating ? styles.simToggleBtnActive : null]}
               onPress={() => pickupStop && startGPSSimulator(pickupStop.lat, pickupStop.lng)}
             >
               <Ionicons name={isSimulating ? "pause" : "navigate"} size={16} color="#fff" />
@@ -1172,7 +1061,7 @@ export default function ActiveOrderScreen() {
                     size={20}
                     color={isChecked ? "#00B7EB" : "#9CA3AF"}
                   />
-                  <Text style={[styles.checkText, isChecked && styles.checkTextSelected]}>
+                  <Text style={[styles.checkText, isChecked ? styles.checkTextSelected : null]}>
                     {item.quantity}x {item.name}
                   </Text>
                 </TouchableOpacity>
@@ -1208,7 +1097,7 @@ export default function ActiveOrderScreen() {
             <View style={styles.otpSection}>
               <Text style={styles.otpLabel}>RESTAURANT PICKUP CODE</Text>
               <TextInput
-                style={[styles.otpInput, restaurantOTPError && styles.otpInputError]}
+                style={[styles.otpInput, restaurantOTPError ? styles.otpInputError : null]}
                 placeholder="Enter 4-digit Pickup Code"
                 placeholderTextColor="#9CA3AF"
                 keyboardType="number-pad"
@@ -1272,7 +1161,7 @@ export default function ActiveOrderScreen() {
               </View>
             </View>
             <TouchableOpacity
-              style={[styles.simToggleBtn, isSimulating && styles.simToggleBtnActive]}
+              style={[styles.simToggleBtn, isSimulating ? styles.simToggleBtnActive : null]}
               onPress={() => deliveryStop && startGPSSimulator(deliveryStop.lat, deliveryStop.lng)}
             >
               <Ionicons name={isSimulating ? "pause" : "navigate"} size={16} color="#fff" />
@@ -1332,10 +1221,10 @@ export default function ActiveOrderScreen() {
               {(["door", "gate", "contactless"] as const).map((opt) => (
                 <TouchableOpacity
                   key={opt}
-                  style={[styles.optionBtn, deliveryOption === opt && styles.optionBtnSelected]}
+                  style={[styles.optionBtn, deliveryOption === opt ? styles.optionBtnSelected : null]}
                   onPress={() => setDeliveryOption(opt)}
                 >
-                  <Text style={[styles.optionBtnText, deliveryOption === opt && styles.optionBtnTextSelected]}>
+                  <Text style={[styles.optionBtnText, deliveryOption === opt ? styles.optionBtnTextSelected : null]}>
                     {opt.toUpperCase()}
                   </Text>
                 </TouchableOpacity>
@@ -1347,7 +1236,7 @@ export default function ActiveOrderScreen() {
           <View style={styles.otpSection}>
             <Text style={styles.otpLabel}>CUSTOMER CONFIRMATION OTP</Text>
             <TextInput
-              style={[styles.otpInput, customerOTPError && styles.otpInputError]}
+              style={[styles.otpInput, customerOTPError ? styles.otpInputError : null]}
               placeholder="Enter 4-Digit OTP"
               placeholderTextColor="#9CA3AF"
               keyboardType="number-pad"
@@ -1501,40 +1390,40 @@ export default function ActiveOrderScreen() {
           }}
         >
           {/* Pickup Stop Marker */}
-          {pickupStop && (
-            <Marker coordinate={{ latitude: pickupStop.lat, longitude: pickupStop.lng }}>
+          {(pickupStop != null && pickupStop.lat != null && pickupStop.lng != null) ? (
+            <Marker coordinate={{ latitude: Number(pickupStop.lat), longitude: Number(pickupStop.lng) }}>
               <View style={styles.restaurantMarker}>
                 <Ionicons name="restaurant" size={16} color="#fff" />
               </View>
             </Marker>
-          )}
+          ) : null}
 
           {/* Delivery Stop Marker */}
-          {deliveryStop && (
-            <Marker coordinate={{ latitude: deliveryStop.lat, longitude: deliveryStop.lng }}>
+          {(deliveryStop != null && deliveryStop.lat != null && deliveryStop.lng != null) ? (
+            <Marker coordinate={{ latitude: Number(deliveryStop.lat), longitude: Number(deliveryStop.lng) }}>
               <View style={styles.userMarker}>
                 <Ionicons name="person" size={16} color="#fff" />
               </View>
             </Marker>
-          )}
+          ) : null}
 
           {/* Driver Location Marker */}
-          {driverLocation && (
-            <Marker coordinate={{ latitude: driverLocation.lat, longitude: driverLocation.lng }}>
+          {(driverLocation != null && driverLocation.lat != null && driverLocation.lng != null) ? (
+            <Marker coordinate={{ latitude: Number(driverLocation.lat), longitude: Number(driverLocation.lng) }}>
               <View style={styles.driverMarker}>
                 <Ionicons name="bicycle" size={18} color="#fff" />
               </View>
             </Marker>
-          )}
+          ) : null}
 
           {/* Dashed line along the road from driver to customer */}
-          {currentOrder.polyline && ["en_route_delivery", "arrived_delivery"].includes(currentOrder.status.toLowerCase()) && (
+          {(currentOrder.polyline && ["en_route_delivery", "arrived_delivery"].includes(currentOrder.status.toLowerCase())) ? (
             <Polyline
               coordinates={decodePolyline(currentOrder.polyline)}
               strokeWidth={4}
               strokeColor="#00B7EB"
             />
-          )}
+          ) : null}
         </MapView>
       </View>
 

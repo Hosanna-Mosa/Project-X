@@ -25,6 +25,8 @@ router.get("/", authenticateToken, ordersController.getUserOrders.bind(ordersCon
 router.get("/estimate-fare", authenticateToken, validateRequest(estimateFareSchema), ordersController.estimateFare.bind(ordersController));
 router.get("/vendor/:vendorId", ordersController.getVendorOrders.bind(ordersController));
 router.get("/:id", authenticateToken, ordersController.getOrder.bind(ordersController));
+router.patch("/:id/increase-price", authenticateToken, ordersController.increasePrice.bind(ordersController));
+router.post("/:id/decline", authenticateToken, authorizeRole([UserRole.DRIVER]), ordersController.decline.bind(ordersController));
 router.patch("/:id/status", authenticateToken, ordersController.updateStatus.bind(ordersController));
 router.post("/:id/accept", authenticateToken, authorizeRole([UserRole.DRIVER]), ordersController.accept.bind(ordersController));
 router.post("/:id/sos", authenticateToken, ordersController.triggerSOS.bind(ordersController));
