@@ -3,6 +3,7 @@ import mongoose from "mongoose";
 import FoodItem from "../../database/models/FoodItem";
 import Vendor from "../../database/models/Vendor";
 import { CloudinaryService } from "../../services/cloudinary.service";
+import { ZonesService } from "../zones/zones.service";
 
 const cloudinaryService = new CloudinaryService();
 
@@ -125,38 +126,51 @@ export const getStore149Items = async (req: Request, res: Response) => {
       return "https://images.unsplash.com/photo-1631452180519-c014fe946bc0?w=400"; // fallback paneer/curry
     };
     
-    // We will attempt to search for nearby vendors if lat/lng are provided
+    // We will search for nearby vendors within active zone if lat/lng are provided
     let vendors: any[] = [];
     if (lat && lng) {
       const userLat = parseFloat(lat as string);
       const userLng = parseFloat(lng as string);
-      
-      // Proximity query (within 25km radius)
-      vendors = await Vendor.aggregate([
-        {
-          $geoNear: {
-            near: {
-              type: "Point",
-              coordinates: [userLng, userLat],
+
+      if (Number.isFinite(userLat) && Number.isFinite(userLng)) {
+        const zonesService = new ZonesService();
+        const activeZone = await zonesService.getZoneForCoordinates(userLat, userLng);
+        if (!activeZone) {
+          return res.json([]);
+        }
+
+        const geoQuery: any = { partnerType: { $ne: "meat" } };
+        if (activeZone.type === "polygon" && activeZone.boundary) {
+          geoQuery.location = { $geoWithin: { $geometry: activeZone.boundary } };
+        }
+
+        const maxDist = activeZone.type === "circle" && activeZone.radius ? Math.min(15000, activeZone.radius) : 15000;
+
+        vendors = await Vendor.aggregate([
+          {
+            $geoNear: {
+              near: { type: "Point", coordinates: [userLng, userLat] },
+              distanceField: "distance",
+              maxDistance: maxDist,
+              spherical: true,
+              key: "location",
+              query: geoQuery,
             },
-            distanceField: "distance",
-            maxDistance: 25000,
-            spherical: true,
-            key: "location",
-            query: { partnerType: { $ne: "meat" } },
           },
-        },
-        { $limit: 10 }
-      ]);
-    } else {
-      // Otherwise just fetch any 10 vendors
-      vendors = await Vendor.find({ partnerType: { $ne: "meat" } }).limit(10);
+          { $limit: 10 }
+        ]);
+      }
     }
 
-    let foodItems: any[] = [];
-    if (vendors.length > 0) {
-      const vendorIds = vendors.map(v => v._id);
-      foodItems = await FoodItem.find({ vendorId: { $in: vendorIds }, isAvailable: true }).limit(15);
+    if (vendors.length === 0) {
+      return res.json([]);
+    }
+
+    const vendorIds = vendors.map(v => v._id);
+    const foodItems = await FoodItem.find({ vendorId: { $in: vendorIds }, isAvailable: true }).limit(15);
+
+    if (foodItems.length === 0) {
+      return res.json([]);
     }
 
     // Curated mock fallback items to guarantee premium, visually complete experience

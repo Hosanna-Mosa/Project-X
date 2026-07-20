@@ -67,7 +67,6 @@ function RootLayoutNav() {
         <Stack.Screen name="checkout" options={{ headerShown: false }} />
         <Stack.Screen name="payment" options={{ headerShown: false }} />
         <Stack.Screen name="tracking" options={{ headerShown: false }} />
-        <Stack.Screen name="service-selection" options={{ headerShown: false }} />
         <Stack.Screen name="pickup-confirmation" options={{ headerShown: false }} />
         <Stack.Screen name="ride-searching" options={{ headerShown: false }} />
         <Stack.Screen name="restaurant-menu" options={{ headerShown: false }} />
