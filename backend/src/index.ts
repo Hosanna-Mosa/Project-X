@@ -27,6 +27,7 @@ import onboardingRoutes from "./modules/onboarding/onboarding.routes";
 import zonesRoutes from "./modules/zones/zones.routes";
 import notificationsRoutes from "./modules/notifications/notifications.routes";
 import supportRoutes from "./modules/support/support.routes";
+import reviewRoutes from "./modules/reviews/reviews.routes";
 
 dotenv.config();
 
@@ -73,6 +74,7 @@ connectDB().then(async () => {
   app.use("/api/v1/zones", zonesRoutes);
   app.use("/api/v1/notifications", notificationsRoutes);
   app.use("/api/v1/support", supportRoutes);
+  app.use("/api/v1/reviews", reviewRoutes);
 
   // Global Error Handler Middleware
   app.use(globalErrorHandler);
@@ -99,5 +101,3 @@ process.on("SIGTERM", () => {
     process.exit(0);
   });
 });
-
-// Trigger nodemon restart 3

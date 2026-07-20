@@ -8,6 +8,7 @@ import {
   View,
   Linking,
   Alert,
+  TextInput,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
@@ -34,6 +35,199 @@ const STATUS_SEQUENCE: OrderStatus[] = [
   "arrived_delivery",
   "delivered",
 ];
+
+function OrderReviewCard({
+  orderId,
+  isRide,
+  isHelper,
+  colors,
+}: {
+  orderId: string;
+  isRide: boolean;
+  isHelper: boolean;
+  colors: any;
+}) {
+  const [rating, setRating] = useState(5);
+  const [selectedTags, setSelectedTags] = useState<string[]>([]);
+  const [comment, setComment] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isSubmitted, setIsSubmitted] = useState(false);
+  const [existingReview, setExistingReview] = useState<any>(null);
+  const styles = React.useMemo(() => createStyles(colors), [colors]);
+
+  const availableTags = isRide
+    ? ["⚡ On Time", "🚗 Smooth Ride", "😊 Polite Driver", "🧼 Clean Vehicle", "📍 Great Route"]
+    : (isHelper
+      ? ["⚡ Punctual", "💪 Very Helpful", "😊 Polite Behavior", "⭐ Great Skill", "👍 Efficient Work"]
+      : ["⚡ Fast Delivery", "🍱 Fresh & Hot", "📦 Well Packaged", "😊 Friendly Partner", "👍 Perfect Order"]);
+
+  useEffect(() => {
+    if (!orderId) return;
+    customFetch<any>(`/api/v1/reviews/order/${orderId}`)
+      .then((res) => {
+        if (res && res.review) {
+          setIsSubmitted(true);
+          setExistingReview(res.review);
+        }
+      })
+      .catch(() => {
+        // No review yet
+      });
+  }, [orderId]);
+
+  const toggleTag = (tag: string) => {
+    if (selectedTags.includes(tag)) {
+      setSelectedTags(selectedTags.filter((t) => t !== tag));
+    } else {
+      setSelectedTags([...selectedTags, tag]);
+    }
+  };
+
+  const handleSubmit = async () => {
+    if (!orderId) return;
+    try {
+      setIsSubmitting(true);
+      const res = await customFetch<any>("/api/v1/reviews", {
+        method: "POST",
+        body: JSON.stringify({
+          orderId,
+          rating,
+          comment,
+          tags: selectedTags,
+        }),
+      });
+      if (res && res.review) {
+        setIsSubmitted(true);
+        setExistingReview(res.review);
+        Alert.alert("Thank You!", "Your review has been submitted successfully.");
+      }
+    } catch (err: any) {
+      console.error("Submit review error:", err);
+      Alert.alert("Error", err.message || "Failed to submit review. Please try again.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  if (isSubmitted && existingReview) {
+    return (
+      <View style={[styles.reviewContainerCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+        <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", width: "100%" }}>
+          <Text style={[styles.reviewHeaderTitle, { color: colors.text }]}>Your Feedback</Text>
+          <View style={{ flexDirection: "row", alignItems: "center", backgroundColor: colors.success + "18", paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12, gap: 4 }}>
+            <Feather name="check" size={14} color={colors.success} />
+            <Text style={{ fontSize: 12, fontWeight: "600", color: colors.success }}>Submitted</Text>
+          </View>
+        </View>
+
+        <View style={{ flexDirection: "row", gap: 6, marginVertical: 8 }}>
+          {[1, 2, 3, 4, 5].map((star) => (
+            <Feather
+              key={star}
+              name="star"
+              size={22}
+              color={star <= existingReview.rating ? "#F59E0B" : colors.border}
+            />
+          ))}
+        </View>
+
+        {existingReview.tags && existingReview.tags.length > 0 && (
+          <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6, marginVertical: 4, width: "100%" }}>
+            {existingReview.tags.map((tag: string, idx: number) => (
+              <View key={idx} style={{ backgroundColor: colors.primary + "15", paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12 }}>
+                <Text style={{ fontSize: 12, color: colors.primary, fontWeight: "500" }}>{tag}</Text>
+              </View>
+            ))}
+          </View>
+        )}
+
+        {existingReview.comment ? (
+          <Text style={{ fontSize: 13, color: colors.textSecondary, fontStyle: "italic", alignSelf: "flex-start", marginTop: 4 }}>
+            "{existingReview.comment}"
+          </Text>
+        ) : null}
+      </View>
+    );
+  }
+
+  return (
+    <View style={[styles.reviewContainerCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+      <Text style={[styles.reviewHeaderTitle, { color: colors.text, alignSelf: "flex-start" }]}>Rate your Experience</Text>
+      
+      {/* Interactive Star Picker */}
+      <View style={{ flexDirection: "row", gap: 8, marginVertical: 8 }}>
+        {[1, 2, 3, 4, 5].map((star) => (
+          <TouchableOpacity key={star} onPress={() => setRating(star)} activeOpacity={0.7}>
+            <Feather
+              name="star"
+              size={28}
+              color={star <= rating ? "#F59E0B" : colors.border}
+            />
+          </TouchableOpacity>
+        ))}
+      </View>
+      <Text style={{ fontSize: 12, fontWeight: "600", color: "#F59E0B", marginBottom: 6 }}>
+        {rating === 5 ? "Excellent! 🌟" : rating === 4 ? "Good 👍" : rating === 3 ? "Average 👌" : rating === 2 ? "Below Average 😐" : "Poor 👎"}
+      </Text>
+
+      {/* Feedback Chips */}
+      <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6, marginVertical: 6, justifyContent: "center" }}>
+        {availableTags.map((tag) => {
+          const selected = selectedTags.includes(tag);
+          return (
+            <TouchableOpacity
+              key={tag}
+              style={[
+                styles.tagChip,
+                {
+                  backgroundColor: selected ? colors.primary : colors.background,
+                  borderColor: selected ? colors.primary : colors.border,
+                },
+              ]}
+              onPress={() => toggleTag(tag)}
+            >
+              <Text style={[styles.tagChipText, { color: selected ? "#FFFFFF" : colors.text }]}>{tag}</Text>
+            </TouchableOpacity>
+          );
+        })}
+      </View>
+
+      {/* Optional Comment Field */}
+      <TextInput
+        style={[
+          styles.commentInput,
+          {
+            backgroundColor: colors.background,
+            borderColor: colors.border,
+            color: colors.text,
+          },
+        ]}
+        placeholder="Write comments or feedback (optional)..."
+        placeholderTextColor={colors.textMuted}
+        value={comment}
+        onChangeText={setComment}
+        multiline
+        numberOfLines={2}
+      />
+
+      {/* Submit Button */}
+      <TouchableOpacity
+        style={[
+          styles.submitReviewBtn,
+          { backgroundColor: colors.primary, opacity: isSubmitting ? 0.6 : 1 },
+        ]}
+        onPress={handleSubmit}
+        disabled={isSubmitting}
+      >
+        {isSubmitting ? (
+          <ActivityIndicator size="small" color="#FFFFFF" />
+        ) : (
+          <Text style={styles.submitReviewBtnText}>Submit Feedback</Text>
+        )}
+      </TouchableOpacity>
+    </View>
+  );
+}
 
 export default function TrackingScreen() {
   const insets = useSafeAreaInsets();
@@ -417,15 +611,12 @@ export default function TrackingScreen() {
           )}
 
           {/* Feedback Section */}
-          <View style={[styles.successCard, { backgroundColor: colors.surface, borderColor: colors.border, alignItems: "center", gap: 10 }]}>
-            <Text style={[styles.successCardHeader, { color: colors.text, alignSelf: "flex-start" }]}>Rate your Experience</Text>
-            <View style={{ flexDirection: "row", gap: 6, marginVertical: 4 }}>
-              {[1, 2, 3, 4, 5].map((star) => (
-                <Feather key={star} name="star" size={24} color="#F59E0B" />
-              ))}
-            </View>
-            <Text style={{ fontSize: 11, color: colors.textMuted }}>Your feedback helps us improve our services.</Text>
-          </View>
+          <OrderReviewCard
+            orderId={currentOrderId || ""}
+            isRide={isRide}
+            isHelper={isHelper}
+            colors={colors}
+          />
         </ScrollView>
 
         <View style={[styles.successFooter, { paddingBottom: insets.bottom + 16 }]}>
@@ -994,5 +1185,50 @@ const createStyles = (colors: typeof Colors.light) => StyleSheet.create({
     color: "#fff",
     fontSize: 16,
     fontWeight: "800",
+  },
+  reviewContainerCard: {
+    padding: 16,
+    borderRadius: 16,
+    borderWidth: 1,
+    alignItems: "center",
+    marginBottom: 16,
+    width: "100%",
+  },
+  reviewHeaderTitle: {
+    fontSize: 16,
+    fontWeight: "700",
+  },
+  tagChip: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    borderWidth: 1,
+  },
+  tagChipText: {
+    fontSize: 12,
+    fontWeight: "500",
+  },
+  commentInput: {
+    width: "100%",
+    borderRadius: 12,
+    borderWidth: 1,
+    padding: 10,
+    fontSize: 13,
+    marginTop: 8,
+    textAlignVertical: "top",
+    minHeight: 50,
+  },
+  submitReviewBtn: {
+    width: "100%",
+    paddingVertical: 12,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: 12,
+  },
+  submitReviewBtnText: {
+    color: "#FFFFFF",
+    fontSize: 14,
+    fontWeight: "700",
   },
 });
