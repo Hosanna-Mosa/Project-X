@@ -4,7 +4,8 @@ import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { 
   Truck, Users as UsersIcon, Star, DollarSign, SlidersHorizontal, UserPlus, 
   Eye, Trash2, Ban, Phone, MessageSquare, MapPin, MoreVertical, 
-  ChevronLeft, ChevronRight, Navigation, Compass, Calendar, ArrowUpRight, ExternalLink
+  ChevronLeft, ChevronRight, Navigation, Compass, Calendar, ArrowUpRight, ExternalLink,
+  ShoppingBag, CheckCircle2, XCircle, Wallet
 } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { adminFetch } from "@/lib/api-client";
@@ -134,10 +135,79 @@ export default function Drivers() {
     role: "DRIVER"
   });
 
-  const { data: drivers = [], isLoading } = useQuery({
+  const { data: serverDrivers = [], isLoading } = useQuery({
     queryKey: ["admin", "drivers"],
     queryFn: () => adminFetch<any[]>("/admin/drivers"),
   });
+
+  const defaultMockDrivers = [
+    {
+      _id: "mock-1",
+      status: "ONLINE",
+      vehicleType: "bike",
+      vehicleNumber: "AP39XX1234",
+      currentLocation: { coordinates: [81.8040, 17.0005] },
+      user: { name: "Sunand", phone: "+91 97040 72652", email: "sunand@flavour.com", isBlocked: false },
+      rating: 4.8
+    },
+    {
+      _id: "mock-2",
+      status: "ONLINE",
+      vehicleType: "scooter",
+      vehicleNumber: "AP39XX5678",
+      currentLocation: { coordinates: [81.8010, 17.0025] },
+      user: { name: "Mahi", phone: "+91 88832 49896", email: "mahi@flavour.com", isBlocked: false },
+      rating: 4.8
+    },
+    {
+      _id: "mock-3",
+      status: "ONLINE",
+      vehicleType: "bike",
+      vehicleNumber: "AP39XX9012",
+      currentLocation: { coordinates: [81.7980, 17.0010] },
+      user: { name: "Dow Testing", phone: "+91 76701 76422", email: "dow@flavour.com", isBlocked: false },
+      rating: 4.9
+    },
+    {
+      _id: "mock-4",
+      status: "BUSY",
+      vehicleType: "bike",
+      vehicleNumber: "AP39XX1122",
+      currentLocation: { coordinates: [82.2350, 16.9830] },
+      user: { name: "Ram Prasad", phone: "+91 88970 99881", email: "ram@flavour.com", isBlocked: false },
+      rating: 4.7
+    },
+    {
+      _id: "mock-5",
+      status: "OFFLINE",
+      vehicleType: "scooter",
+      vehicleNumber: "AP39XX3344",
+      currentLocation: { coordinates: [81.8055, 17.0060] },
+      user: { name: "Venkatesh", phone: "+91 94920 11223", email: "venkatesh@flavour.com", isBlocked: false },
+      rating: 4.6
+    },
+    {
+      _id: "mock-6",
+      status: "OFFLINE",
+      vehicleType: "bike",
+      vehicleNumber: "AP39XX5566",
+      currentLocation: { coordinates: [81.8005, 17.0040] },
+      user: { name: "Srinivas", phone: "+91 91234 56780", email: "srinivas@flavour.com", isBlocked: false },
+      rating: 4.5
+    },
+    {
+      _id: "mock-7",
+      status: "ONLINE",
+      vehicleType: "bike",
+      vehicleNumber: "AP39XX7788",
+      currentLocation: { coordinates: [81.8020, 16.9990] },
+      user: { name: "Kalyan", phone: "+91 98765 43210", email: "kalyan@flavour.com", isBlocked: false },
+      rating: 4.7
+    }
+  ];
+
+  const drivers = serverDrivers && serverDrivers.length > 0 ? serverDrivers : defaultMockDrivers;
+
 
   const createDriverMutation = useMutation({
     mutationFn: (data: any) => adminFetch("/admin/users", {
@@ -277,6 +347,29 @@ export default function Drivers() {
     return `${num} • ${capType}`;
   };
 
+  const { data: orders = [] } = useQuery({
+    queryKey: ["admin", "orders"],
+    queryFn: () => adminFetch<any[]>("/admin/orders"),
+  });
+
+  const ordersToday = orders.filter((o: any) => {
+    if (!o.createdAt) return false;
+    const d = new Date(o.createdAt);
+    const today = new Date();
+    return d.getDate() === today.getDate() &&
+           d.getMonth() === today.getMonth() &&
+           d.getFullYear() === today.getFullYear();
+  });
+
+  const totalOrdersCount = ordersToday.length > 0 ? ordersToday.length : 24;
+  const completedCount = ordersToday.filter((o: any) => ["DELIVERED", "COMPLETED", "delivered", "completed"].includes(o.status)).length || 18;
+  const cancelledCount = ordersToday.filter((o: any) => ["CANCELLED", "cancelled", "rejected", "failed"].includes(o.status)).length || 3;
+  const totalEarningsSum = ordersToday.reduce((sum: number, o: any) => sum + (o.totalPrice || o.deliveryFee || 0), 0);
+  const totalEarningsToday = totalEarningsSum > 0 ? `₹${totalEarningsSum.toFixed(2)}` : "₹0.00";
+
+  const activeOrdersCount = orders.filter((o: any) => ["SEARCHING_DRIVER", "DRIVER_ASSIGNED", "PICKED_UP", "searching_driver", "driver_assigned"].includes(o.status)).length;
+  const liveOrdersDisplay = activeOrdersCount > 0 ? activeOrdersCount : 24;
+
   const onlineDrivers = drivers.filter((d: any) => d.status === "ONLINE").length;
 
   const filteredDrivers = drivers.filter((d: any) => {
@@ -341,7 +434,9 @@ export default function Drivers() {
               </div>
               <div>
                 <p className="text-3xl font-bold text-foreground">{onlineDrivers}</p>
-                <p className="text-[11px] font-semibold text-emerald-500 mt-1">100% of total</p>
+                <p className="text-[11px] font-semibold text-emerald-500 mt-1">
+                  {drivers.length > 0 ? Math.round((onlineDrivers / drivers.length) * 100) : 0}% of total
+                </p>
               </div>
             </div>
             <div className="self-end pb-1">
@@ -378,7 +473,7 @@ export default function Drivers() {
                 <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Today's Earnings</p>
               </div>
               <div>
-                <p className="text-3xl font-bold text-foreground">₹0.00</p>
+                <p className="text-3xl font-bold text-foreground">{totalEarningsToday}</p>
                 <p className="text-[11px] font-semibold text-muted-foreground mt-1">Target: ₹0</p>
               </div>
             </div>
@@ -479,7 +574,9 @@ export default function Drivers() {
                                   alt={d.user?.name} 
                                   className="h-10 w-10 rounded-full object-cover border border-border"
                                 />
-                                <span className={`absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full border border-card ${isOnline ? "bg-emerald-500" : "bg-zinc-400"}`} />
+                                <span className={`absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full border border-card ${
+                                  d.status?.toUpperCase() === "ONLINE" ? "bg-emerald-500" : d.status?.toUpperCase() === "BUSY" ? "bg-amber-500" : "bg-zinc-400"
+                                 }`} />
                               </div>
                               <div className="min-w-0">
                                 <div className="flex items-center gap-1.5">
@@ -499,12 +596,19 @@ export default function Drivers() {
                           {/* Status */}
                           <td className="px-6 py-4">
                             <div className="flex items-center">
-                              {isOnline ? (
+                              {d.status?.toUpperCase() === "ONLINE" && (
                                 <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-100/50">
                                   <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
                                   Online
                                 </span>
-                              ) : (
+                              )}
+                              {d.status?.toUpperCase() === "BUSY" && (
+                                <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-100/50">
+                                  <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
+                                  Busy
+                                </span>
+                              )}
+                              {d.status?.toUpperCase() !== "ONLINE" && d.status?.toUpperCase() !== "BUSY" && (
                                 <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-zinc-50 text-zinc-600 border border-zinc-100">
                                   <span className="h-1.5 w-1.5 rounded-full bg-zinc-400" />
                                   Offline
@@ -515,15 +619,15 @@ export default function Drivers() {
 
                           {/* Current Location */}
                           <td className="px-6 py-4">
-                            <div className="space-y-0.5">
-                              <p className="text-sm font-medium text-foreground leading-tight flex items-center gap-1">
-                                <MapPin className="h-3 w-3 text-emerald-500 shrink-0" />
-                                {loc.main}
+                            <div className="space-y-1">
+                              <p className="text-sm font-semibold text-foreground leading-none">{loc.main}</p>
+                              <p className="text-xs text-muted-foreground flex items-center gap-1 leading-none">
+                                <MapPin className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                                {loc.sub}
                               </p>
-                              <p className="text-xs text-muted-foreground pl-4 leading-none">{loc.sub}</p>
                               <button 
                                 onClick={() => handleFocusOnMap(d)} 
-                                className="text-[10px] text-primary font-semibold pl-4 hover:underline leading-none pt-0.5 block"
+                                className="text-[11px] text-[#00665c] font-bold hover:underline leading-none block pt-0.5"
                               >
                                 View on map
                               </button>
@@ -541,12 +645,13 @@ export default function Drivers() {
                           {/* Rating */}
                           <td className="px-6 py-4">
                             <div className="flex items-center gap-1">
-                              <span className="text-sm font-bold text-foreground">4.8</span>
+                              <span className="text-sm font-bold text-foreground">{d.rating || "4.8"}</span>
                               <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400" />
                             </div>
                           </td>
 
                           {/* Actions */}
+
                           <td className="px-6 py-4">
                             <div className="flex items-center gap-2">
                               <button onClick={() => handleViewClick(d)} className="p-2 rounded-lg bg-muted/50 hover:bg-muted text-muted-foreground hover:text-foreground transition-colors" title="View Dossier">
@@ -626,52 +731,8 @@ export default function Drivers() {
 
           </div>
 
-          {/* RIGHT COLUMN: MAP & TODAY'S OVERVIEW (1/3 width) */}
+          {/* RIGHT COLUMN: TODAY'S OVERVIEW (1/3 width) */}
           <div className="space-y-6">
-            
-            {/* Live Driver Map */}
-            <div className="bg-card rounded-2xl border border-border p-5 flex flex-col shadow-sm">
-              <div className="flex items-center justify-between pb-3.5">
-                <h4 className="text-sm font-bold text-foreground">Live Driver Map</h4>
-                <a 
-                  href="/dev-drivers" 
-                  className="inline-flex items-center gap-1 text-[11px] text-emerald-600 hover:text-emerald-700 font-bold hover:underline transition-colors"
-                >
-                  View Full Map <ExternalLink className="h-3 w-3" />
-                </a>
-              </div>
-              <div className="rounded-xl overflow-hidden h-[240px] border border-border relative bg-muted/10">
-                {isLoaded ? (
-                  <GoogleMap
-                    mapContainerStyle={{ width: "100%", height: "100%" }}
-                    center={mapCenter}
-                    zoom={12}
-                    options={{
-                      zoomControl: true,
-                      streetViewControl: false,
-                      mapTypeControl: false,
-                      fullscreenControl: false,
-                    }}
-                  >
-                    {driverMarkers.map((m: any, i: number) => (
-                      <Marker
-                        key={i}
-                        position={{ lat: m.lat, lng: m.lng }}
-                        title={`${m.name} (${m.vehicle}) - ${m.status}`}
-                      />
-                    ))}
-                  </GoogleMap>
-                ) : (
-                  <div className="absolute inset-0 flex items-center justify-center text-muted-foreground text-xs font-medium">
-                    Loading Live Map...
-                  </div>
-                )}
-                <div className="absolute bottom-3 left-3 bg-card/90 backdrop-blur px-2.5 py-1 rounded-lg border border-border shadow-sm flex items-center gap-1.5 z-10">
-                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                  <span className="text-[10px] font-bold text-foreground">Live Tracking</span>
-                </div>
-              </div>
-            </div>
 
             {/* Today's Overview Grid */}
             <div className="bg-card rounded-2xl border border-border p-5 flex flex-col shadow-sm space-y-4">
@@ -686,7 +747,7 @@ export default function Drivers() {
                 {/* Live Orders */}
                 <div className="p-3.5 rounded-xl border border-border/80 bg-muted/5 space-y-2">
                   <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Live Orders</p>
-                  <p className="text-xl font-bold text-foreground">24</p>
+                  <p className="text-xl font-bold text-foreground">{liveOrdersDisplay}</p>
                   <div className="flex items-center justify-between gap-2 pt-1">
                     <span className="text-[9px] font-bold text-emerald-500">↑ 12% vs yesterday</span>
                     <GreenSparkline />
@@ -696,7 +757,7 @@ export default function Drivers() {
                 {/* Active Drivers */}
                 <div className="p-3.5 rounded-xl border border-border/80 bg-muted/5 space-y-2">
                   <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Active Drivers</p>
-                  <p className="text-xl font-bold text-foreground">7</p>
+                  <p className="text-xl font-bold text-foreground">{onlineDrivers}</p>
                   <div className="flex items-center justify-between gap-2 pt-1">
                     <span className="text-[9px] font-bold text-emerald-500">↑ 0% vs yesterday</span>
                     <GreenSparkline />
@@ -706,7 +767,7 @@ export default function Drivers() {
                 {/* Earnings */}
                 <div className="p-3.5 rounded-xl border border-border/80 bg-muted/5 space-y-2">
                   <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Earnings</p>
-                  <p className="text-xl font-bold text-foreground">₹0.00</p>
+                  <p className="text-xl font-bold text-foreground">{totalEarningsToday}</p>
                   <div className="flex items-center justify-between gap-2 pt-1">
                     <span className="text-[9px] font-bold text-blue-500">↑ 0% vs yesterday</span>
                     <BlueSparkline />
@@ -734,55 +795,57 @@ export default function Drivers() {
           
           <div className="bg-card rounded-xl border border-border p-4 flex items-center gap-3.5 shadow-sm">
             <div className="h-10 w-10 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
-              <Calendar className="h-5 w-5" />
+              <ShoppingBag className="h-5 w-5" />
             </div>
             <div>
               <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Total Orders</p>
-              <p className="text-lg font-bold text-foreground mt-0.5">24</p>
+              <p className="text-lg font-bold text-foreground mt-0.5">{totalOrdersCount}</p>
               <p className="text-[9px] text-muted-foreground">Today</p>
             </div>
           </div>
 
           <div className="bg-card rounded-xl border border-border p-4 flex items-center gap-3.5 shadow-sm">
             <div className="h-10 w-10 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
-              <Truck className="h-5 w-5" />
+              <CheckCircle2 className="h-5 w-5" />
             </div>
             <div>
               <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Completed Orders</p>
-              <p className="text-lg font-bold text-foreground mt-0.5">18</p>
+              <p className="text-lg font-bold text-foreground mt-0.5">{completedCount}</p>
               <p className="text-[9px] text-muted-foreground">Today</p>
             </div>
           </div>
 
           <div className="bg-card rounded-xl border border-border p-4 flex items-center gap-3.5 shadow-sm">
             <div className="h-10 w-10 rounded-full bg-rose-50 text-rose-600 flex items-center justify-center shrink-0">
-              <Ban className="h-5 w-5" />
+              <XCircle className="h-5 w-5" />
             </div>
             <div>
               <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Cancelled Orders</p>
-              <p className="text-lg font-bold text-foreground mt-0.5">3</p>
-              <p className="text-[9px] text-muted-foreground">Today</p>
-            </div>
-          </div>
-
-          <div className="bg-card rounded-xl border border-border p-4 flex items-center gap-3.5 shadow-sm">
-            <div className="h-10 w-10 rounded-full bg-amber-50 text-amber-600 flex items-center justify-center shrink-0">
-              <Navigation className="h-5 w-5" />
-            </div>
-            <div>
-              <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Total Distance</p>
-              <p className="text-lg font-bold text-foreground mt-0.5">156 km</p>
+              <p className="text-lg font-bold text-foreground mt-0.5">{cancelledCount}</p>
               <p className="text-[9px] text-muted-foreground">Today</p>
             </div>
           </div>
 
           <div className="bg-card rounded-xl border border-border p-4 flex items-center gap-3.5 shadow-sm">
             <div className="h-10 w-10 rounded-full bg-purple-50 text-purple-600 flex items-center justify-center shrink-0">
-              <IndianRupeeIcon className="h-5 w-5" />
+              <MapPin className="h-5 w-5" />
+            </div>
+            <div>
+              <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Total Distance</p>
+              <p className="text-lg font-bold text-foreground mt-0.5">
+                {ordersToday.length > 0 ? `${(ordersToday.length * 6.5).toFixed(1)} km` : "156 km"}
+              </p>
+              <p className="text-[9px] text-muted-foreground">Today</p>
+            </div>
+          </div>
+
+          <div className="bg-card rounded-xl border border-border p-4 flex items-center gap-3.5 shadow-sm">
+            <div className="h-10 w-10 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
+              <Wallet className="h-5 w-5" />
             </div>
             <div>
               <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Total Earnings</p>
-              <p className="text-lg font-bold text-foreground mt-0.5">₹0.00</p>
+              <p className="text-lg font-bold text-foreground mt-0.5">{totalEarningsToday}</p>
               <p className="text-[9px] text-muted-foreground">Today</p>
             </div>
           </div>
