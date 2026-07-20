@@ -440,17 +440,44 @@ export class SocketManager {
         console.log(`[CHAT][EMIT] order=${data.orderId} from=${from} id=${payload.id} recipients=${this.getRoomSize(data.orderId)}`);
       });
 
-      socket.on("disconnect", () => {
+      socket.on("disconnect", async () => {
         if (userId) {
           this.forgetSocket(userId, socket.id);
         }
 
+        const userStatus = userId ? this.getUserSocketStatus(userId) : null;
+        const isDriver = role === "DRIVER";
+
         console.log(
           `[SOCKET][DISCONNECT] source=client socket=${socket.id} user=${userId || "unknown"} role=${role} ` +
-          `userStillOnline=${userId ? this.getUserSocketStatus(userId).online : false} ` +
-          `remainingUserSockets=${userId ? this.getUserSocketStatus(userId).socketIds.length : 0} ` +
+          `userStillOnline=${userStatus?.online ?? false} ` +
+          `remainingUserSockets=${userStatus?.socketIds.length ?? 0} ` +
           `driversRoomSize=${this.getDriverRoomStatus().onlineDrivers}`
         );
+
+        // If driver's last active socket disconnects (app force-closed/killed), mark driver OFFLINE in MongoDB & Redis
+        if (isDriver && userId && (!userStatus || !userStatus.online)) {
+          try {
+            const driver = await Driver.findOne({ user: userId });
+            if (driver) {
+              driver.status = DriverStatus.OFFLINE;
+              driver.isAvailable = false;
+              await driver.save();
+              console.log(`🔌 [SOCKET][DRIVER][OFFLINE] Driver ${driver._id} (${authUser?.name || "Driver"}) marked OFFLINE on socket disconnect.`);
+
+              if (this.redisClient) {
+                try {
+                  await this.redisClient.zRem("drivers:locations", driver._id.toString());
+                  await this.redisClient.del(`driver_status:${driver._id.toString()}`);
+                } catch (rErr: any) {
+                  console.warn("[REDIS DISCONNECT CLEANUP] Failed to remove driver from Redis:", rErr.message);
+                }
+              }
+            }
+          } catch (dErr: any) {
+            console.error("[SOCKET DISCONNECT OFFLINE] Error setting driver offline:", dErr.message);
+          }
+        }
       });
     });
   }

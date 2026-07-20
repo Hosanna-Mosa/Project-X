@@ -9,19 +9,20 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Stack, router, useSegments } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import React, { useEffect, useRef, useState } from "react";
-import { Alert } from "react-native";
+import { Alert, Platform } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { KeyboardProvider } from "react-native-keyboard-controller";
 import { SafeAreaProvider } from "react-native-safe-area-context";
+import Constants, { ExecutionEnvironment } from "expo-constants";
+import * as Notifications from "expo-notifications";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { useDriverStore } from "@/store/driverStore";
 import { LocationHandler } from "@/components/LocationHandler";
 import { GlobalSocketHandler } from "@/components/GlobalSocketHandler";
 import UpdateModal from "@/components/UpdateModal";
-import Constants from "expo-constants";
-import { Platform } from "react-native";
-import * as Notifications from "expo-notifications";
+import { registerForPushNotificationsAsync } from "../utils/notificationRegister";
 import "@/utils/networkLogger";
 
 SplashScreen.preventAutoHideAsync();
@@ -115,54 +116,66 @@ function RootLayoutNav() {
   useEffect(() => {
     if (!token) return;
 
-    const { registerForPushNotificationsAsync } = require("../utils/notificationRegister");
-    const apiUrl = process.env.EXPO_PUBLIC_API_URL || Constants.expoConfig?.extra?.apiUrl;
+    const isExpoGo =
+      Constants.executionEnvironment === ExecutionEnvironment.StoreClient ||
+      (Constants as any).appOwnership === "expo";
 
-    // 1. Initial Registration
-    registerForPushNotificationsAsync(token).catch((err: any) => {
-      console.error("Error registering push notifications:", err);
-    });
+    if (isExpoGo) {
+      console.log("[PushNotifications] Push notifications disabled in Expo Go SDK 53+. Use a development build.");
+      return;
+    }
 
-    // 2. Token Refresh Listener (Priority 3)
-    const tokenSubscription = Notifications.addPushTokenListener(async (tokenData) => {
-      console.log("[PushNotifications] Token refreshed (Driver):", tokenData.data);
-      try {
-        const response = await fetch(`${apiUrl}/api/v1/users/push-token`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "Authorization": `Bearer ${token}`,
-          },
-          body: JSON.stringify({ expoPushToken: tokenData.data }),
-        });
-        if (response.ok) {
-          console.log("[PushNotifications] Refreshed token updated on backend successfully (Driver)!");
-        } else {
-          console.error("[PushNotifications] Failed to sync refreshed token on backend (Driver):", await response.text());
+    try {
+      const apiUrl = process.env.EXPO_PUBLIC_API_URL || Constants.expoConfig?.extra?.apiUrl;
+
+      // 1. Initial Registration
+      registerForPushNotificationsAsync(token).catch((err: any) => {
+        console.error("Error registering push notifications:", err);
+      });
+
+      // 2. Token Refresh Listener (Priority 3)
+      const tokenSubscription = Notifications.addPushTokenListener(async (tokenData: any) => {
+        console.log("[PushNotifications] Token refreshed (Driver):", tokenData.data);
+        try {
+          const response = await fetch(`${apiUrl}/api/v1/users/push-token`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "Authorization": `Bearer ${token}`,
+            },
+            body: JSON.stringify({ expoPushToken: tokenData.data }),
+          });
+          if (response.ok) {
+            console.log("[PushNotifications] Refreshed token updated on backend successfully (Driver)!");
+          } else {
+            console.error("[PushNotifications] Failed to sync refreshed token on backend (Driver):", await response.text());
+          }
+        } catch (err) {
+          console.error("[PushNotifications] Failed to sync refreshed token on backend (Driver):", err);
         }
-      } catch (err) {
-        console.error("[PushNotifications] Failed to sync refreshed token on backend (Driver):", err);
-      }
-    });
+      });
 
-    // 3. Notification Tap / Response Listener (Priority 4)
-    const responseSubscription = Notifications.addNotificationResponseReceivedListener((response) => {
-      const data = response.notification.request.content.data;
-      console.log("[PushNotifications] Notification tapped (Driver). Payload data:", data);
-      
-      if (data && data.orderId) {
-        // Deep link to the active order screen
-        router.push({
-          pathname: "/active-order",
-          params: { orderId: data.orderId }
-        });
-      }
-    });
+      // 3. Notification Tap / Response Listener (Priority 4)
+      const responseSubscription = Notifications.addNotificationResponseReceivedListener((response: any) => {
+        const data = response.notification.request.content.data;
+        console.log("[PushNotifications] Notification tapped (Driver). Payload data:", data);
+        
+        if (data && data.orderId) {
+          // Deep link to the active order screen
+          router.push({
+            pathname: "/active-order",
+            params: { orderId: data.orderId }
+          });
+        }
+      });
 
-    return () => {
-      tokenSubscription.remove();
-      responseSubscription.remove();
-    };
+      return () => {
+        tokenSubscription?.remove();
+        responseSubscription?.remove();
+      };
+    } catch (err) {
+      console.warn("[PushNotifications] Error setting up notifications:", err);
+    }
   }, [token]);
 
   if (!hydrated) {
@@ -188,7 +201,6 @@ export default function RootLayout() {
 
   const handleDismissUpdate = async () => {
     try {
-      const AsyncStorage = require("@react-native-async-storage/async-storage").default;
       if (latestVersion) {
         await AsyncStorage.setItem("dismissed_update_version", latestVersion);
       }
@@ -230,8 +242,6 @@ export default function RootLayout() {
           if (result.forceUpdate) {
             setShowUpdate(true);
           } else {
-            // Check if this version was already dismissed
-            const AsyncStorage = require("@react-native-async-storage/async-storage").default;
             const dismissedVersion = await AsyncStorage.getItem("dismissed_update_version");
             if (dismissedVersion !== latest) {
               setShowUpdate(true);

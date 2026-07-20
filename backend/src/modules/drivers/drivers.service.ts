@@ -3,6 +3,7 @@ import Driver, { DriverStatus } from "../../database/models/Driver";
 import Order, { OrderStatus, StopType } from "../../database/models/Order";
 import DriverPayout, { DriverPayoutStatus } from "../../database/models/DriverPayout";
 import User from "../../database/models/User";
+import Zone from "../../database/models/Zone";
 import { PaymentService } from "../payments/payment.service";
 import { SocketManager } from "../../sockets/socket.manager";
 import { ZonesService } from "../zones/zones.service";
@@ -37,211 +38,151 @@ export class DriverService {
     return R * c; // distance in meters
   }
 
-  async getNearbyDrivers(lat: number, lng: number, radiusInMeters: number = 5000, vehicleType?: string) {
+  async getNearbyDrivers(lat: number, lng: number, radiusInMeters?: number, vehicleType?: string) {
     const socketManager = SocketManager.getInstance();
     const redisClient = socketManager ? (socketManager as any).redisClient : null;
+    const { getDispatchStagesForVehicle } = require("../../config/dispatch.config");
 
-    console.log(`[DRIVER SEARCH] Query coordinates: [lng: ${lng}, lat: ${lat}] with radius: ${radiusInMeters}m, vehicleType: ${vehicleType}`);
+    // Fetch all zones into a quick name-lookup map
+    let zoneMap = new Map<string, string>();
+    try {
+      const allZones = await Zone.find().lean();
+      allZones.forEach(z => zoneMap.set(z._id.toString(), z.name));
+    } catch (zErr: any) {
+      console.error("Error building zone map for logging:", zErr.message);
+    }
 
     // Zone Serviceability Check
     const zonesService = new ZonesService();
     const activeZone = await zonesService.getZoneForCoordinates(lat, lng);
     if (!activeZone) {
-      console.log(`[DRIVER SEARCH] Coordinates [lat: ${lat}, lng: ${lng}] are outside all active zones. Returning 0 drivers.`);
+      console.log(`\n============================================================`);
+      console.log(`⚠️ [ZONE CHECK] Coordinates [lat: ${lat}, lng: ${lng}] are OUTSIDE all active zones.`);
+      console.log("============================================================\n");
       return [];
     }
-    const zoneId = activeZone._id;
+
+    console.log("\n============================================================");
+    console.log(`📍 [DRIVER SEARCH] Pickup Coordinates: [lat: ${lat}, lng: ${lng}] | Zone: "${activeZone.name}"`);
 
     try {
-      const allOnlineDrivers = await Driver.find({ status: DriverStatus.ONLINE });
-      console.log(`[DRIVER SEARCH DB] Total Online Drivers in DB: ${allOnlineDrivers.length}`);
+      const allOnlineDrivers = await Driver.find({ status: DriverStatus.ONLINE }).populate("user");
+      console.log(`🟢 ONLINE DRIVERS AVAILABLE IN BACKEND: ${allOnlineDrivers.length}`);
       allOnlineDrivers.forEach(d => {
-        console.log(` -> Driver ID: ${d._id}, vehicleType: ${d.vehicleType}, status: ${d.status}, isAvailable: ${d.isAvailable}, preferredZone: ${d.preferredZone}, coordinates: ${JSON.stringify(d.currentLocation?.coordinates)}`);
+        const userName = (d.user as any)?.name || "Unknown";
+        const userPhone = (d.user as any)?.phone || "No Phone";
+        const driverZoneName = d.preferredZone ? (zoneMap.get(d.preferredZone.toString()) || "Unknown Zone") : "No Zone Assigned";
+        console.log(`   🚗 Driver: ${userName} (${userPhone}) | ID: ${d._id} | Vehicle: ${d.vehicleType || "N/A"} | Zone: "${driverZoneName}"`);
       });
     } catch (err: any) {
-      console.error("[DRIVER SEARCH DB] Error querying online drivers for logging:", err.message);
+      console.error("Error querying online drivers for logging:", err.message);
     }
+    console.log("============================================================\n");
 
-    // For development/testing: Ensure we have at least 2 drivers of each vehicle type in the database
-    if (process.env.DISABLE_DRIVER_SIMULATOR !== "true") {
-      const allTypes = ["bike", "auto", "car"];
-      for (const t of allTypes) {
-        const totalOfType = await Driver.countDocuments({ vehicleType: t });
-        if (totalOfType < 2) {
-          const driverToConvert = await Driver.findOne({
-            $or: [
-              { vehicleType: { $exists: false } },
-              { vehicleType: null },
-              { vehicleType: "bike", status: DriverStatus.OFFLINE }
-            ]
-          });
-          if (driverToConvert) {
-            driverToConvert.vehicleType = t as "bike" | "auto" | "car";
-            await driverToConvert.save();
-            console.log(`[SIMULATOR] Converted driver ${driverToConvert._id} vehicleType to ${t}`);
-          }
-        }
-      }
-
-      // Ensure we have online drivers of the requested vehicle type near the user.
-      const typesToEnsure = vehicleType ? [vehicleType] : ["bike", "auto", "car"];
-      for (const type of typesToEnsure) {
-        const activeCount = await Driver.countDocuments({
-          status: DriverStatus.ONLINE,
-          vehicleType: type,
-        });
-
-        if (activeCount < 2) {
-          const driversToActivate = await Driver.find({
-            vehicleType: type,
-            status: DriverStatus.OFFLINE
-          }).limit(2 - activeCount);
-
-          for (const d of driversToActivate) {
-            d.status = DriverStatus.ONLINE;
-            d.isAvailable = true;
-            await d.save();
-            console.log(`[SIMULATOR] Set driver ${d._id} (${type}) to ONLINE`);
-          }
-        }
-
-        const onlineDrivers = await Driver.find({
-          status: DriverStatus.ONLINE,
-          vehicleType: type
-        });
-
-        for (const d of onlineDrivers) {
-          const coords = d.currentLocation?.coordinates;
-          const isFar = coords ? this.haversineDistance(lat, lng, coords[1], coords[0]) > radiusInMeters : true;
-          
-          // Simulator auto-assign logic: Auto-simulate only for Rajahmundry zones
-          const isAutoSimulatedZone = activeZone.name.toLowerCase().includes("533101") ||
-                                      activeZone.name.toLowerCase().includes("rajahmundry") ||
-                                      activeZone.name.toLowerCase().includes("demo") ||
-                                      activeZone.name.toLowerCase().includes("palacharla");
-                                      
-          const needsZoneUpdate = isAutoSimulatedZone && String(d.preferredZone) !== String(zoneId);
-
-          if (!coords || (coords[0] === 0 && coords[1] === 0) || isFar || needsZoneUpdate) {
-            const randomLatOffset = (Math.random() - 0.5) * 0.03;
-            const randomLngOffset = (Math.random() - 0.5) * 0.03;
-            const finalLng = lng + randomLngOffset;
-            const finalLat = lat + randomLatOffset;
-            
-            d.currentLocation = {
-              type: "Point",
-              coordinates: [finalLng, finalLat]
-            };
-            
-            if (isAutoSimulatedZone) {
-              d.preferredZone = activeZone._id;
-            }
-            
-            await d.save();
-            console.log(`[SIMULATOR] Moved online driver ${d._id} (${type}) to [${finalLng}, ${finalLat}] (Zone: ${activeZone.name})`);
-
-            // Sync simulator locations to Redis geospatial store
-            if (redisClient) {
-              try {
-                await redisClient.geoAdd("drivers:locations", {
-                  longitude: finalLng,
-                  latitude: finalLat,
-                  member: d._id.toString()
-                });
-                await redisClient.set(`driver_status:${d._id}`, "online", { EX: 30 });
-              } catch (err: any) {
-                console.error(`[SIMULATOR REDIS] geoAdd failed:`, err.message);
-              }
-            }
-          }
-        }
-      }
-    }
+    // Retrieve vehicle-specific 3-stage expansion configuration
+    const stages = getDispatchStagesForVehicle(vehicleType);
 
     let results: any[] = [];
+    let matchedStageName = "";
 
-    // Attempt Geospatial lookup in Redis first
-    if (redisClient) {
-      try {
-        console.log(`[REDIS] Querying nearby drivers within ${radiusInMeters}m of [${lng}, ${lat}] in Zone: ${activeZone.name}`);
-        const nearbyDriverIds = await redisClient.geoSearch("drivers:locations",
-          { longitude: lng, latitude: lat },
-          { radius: radiusInMeters, unit: "m" }
-        );
+    for (const stage of stages) {
+      const currentRadius = radiusInMeters && radiusInMeters > stage.radiusMeters ? radiusInMeters : stage.radiusMeters;
+      console.log(`🔍 [DYNAMIC DISPATCH - ${stage.name}] Searching within ${currentRadius}m radius...`);
 
-        if (nearbyDriverIds && nearbyDriverIds.length > 0) {
-          const query: any = {
-            _id: { $in: nearbyDriverIds },
-            status: DriverStatus.ONLINE,
-            isAvailable: true,
-            preferredZone: activeZone._id, // Filter strictly by activeZone
-          };
-          if (vehicleType && ["bike", "auto", "car"].includes(vehicleType)) {
-            query.vehicleType = vehicleType;
+      let stageDrivers: any[] = [];
+
+      // 1. Redis lookup
+      if (redisClient) {
+        try {
+          const nearbyDriverIds = await redisClient.geoSearch("drivers:locations",
+            { longitude: lng, latitude: lat },
+            { radius: currentRadius, unit: "m" }
+          );
+
+          if (nearbyDriverIds && nearbyDriverIds.length > 0) {
+            const validObjectIds = nearbyDriverIds.filter((id: any) => mongoose.Types.ObjectId.isValid(id));
+            const query: any = {
+              _id: { $in: validObjectIds },
+              status: DriverStatus.ONLINE,
+              isAvailable: true,
+              preferredZone: activeZone._id,
+            };
+            if (vehicleType && ["bike", "auto", "car", "cab", "cab_prime"].includes(vehicleType)) {
+              query.vehicleType = vehicleType;
+            }
+            const drivers = await Driver.find(query).populate("user");
+            const driverMap = new Map(drivers.map((d: any) => [d._id.toString(), d]));
+            stageDrivers = nearbyDriverIds
+              .map((id: any) => driverMap.get(id))
+              .filter(Boolean);
           }
-          const drivers = await Driver.find(query).populate("user");
-
-          // Keep distance order as returned by Redis geoSearch
-          const driverMap = new Map(drivers.map((d: any) => [d._id.toString(), d]));
-          results = nearbyDriverIds
-            .map((id: any) => driverMap.get(id))
-            .filter(Boolean);
-
-          console.log(`[REDIS] Found ${results.length} matching drivers near coordinates`);
+        } catch (err: any) {
+          console.warn(`[REDIS] geoSearch failed for ${stage.name}, using MongoDB:`, err.message);
         }
-      } catch (err: any) {
-        console.warn(`[REDIS] geoSearch lookup failed, falling back to MongoDB:`, err.message);
       }
-    }
 
-    if (results.length === 0) {
-      // MongoDB Fallback Proximity Query
-      const query: any = {
-        status: DriverStatus.ONLINE,
-        isAvailable: true,
-        preferredZone: activeZone._id, // Filter strictly by activeZone
-        currentLocation: {
-          $near: {
-            $geometry: {
-              type: "Point",
-              coordinates: [lng, lat],
+      // 2. MongoDB Proximity Query Fallback
+      if (stageDrivers.length === 0) {
+        const query: any = {
+          status: DriverStatus.ONLINE,
+          isAvailable: true,
+          preferredZone: activeZone._id,
+          currentLocation: {
+            $near: {
+              $geometry: {
+                type: "Point",
+                coordinates: [lng, lat],
+              },
+              $maxDistance: currentRadius,
             },
-            $maxDistance: radiusInMeters,
           },
-        },
-      };
+        };
 
-      if (vehicleType && ["bike", "auto", "car"].includes(vehicleType)) {
-        query.vehicleType = vehicleType;
-      }
+        if (vehicleType && ["bike", "auto", "car", "cab", "cab_prime"].includes(vehicleType)) {
+          query.vehicleType = vehicleType;
+        }
 
-      results = await Driver.find(query).populate("user");
-    }
-
-    // Force include online dev drivers (check1 to check10) for testing
-    try {
-      const devUsers = await User.find({ name: /^check\d+$/i });
-      const devUserIds = devUsers.map(u => u._id);
-      const devDriversQuery: any = {
-        user: { $in: devUserIds },
-        status: DriverStatus.ONLINE
-      };
-      if (vehicleType && ["bike", "auto", "car"].includes(vehicleType)) {
-        devDriversQuery.vehicleType = vehicleType;
-      }
-      const devDrivers = await Driver.find(devDriversQuery).populate("user");
-      for (const dd of devDrivers) {
-        if (!results.some(d => d._id.toString() === dd._id.toString())) {
-          results.push(dd);
+        try {
+          stageDrivers = await Driver.find(query).populate("user");
+        } catch (mErr: any) {
+          console.error(`MongoDB geoQuery failed for ${stage.name}:`, mErr.message);
         }
       }
-    } catch (devErr) {
-      console.warn("[DEV DRIVERS SEARCH FETCH] Error loading dev drivers:", devErr);
+
+      // Include dev check drivers for testing
+      try {
+        const devUsers = await User.find({ name: /^check\d+$/i });
+        const devUserIds = devUsers.map(u => u._id);
+        const devDriversQuery: any = {
+          user: { $in: devUserIds },
+          status: DriverStatus.ONLINE
+        };
+        if (vehicleType && ["bike", "auto", "car", "cab", "cab_prime"].includes(vehicleType)) {
+          devDriversQuery.vehicleType = vehicleType;
+        }
+        const devDrivers = await Driver.find(devDriversQuery).populate("user");
+        for (const dd of devDrivers) {
+          if (!stageDrivers.some(d => d._id.toString() === dd._id.toString())) {
+            stageDrivers.push(dd);
+          }
+        }
+      } catch (devErr) {
+        console.warn("[DEV DRIVERS SEARCH FETCH] Error loading dev drivers:", devErr);
+      }
+
+      if (stageDrivers.length > 0) {
+        results = stageDrivers;
+        matchedStageName = stage.name;
+        console.log(`✅ [DISPATCH MATCH - ${stage.name}] Found ${results.length} available driver(s)! Stopping expansion.`);
+        break; // Drivers found! Stop further expansion.
+      } else {
+        console.log(`⚠️ [DISPATCH EXPANSION - ${stage.name}] 0 drivers found within ${currentRadius}m. Expanding to next stage...`);
+      }
     }
 
-    console.log(`[DRIVER SEARCH RESULTS] Total: ${results.length}, vehicleType: ${vehicleType}`);
+    console.log(`[DISPATCH FINAL] Matched: ${results.length} driver(s) via ${matchedStageName || "No Stage Match"}`);
     results.forEach((d) => {
-      console.log(` -> ID: ${d._id}, Name: ${d.user?.name}, Phone: ${d.user?.phone}, status: ${d.status}, vehicleType: ${d.vehicleType}, coords: ${JSON.stringify(d.currentLocation?.coordinates)}`);
+      console.log(` -> Matched Driver: ${d._id}, Name: ${d.user?.name}, Phone: ${d.user?.phone}, vehicleType: ${d.vehicleType}`);
     });
 
     return results;
