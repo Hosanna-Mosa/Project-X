@@ -446,11 +446,60 @@ export default function OnboardingScreen() {
       } catch (err) {
         console.error("Failed to fetch zones for onboarding:", err);
       }
+
+      try {
+        const token = useDriverStore.getState().token;
+        if (token) {
+          const res = await fetch(`${API_URL}/api/v1/users/addresses`, {
+            headers: { Authorization: `Bearer ${token}` },
+          });
+          if (res.ok) {
+            const data = await res.json();
+            if (Array.isArray(data)) {
+              const homeAddr = data.find((a) => a.label && a.label.toLowerCase() === "home");
+              if (homeAddr) {
+                setHomeAddressLine(homeAddr.addressLine);
+                const coords = homeAddr.location?.coordinates;
+                if (coords && coords.length >= 2) {
+                  setHomeLng(coords[0]);
+                  setHomeLat(coords[1]);
+                }
+              } 
+            }
+          }
+        }
+      } catch (err) {
+        console.warn("Failed to fetch saved addresses on onboarding mount:", err);
+      }
     })();
   }, []);
 
   // ── Step 1 State ──────────────────────────────────────────────────────────
   const [gender, setGender] = useState<string | null>(null);
+  const [homeAddressLine, setHomeAddressLine] = useState("");
+  const [homeLat, setHomeLat] = useState<number | null>(null);
+  const [homeLng, setHomeLng] = useState<number | null>(null);
+  const [suggestions, setSuggestions] = useState<any[]>([]);
+
+  const fetchSuggestions = async (query: string) => {
+    if (!query.trim()) {
+      setSuggestions([]);
+      return;
+    }
+    try {
+      const token = useDriverStore.getState().token;
+      const headers = {};
+      if (token) headers["Authorization"] = `Bearer ${token}`;
+
+      const res = await fetch(`${API_URL}/api/v1/places/autocomplete?input=${encodeURIComponent(query)}`, { headers });
+      if (res.ok) {
+        const data = await res.json();
+        setSuggestions(Array.isArray(data) ? data : []);
+      }
+    } catch (err) {
+      console.warn("Failed to fetch autocomplete suggestions:", err);
+    }
+  };
   const [vehicle, setVehicle] = useState<string | null>(null);
   const [preferredZone, setPreferredZone] = useState<string | null>(null);
   const [zones, setZones] = useState<any[]>([]);
@@ -490,6 +539,7 @@ export default function OnboardingScreen() {
     { key: "gender", label: "Gender" },
     { key: "vehicle", label: "Vehicle" },
     { key: "zone", label: "Preferred Zone" },
+    { key: "homeAddress", label: "Home Address" },
   ];
 
   const step2SectionsBase = [
@@ -707,6 +757,34 @@ export default function OnboardingScreen() {
       case "zone":
         data = { preferredZone };
         break;
+      case "homeAddress": {
+        setSaving(true);
+        try {
+          const res = await fetch(`${API_URL}/api/v1/users/addresses`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify({
+              label: "Home",
+              addressLine: homeAddressLine,
+              phone: useDriverStore.getState().driverPhone || "+919999999999",
+              coordinates: { lat: homeLat, lng: homeLng }
+            }),
+          });
+          if (res.status === 401 || res.status === 403) {
+            useDriverStore.getState().logout();
+            router.replace("/auth");
+            return;
+          }
+        } catch (err) {
+          console.error("Failed to save home address on onboarding:", err);
+        } finally {
+          setSaving(false);
+        }
+        return;
+      }
       default:
         return;
     }
@@ -810,6 +888,7 @@ export default function OnboardingScreen() {
       case "gender": return !!gender;
       case "vehicle": return !!vehicle;
       case "zone": return !!preferredZone;
+      case "homeAddress": return !!homeAddressLine && homeLat !== null && homeLng !== null;
       case "aadhaar": return canProceedAadhaar();
       case "pan": return canProceedPAN();
       case "license": return validateDLFormat(dlNumber) && !!dlExpiry;
@@ -827,6 +906,7 @@ export default function OnboardingScreen() {
       case "gender": return "Select Your Gender";
       case "vehicle": return "Select Your Vehicle";
       case "zone": return "Select Preferred Zone";
+      case "homeAddress": return "Enter Your Home Address";
       case "aadhaar": return "Aadhaar Verification";
       case "pan": return "PAN Card Details";
       case "license": return "Driving License";
@@ -842,6 +922,7 @@ export default function OnboardingScreen() {
       case "gender": return "This helps us personalise your experience.";
       case "vehicle": return "Choose the vehicle you'll use for deliveries. You can change this later.";
       case "zone": return "Choose your preferred operational zone. This is where you will receive ride and delivery requests.";
+      case "homeAddress": return "This is used for the 'Head Home' matching feature, giving you orders on your way home.";
       case "aadhaar": return panVerified ? "Aadhaar details collected for records (PAN was used for identity verification)." : "Enter your 12-digit Aadhaar number to verify your identity.";
       case "pan": return aadhaarVerified ? "PAN details collected for records (Aadhaar was used for identity verification)." : "Enter your PAN details for identity verification.";
       case "license": return "Enter your driving license number and expiry date.";
@@ -1013,6 +1094,85 @@ export default function OnboardingScreen() {
           </View>
         );
       }
+
+      case "homeAddress":
+        return (
+          <View style={{ gap: 16 }}>
+            <FormInput
+              label="Full Home Address"
+              value={homeAddressLine}
+              onChangeText={(t) => {
+                setHomeAddressLine(t);
+                fetchSuggestions(t);
+              }}
+              placeholder="e.g. 12, MG Road, Rajahmundry"
+              icon="home"
+            />
+
+            {suggestions.length > 0 && (
+              <View style={{
+                borderWidth: 1,
+                borderColor: Colors.border || "#e2e8f0",
+                borderRadius: 12,
+                backgroundColor: "#ffffff",
+                maxHeight: 180,
+                overflow: "hidden",
+                marginTop: -8,
+                shadowColor: "#000",
+                shadowOffset: { width: 0, height: 2 },
+                shadowOpacity: 0.1,
+                shadowRadius: 4,
+                elevation: 3,
+                zIndex: 999
+              }}>
+                <ScrollView nestedScrollEnabled={true} style={{ maxHeight: 180 }}>
+                  {suggestions.map((item) => (
+                    <TouchableOpacity
+                      key={item.id}
+                      onPress={() => {
+                        setHomeAddressLine(item.address);
+                        setHomeLat(item.lat);
+                        setHomeLng(item.lng);
+                        setSuggestions([]);
+                      }}
+                      style={{
+                        padding: 12,
+                        borderBottomWidth: 1,
+                        borderBottomColor: "#f1f5f9"
+                      }}
+                    >
+                      <Text style={{ fontSize: 14, color: "#1e293b", fontWeight: "600" }}>{item.name}</Text>
+                      <Text style={{ fontSize: 12, color: "#64748b" }}>{item.address}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+              </View>
+            )}
+
+            {homeLat !== null && homeLng !== null && (
+              <View style={{
+                flexDirection: "row",
+                alignItems: "center",
+                backgroundColor: "#f0fdf4",
+                borderWidth: 1.5,
+                borderColor: Colors.success || "#22c55e",
+                borderRadius: 12,
+                padding: 12,
+                gap: 10
+              }}>
+                <Feather name="check-circle" size={18} color="#22c55e" />
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontSize: 13, fontWeight: "600", color: "#166534" }}>
+                    Location Verified Geometrically
+                  </Text>
+                  <Text style={{ fontSize: 11, color: "#15803d", marginTop: 2 }}>
+                    Coords: [${homeLng.toFixed(4)}, ${homeLat.toFixed(4)}]
+                  </Text>
+                </View>
+              </View>
+            )}
+          </View>
+        );
 
       // ── Step 2 ────────────────────────────────────────────────────────────
       case "aadhaar":
@@ -1433,6 +1593,20 @@ export default function OnboardingScreen() {
             }
 
             if (sec === "zone" && canProceedSection()) {
+              return (
+                <PrimaryButton
+                  title="Save & Continue"
+                  onPress={async () => {
+                    await saveCurrentSectionData();
+                    goToNextSection();
+                  }}
+                  icon="arrow-right"
+                  loading={saving}
+                />
+              );
+            }
+
+            if (sec === "homeAddress" && canProceedSection()) {
               return (
                 <PrimaryButton
                   title="Save & Continue"

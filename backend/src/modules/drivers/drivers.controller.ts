@@ -23,6 +23,37 @@ export class DriversController {
     }
   }
 
+  async updateHomeMode(req: AuthRequest, res: Response) {
+    try {
+      const { homeMode } = req.body;
+      const { userId } = req.user!;
+
+      const driver = await Driver.findOne({ user: userId });
+      if (!driver) return res.status(404).json({ message: "Driver profile not found" });
+
+      if (homeMode === true) {
+        const user = await User.findById(userId);
+        if (!user) return res.status(404).json({ message: "User profile not found" });
+
+        const homeAddress = user.addresses?.find(
+          (addr: any) => addr.label && addr.label.trim().toLowerCase() === "home"
+        );
+
+        if (!homeAddress || !homeAddress.location?.coordinates || homeAddress.location.coordinates.length < 2) {
+          return res.status(400).json({
+            message: "Please save a home address in your profile first before turning on Head Home mode."
+          });
+        }
+      }
+
+      await driverService.updateHomeMode((driver._id as any).toString(), Boolean(homeMode));
+      return res.json({ message: "Home mode updated", homeMode });
+    } catch (error: any) {
+      console.error("Update home mode error:", error);
+      return res.status(500).json({ message: error.message || "Internal server error" });
+    }
+  }
+
   async nearby(req: AuthRequest, res: Response) {
     try {
       const { latitude, longitude, radius, vehicleType } = req.query;

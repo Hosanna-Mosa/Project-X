@@ -15,6 +15,7 @@ import { SafeAreaProvider, useSafeAreaInsets } from "react-native-safe-area-cont
 import Constants from "expo-constants";
 import { Platform, View } from "react-native";
 import * as NavigationBar from "expo-navigation-bar";
+import * as Notifications from "expo-notifications";
 
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { useAuthStore } from "@/contexts/authStore";
@@ -177,14 +178,50 @@ export default function RootLayout() {
       }
   }, [isInitialized, token, fontsLoaded, fontError, segments]);
 
-  // Register push notifications when authenticated
+  // Register push notifications when authenticated, and listen for tokens & taps (Priority 3 & 4)
   useEffect(() => {
-    if (token) {
-      const { registerForPushNotificationsAsync } = require("@/utils/notificationRegister");
-      registerForPushNotificationsAsync().catch((err: any) => {
-        console.error("Error registering push notifications:", err);
-      });
-    }
+    if (!token) return;
+
+    const { registerForPushNotificationsAsync } = require("@/utils/notificationRegister");
+    const { customFetch } = require("@/utils/api/custom-fetch");
+
+    // 1. Initial Registration
+    registerForPushNotificationsAsync().catch((err: any) => {
+      console.error("Error registering push notifications:", err);
+    });
+
+    // 2. Token Refresh Listener (Priority 3)
+    const tokenSubscription = Notifications.addPushTokenListener(async (tokenData) => {
+      console.log("[PushNotifications] Token refreshed:", tokenData.data);
+      try {
+        await customFetch("/api/v1/users/push-token", {
+          method: "POST",
+          body: JSON.stringify({ expoPushToken: tokenData.data }),
+        });
+        console.log("[PushNotifications] Refreshed token updated on backend successfully!");
+      } catch (err) {
+        console.error("[PushNotifications] Failed to sync refreshed token on backend:", err);
+      }
+    });
+
+    // 3. Notification Tap / Response Listener (Priority 4)
+    const responseSubscription = Notifications.addNotificationResponseReceivedListener((response) => {
+      const data = response.notification.request.content.data;
+      console.log("[PushNotifications] Notification tapped. Payload data:", data);
+      
+      if (data && data.orderId) {
+        // Deep link to the order tracking screen
+        router.push({
+          pathname: "/tracking",
+          params: { orderId: data.orderId }
+        });
+      }
+    });
+
+    return () => {
+      tokenSubscription.remove();
+      responseSubscription.remove();
+    };
   }, [token]);
 
   if (!fontsLoaded && !fontError) return null;

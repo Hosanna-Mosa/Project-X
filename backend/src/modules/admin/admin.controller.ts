@@ -7,6 +7,7 @@ import Coupon from "../../database/models/Coupon";
 import SystemConfig from "../../database/models/SystemConfig";
 import ChatMessage from "../../database/models/ChatMessage";
 import AppVersion from "../../database/models/AppVersion";
+import Zone from "../../database/models/Zone";
 
 export class AdminController {
   async getAllOrders(req: Request, res: Response) {
@@ -785,6 +786,196 @@ export class AdminController {
       return res.json({ success: true, data: config });
     } catch (error) {
       console.error("Error updating app version:", error);
+      return res.status(500).json({ message: "Internal server error" });
+    }
+  }
+
+  async seedDevDrivers(req: Request, res: Response) {
+    try {
+      // 1. Clean existing check users/drivers
+      const devUsers = await User.find({ name: /^check/i });
+      const devUserIds = devUsers.map((u) => u._id);
+      await Driver.deleteMany({ user: { $in: devUserIds } });
+      await User.deleteMany({ _id: { $in: devUserIds } });
+
+      // 2. Seed 10 check drivers
+      const seededDrivers = [];
+      const centers = [
+        { lat: 16.9891, lng: 82.2475, name: "Kakinada" },
+        { lat: 17.0005, lng: 81.7831, name: "Rajahmundry" },
+        { lat: 16.7300, lng: 82.2100, name: "Yanam" }
+      ];
+
+      for (let i = 1; i <= 10; i++) {
+        const user = new User({
+          name: `check${i}`,
+          email: `check${i}@example.com`,
+          phone: `+999999000${i}`,
+          password: "password123",
+          role: "DRIVER"
+        });
+        await user.save();
+
+        const center = centers[(i - 1) % centers.length];
+        const angle = (i * 2 * Math.PI) / 10;
+        const radius = 0.012; // spread of ~1.2km around the center
+        let lat = center.lat + Math.sin(angle) * radius;
+        let lng = center.lng + Math.cos(angle) * radius;
+        let preferredZone = undefined;
+
+        try {
+          const { ZonesService } = require("../zones/zones.service");
+          const zonesService = new ZonesService();
+          const activeZone = await zonesService.getZoneForCoordinates(lat, lng);
+          if (activeZone) {
+            preferredZone = activeZone._id;
+          }
+        } catch (zoneErr) {
+          console.warn("Dev driver seed zone lookup error:", zoneErr);
+        }
+
+        const driver = new Driver({
+          user: user._id,
+          status: DriverStatus.ONLINE,
+          isAvailable: true,
+          onboardingStatus: "completed",
+          vehicleType: "bike",
+          preferredZone,
+          currentLocation: {
+            type: "Point",
+            coordinates: [lng, lat]
+          }
+        });
+        await driver.save();
+        
+        // Sync with Redis if active
+        try {
+          const { SocketManager } = require("../../sockets/socket.manager");
+          const socketManager = SocketManager.getInstance();
+          const redisClient = socketManager ? socketManager.redisClient : null;
+          if (redisClient) {
+            await redisClient.geoAdd("drivers:locations", {
+              longitude: lng,
+              latitude: lat,
+              member: driver._id.toString()
+            });
+            await redisClient.set(`driver_status:${driver._id}`, "online", { EX: 30 });
+          }
+        } catch (redisErr) {
+          console.warn("Dev driver Redis sync warning:", redisErr);
+        }
+
+        seededDrivers.push(driver);
+      }
+
+      return res.json({ success: true, message: "10 Dev Drivers seeded successfully", count: seededDrivers.length });
+    } catch (error) {
+      console.error("Error seeding dev drivers:", error);
+      return res.status(500).json({ message: "Internal server error" });
+    }
+  }
+
+  async getDevDrivers(req: Request, res: Response) {
+    try {
+      const devUsers = await User.find({ name: /^check/i });
+      const devUserIds = devUsers.map((u) => u._id);
+      const drivers = await Driver.find({ user: { $in: devUserIds } }).populate("user");
+      return res.json(drivers);
+    } catch (error) {
+      console.error("Error getting dev drivers:", error);
+      return res.status(500).json({ message: "Internal server error" });
+    }
+  }
+
+  async updateDevDriver(req: Request, res: Response) {
+    try {
+      const { id } = req.params;
+      const { status, vehicleType, latitude, longitude } = req.body;
+
+      const driver = await Driver.findById(id).populate("user");
+      if (!driver) {
+        return res.status(404).json({ message: "Driver not found" });
+      }
+
+      if (status !== undefined) {
+        driver.status = status;
+        driver.isAvailable = status === "ONLINE";
+      }
+      if (vehicleType !== undefined) {
+        driver.vehicleType = vehicleType;
+      }
+      if (latitude !== undefined && longitude !== undefined) {
+        driver.currentLocation = {
+          type: "Point",
+          coordinates: [Number(longitude), Number(latitude)]
+        };
+        try {
+          const { ZonesService } = require("../zones/zones.service");
+          const zonesService = new ZonesService();
+          const activeZone = await zonesService.getZoneForCoordinates(Number(latitude), Number(longitude));
+          if (activeZone) {
+            driver.preferredZone = activeZone._id;
+          }
+        } catch (zoneErr) {
+          console.warn("Dev driver update zone lookup error:", zoneErr);
+        }
+      }
+
+      await driver.save();
+
+      // Sync with Redis if active
+      try {
+        const { SocketManager } = require("../../sockets/socket.manager");
+        const socketManager = SocketManager.getInstance();
+        const redisClient = socketManager ? socketManager.redisClient : null;
+        if (redisClient) {
+          if (latitude !== undefined && longitude !== undefined) {
+            await redisClient.geoAdd("drivers:locations", {
+              longitude: Number(longitude),
+              latitude: Number(latitude),
+              member: driver._id.toString()
+            });
+          }
+          await redisClient.set(`driver_status:${driver._id}`, status === "ONLINE" ? "online" : "offline", { EX: 30 });
+        }
+      } catch (redisErr) {
+        console.warn("Dev driver Redis update warning:", redisErr);
+      }
+
+      return res.json({ success: true, driver });
+    } catch (error) {
+      console.error("Error updating dev driver:", error);
+      return res.status(500).json({ message: "Internal server error" });
+    }
+  }
+
+  async deleteDevDrivers(req: Request, res: Response) {
+    try {
+      const devUsers = await User.find({ name: /^check/i });
+      const devUserIds = devUsers.map((u) => u._id);
+      const devDrivers = await Driver.find({ user: { $in: devUserIds } });
+      const devDriverIds = devDrivers.map((d) => d._id);
+
+      try {
+        const { SocketManager } = require("../../sockets/socket.manager");
+        const socketManager = SocketManager.getInstance();
+        const redisClient = socketManager ? socketManager.redisClient : null;
+        if (redisClient) {
+          for (const driverId of devDriverIds) {
+            await redisClient.geoRemove("drivers:locations", driverId.toString());
+            await redisClient.del(`driver_status:${driverId}`);
+          }
+        }
+      } catch (redisErr) {
+        console.warn("Dev driver delete Redis warning:", redisErr);
+      }
+
+      await Driver.deleteMany({ _id: { $in: devDriverIds } });
+      await User.deleteMany({ _id: { $in: devUserIds } });
+
+      return res.json({ message: "All mock dev drivers deleted successfully!" });
+    } catch (error) {
+      console.error("Error deleting dev drivers:", error);
       return res.status(500).json({ message: "Internal server error" });
     }
   }

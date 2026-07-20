@@ -158,6 +158,8 @@ export class DriverService {
       }
     }
 
+    let results: any[] = [];
+
     // Attempt Geospatial lookup in Redis first
     if (redisClient) {
       try {
@@ -181,39 +183,68 @@ export class DriverService {
 
           // Keep distance order as returned by Redis geoSearch
           const driverMap = new Map(drivers.map((d: any) => [d._id.toString(), d]));
-          const sortedDrivers = nearbyDriverIds
+          results = nearbyDriverIds
             .map((id: any) => driverMap.get(id))
             .filter(Boolean);
 
-          console.log(`[REDIS] Found ${sortedDrivers.length} matching drivers near coordinates`);
-          return sortedDrivers;
+          console.log(`[REDIS] Found ${results.length} matching drivers near coordinates`);
         }
       } catch (err: any) {
         console.warn(`[REDIS] geoSearch lookup failed, falling back to MongoDB:`, err.message);
       }
     }
 
-    // MongoDB Fallback Proximity Query
-    const query: any = {
-      status: DriverStatus.ONLINE,
-      isAvailable: true,
-      preferredZone: activeZone._id, // Filter strictly by activeZone
-      currentLocation: {
-        $near: {
-          $geometry: {
-            type: "Point",
-            coordinates: [lng, lat],
+    if (results.length === 0) {
+      // MongoDB Fallback Proximity Query
+      const query: any = {
+        status: DriverStatus.ONLINE,
+        isAvailable: true,
+        preferredZone: activeZone._id, // Filter strictly by activeZone
+        currentLocation: {
+          $near: {
+            $geometry: {
+              type: "Point",
+              coordinates: [lng, lat],
+            },
+            $maxDistance: radiusInMeters,
           },
-          $maxDistance: radiusInMeters,
         },
-      },
-    };
+      };
 
-    if (vehicleType && ["bike", "auto", "car"].includes(vehicleType)) {
-      query.vehicleType = vehicleType;
+      if (vehicleType && ["bike", "auto", "car"].includes(vehicleType)) {
+        query.vehicleType = vehicleType;
+      }
+
+      results = await Driver.find(query).populate("user");
     }
 
-    return Driver.find(query).populate("user");
+    // Force include online dev drivers (check1 to check10) for testing
+    try {
+      const devUsers = await User.find({ name: /^check\d+$/i });
+      const devUserIds = devUsers.map(u => u._id);
+      const devDriversQuery: any = {
+        user: { $in: devUserIds },
+        status: DriverStatus.ONLINE
+      };
+      if (vehicleType && ["bike", "auto", "car"].includes(vehicleType)) {
+        devDriversQuery.vehicleType = vehicleType;
+      }
+      const devDrivers = await Driver.find(devDriversQuery).populate("user");
+      for (const dd of devDrivers) {
+        if (!results.some(d => d._id.toString() === dd._id.toString())) {
+          results.push(dd);
+        }
+      }
+    } catch (devErr) {
+      console.warn("[DEV DRIVERS SEARCH FETCH] Error loading dev drivers:", devErr);
+    }
+
+    console.log(`[DRIVER SEARCH RESULTS] Total: ${results.length}, vehicleType: ${vehicleType}`);
+    results.forEach((d) => {
+      console.log(` -> ID: ${d._id}, Name: ${d.user?.name}, Phone: ${d.user?.phone}, status: ${d.status}, vehicleType: ${d.vehicleType}, coords: ${JSON.stringify(d.currentLocation?.coordinates)}`);
+    });
+
+    return results;
   }
 
   async updateLocation(driverId: string, lat: number, lng: number) {
@@ -224,6 +255,18 @@ export class DriverService {
       type: "Point",
       coordinates: [lng, lat],
     };
+
+    try {
+      const { ZonesService } = require("../zones/zones.service");
+      const zonesService = new ZonesService();
+      const activeZone = await zonesService.getZoneForCoordinates(lat, lng);
+      if (activeZone) {
+        driver.preferredZone = activeZone._id;
+      }
+    } catch (zoneErr) {
+      console.warn("[HTTP LOCATION UPDATE] Error resolving zone for driver:", zoneErr);
+    }
+
     return driver.save();
   }
 
@@ -236,6 +279,71 @@ export class DriverService {
       driver.isAvailable = true;
     }
     return driver.save();
+  }
+
+  async updateHomeMode(driverId: string, homeMode: boolean) {
+    const driver = await Driver.findById(driverId);
+    if (!driver) throw new Error("Driver not found");
+
+    driver.homeMode = homeMode;
+    return driver.save();
+  }
+
+  async isOrderOnTheWayToHome(driverId: string, orderPickupCoords: number[], orderDropoffCoords: number[]): Promise<boolean> {
+    const driver = await Driver.findById(driverId).populate("user");
+    if (!driver || !driver.user) return false;
+
+    const user = driver.user as any;
+    const homeAddress = user.addresses?.find(
+      (addr: any) => addr.label && addr.label.trim().toLowerCase() === "home"
+    );
+
+    if (!homeAddress || !homeAddress.location?.coordinates || homeAddress.location.coordinates.length < 2) {
+      return false;
+    }
+
+    const driverCoords = driver.currentLocation?.coordinates;
+    if (!driverCoords || driverCoords.length < 2) return false;
+
+    const driverLng = driverCoords[0];
+    const driverLat = driverCoords[1];
+    const homeLng = homeAddress.location.coordinates[0];
+    const homeLat = homeAddress.location.coordinates[1];
+    const pickupLng = orderPickupCoords[0];
+    const pickupLat = orderPickupCoords[1];
+    const dropoffLng = orderDropoffCoords[0];
+    const dropoffLat = orderDropoffCoords[1];
+
+    const d_h = this.haversineDistance(driverLat, driverLng, homeLat, homeLng);
+    const d_p = this.haversineDistance(driverLat, driverLng, pickupLat, pickupLng);
+    const p_d = this.haversineDistance(pickupLat, pickupLng, dropoffLat, dropoffLng);
+    const drop_h = this.haversineDistance(dropoffLat, dropoffLng, homeLat, homeLng);
+
+    const fs = require("fs");
+    const path = require("path");
+    const logPath = path.join(__dirname, "../../../debug.log");
+    fs.appendFileSync(logPath, `[DETOUR CHECK] Driver: ${driverId}\n` +
+      `  Driver: [${driverLng}, ${driverLat}]\n` +
+      `  Home: [${homeLng}, ${homeLat}]\n` +
+      `  Pickup: [${pickupLng}, ${pickupLat}]\n` +
+      `  Dropoff: [${dropoffLng}, ${dropoffLat}]\n` +
+      `  Distances: d_h = ${d_h.toFixed(1)}m, d_p = ${d_p.toFixed(1)}m, p_d = ${p_d.toFixed(1)}m, drop_h = ${drop_h.toFixed(1)}m\n`);
+
+    if (d_h < 3000) {
+      fs.appendFileSync(logPath, `  -> MATCHED: Driver is already within 3km of home.\n`);
+      return true;
+    }
+
+    if (drop_h >= d_h) {
+      fs.appendFileSync(logPath, `  -> FILTERED OUT: Dropoff is further from home than driver starting point (drop_h: ${drop_h.toFixed(1)}m >= d_h: ${d_h.toFixed(1)}m)\n`);
+      return false;
+    }
+
+    const detourOverhead = (d_p + p_d + drop_h) - d_h;
+    const maxAllowedDetour = Math.max(10000, 0.3 * d_h);
+    const result = detourOverhead <= maxAllowedDetour;
+    fs.appendFileSync(logPath, `  -> Detour overhead: ${detourOverhead.toFixed(1)}m, Max allowed detour: ${maxAllowedDetour.toFixed(1)}m. Result: ${result}\n`);
+    return result;
   }
 
   async getHighDemandAreas(limit: number = 6): Promise<HighDemandArea[]> {

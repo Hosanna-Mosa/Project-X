@@ -229,22 +229,104 @@ const allNewZones = [
         ]
       ]
     }
+  },
+  // ── ATREYAPURAM ZONES ──────────────────────────────────────────────────────
+  {
+    name: "Atreyapuram Central (Village & Markets)",
+    type: ZoneType.POLYGON,
+    pricingMultiplier: 1.15,
+    isActive: true,
+    description: "Core zone covering Atreyapuram village center, local markets, and main residential streets.",
+    allowedServices: ["bike", "auto", "cab", "cab_prime", "delivery", "helper"],
+    boundary: {
+      type: "Polygon",
+      coordinates: [
+        [
+          [81.765, 16.815],
+          [81.805, 16.815],
+          [81.805, 16.845],
+          [81.765, 16.845],
+          [81.765, 16.815]
+        ]
+      ]
+    }
+  },
+  {
+    name: "Atreyapuram North & Ryali",
+    type: ZoneType.POLYGON,
+    pricingMultiplier: 1.2,
+    isActive: true,
+    description: "Operational zone covering northern outskirts of Atreyapuram and the neighboring Ryali village area.",
+    allowedServices: ["bike", "auto", "cab", "cab_prime", "delivery", "helper"],
+    boundary: {
+      type: "Polygon",
+      coordinates: [
+        [
+          [81.775, 16.845],
+          [81.825, 16.845],
+          [81.825, 16.885],
+          [81.775, 16.885],
+          [81.775, 16.845]
+        ]
+      ]
+    }
+  },
+  // ── YANAM ZONES ────────────────────────────────────────────────────────────
+  {
+    name: "Yanam Central",
+    type: ZoneType.POLYGON,
+    pricingMultiplier: 1.15,
+    isActive: true,
+    description: "Core zone covering Yanam municipal center and main local markets.",
+    allowedServices: ["bike", "auto", "cab", "cab_prime", "delivery", "helper"],
+    boundary: {
+      type: "Polygon",
+      coordinates: [
+        [
+          [82.190, 16.710],
+          [82.230, 16.710],
+          [82.230, 16.750],
+          [82.190, 16.750],
+          [82.190, 16.710]
+        ]
+      ]
+    }
+  },
+  {
+    name: "Yanam Ferry & Riverfront",
+    type: ZoneType.POLYGON,
+    pricingMultiplier: 1.2,
+    isActive: true,
+    description: "Operational zone covering Yanam Ferry Road, Gautami riverfront, and surrounding regions.",
+    allowedServices: ["bike", "auto", "cab", "cab_prime", "delivery", "helper"],
+    boundary: {
+      type: "Polygon",
+      coordinates: [
+        [
+          [82.170, 16.720],
+          [82.210, 16.720],
+          [82.210, 16.760],
+          [82.170, 16.760],
+          [82.170, 16.720]
+        ]
+      ]
+    }
   }
 ];
 
 async function seedZones() {
   console.log("==================================================");
-  console.log("🌱 SEEDING OPERATIONAL ZONES (RAJAHMUNDRY & KAKINADA)");
+  console.log("🌱 SEEDING OPERATIONAL ZONES (RAJAHMUNDRY, KAKINADA, ATREYAPURAM & YANAM)");
   console.log("==================================================");
   console.log(`Connecting to database...`);
   try {
     await mongoose.connect(DATABASE_URL);
     console.log("Connected successfully to MongoDB.");
 
-    // Remove existing Rajahmundry and Kakinada zones
-    console.log("Cleaning up previous Rajahmundry & Kakinada zones...");
+    // Remove existing Rajahmundry, Kakinada, Atreyapuram and Yanam zones
+    console.log("Cleaning up previous Rajahmundry, Kakinada, Atreyapuram & Yanam zones...");
     const cleanupResult = await Zone.deleteMany({
-      name: { $regex: /(Rajahmundry|Kakinada)/i }
+      name: { $regex: /(Rajahmundry|Kakinada|Atreyapuram|Yanam)/i }
     });
     console.log(`Removed ${cleanupResult.deletedCount} old zone entries.`);
 

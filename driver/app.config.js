@@ -1,11 +1,11 @@
 export default {
   "expo": {
-    "name": "Driver App",
-    "slug": "driver-app",
+    "name": "Flavour Driver",
+    "slug": "flavour-driver",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "driver-app",
+    "scheme": "flavour-driver",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "splash": {
@@ -15,13 +15,18 @@ export default {
     },
     "ios": {
       "supportsTablet": false,
-      "bundleIdentifier": "com.hosanna.triozen.driver",
+      "bundleIdentifier": "com.flavour.driver",
       "config": {
         "googleMapsApiKey": process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY
       }
     },
     "android": {
-      "package": "com.hosanna.triozen.driver",
+      "package": "com.flavour.driver",
+      "googleServicesFile": "./google-services.json",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/images/icon.png",
+        "backgroundColor": "#ffffff"
+      },
       "config": {
         "googleMaps": {
           "apiKey": process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY
@@ -30,8 +35,14 @@ export default {
       "permissions": [
         "ACCESS_COARSE_LOCATION",
         "ACCESS_FINE_LOCATION",
-        "ACCESS_BACKGROUND_LOCATION"
+        "ACCESS_BACKGROUND_LOCATION",
+        "android.permission.POST_NOTIFICATIONS",
+        "android.permission.RECEIVE_BOOT_COMPLETED"
       ]
+    },
+    "notification": {
+      "icon": "./assets/images/icon.png",
+      "color": "#ffffff"
     },
     "web": {
       "favicon": "./assets/images/icon.png"
@@ -52,7 +63,14 @@ export default {
         }
       ],
       "expo-font",
-      "expo-web-browser"
+      "expo-web-browser",
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/images/icon.png",
+          "color": "#ffffff"
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,
@@ -61,8 +79,9 @@ export default {
     "extra": {
       "apiUrl": process.env.EXPO_PUBLIC_API_URL,
       "eas": {
-        "projectId": "596ad599-818e-435b-8cb5-a280a81fbc83"
+        "projectId": "3d9d3cae-588c-4cdf-b0bf-ff91b95497a4"
       }
-    }
+    },
+    "owner": "hosanna4189"
   }
 }

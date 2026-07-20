@@ -19,6 +19,7 @@ export default function FindingDriverScreen() {
   const [bookingConfirmed, setBookingConfirmed] = useState(false);
   const [confirmedDriver, setConfirmedDriver] = useState<any>(null);
   const [stops, setStops] = useState<any[]>([]);
+  const [onlineDrivers, setOnlineDrivers] = useState<any[]>([]);
 
   const pulse1 = useRef(new Animated.Value(0)).current;
   const pulse2 = useRef(new Animated.Value(0)).current;
@@ -189,7 +190,13 @@ export default function FindingDriverScreen() {
               type: s.type,
               items: s.items?.lines || [],
             }));
-            setStops(mappedStops);
+            setStops(prev => {
+              if (prev && prev.length === mappedStops.length) {
+                const isSame = prev.every((val, idx) => val.id === mappedStops[idx].id);
+                if (isSame) return prev;
+              }
+              return mappedStops;
+            });
           }
           if (orderData.status && orderData.status.toUpperCase() === "CANCELLED") {
             handleOrderCancelled();
@@ -285,6 +292,45 @@ export default function FindingDriverScreen() {
     }
   };
 
+  useEffect(() => {
+    if (!stops || stops.length === 0) return;
+    const pickupStop = stops.find(s => s.type === "pickup") || stops[0];
+    if (!pickupStop || !pickupStop.lat || !pickupStop.lng) return;
+
+    let active = true;
+    const fetchOnlineDrivers = async () => {
+      try {
+        const queryParams = new URLSearchParams({
+          latitude: String(pickupStop.lat),
+          longitude: String(pickupStop.lng),
+          radius: "50000",
+        });
+        const res = await customFetch<any[]>(`/api/v1/drivers/nearby?${queryParams.toString()}`);
+        console.log(`[CLIENT DRIVER SEARCH RESPONSE] Returned count: ${res ? res.length : 0}`);
+        if (active && Array.isArray(res)) {
+          const mapped = res.map(drv => ({
+            id: drv._id,
+            lat: drv.currentLocation?.coordinates[1],
+            lng: drv.currentLocation?.coordinates[0],
+            vehicleType: drv.vehicleType || "bike",
+            name: drv.user?.name || "Driver",
+          })).filter(d => d.lat && d.lng);
+          setOnlineDrivers(mapped);
+        }
+      } catch (error) {
+        console.error("Failed to fetch nearby drivers in finding-driver:", error);
+      }
+    };
+
+    fetchOnlineDrivers();
+    const interval = setInterval(fetchOnlineDrivers, 10000);
+
+    return () => {
+      active = false;
+      clearInterval(interval);
+    };
+  }, [stops]);
+
   if (bookingConfirmed && confirmedDriver) {
     let formattedDate = "scheduled time";
     if (dateTimeStr) {
@@ -320,6 +366,7 @@ export default function FindingDriverScreen() {
     <View style={styles.root}>
       <MapBackground 
         stops={stops}
+        driverMarkers={onlineDrivers}
         style={StyleSheet.absoluteFill}
       />
 

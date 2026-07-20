@@ -1,11 +1,11 @@
 export default {
   "expo": {
-    "name": "ProjectX",
-    "slug": "mobile",
+    "name": "Flavour",
+    "slug": "flavour",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "mobile",
+    "scheme": "flavour",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "splash": {
@@ -15,7 +15,7 @@ export default {
     },
     "ios": {
       "supportsTablet": false,
-      "bundleIdentifier": "com.hosanna.triozen.x",
+      "bundleIdentifier": "com.flavour.customer",
       "config": {
         "googleMapsApiKey": process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY
       },
@@ -24,7 +24,12 @@ export default {
       }
     },
     "android": {
-      "package": "com.hosanna.triozen.x",
+      "package": "com.flavour.customer",
+      "googleServicesFile": "./google-services.json",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/images/icon.png",
+        "backgroundColor": "#ffffff"
+      },
       "usesCleartextTraffic": true,
       "navigationBar": {
         "backgroundColor": "#FFFFFF",
@@ -37,8 +42,14 @@ export default {
       },
       "permissions": [
         "ACCESS_COARSE_LOCATION",
-        "ACCESS_FINE_LOCATION"
+        "ACCESS_FINE_LOCATION",
+        "android.permission.POST_NOTIFICATIONS",
+        "android.permission.RECEIVE_BOOT_COMPLETED"
       ]
+    },
+    "notification": {
+      "icon": "./assets/images/icon.png",
+      "color": "#ffffff"
     },
     "web": {
       "favicon": "./assets/images/icon.png"
@@ -52,17 +63,25 @@ export default {
       ],
       "expo-font",
       "expo-web-browser",
-      "@react-native-community/datetimepicker"
+      "@react-native-community/datetimepicker",
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/images/icon.png",
+          "color": "#ffffff"
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
     },
     "extra": {
-       "apiUrl": process.env.EXPO_PUBLIC_API_URL,
+      "apiUrl": process.env.EXPO_PUBLIC_API_URL,
       "eas": {
-        "projectId": "7f0826d6-97a5-4c59-9eb9-46f51993f3cf"
+        "projectId": "a59a7934-9b67-4dc2-b01c-0958cdc8f819"
       }
-    }
+    },
+    "owner": "hosanna4189"
   }
 }

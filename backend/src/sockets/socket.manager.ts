@@ -239,6 +239,16 @@ export class SocketManager {
             };
             resolvedDriver.status = DriverStatus.ONLINE;
             resolvedDriver.isAvailable = true; // Set available on active tracking update
+            try {
+              const { ZonesService } = require("../modules/zones/zones.service");
+              const zonesService = new ZonesService();
+              const activeZone = await zonesService.getZoneForCoordinates(Number(data.lat), Number(data.lng));
+              if (activeZone) {
+                resolvedDriver.preferredZone = activeZone._id;
+              }
+            } catch (zoneErr) {
+              console.warn("[SOCKET ZONE UPDATE] Error resolving zone for driver:", zoneErr);
+            }
             await resolvedDriver.save();
           }
         } catch (e: any) {

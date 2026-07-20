@@ -387,6 +387,13 @@ export default function ProfileScreen() {
         ],
       },
       {
+        key: "address",
+        icon: "map-pin" as const,
+        title: "Saved Addresses",
+        subtitle: `${profile.account.addresses?.length || 0} saved addresses`,
+        fields: [],
+      },
+      {
         key: "settings",
         icon: "settings" as const,
         title: "Settings",
@@ -857,6 +864,8 @@ export default function ProfileScreen() {
                   onPress={() => {
                     if (item.key === "support") {
                       router.push("/support");
+                    } else if (item.key === "address") {
+                      router.push("/saved-addresses");
                     } else {
                       setActiveSection(item.key);
                     }
