@@ -79,9 +79,9 @@ export default {
     "extra": {
       "apiUrl": process.env.EXPO_PUBLIC_API_URL,
       "eas": {
-        "projectId": "a59a7934-9b67-4dc2-b01c-0958cdc8f819"
+        "projectId": "e3e714ab-ffe7-4ea4-bf62-b317be38497c"
       }
     },
-    "owner": "hosanna4189"
+    "owner": "hosanna4190"
   }
 }
