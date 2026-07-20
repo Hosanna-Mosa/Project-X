@@ -889,3 +889,10 @@ Checking driver 6a5db6a72b4c19e29ec7d8bd (User: 6a5db6a72b4c19e29ec7d8b9). homeM
 Driver 6a5db6a72b4c19e29ec7d8bd has homeMode OFF. Adding unconditionally.
 Checking driver 6a5db6a62b4c19e29ec7d8ab (User: 6a5db6a52b4c19e29ec7d8a7). homeMode = false
 Driver 6a5db6a62b4c19e29ec7d8ab has homeMode OFF. Adding unconditionally.
+[DETOUR CHECK] Driver: 6a42577448525b572677670d
+  Driver: [81.79328182193248, 16.96231403220352]
+  Home: [82.1842504, 17.120459]
+  Pickup: [81.7804732, 17.0050454]
+  Dropoff: [81.7890874, 17.0023083]
+  Distances: d_h = 45131.7m, d_p = 4942.9m, p_d = 965.2m, drop_h = 44012.9m
+  -> Detour overhead: 4789.3m, Max allowed detour: 13539.5m. Result: true

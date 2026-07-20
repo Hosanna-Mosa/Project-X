@@ -105,10 +105,25 @@ export const getNearbyVendors = async (req: Request, res: Response) => {
       return res.json([]);
     }
 
-    const radiusInMeters = radius ? Math.max(1000, Number(radius) || 0) : 20000000;
+    const maxDefaultRadius = 15000; // 15 km max default radius
+    const radiusInMeters = radius ? Math.max(1000, Number(radius) || 0) : maxDefaultRadius;
     const skip = (Number(page) - 1) * Number(limit);
 
     console.log(`[API] Fetching nearby vendors - Lat: ${userLat}, Lng: ${userLng}, Page: ${page} (Zone: ${activeZone.name})`);
+
+    // Build spatial match query enforcing active zone boundaries
+    const geoQuery: any = { partnerType: { $ne: "meat" } };
+    if (activeZone.type === "polygon" && activeZone.boundary) {
+      geoQuery.location = {
+        $geoWithin: {
+          $geometry: activeZone.boundary
+        }
+      };
+    }
+
+    const maxDist = activeZone.type === "circle" && activeZone.radius 
+      ? Math.min(radiusInMeters, activeZone.radius) 
+      : radiusInMeters;
 
     // MongoDB Proximity Query with Pagination
     const vendors = await Vendor.aggregate([
@@ -119,10 +134,10 @@ export const getNearbyVendors = async (req: Request, res: Response) => {
             coordinates: [userLng, userLat],
           },
           distanceField: "distance",
-          ...(radiusInMeters ? { maxDistance: radiusInMeters } : {}),
+          maxDistance: maxDist,
           spherical: true,
           key: "location",
-          query: { partnerType: { $ne: "meat" } },
+          query: geoQuery,
         },
       },
       { $skip: skip },

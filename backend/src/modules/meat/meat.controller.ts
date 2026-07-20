@@ -171,25 +171,37 @@ export const getNearbyMeatCenters = async (req: Request, res: Response) => {
     const fetchAll = all === "true";
     const skip = fetchAll ? 0 : (pageNumber - 1) * requestedLimit;
     const pageLimit = requestedLimit;
-    const radiusInMeters = radius ? Math.max(1000, Number(radius) || 0) : 25000;
+    const maxDefaultRadius = 15000; // 15 km max default radius
+    const radiusInMeters = radius ? Math.max(1000, Number(radius) || 0) : maxDefaultRadius;
 
     const matchStage: any = {};
     if (category) {
       matchStage.categories = { $in: [category] };
     }
 
+    // Spatial query parameters enforcing active zone
+    const centerGeoQuery: any = {};
+    const vendorGeoQuery: any = { partnerType: "meat" };
+
+    if (activeZone.type === "polygon" && activeZone.boundary) {
+      centerGeoQuery.location = { $geoWithin: { $geometry: activeZone.boundary } };
+      vendorGeoQuery.location = { $geoWithin: { $geometry: activeZone.boundary } };
+    }
+
+    const effectiveMaxDistance = activeZone.type === "circle" && activeZone.radius
+      ? Math.min(radiusInMeters, activeZone.radius)
+      : radiusInMeters;
+
     if (fetchAll) {
       const [centers, meatVendors] = await Promise.all([
-        MeatCenter.find(matchStage).lean(),
-        Vendor.find({ ...matchStage, partnerType: "meat" }).lean(),
+        MeatCenter.find({ ...matchStage, ...centerGeoQuery }).lean(),
+        Vendor.find({ ...matchStage, ...vendorGeoQuery }).lean(),
       ]);
 
-      const filteredCenters = radiusInMeters
-        ? [...centers, ...meatVendors].filter((center: any) => {
-          const [centerLng = userLng, centerLat = userLat] = center.location?.coordinates || [];
-          return getDistanceInMeters(userLat, userLng, centerLat, centerLng) <= radiusInMeters;
-        })
-        : [...centers, ...meatVendors];
+      const filteredCenters = [...centers, ...meatVendors].filter((center: any) => {
+        const [centerLng = userLng, centerLat = userLat] = center.location?.coordinates || [];
+        return getDistanceInMeters(userLat, userLng, centerLat, centerLng) <= effectiveMaxDistance;
+      });
 
       const formattedCenters = filteredCenters.map((center: any) => {
         const [centerLng = userLng, centerLat = userLat] = center.location?.coordinates || [];
@@ -223,9 +235,10 @@ export const getNearbyMeatCenters = async (req: Request, res: Response) => {
             coordinates: [userLng, userLat],
           },
           distanceField: "distance",
-          ...(radiusInMeters ? { maxDistance: radiusInMeters } : {}),
+          maxDistance: effectiveMaxDistance,
           spherical: true,
-          key: "location"
+          key: "location",
+          query: centerGeoQuery,
         },
       }
     ];
@@ -246,10 +259,10 @@ export const getNearbyMeatCenters = async (req: Request, res: Response) => {
             coordinates: [userLng, userLat],
           },
           distanceField: "distance",
-          ...(radiusInMeters ? { maxDistance: radiusInMeters } : {}),
+          maxDistance: effectiveMaxDistance,
           spherical: true,
           key: "location",
-          query: { partnerType: "meat" },
+          query: vendorGeoQuery,
         },
       },
     ];
