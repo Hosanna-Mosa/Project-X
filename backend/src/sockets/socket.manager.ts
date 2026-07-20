@@ -365,6 +365,22 @@ export class SocketManager {
         }
       });
 
+      // HELPER TASK EVENTS
+      socket.on("assign_task_confirmed", (data: { orderId: string }) => {
+        if (!data.orderId) return;
+        socket.to(data.orderId).emit("assign_task_confirmed", data);
+      });
+
+      socket.on("task_started", (data: { orderId: string }) => {
+        if (!data.orderId) return;
+        socket.to(data.orderId).emit("task_started", data);
+      });
+
+      socket.on("helper_status_update", (data: { orderId: string, text: string }) => {
+        if (!data.orderId) return;
+        socket.to(data.orderId).emit("helper_status_update", data);
+      });
+
       // CHAT MESSAGES: Forward messages within the order room
       socket.on("send_message", async (data: { orderId: string; senderId: string; role: string; text: string; id?: string }) => {
         if (!authUser) return;

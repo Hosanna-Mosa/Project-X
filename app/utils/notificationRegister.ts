@@ -1,22 +1,33 @@
-import * as Notifications from "expo-notifications";
 import * as Device from "expo-device";
 import { Platform } from "react-native";
 import Constants from "expo-constants";
 import { customFetch } from "./api/custom-fetch";
 
-Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowAlert: true,
-    shouldPlaySound: true,
-    shouldSetBadge: false,
-    shouldShowBanner: true,
-    shouldShowList: true,
-  }),
-});
+let Notifications: any = null;
+if (Constants.appOwnership !== "expo") {
+  try {
+    Notifications = require("expo-notifications");
+    Notifications.setNotificationHandler({
+      handleNotification: async () => ({
+        shouldShowAlert: true,
+        shouldPlaySound: true,
+        shouldSetBadge: false,
+        shouldShowBanner: true,
+        shouldShowList: true,
+      }),
+    });
+  } catch (e) {
+    console.warn("Failed to require expo-notifications:", e);
+  }
+}
 
 export async function registerForPushNotificationsAsync() {
   if (!Device.isDevice) {
     console.log("[PushNotifications] Skipped registration: must run on physical device");
+    return null;
+  }
+  if (Constants.appOwnership === "expo" || !Notifications) {
+    console.log("[PushNotifications] Skipped registration: Expo Go does not support Push Notifications in SDK 53+");
     return null;
   }
 

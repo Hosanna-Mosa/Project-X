@@ -292,11 +292,11 @@ export const MapBackground = forwardRef<MapBackgroundRef, Props>(({
           }
         }}
       >
-        {radiusCenter && radiusMeters && (
+        {(radiusCenter != null && radiusMeters != null && radiusMeters > 0) ? (
           <>
             <Circle
-              center={{ latitude: radiusCenter.lat, longitude: radiusCenter.lng }}
-              radius={radiusMeters}
+              center={{ latitude: Number(radiusCenter.lat), longitude: Number(radiusCenter.lng) }}
+              radius={Number(radiusMeters)}
               fillColor="rgba(79, 70, 229, 0.15)"
               strokeColor="rgba(79, 70, 229, 0.6)"
               strokeWidth={2}
@@ -304,8 +304,8 @@ export const MapBackground = forwardRef<MapBackgroundRef, Props>(({
             <Marker
               key="radius-badge"
               coordinate={{ 
-                latitude: radiusCenter.lat - (radiusMeters / 111320), 
-                longitude: radiusCenter.lng 
+                latitude: Number(radiusCenter.lat) - (Number(radiusMeters) / 111320), 
+                longitude: Number(radiusCenter.lng) 
               }}
               anchor={{ x: 0.5, y: 0.5 }}
               tracksViewChanges={false}
@@ -329,25 +329,28 @@ export const MapBackground = forwardRef<MapBackgroundRef, Props>(({
               </View>
             </Marker>
           </>
-        )}
+        ) : null}
 
         {markers.map((item) => (
-          <Marker
-            key={item.id}
-            coordinate={{ latitude: item.lat, longitude: item.lng }}
-            onPress={() => onMarkerPress?.(item)}
-            pinColor="#EF4444"
-            tracksViewChanges={true}
-          />
+          (item.lat != null && item.lng != null) ? (
+            <Marker
+              key={item.id}
+              coordinate={{ latitude: Number(item.lat), longitude: Number(item.lng) }}
+              onPress={() => onMarkerPress?.(item)}
+              pinColor="#EF4444"
+              tracksViewChanges={true}
+            />
+          ) : null
         ))}
 
         {driverMarkers.map((driver) => {
+          if (driver.lat == null || driver.lng == null) return null;
           const vehicleType = driver.vehicleType || driver.vehicle || "car";
           const iconName = vehicleType === "bike" ? "navigation" : vehicleType === "auto" ? "truck" : "briefcase";
           return (
             <Marker
               key={driver.id || driver._id}
-              coordinate={{ latitude: driver.lat, longitude: driver.lng }}
+              coordinate={{ latitude: Number(driver.lat), longitude: Number(driver.lng) }}
               anchor={{ x: 0.5, y: 0.5 }}
               tracksViewChanges={false}
             >
@@ -359,14 +362,14 @@ export const MapBackground = forwardRef<MapBackgroundRef, Props>(({
         })}
 
         {stops.map((stop, index) => (
-          stop.lat && stop.lng && (
+          (stop.lat != null && stop.lng != null) ? (
             <Marker
               key={stop.id}
-              coordinate={{ latitude: stop.lat, longitude: stop.lng }}
+              coordinate={{ latitude: Number(stop.lat), longitude: Number(stop.lng) }}
               title={stop.storeName || `Pickup ${index + 1}`}
               description={stop.address}
             />
-          )
+          ) : null
         ))}
           
         {userLocation && (
@@ -392,13 +395,13 @@ export const MapBackground = forwardRef<MapBackgroundRef, Props>(({
           />
         )}
 
-        {(polyline || autoRoutePolyline) && (
+        {(polyline || autoRoutePolyline) ? (
           <Polyline
             coordinates={decodePolyline(polyline || autoRoutePolyline || "")}
             strokeWidth={4}
             strokeColor="#16A34A"
           />
-        )}
+        ) : null}
       </MapView>
       {children}
     </View>

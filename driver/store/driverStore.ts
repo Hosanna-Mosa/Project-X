@@ -109,7 +109,7 @@ interface DriverState {
   goOffline: () => Promise<void>;
   toggleHomeMode: () => void;
   acceptOrder: () => void;
-  rejectOrder: () => void;
+  rejectOrder: (reason?: string) => void;
   updateStep: (step: number) => void;
   updateOrderStatus: (status: OrderStatus, otp?: string) => Promise<void>;
   completeOrder: () => void;
@@ -500,7 +500,24 @@ export const useDriverStore = create<DriverState>()(
         }
       },
 
-      rejectOrder: () => set({ incomingOrder: null }),
+      rejectOrder: async (reason?: string) => {
+        const { incomingOrder, token } = get();
+        if (incomingOrder && token && reason) {
+          try {
+            await fetch(`${apiUrl}/api/v1/orders/${incomingOrder.id}/decline`, {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${token}`
+              },
+              body: JSON.stringify({ reason })
+            });
+          } catch (e) {
+            console.error("Failed to decline order", e);
+          }
+        }
+        set({ incomingOrder: null });
+      },
 
       updateStep: (step) => {
         const { currentOrder } = get();

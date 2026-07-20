@@ -163,6 +163,27 @@ export class OrdersController {
     }
   }
 
+  async increasePrice(req: AuthRequest, res: Response, next: NextFunction) {
+    try {
+      const { id } = req.params;
+      const { amount } = req.body;
+      const userId = req.user?.userId;
+
+      if (!userId) {
+        throw new UnauthorizedError("User is not authenticated");
+      }
+
+      if (!amount || amount <= 0) {
+        throw new ValidationError("Invalid amount to increase");
+      }
+
+      const order = await ordersService.increaseOrderPrice(id as string, amount, userId);
+      return res.json(order);
+    } catch (error: any) {
+      next(error);
+    }
+  }
+
   async updateStatus(req: AuthRequest, res: Response, next: NextFunction) {
     try {
       const { id } = req.params;
@@ -229,6 +250,29 @@ export class OrdersController {
       if (error.message === "Order is no longer available") {
         return next(new ConflictError(error.message));
       }
+      if (error.message === "Driver profile not found" || error.message === "Order not found") {
+        return next(new NotFoundError(error.message));
+      }
+      next(error);
+    }
+  }
+
+  async decline(req: AuthRequest, res: Response, next: NextFunction) {
+    try {
+      const { id } = req.params;
+      const { reason } = req.body;
+      const driverUserId = req.user?.userId;
+
+      if (!driverUserId) {
+        throw new UnauthorizedError("Driver is not authenticated");
+      }
+      if (!reason) {
+        throw new ValidationError("Decline reason is required");
+      }
+
+      await ordersService.declineOrder(id as string, driverUserId, reason);
+      return res.json({ success: true, message: "Order declined successfully" });
+    } catch (error: any) {
       if (error.message === "Driver profile not found" || error.message === "Order not found") {
         return next(new NotFoundError(error.message));
       }

@@ -1,6 +1,8 @@
 import { io, Socket } from "socket.io-client";
 
 const SOCKET_URL = process.env.EXPO_PUBLIC_API_URL || "";
+// Extract the base URL to prevent Socket.io from using the API path as a namespace
+const BASE_SOCKET_URL = SOCKET_URL.split("/api")[0] || SOCKET_URL;
 
 class SocketService {
   private socket: Socket | null = null;
@@ -29,9 +31,9 @@ class SocketService {
       console.warn("[SocketService] Failed to load token from driverStore:", e);
     }
 
-    console.log(`[Driver Socket] Connecting to ${SOCKET_URL || "not configured"}/ws/v1/socket.io`);
+    console.log(`[Driver Socket] Connecting to ${BASE_SOCKET_URL || "not configured"}/ws/v1/socket.io`);
 
-    this.socket = io(SOCKET_URL, {
+    this.socket = io(BASE_SOCKET_URL, {
       transports: ["websocket", "polling"],
       autoConnect: true,
       path: "/ws/v1/socket.io",

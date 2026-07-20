@@ -22,6 +22,7 @@ export default function IncomingOrderModal() {
   const { incomingOrder, acceptOrder, rejectOrder } = useDriverStore();
   const slideAnim = React.useRef(new Animated.Value(height)).current;
   const [secondsLeft, setSecondsLeft] = React.useState(15);
+  const [showDeclineReasons, setShowDeclineReasons] = React.useState(false);
 
   useEffect(() => {
     if (incomingOrder) {
@@ -31,6 +32,7 @@ export default function IncomingOrderModal() {
         setSecondsLeft((prev) => {
           if (prev <= 1) {
             clearInterval(timer);
+            setShowDeclineReasons(false);
             rejectOrder();
             return 0;
           }
@@ -92,7 +94,7 @@ export default function IncomingOrderModal() {
   }) : "N/A";
 
   return (
-    <Modal visible transparent animationType="none" onRequestClose={rejectOrder}>
+    <Modal visible transparent animationType="none" onRequestClose={() => rejectOrder()}>
       <View style={styles.overlay}>
         <Animated.View
           style={[
@@ -127,11 +129,36 @@ export default function IncomingOrderModal() {
             <Text style={styles.timerText}>Decline auto-triggers in {secondsLeft} seconds</Text>
           </View>
 
-          <ScrollView
-            style={styles.body}
-            contentContainerStyle={styles.bodyContent}
-            showsVerticalScrollIndicator={false}
-          >
+          {showDeclineReasons ? (
+            <View style={{ paddingVertical: 10, paddingBottom: 20 }}>
+              <Text style={{ fontSize: 18, fontWeight: '700', color: '#111827', marginBottom: 16 }}>Why are you declining?</Text>
+              {["Fare is too low", "Distance is too long", "Pickup is too far", "Not interested right now"].map((reason) => (
+                <TouchableOpacity 
+                  key={reason}
+                  style={{ paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: '#F3F4F6', flexDirection: 'row', alignItems: 'center' }}
+                  onPress={() => {
+                    setShowDeclineReasons(false);
+                    rejectOrder(reason);
+                  }}
+                >
+                  <Text style={{ fontSize: 16, color: '#374151', flex: 1 }}>{reason}</Text>
+                  <Ionicons name="chevron-forward" size={18} color="#9CA3AF" />
+                </TouchableOpacity>
+              ))}
+              <TouchableOpacity 
+                style={{ marginTop: 24, paddingVertical: 14, backgroundColor: '#F3F4F6', borderRadius: 12, alignItems: 'center' }}
+                onPress={() => setShowDeclineReasons(false)}
+              >
+                <Text style={{ fontSize: 16, fontWeight: '700', color: '#4B5563' }}>Back to Order</Text>
+              </TouchableOpacity>
+            </View>
+          ) : (
+            <>
+              <ScrollView
+                style={styles.body}
+                contentContainerStyle={styles.bodyContent}
+                showsVerticalScrollIndicator={false}
+              >
             <View style={styles.detailsContainer}>
               <View style={styles.detailRow}>
                 <Ionicons name="location-outline" size={19} color="#4B5563" />
@@ -199,22 +226,28 @@ export default function IncomingOrderModal() {
           </ScrollView>
 
           <View style={styles.actionButtons}>
-            <TouchableOpacity style={styles.rejectBtn} onPress={rejectOrder}>
-              <Text style={styles.rejectText}>Decline</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.acceptBtn}
-              onPress={async () => {
-                const isReserved = incomingOrder.isReserved;
-                await acceptOrder();
-                if (!isReserved) {
-                  router.push("/active-order");
-                }
-              }}
-            >
-              <Text style={styles.acceptText}>Accept Order</Text>
-            </TouchableOpacity>
-          </View>
+              <TouchableOpacity style={styles.rejectBtn} onPress={() => setShowDeclineReasons(true)}>
+                <Text style={styles.rejectText}>Decline</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.acceptBtn}
+                onPress={async () => {
+                  const isReserved = incomingOrder.isReserved;
+                  await acceptOrder();
+                  if (!isReserved) {
+                    if (isHelper) {
+                      router.push({ pathname: "/chat", params: { orderId: incomingOrder.id } });
+                    } else {
+                      router.push("/active-order");
+                    }
+                  }
+                }}
+              >
+                <Text style={styles.acceptText}>Accept Order</Text>
+              </TouchableOpacity>
+            </View>
+          </>
+          )}
         </Animated.View>
       </View>
     </Modal>
