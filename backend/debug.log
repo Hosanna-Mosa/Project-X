@@ -720,3 +720,103 @@ Checking driver 6a5509c918c1679a4640f1b5 (User: 6a5509c818c1679a4640f1b0). homeM
 Driver 6a5509c918c1679a4640f1b5 has homeMode OFF. Adding unconditionally.
 Checking driver 6a5509c918c1679a4640f1c1 (User: 6a5509c918c1679a4640f1b7). homeMode = false
 Driver 6a5509c918c1679a4640f1c1 has homeMode OFF. Adding unconditionally.
+
+[2026-07-20T05:53:50.405Z] Order ORD-20260720-YZOV9B created. Stops: pickup: 81.7834095,16.9524922, dropoff: 81.7777688,16.9962516. Candidates: 11
+Checking driver 6a5db6a82b4c19e29ec7d8c9 (User: 6a5db6a82b4c19e29ec7d8c5). homeMode = false
+Driver 6a5db6a82b4c19e29ec7d8c9 has homeMode OFF. Adding unconditionally.
+Checking driver 6a5db6a72b4c19e29ec7d8c3 (User: 6a5db6a72b4c19e29ec7d8bf). homeMode = false
+Driver 6a5db6a72b4c19e29ec7d8c3 has homeMode OFF. Adding unconditionally.
+Checking driver 6a5db6aa2b4c19e29ec7d8e1 (User: 6a5db6aa2b4c19e29ec7d8dd). homeMode = false
+Driver 6a5db6aa2b4c19e29ec7d8e1 has homeMode OFF. Adding unconditionally.
+Checking driver 6a5db6a82b4c19e29ec7d8cf (User: 6a5db6a82b4c19e29ec7d8cb). homeMode = false
+Driver 6a5db6a82b4c19e29ec7d8cf has homeMode OFF. Adding unconditionally.
+Checking driver 6a453f1fecb0e2672c8b06b1 (User: 6a453f1cecb0e2672c8b06aa). homeMode = false
+Driver 6a453f1fecb0e2672c8b06b1 has homeMode OFF. Adding unconditionally.
+Checking driver 6a5db6aa2b4c19e29ec7d8db (User: 6a5db6a92b4c19e29ec7d8d7). homeMode = false
+Driver 6a5db6aa2b4c19e29ec7d8db has homeMode OFF. Adding unconditionally.
+Checking driver 6a5db6a62b4c19e29ec7d8b1 (User: 6a5db6a62b4c19e29ec7d8ad). homeMode = false
+Driver 6a5db6a62b4c19e29ec7d8b1 has homeMode OFF. Adding unconditionally.
+Checking driver 6a5db6a72b4c19e29ec7d8b7 (User: 6a5db6a62b4c19e29ec7d8b3). homeMode = false
+Driver 6a5db6a72b4c19e29ec7d8b7 has homeMode OFF. Adding unconditionally.
+Checking driver 6a5db6a92b4c19e29ec7d8d5 (User: 6a5db6a92b4c19e29ec7d8d1). homeMode = false
+Driver 6a5db6a92b4c19e29ec7d8d5 has homeMode OFF. Adding unconditionally.
+Checking driver 6a5db6a72b4c19e29ec7d8bd (User: 6a5db6a72b4c19e29ec7d8b9). homeMode = false
+Driver 6a5db6a72b4c19e29ec7d8bd has homeMode OFF. Adding unconditionally.
+Checking driver 6a5db6a62b4c19e29ec7d8ab (User: 6a5db6a52b4c19e29ec7d8a7). homeMode = false
+Driver 6a5db6a62b4c19e29ec7d8ab has homeMode OFF. Adding unconditionally.
+
+[2026-07-20T06:08:17.068Z] Order ORD-20260720-JPLXT3 created. Stops: pickup: 81.7834637,16.9524857, dropoff: 81.7777688,16.9962516. Candidates: 11
+Checking driver 6a5db6a82b4c19e29ec7d8c9 (User: 6a5db6a82b4c19e29ec7d8c5). homeMode = false
+Driver 6a5db6a82b4c19e29ec7d8c9 has homeMode OFF. Adding unconditionally.
+Checking driver 6a5db6a72b4c19e29ec7d8c3 (User: 6a5db6a72b4c19e29ec7d8bf). homeMode = false
+Driver 6a5db6a72b4c19e29ec7d8c3 has homeMode OFF. Adding unconditionally.
+Checking driver 6a5db6aa2b4c19e29ec7d8e1 (User: 6a5db6aa2b4c19e29ec7d8dd). homeMode = false
+Driver 6a5db6aa2b4c19e29ec7d8e1 has homeMode OFF. Adding unconditionally.
+Checking driver 6a5db6a82b4c19e29ec7d8cf (User: 6a5db6a82b4c19e29ec7d8cb). homeMode = false
+Driver 6a5db6a82b4c19e29ec7d8cf has homeMode OFF. Adding unconditionally.
+Checking driver 6a453f1fecb0e2672c8b06b1 (User: 6a453f1cecb0e2672c8b06aa). homeMode = false
+Driver 6a453f1fecb0e2672c8b06b1 has homeMode OFF. Adding unconditionally.
+Checking driver 6a5db6aa2b4c19e29ec7d8db (User: 6a5db6a92b4c19e29ec7d8d7). homeMode = false
+Driver 6a5db6aa2b4c19e29ec7d8db has homeMode OFF. Adding unconditionally.
+Checking driver 6a5db6a62b4c19e29ec7d8b1 (User: 6a5db6a62b4c19e29ec7d8ad). homeMode = false
+Driver 6a5db6a62b4c19e29ec7d8b1 has homeMode OFF. Adding unconditionally.
+Checking driver 6a5db6a72b4c19e29ec7d8b7 (User: 6a5db6a62b4c19e29ec7d8b3). homeMode = false
+Driver 6a5db6a72b4c19e29ec7d8b7 has homeMode OFF. Adding unconditionally.
+Checking driver 6a5db6a92b4c19e29ec7d8d5 (User: 6a5db6a92b4c19e29ec7d8d1). homeMode = false
+Driver 6a5db6a92b4c19e29ec7d8d5 has homeMode OFF. Adding unconditionally.
+Checking driver 6a5db6a72b4c19e29ec7d8bd (User: 6a5db6a72b4c19e29ec7d8b9). homeMode = false
+Driver 6a5db6a72b4c19e29ec7d8bd has homeMode OFF. Adding unconditionally.
+Checking driver 6a5db6a62b4c19e29ec7d8ab (User: 6a5db6a52b4c19e29ec7d8a7). homeMode = false
+Driver 6a5db6a62b4c19e29ec7d8ab has homeMode OFF. Adding unconditionally.
+
+[2026-07-20T06:10:24.293Z] Order ORD-20260720-R0HJRV created. Stops: pickup: 81.7834409,16.9524852, dropoff: 81.7777688,16.9962516. Candidates: 12
+Checking driver 6a5db6a82b4c19e29ec7d8c9 (User: 6a5db6a82b4c19e29ec7d8c5). homeMode = false
+Driver 6a5db6a82b4c19e29ec7d8c9 has homeMode OFF. Adding unconditionally.
+Checking driver 6a4bc530a685d9f0c3950bc5 (User: 6a4bc52da685d9f0c3950bb0). homeMode = false
+Driver 6a4bc530a685d9f0c3950bc5 has homeMode OFF. Adding unconditionally.
+Checking driver 6a5db6a72b4c19e29ec7d8c3 (User: 6a5db6a72b4c19e29ec7d8bf). homeMode = false
+Driver 6a5db6a72b4c19e29ec7d8c3 has homeMode OFF. Adding unconditionally.
+Checking driver 6a5db6aa2b4c19e29ec7d8e1 (User: 6a5db6aa2b4c19e29ec7d8dd). homeMode = false
+Driver 6a5db6aa2b4c19e29ec7d8e1 has homeMode OFF. Adding unconditionally.
+Checking driver 6a5db6a82b4c19e29ec7d8cf (User: 6a5db6a82b4c19e29ec7d8cb). homeMode = false
+Driver 6a5db6a82b4c19e29ec7d8cf has homeMode OFF. Adding unconditionally.
+Checking driver 6a453f1fecb0e2672c8b06b1 (User: 6a453f1cecb0e2672c8b06aa). homeMode = false
+Driver 6a453f1fecb0e2672c8b06b1 has homeMode OFF. Adding unconditionally.
+Checking driver 6a5db6aa2b4c19e29ec7d8db (User: 6a5db6a92b4c19e29ec7d8d7). homeMode = false
+Driver 6a5db6aa2b4c19e29ec7d8db has homeMode OFF. Adding unconditionally.
+Checking driver 6a5db6a62b4c19e29ec7d8b1 (User: 6a5db6a62b4c19e29ec7d8ad). homeMode = false
+Driver 6a5db6a62b4c19e29ec7d8b1 has homeMode OFF. Adding unconditionally.
+Checking driver 6a5db6a72b4c19e29ec7d8b7 (User: 6a5db6a62b4c19e29ec7d8b3). homeMode = false
+Driver 6a5db6a72b4c19e29ec7d8b7 has homeMode OFF. Adding unconditionally.
+Checking driver 6a5db6a92b4c19e29ec7d8d5 (User: 6a5db6a92b4c19e29ec7d8d1). homeMode = false
+Driver 6a5db6a92b4c19e29ec7d8d5 has homeMode OFF. Adding unconditionally.
+Checking driver 6a5db6a72b4c19e29ec7d8bd (User: 6a5db6a72b4c19e29ec7d8b9). homeMode = false
+Driver 6a5db6a72b4c19e29ec7d8bd has homeMode OFF. Adding unconditionally.
+Checking driver 6a5db6a62b4c19e29ec7d8ab (User: 6a5db6a52b4c19e29ec7d8a7). homeMode = false
+Driver 6a5db6a62b4c19e29ec7d8ab has homeMode OFF. Adding unconditionally.
+
+[2026-07-20T06:15:40.696Z] Order ORD-20260720-HXXYPJ created. Stops: pickup: 81.7834524,16.9524872, dropoff: 81.7777688,16.9962516. Candidates: 12
+Checking driver 6a5db6a82b4c19e29ec7d8c9 (User: 6a5db6a82b4c19e29ec7d8c5). homeMode = false
+Driver 6a5db6a82b4c19e29ec7d8c9 has homeMode OFF. Adding unconditionally.
+Checking driver 6a5db6a72b4c19e29ec7d8c3 (User: 6a5db6a72b4c19e29ec7d8bf). homeMode = false
+Driver 6a5db6a72b4c19e29ec7d8c3 has homeMode OFF. Adding unconditionally.
+Checking driver 6a5db6aa2b4c19e29ec7d8e1 (User: 6a5db6aa2b4c19e29ec7d8dd). homeMode = false
+Driver 6a5db6aa2b4c19e29ec7d8e1 has homeMode OFF. Adding unconditionally.
+Checking driver 6a5db6a82b4c19e29ec7d8cf (User: 6a5db6a82b4c19e29ec7d8cb). homeMode = false
+Driver 6a5db6a82b4c19e29ec7d8cf has homeMode OFF. Adding unconditionally.
+Checking driver 6a453f1fecb0e2672c8b06b1 (User: 6a453f1cecb0e2672c8b06aa). homeMode = false
+Driver 6a453f1fecb0e2672c8b06b1 has homeMode OFF. Adding unconditionally.
+Checking driver 6a4bc530a685d9f0c3950bc5 (User: 6a4bc52da685d9f0c3950bb0). homeMode = false
+Driver 6a4bc530a685d9f0c3950bc5 has homeMode OFF. Adding unconditionally.
+Checking driver 6a5db6aa2b4c19e29ec7d8db (User: 6a5db6a92b4c19e29ec7d8d7). homeMode = false
+Driver 6a5db6aa2b4c19e29ec7d8db has homeMode OFF. Adding unconditionally.
+Checking driver 6a5db6a62b4c19e29ec7d8b1 (User: 6a5db6a62b4c19e29ec7d8ad). homeMode = false
+Driver 6a5db6a62b4c19e29ec7d8b1 has homeMode OFF. Adding unconditionally.
+Checking driver 6a5db6a72b4c19e29ec7d8b7 (User: 6a5db6a62b4c19e29ec7d8b3). homeMode = false
+Driver 6a5db6a72b4c19e29ec7d8b7 has homeMode OFF. Adding unconditionally.
+Checking driver 6a5db6a92b4c19e29ec7d8d5 (User: 6a5db6a92b4c19e29ec7d8d1). homeMode = false
+Driver 6a5db6a92b4c19e29ec7d8d5 has homeMode OFF. Adding unconditionally.
+Checking driver 6a5db6a72b4c19e29ec7d8bd (User: 6a5db6a72b4c19e29ec7d8b9). homeMode = false
+Driver 6a5db6a72b4c19e29ec7d8bd has homeMode OFF. Adding unconditionally.
+Checking driver 6a5db6a62b4c19e29ec7d8ab (User: 6a5db6a52b4c19e29ec7d8a7). homeMode = false
+Driver 6a5db6a62b4c19e29ec7d8ab has homeMode OFF. Adding unconditionally.
