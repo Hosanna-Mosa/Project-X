@@ -22,6 +22,7 @@ import { useThemeStore } from "@/contexts/themeStore";
 import { customFetch } from "@/utils/api/custom-fetch";
 import { useAuthStore } from "@/contexts/authStore";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { useDeliveryStore } from "@/contexts/deliveryStore";
 
 type RecentPlace = {
   id: string;
@@ -62,6 +63,13 @@ export default function LocationSelectionScreen() {
   const colors = Colors[theme];
   const styles = React.useMemo(() => createStyles(colors), [theme]);
   const { user } = useAuthStore();
+  const setServiceType = useDeliveryStore((state) => state.setServiceType);
+
+  useEffect(() => {
+    if (serviceId) {
+      setServiceType(serviceId);
+    }
+  }, [serviceId, setServiceType]);
 
   const [pickup, setPickup] = useState<any>(null);
   const [drop, setDrop] = useState<any>(null);
