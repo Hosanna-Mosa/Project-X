@@ -313,12 +313,13 @@ export class OrdersService {
 
       socketManager.logConnectionStatus("before_new_order_selective_emit", userId, undefined, savedOrder._id.toString());
       
-      require('fs').appendFileSync('e:/X/x25/Project-X/backend/debug_helper.txt', `\n[${new Date().toISOString()}] Created order ${savedOrder._id} type: ${effectiveType}, driversToNotify: ${driversToNotify.length}, isReserved: ${savedOrder.isReserved}\n`);
+      const debugHelperPath = require('path').join(__dirname, "../../../debug_helper.txt");
+      require('fs').appendFileSync(debugHelperPath, `\n[${new Date().toISOString()}] Created order ${savedOrder._id} type: ${effectiveType}, driversToNotify: ${driversToNotify.length}, isReserved: ${savedOrder.isReserved}\n`);
 
       for (const d of driversToNotify) {
         const driverUser = d.user as any;
         if (driverUser && driverUser._id) {
-          require('fs').appendFileSync('e:/X/x25/Project-X/backend/debug_helper.txt', ` -> emitting new_order to driverUser._id: ${driverUser._id.toString()}\n`);
+          require('fs').appendFileSync(debugHelperPath, ` -> emitting new_order to driverUser._id: ${driverUser._id.toString()}\n`);
           socketManager.emitToDriver(driverUser._id.toString(), "new_order", orderPayload, "orders.createOrder");
         }
       }

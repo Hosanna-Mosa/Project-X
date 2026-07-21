@@ -147,3 +147,16 @@
 [2026-07-21T10:54:14.123Z] Created order ORD-20260721-SZ9GY9 type: helper, driversToNotify: 0, isReserved: false
 
 [2026-07-21T10:54:51.117Z] Created order ORD-20260721-41A571 type: helper, driversToNotify: 0, isReserved: false
+
+[2026-07-21T15:41:25.244Z] Created order FLR-260721-3540 type: bike, driversToNotify: 11, isReserved: false
+ -> emitting new_order to driverUser._id: 6a453f1cecb0e2672c8b06aa
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c4092f
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c40940
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c40951
+ -> emitting new_order to driverUser._id: 6a5f8e145f35a1dd09c40929
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c40935
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c4093a
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c40946
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c4094b
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c40957
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c4095c
