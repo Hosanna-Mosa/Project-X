@@ -1,7 +1,7 @@
 const mongoose = require('mongoose');
 const dotenv = require('dotenv');
 
-dotenv.config({ path: 'e:/X/x25/Project-X/backend/.env' });
+dotenv.config({ path: require('path').join(__dirname, '.env') });
 
 async function checkOrder() {
   await mongoose.connect(process.env.DATABASE_URL);
