@@ -589,7 +589,7 @@ export default function HomeScreen() {
         try {
           // Add a 5 second timeout so we don't hang on skeletons forever
           const fetchPromise = Promise.all([
-            // checkNearbyDrivers(lat, lng), // Temporarily disabled to check if this is hanging
+            checkNearbyDrivers(lat, lng),
             activeService === 'Meat' 
               ? fetchMeatCenters(lat, lng, 1) 
               : Promise.all([
@@ -1119,6 +1119,7 @@ export default function HomeScreen() {
           setPage(1);
           setHasMore(true);
           const { lat, lng } = await getCoords();
+          checkNearbyDrivers(lat, lng);
           if (activeService === 'Meat') {
             fetchMeatCenters(lat, lng, 1);
           } else {
