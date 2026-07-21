@@ -38,7 +38,7 @@ export class DriverService {
     return R * c; // distance in meters
   }
 
-  async getNearbyDrivers(lat: number, lng: number, radiusInMeters?: number, vehicleType?: string) {
+  async getNearbyDrivers(lat: number, lng: number, radiusInMeters?: number, vehicleType?: string, requireOnline: boolean = false) {
     const socketManager = SocketManager.getInstance();
     const redisClient = socketManager ? (socketManager as any).redisClient : null;
     const { getDispatchStagesForVehicle } = require("../../config/dispatch.config");
@@ -63,7 +63,7 @@ export class DriverService {
     }
 
     console.log("\n============================================================");
-    console.log(`📍 [DRIVER SEARCH] Pickup Coordinates: [lat: ${lat}, lng: ${lng}] | Zone: "${activeZone.name}"`);
+    console.log(`📍 [DRIVER SEARCH] Pickup Coordinates: [lat: ${lat}, lng: ${lng}] | Zone: "${activeZone.name}" | requireOnline: ${requireOnline}`);
 
     try {
       const allOnlineDrivers = await Driver.find({ status: DriverStatus.ONLINE }).populate("user");
@@ -103,10 +103,12 @@ export class DriverService {
             const validObjectIds = nearbyDriverIds.filter((id: any) => mongoose.Types.ObjectId.isValid(id));
             const query: any = {
               _id: { $in: validObjectIds },
-              status: DriverStatus.ONLINE,
-              isAvailable: true,
               preferredZone: activeZone._id,
             };
+            if (requireOnline) {
+              query.status = DriverStatus.ONLINE;
+              query.isAvailable = true;
+            }
             if (vehicleType && ["bike", "auto", "car", "cab", "cab_prime"].includes(vehicleType)) {
               query.vehicleType = vehicleType;
             }
@@ -124,8 +126,6 @@ export class DriverService {
       // 2. MongoDB Proximity Query Fallback
       if (stageDrivers.length === 0) {
         const query: any = {
-          status: DriverStatus.ONLINE,
-          isAvailable: true,
           preferredZone: activeZone._id,
           currentLocation: {
             $near: {
@@ -137,6 +137,11 @@ export class DriverService {
             },
           },
         };
+
+        if (requireOnline) {
+          query.status = DriverStatus.ONLINE;
+          query.isAvailable = true;
+        }
 
         if (vehicleType && ["bike", "auto", "car", "cab", "cab_prime"].includes(vehicleType)) {
           query.vehicleType = vehicleType;
@@ -155,8 +160,10 @@ export class DriverService {
         const devUserIds = devUsers.map(u => u._id);
         const devDriversQuery: any = {
           user: { $in: devUserIds },
-          status: DriverStatus.ONLINE
         };
+        if (requireOnline) {
+          devDriversQuery.status = DriverStatus.ONLINE;
+        }
         if (vehicleType && ["bike", "auto", "car", "cab", "cab_prime"].includes(vehicleType)) {
           devDriversQuery.vehicleType = vehicleType;
         }
@@ -173,16 +180,43 @@ export class DriverService {
       if (stageDrivers.length > 0) {
         results = stageDrivers;
         matchedStageName = stage.name;
-        console.log(`✅ [DISPATCH MATCH - ${stage.name}] Found ${results.length} available driver(s)! Stopping expansion.`);
+        console.log(`✅ [DISPATCH MATCH - ${stage.name}] Found ${results.length} driver(s)! Stopping expansion.`);
         break; // Drivers found! Stop further expansion.
       } else {
         console.log(`⚠️ [DISPATCH EXPANSION - ${stage.name}] 0 drivers found within ${currentRadius}m. Expanding to next stage...`);
       }
     }
 
-    console.log(`[DISPATCH FINAL] Matched: ${results.length} driver(s) via ${matchedStageName || "No Stage Match"}`);
+    // 3. Ultimate Fallback: Check if ANY driver exists in DB for this activeZone (online or offline)
+    if (results.length === 0) {
+      try {
+        const zoneDriversQuery: any = {
+          $or: [
+            { preferredZone: activeZone._id },
+            { preferredZones: activeZone._id }
+          ]
+        };
+        if (requireOnline) {
+          zoneDriversQuery.status = DriverStatus.ONLINE;
+          zoneDriversQuery.isAvailable = true;
+        }
+        if (vehicleType && ["bike", "auto", "car", "cab", "cab_prime"].includes(vehicleType)) {
+          zoneDriversQuery.vehicleType = vehicleType;
+        }
+        const zoneDrivers = await Driver.find(zoneDriversQuery).populate("user");
+        if (zoneDrivers.length > 0) {
+          results = zoneDrivers;
+          matchedStageName = "Zone DB Fallback";
+          console.log(`✅ [ZONE DB MATCH] Found ${results.length} driver(s) registered for zone "${activeZone.name}".`);
+        }
+      } catch (zQueryErr: any) {
+        console.error("Error checking zone drivers fallback:", zQueryErr.message);
+      }
+    }
+
+    console.log(`[DRIVER SEARCH FINAL] Matched: ${results.length} driver(s) via ${matchedStageName || "No Stage Match"}`);
     results.forEach((d) => {
-      console.log(` -> Matched Driver: ${d._id}, Name: ${d.user?.name}, Phone: ${d.user?.phone}, vehicleType: ${d.vehicleType}`);
+      console.log(` -> Matched Driver: ${d._id}, Name: ${d.user?.name}, Phone: ${d.user?.phone}, vehicleType: ${d.vehicleType}, status: ${d.status}`);
     });
 
     return results;

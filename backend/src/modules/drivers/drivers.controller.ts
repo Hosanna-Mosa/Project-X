@@ -56,12 +56,14 @@ export class DriversController {
 
   async nearby(req: AuthRequest, res: Response) {
     try {
-      const { latitude, longitude, radius, vehicleType } = req.query;
+      const { latitude, longitude, radius, vehicleType, onlineOnly } = req.query;
+      const isOnlineOnly = onlineOnly === "true";
       const drivers = await driverService.getNearbyDrivers(
         Number(latitude), 
         Number(longitude), 
         radius ? Number(radius) : 5000,
-        vehicleType ? String(vehicleType) : undefined
+        vehicleType ? String(vehicleType) : undefined,
+        isOnlineOnly
       );
       return res.json(drivers);
     } catch (error) {

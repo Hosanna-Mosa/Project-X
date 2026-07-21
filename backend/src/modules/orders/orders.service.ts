@@ -224,7 +224,8 @@ export class OrdersService {
           startPos.latitude,
           startPos.longitude,
           undefined, // Let 3-Stage Dynamic Expansion drive search radius per vehicle type
-          effectiveType
+          effectiveType,
+          true
         );
       } catch (err) {
         console.error("Error getting nearby drivers in createOrder:", err);
@@ -650,7 +651,8 @@ export class OrdersService {
             startPos[1], // lat
             startPos[0], // lng
             5000,
-            order.serviceType
+            order.serviceType,
+            true
           );
 
           let driversToNotify = [...nearbyDrivers];
