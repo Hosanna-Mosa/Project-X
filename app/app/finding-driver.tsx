@@ -308,13 +308,17 @@ export default function FindingDriverScreen() {
         const res = await customFetch<any[]>(`/api/v1/drivers/nearby?${queryParams.toString()}`);
         console.log(`[CLIENT DRIVER SEARCH RESPONSE] Returned count: ${res ? res.length : 0}`);
         if (active && Array.isArray(res)) {
-          const mapped = res.map(drv => ({
-            id: drv._id,
-            lat: drv.currentLocation?.coordinates[1],
-            lng: drv.currentLocation?.coordinates[0],
-            vehicleType: drv.vehicleType || "bike",
-            name: drv.user?.name || "Driver",
-          })).filter(d => d.lat && d.lng);
+          const mapped = res.map(drv => {
+            const lat = drv.currentLocation?.coordinates?.[1] || drv.user?.addresses?.[0]?.location?.coordinates?.[1] || pickupStop.lat;
+            const lng = drv.currentLocation?.coordinates?.[0] || drv.user?.addresses?.[0]?.location?.coordinates?.[0] || pickupStop.lng;
+            return {
+              id: drv._id,
+              lat,
+              lng,
+              vehicleType: drv.vehicleType || "bike",
+              name: drv.user?.name || "Driver",
+            };
+          }).filter(d => d.lat && d.lng);
           setOnlineDrivers(mapped);
         }
       } catch (error) {

@@ -8,7 +8,7 @@ export class DeliveryService {
   private driverService = new DriverService();
 
   async findAndAssignDriver(orderId: string, lat: number, lng: number) {
-    const nearbyDrivers = await this.driverService.getNearbyDrivers(lat, lng);
+    const nearbyDrivers = await this.driverService.getNearbyDrivers(lat, lng, undefined, undefined, true);
 
     if (nearbyDrivers.length === 0) {
       console.log(`No drivers found for order ${orderId}`);

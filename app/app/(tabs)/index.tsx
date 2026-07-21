@@ -766,38 +766,28 @@ export default function HomeScreen() {
                   <View style={styles.dishesRowsContainer}>
                     <View style={styles.dishesRow}>
                       {popularTags.slice(0, 7).map((tag, index) => (
-                        <TouchableOpacity
+                        <View
                           key={index}
                           style={styles.dishChip}
-                          activeOpacity={0.8}
-                          onPress={() => {
-                            setSearchText(tag.name);
-                            setIsSearchActive(true);
-                          }}
                         >
                           <View style={[styles.dishIconCircle, { backgroundColor: tag.color + '15' }]}>
                             {renderTagIcon(tag)}
                           </View>
                           <Text style={styles.dishChipText}>{tag.name}</Text>
-                        </TouchableOpacity>
+                        </View>
                       ))}
                     </View>
                     <View style={styles.dishesRow}>
                       {popularTags.slice(7, 14).map((tag, index) => (
-                        <TouchableOpacity
+                        <View
                           key={index}
                           style={styles.dishChip}
-                          activeOpacity={0.8}
-                          onPress={() => {
-                            setSearchText(tag.name);
-                            setIsSearchActive(true);
-                          }}
                         >
                           <View style={[styles.dishIconCircle, { backgroundColor: tag.color + '15' }]}>
                             {renderTagIcon(tag)}
                           </View>
                           <Text style={styles.dishChipText}>{tag.name}</Text>
-                        </TouchableOpacity>
+                        </View>
                       ))}
                     </View>
                   </View>
