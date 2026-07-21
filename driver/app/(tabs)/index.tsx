@@ -1,7 +1,8 @@
 import React, { useCallback, useEffect, useState } from "react";
-import { Alert, Linking, Pressable, ScrollView, StyleSheet, Text, View, TouchableOpacity } from "react-native";
-import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
+import { Alert, Linking, Pressable, ScrollView, StyleSheet, Text, View, TouchableOpacity, Image, Animated, Easing } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
+import { LinearGradient } from "expo-linear-gradient";
 
 import Colors from "@/constants/colors";
 import { ServiceToggle } from "@/components/ServiceToggle";
@@ -64,6 +65,36 @@ export default function HomeScreen() {
 
   const [scheduledRides, setScheduledRides] = useState<any[]>([]);
   const [loadingScheduled, setLoadingScheduled] = useState(false);
+
+  const translateX = React.useRef(new Animated.Value(0)).current;
+
+  // Drive Animation when going online
+  useEffect(() => {
+    if (isOnline) {
+      Animated.sequence([
+        // Drive off screen to the right
+        Animated.timing(translateX, {
+          toValue: 200, 
+          duration: 500,
+          easing: Easing.in(Easing.back(1.5)),
+          useNativeDriver: true,
+        }),
+        // Instantly move off-screen left
+        Animated.timing(translateX, {
+          toValue: -300,
+          duration: 0,
+          useNativeDriver: true,
+        }),
+        // Drive in from left to original position
+        Animated.timing(translateX, {
+          toValue: 0,
+          duration: 800,
+          easing: Easing.out(Easing.back(1.2)),
+          useNativeDriver: true,
+        })
+      ]).start();
+    }
+  }, [isOnline, translateX]);
 
   const loadScheduledRides = useCallback(async () => {
     if (!apiUrl || !token) return;
@@ -154,7 +185,14 @@ export default function HomeScreen() {
 
   const handleToggleOnline = () => {
     if (isOnline) {
-      goOffline();
+      Alert.alert(
+        "Go Offline",
+        "Are you sure you want to go offline? You will stop receiving new requests.",
+        [
+          { text: "Cancel", style: "cancel" },
+          { text: "Go Offline", style: "destructive", onPress: () => goOffline() }
+        ]
+      );
       return;
     }
 
@@ -202,74 +240,89 @@ export default function HomeScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.safe} edges={["top"]}>
+    <View style={styles.safe}>
       <ScrollView
         style={styles.container}
-        contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 104 }]}
+        contentContainerStyle={{ paddingBottom: insets.bottom + 104 }}
+        bounces={false}
       >
         {/* Header with Online/Offline Toggle */}
-        <View style={styles.header}>
-          <View style={styles.headerCopy}>
-            <Text style={styles.greeting}>
-              {(() => {
-                const h = new Date().getHours();
-                if (h < 12) return `Good Morning${driverName ? `, ${driverName.split(' ')[0]}` : ''}!`;
-                if (h < 17) return `Good Afternoon${driverName ? `, ${driverName.split(' ')[0]}` : ''}!`;
-                return `Good Evening${driverName ? `, ${driverName.split(' ')[0]}` : ''}!`;
-              })()}
-            </Text>
-            <Text style={styles.subGreeting} numberOfLines={1}>
-              {isOnline ? "You're online and receiving orders" : "Ready to start earning"}
-            </Text>
-          </View>
-          <Pressable
-            style={[
-              styles.onlineToggle,
-              isOnline ? styles.onlineToggleActive : styles.onlineToggleInactive,
-            ]}
-            onPress={handleToggleOnline}
-          >
-            <View
-              style={[
-                styles.onlineToggleDot,
-                isOnline ? styles.onlineDotActive : styles.onlineDotInactive,
-              ]}
-            />
-            <Text
-              style={[
-                styles.onlineToggleText,
-                isOnline ? styles.onlineToggleTextActive : styles.onlineToggleTextInactive,
-              ]}
-            >
-              {isOnline ? "ONLINE" : "OFFLINE"}
-            </Text>
-          </Pressable>
-        </View>
-
-        {/* Online Status Banner */}
-        <Pressable
-          style={[
-            styles.statusRow,
-            isOnline && styles.statusRowOnline,
-          ]}
-          onPress={handleToggleOnline}
+        <LinearGradient
+          colors={['#60a5fa', '#3b82f6']}
+          style={[styles.headerGradient, { paddingTop: insets.top + 16 }]}
         >
-          <Feather
-            name={isOnline ? "wifi" : "wifi-off"}
-            size={14}
-            color={isOnline ? Colors.success : Colors.offline}
+          <Image 
+            source={require('../../assets/images/cityscape_bg.png')} 
+            style={styles.headerBgImage} 
+            resizeMode="cover" 
           />
-          <Text style={[styles.statusText, isOnline && styles.statusTextOnline]}>
-            {isOnline
-              ? `Online for ${activeServices.join(" & ")}`
-              : "You're offline — tap to go online"}
-          </Text>
-          <Feather
-            name={isOnline ? "power" : "arrow-up-circle"}
-            size={16}
-            color={isOnline ? Colors.success : Colors.primary}
-          />
-        </Pressable>
+          
+          <View style={styles.headerContent}>
+            {/* Top Row: Greeting */}
+            <View style={styles.headerTopRow}>
+              <View style={styles.headerCopy}>
+                <Text style={styles.greeting}>
+                  {(() => {
+                    const h = new Date().getHours();
+                    if (h < 12) return `Good Morning${driverName ? `, ${driverName.split(' ')[0]}` : ''}!`;
+                    if (h < 17) return `Good Afternoon${driverName ? `, ${driverName.split(' ')[0]}` : ''}!`;
+                    return `Good Evening${driverName ? `, ${driverName.split(' ')[0]}` : ''}!`;
+                  })()} 👋
+                </Text>
+                <Text style={styles.subGreeting} numberOfLines={1}>
+                  {isOnline ? "You're online and receiving orders" : "Ready to start earning"}
+                </Text>
+              </View>
+            </View>
+          </View>
+        </LinearGradient>
+
+        <View style={styles.content}>
+            <View style={{ position: 'relative', zIndex: 10, marginTop: -46, marginBottom: 8 }}>
+              {/* Online Status Banner (Overlapping) */}
+              <Pressable
+                style={styles.statusCard}
+                onPress={handleToggleOnline}
+              >
+              <View style={[styles.statusIconBg, { backgroundColor: isOnline ? '#e6faec' : '#f1f5f9' }]}>
+                <Feather
+                  name={isOnline ? "wifi" : "wifi-off"}
+                  size={20}
+                  color={isOnline ? Colors.success : Colors.textMuted}
+                />
+              </View>
+              <View style={styles.statusCardCopy}>
+                <Text style={styles.statusCardTitle}>
+                  {isOnline ? `Online for ${activeServices.join(" & ").toLowerCase()}` : "You're Offline"}
+                </Text>
+                <Text style={styles.statusCardDesc}>
+                  {isOnline ? "You're visible to customers" : "Tap to go online"}
+                </Text>
+              </View>
+              <View style={[
+                styles.powerButton, 
+                { backgroundColor: isOnline ? '#22C55E' : '#EF4444', borderWidth: 0 }
+              ]}>
+                <Feather
+                  name="power"
+                  size={24}
+                  color="#ffffff"
+                />
+              </View>
+            </Pressable>
+            {/* Illustration */}
+            <Animated.Image 
+              source={require('../../assets/images/generated_blue_scooter.png')} 
+              style={[styles.heroIllustration, { transform: [{ translateX }] }]}
+              resizeMode="contain"
+            />
+            <Animated.View style={[styles.onlineBadgeHero, { transform: [{ translateX }] }]}>
+              <View style={[styles.onlineBadgeDot, !isOnline && { backgroundColor: Colors.textMuted }]} />
+              <Text style={[styles.onlineBadgeText, !isOnline && { color: Colors.textMuted }]}>
+                {isOnline ? "ONLINE" : "OFFLINE"}
+              </Text>
+            </Animated.View>
+          </View>
 
         {/* Head Home Mode — visible only when online */}
         {isOnline && (
@@ -285,7 +338,7 @@ export default function HomeScreen() {
                 <Feather
                   name="home"
                   size={18}
-                  color={homeMode ? Colors.white : Colors.primary}
+                  color={homeMode ? Colors.white : "#0ea5e9"}
                 />
               </View>
               <View style={styles.homeModeTextWrap}>
@@ -346,12 +399,21 @@ export default function HomeScreen() {
             <View style={styles.sectionHeader}>
               <Text style={styles.sectionTitle}>Active Tasks</Text>
             </View>
-            <View style={{ backgroundColor: Colors.surface, borderRadius: 12, padding: 20, borderWidth: 1, borderColor: Colors.border, alignItems: "center", justifyContent: "center" }}>
-              <Feather name="briefcase" size={24} color={Colors.textMuted} style={{ marginBottom: 8 }} />
-              <Text style={{ fontFamily: "Inter_600SemiBold", fontSize: 14, color: Colors.text, marginBottom: 4 }}>No Active Tasks</Text>
-              <Text style={{ fontFamily: "Inter_400Regular", fontSize: 12, color: Colors.textMuted, textAlign: "center" }}>
-                {isOnline ? "You are online and ready to receive bookings. Keep the app open." : "Go online to receive and accept bookings."}
-              </Text>
+            <View style={styles.emptyTasksCard}>
+              <Image 
+                source={require('../../assets/images/clipboard_empty_state.png')} 
+                style={styles.emptyTasksImg}
+                resizeMode="contain"
+              />
+              <View style={styles.emptyTasksCopy}>
+                <Text style={styles.emptyTasksTitle}>No Active Tasks</Text>
+                <Text style={styles.emptyTasksDesc}>
+                  {isOnline ? "You are online and ready\nto receive bookings.\nKeep the app open." : "Go online to receive\nand accept bookings."}
+                </Text>
+              </View>
+              <TouchableOpacity style={styles.calendarBtn}>
+                <Feather name="calendar" size={18} color={Colors.primary} />
+              </TouchableOpacity>
             </View>
           </>
         )}
@@ -433,14 +495,20 @@ export default function HomeScreen() {
 
         {/* Safety Alerts */}
         <View style={styles.safetyAlert}>
-          <Text style={styles.safetyIcon}>⚠️</Text>
+          <Feather name="alert-triangle" size={24} color="#f59e0b" style={{ marginTop: 2 }} />
           <View style={styles.safetyContent}>
             <Text style={styles.safetyTitle}>Safety Alert</Text>
             <Text style={styles.safetyText}>
               Road closure reported on Main St due to construction. Use alternate route.
             </Text>
           </View>
+          <Image 
+            source={require('../../assets/images/safety_cones.png')} 
+            style={styles.safetyImg}
+            resizeMode="contain"
+          />
         </View>
+      </View>
       </ScrollView>
 
       <GoOnlineModal
@@ -450,7 +518,7 @@ export default function HomeScreen() {
       />
       
       <IncomingOrderModal />
-    </SafeAreaView>
+    </View>
   );
 }
 
@@ -477,11 +545,37 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter_600SemiBold',
     fontSize: 14,
   },
-  header: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    gap: 12,
+  headerGradient: {
+    borderBottomLeftRadius: 24,
+    borderBottomRightRadius: 24,
+    overflow: 'hidden',
+    position: 'relative',
+  },
+  headerBgImage: {
+    position: 'absolute',
+    bottom: 0,
+    width: '100%',
+    height: 140,
+    opacity: 0.15,
+  },
+  headerContent: {
+    paddingHorizontal: 20,
+    paddingBottom: 40,
+  },
+  headerTopRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 20,
+    zIndex: 2,
+  },
+  menuButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#fff',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
   },
   headerCopy: {
     flex: 1,
@@ -489,81 +583,96 @@ const styles = StyleSheet.create({
   },
   greeting: {
     fontFamily: "Inter_700Bold",
-    fontSize: 24,
-    color: Colors.text,
+    fontSize: 20,
+    color: '#fff',
   },
   subGreeting: {
-    fontFamily: "Inter_400Regular",
-    fontSize: 14,
-    color: Colors.textMuted,
-    marginTop: 2,
-  },
-  onlineToggle: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 8,
-    backgroundColor: Colors.surfaceContainerLow,
-    width: 116,
-    paddingVertical: 10,
-    borderRadius: 100,
-    borderWidth: 1,
-    borderColor: Colors.border,
-  },
-  onlineToggleActive: {
-    backgroundColor: Colors.successLight,
-    borderColor: Colors.success,
-  },
-  onlineToggleInactive: {
-    backgroundColor: "#ffe6e6",
-    borderColor: Colors.error,
-  },
-  onlineToggleDot: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-  },
-  onlineDotActive: {
-    backgroundColor: Colors.success,
-  },
-  onlineDotInactive: {
-    backgroundColor: Colors.error,
-  },
-  onlineToggleText: {
-    fontFamily: "Inter_700Bold",
-    fontSize: 12,
-    color: Colors.textMuted,
-    letterSpacing: 0.8,
-  },
-  onlineToggleTextActive: {
-    color: Colors.success,
-  },
-  onlineToggleTextInactive: {
-    color: Colors.error,
-  },
-  statusRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    paddingVertical: 10,
-    paddingHorizontal: 14,
-    backgroundColor: Colors.surfaceContainerLow,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: Colors.border,
-  },
-  statusRowOnline: {
-    backgroundColor: "#ebfaf0",
-    borderColor: "#a8e6c1",
-  },
-  statusText: {
     fontFamily: "Inter_500Medium",
     fontSize: 13,
-    color: Colors.textSecondary,
+    color: 'rgba(255,255,255,0.9)',
+    marginTop: 2,
+  },
+  heroIllustration: {
+    position: 'absolute',
+    right: 16,
+    top: -85,
+    width: 100,
+    height: 100,
+    zIndex: 10,
+  },
+  onlineBadgeHero: {
+    position: 'absolute',
+    right: 14,
+    top: -96,
+    backgroundColor: 'rgba(255,255,255,0.95)',
+    paddingHorizontal: 6,
+    paddingVertical: 3,
+    borderRadius: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    zIndex: 11,
+  },
+  onlineBadgeDot: {
+    width: 5,
+    height: 5,
+    borderRadius: 2.5,
+    backgroundColor: Colors.success,
+  },
+  onlineBadgeText: {
+    fontFamily: 'Inter_700Bold',
+    fontSize: 9,
+    color: Colors.success,
+  },
+  statusCard: {
+    backgroundColor: '#fff',
+    borderRadius: 16,
+    padding: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 12,
+    elevation: 8,
+    marginTop: 0,
+    marginBottom: 0,
+    zIndex: 5,
+  },
+  statusIconBg: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+  statusCardCopy: {
     flex: 1,
   },
-  statusTextOnline: {
-    color: Colors.success,
+  statusCardTitle: {
+    fontFamily: 'Inter_700Bold',
+    fontSize: 15,
+    color: Colors.text,
+    marginBottom: 2,
+  },
+  statusCardDesc: {
+    fontFamily: 'Inter_500Medium',
+    fontSize: 12,
+    color: Colors.textMuted,
+  },
+  powerButton: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: '#f1f5f9',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  powerButtonOnline: {
+    backgroundColor: '#fff',
+    borderWidth: 1,
+    borderColor: Colors.border,
   },
   homeModeRow: {
     flexDirection: "row",
@@ -589,7 +698,7 @@ const styles = StyleSheet.create({
     width: 38,
     height: 38,
     borderRadius: 10,
-    backgroundColor: Colors.primaryLight,
+    backgroundColor: '#e0f2fe',
     alignItems: "center",
     justifyContent: "center",
   },
@@ -644,42 +753,84 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
   },
   sectionTitle: {
-    fontFamily: "Inter_600SemiBold",
-    fontSize: 13,
-    color: Colors.textSecondary,
-    textTransform: "uppercase",
-    letterSpacing: 0.05,
+    fontFamily: "Inter_700Bold",
+    fontSize: 15,
+    color: Colors.text,
   },
   sectionSpacing: {
-    marginTop: 0,
+    marginTop: 4,
   },
-  safetyAlert: {
-    flexDirection: "row",
-    backgroundColor: "#fff8e6",
-    borderRadius: 12,
-    padding: 14,
+  emptyTasksCard: {
+    backgroundColor: Colors.surface,
+    borderRadius: 16,
+    padding: 20,
+    flexDirection: 'row',
+    alignItems: 'center',
     borderWidth: 1,
-    borderColor: "#f0c040",
-    gap: 10,
+    borderColor: Colors.border,
   },
-  safetyIcon: {
-    fontSize: 20,
-    marginTop: 2,
+  emptyTasksImg: {
+    width: 80,
+    height: 80,
+    marginRight: 16,
   },
-  safetyContent: {
+  emptyTasksCopy: {
     flex: 1,
   },
-  safetyTitle: {
-    fontFamily: "Inter_600SemiBold",
-    fontSize: 13,
+  emptyTasksTitle: {
+    fontFamily: 'Inter_700Bold',
+    fontSize: 15,
     color: Colors.text,
     marginBottom: 4,
   },
-  safetyText: {
-    fontFamily: "Inter_400Regular",
-    fontSize: 13,
+  emptyTasksDesc: {
+    fontFamily: 'Inter_400Regular',
+    fontSize: 12,
     color: Colors.textSecondary,
     lineHeight: 18,
+  },
+  calendarBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: Colors.surfaceContainerLow,
+    alignItems: 'center',
+    justifyContent: 'center',
+    alignSelf: 'flex-start',
+  },
+  safetyAlert: {
+    flexDirection: "row",
+    backgroundColor: "#fff5e6",
+    borderRadius: 16,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: "#fde68a",
+    gap: 12,
+    position: 'relative',
+    overflow: 'hidden',
+  },
+  safetyContent: {
+    flex: 1,
+    marginRight: 60, // Make room for image
+  },
+  safetyTitle: {
+    fontFamily: "Inter_700Bold",
+    fontSize: 15,
+    color: '#92400e',
+    marginBottom: 4,
+  },
+  safetyText: {
+    fontFamily: "Inter_500Medium",
+    fontSize: 12,
+    color: '#b45309',
+    lineHeight: 18,
+  },
+  safetyImg: {
+    width: 80,
+    height: 80,
+    position: 'absolute',
+    right: -10,
+    bottom: -10,
   },
   scheduledCard: {
     backgroundColor: Colors.surface,

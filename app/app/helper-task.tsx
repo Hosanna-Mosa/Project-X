@@ -58,6 +58,7 @@ export default function HelperTaskScreen() {
   
   // The AI Matching Deck Animations
   const formHeightAnim = React.useRef(new Animated.Value(1)).current;
+  const scrollViewRef = React.useRef<ScrollView>(null);
   const deckOpacityAnim = React.useRef(new Animated.Value(0)).current;
   const cardSwipeXAnim = React.useRef(new Animated.Value(400)).current;
   const cardSwipeYAnim = React.useRef(new Animated.Value(0)).current;
@@ -344,8 +345,8 @@ export default function HelperTaskScreen() {
           // Lock on animation (Turns green)
           Animated.timing(lockOnAnim, { toValue: 1, duration: 200, useNativeDriver: false }),
           
-          // Hold the dramatic cinematic scene
-          Animated.delay(1500), 
+          // Hold the dramatic cinematic scene briefly
+          Animated.delay(200), 
           
           // Hide deck and bring form back up, POP the photo!
           Animated.parallel([
@@ -566,10 +567,9 @@ export default function HelperTaskScreen() {
          }
          socketService.off("order_accepted", handleOrderAccepted);
          socketService.off("order_status_update", handleOrderStatus);
-         // Chat-First Flow: Route immediately to chat!
-         router.push("/chat");
-         socketService.off("order_accepted", handleOrderAccepted);
-         socketService.off("order_status_update", handleOrderStatus);
+         
+         // Trigger the assignment animation which will then route to chat
+         setTaskState("assigned");
       };
       
       const handleOrderStatus = (data: any) => {
@@ -642,10 +642,10 @@ export default function HelperTaskScreen() {
 
       <KeyboardAvoidingView 
         style={{ flex: 1 }}
-        behavior={Platform.OS === "ios" ? "padding" : "padding"}
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
         keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 20}
       >
-        <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+        <ScrollView ref={scrollViewRef} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
           
           {/* Dynamic Purple Header */}
       <Animated.View style={{ backgroundColor: '#5c52eb', paddingTop: insets.top, paddingBottom: 120, height: animatedHeaderHeight, overflow: 'hidden' }}>
@@ -868,10 +868,10 @@ export default function HelperTaskScreen() {
                      </View>
                    
                    {/* Card Details */}
-                   {taskState === "assigned" && assignedDriver ? (
+                   {taskState === "assigned" && driver ? (
                      <>
-                       <Text style={{ color: '#fff', fontSize: 20, fontWeight: '800', marginBottom: 4 }}>{assignedDriver.name || "Driver"}</Text>
-                       <Text style={{ color: 'rgba(255,255,255,0.8)', fontSize: 14, fontWeight: '600', marginBottom: 16 }}>{assignedDriver.vehicle || "Helper"}</Text>
+                       <Text style={{ color: '#fff', fontSize: 20, fontWeight: '800', marginBottom: 4 }}>{driver.name || "Driver"}</Text>
+                       <Text style={{ color: 'rgba(255,255,255,0.8)', fontSize: 14, fontWeight: '600', marginBottom: 16 }}>{driver.vehicle || "Helper"}</Text>
                      </>
                    ) : (
                      <>
@@ -902,7 +902,7 @@ export default function HelperTaskScreen() {
           <Animated.View style={{ 
             backgroundColor: colors.background, 
             borderTopLeftRadius: 30, borderTopRightRadius: 30, 
-            marginTop: -30, padding: 24, paddingBottom: 40, flex: 1, 
+            marginTop: -30, padding: 24, paddingBottom: 0, flex: 1,
             elevation: 10, shadowColor: "#000", shadowOffset: { width: 0, height: -2 }, shadowOpacity: 0.1, shadowRadius: 10
           }}>
             <View style={{ alignSelf: 'center', width: 40, height: 5, borderRadius: 3, backgroundColor: colors.border, marginBottom: 20 }} />
@@ -965,8 +965,8 @@ export default function HelperTaskScreen() {
                   <Text style={{ color: '#EF4444', fontSize: 16, fontWeight: '700', letterSpacing: 1 }}>CANCEL SCAN</Text>
                 </TouchableOpacity>
               </View>
-            ) : taskState === "assigned" && assignedDriver ? (
-               <View style={{ flex: 1, alignItems: 'center', paddingTop: 0 }}>
+            ) : taskState === "assigned" && driver ? (
+               <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', paddingTop: 0, paddingBottom: 24, minHeight: 400 }}>
                   <Animated.View style={{ 
                      transform: [{ scale: assignedPopAnim }, { translateY: assignedPopAnim.interpolate({ inputRange: [0, 1], outputRange: [50, 0] }) }], 
                      opacity: assignedPopAnim,
@@ -983,8 +983,8 @@ export default function HelperTaskScreen() {
                   </Animated.View>
 
                   <Animated.View style={{ opacity: assignedPopAnim, width: '100%', alignItems: 'center' }}>
-                     <Text style={{ fontSize: 28, fontWeight: '900', color: colors.text, marginBottom: 4, letterSpacing: -0.5 }}>{assignedDriver.name || "Driver"}</Text>
-                     <Text style={{ fontSize: 16, color: 'gray', fontWeight: '700', marginBottom: 24 }}>{assignedDriver.vehicle || "Helper"} • <Ionicons name="star" size={14} color="#D97706" /> 4.9</Text>
+                     <Text style={{ fontSize: 28, fontWeight: '900', color: colors.text, marginBottom: 4, letterSpacing: -0.5 }}>{driver.name || "Driver"}</Text>
+                     <Text style={{ fontSize: 16, color: 'gray', fontWeight: '700', marginBottom: 24 }}>{driver.vehicle || "Helper"} • <Ionicons name="star" size={14} color="#D97706" /> 4.9</Text>
                   
                      {/* Action Grid */}
                      <View style={{ flexDirection: 'row', gap: 16, width: '100%', marginBottom: 24 }}>
@@ -997,7 +997,7 @@ export default function HelperTaskScreen() {
                         </TouchableOpacity>
                         
                         <TouchableOpacity 
-                           onPress={() => Linking.openURL(`tel:${assignedDriver.phone || "0000000000"}`)}
+                           onPress={() => Linking.openURL(`tel:${driver.phone || "0000000000"}`)}
                            style={{ flex: 1, backgroundColor: 'rgba(92, 82, 235, 0.1)', paddingVertical: 20, borderRadius: 20, alignItems: 'center', flexDirection: 'row', justifyContent: 'center' }}
                         >
                            <Feather name="phone" size={24} color="#5c52eb" style={{ marginRight: 10 }} />
@@ -1193,12 +1193,17 @@ export default function HelperTaskScreen() {
                   textAlignVertical="top"
                   value={description}
                   onChangeText={setDescription}
+                  onFocus={() => {
+                    setTimeout(() => {
+                      scrollViewRef.current?.scrollToEnd({ animated: true });
+                    }, 100);
+                  }}
                 />
               </View>
             </View>
 
             {/* Slide to Confirm Footer */}
-            <View style={[styles.footer, { paddingBottom: insets.bottom || 24, backgroundColor: colors.background }]}>
+            <View style={[styles.footer, { paddingBottom: insets.bottom || 12, backgroundColor: colors.background }]}>
               {calculatedFare > 0 && (
                 <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 16 }}>
                   <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: `${colors.primary}15`, alignItems: 'center', justifyContent: 'center', marginRight: 10 }}>
@@ -1257,7 +1262,8 @@ const styles = StyleSheet.create({
     textAlign: "center",
   },
   scrollContent: {
-    paddingBottom: 40,
+    paddingBottom: 0,
+    flexGrow: 1,
   },
   introSection: {
     marginBottom: 32,

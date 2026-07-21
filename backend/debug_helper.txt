@@ -1,0 +1,149 @@
+
+[2026-07-20T18:56:10.863Z] Created order ORD-20260721-W3MGNP type: helper, driversToNotify: 10, isReserved: false
+ -> emitting new_order to driverUser._id: 6a5e11305f35a1dd09c3d722
+ -> emitting new_order to driverUser._id: 6a5e11305f35a1dd09c3d728
+ -> emitting new_order to driverUser._id: 6a5e11305f35a1dd09c3d72e
+ -> emitting new_order to driverUser._id: 6a5e11305f35a1dd09c3d733
+ -> emitting new_order to driverUser._id: 6a5e11305f35a1dd09c3d739
+ -> emitting new_order to driverUser._id: 6a5e11305f35a1dd09c3d73f
+ -> emitting new_order to driverUser._id: 6a5e11305f35a1dd09c3d744
+ -> emitting new_order to driverUser._id: 6a5e11305f35a1dd09c3d74a
+ -> emitting new_order to driverUser._id: 6a5e11305f35a1dd09c3d750
+ -> emitting new_order to driverUser._id: 6a5e11305f35a1dd09c3d755
+
+[2026-07-20T19:12:11.042Z] Created order ORD-20260721-P4PDJP type: helper, driversToNotify: 1, isReserved: false
+ -> emitting new_order to driverUser._id: 6a453f1cecb0e2672c8b06aa
+
+[2026-07-20T19:19:44.778Z] Created order ORD-20260721-UJKYM0 type: helper, driversToNotify: 1, isReserved: false
+ -> emitting new_order to driverUser._id: 6a453f1cecb0e2672c8b06aa
+
+[2026-07-20T19:24:07.530Z] Created order ORD-20260721-0ATKL7 type: helper, driversToNotify: 1, isReserved: false
+ -> emitting new_order to driverUser._id: 6a453f1cecb0e2672c8b06aa
+
+[2026-07-20T19:25:35.358Z] Created order ORD-20260721-32473A type: helper, driversToNotify: 1, isReserved: false
+ -> emitting new_order to driverUser._id: 6a453f1cecb0e2672c8b06aa
+
+[2026-07-21T09:16:50.153Z] Created order ORD-20260721-QI1U6N type: helper, driversToNotify: 1, isReserved: false
+ -> emitting new_order to driverUser._id: 6a453f1cecb0e2672c8b06aa
+
+[2026-07-21T09:20:54.215Z] Created order ORD-20260721-UXUBYH type: helper, driversToNotify: 0, isReserved: false
+
+[2026-07-21T09:22:41.873Z] Created order ORD-20260721-9Q8FGK type: bike, driversToNotify: 1, isReserved: false
+ -> emitting new_order to driverUser._id: 6a453f1cecb0e2672c8b06aa
+
+[2026-07-21T09:24:53.351Z] Created order ORD-20260721-66PB6N type: helper, driversToNotify: 1, isReserved: false
+ -> emitting new_order to driverUser._id: 6a453f1cecb0e2672c8b06aa
+
+[2026-07-21T09:29:20.992Z] Created order ORD-20260721-933C5T type: helper, driversToNotify: 0, isReserved: false
+
+[2026-07-21T09:30:03.464Z] Created order ORD-20260721-DSVFLF type: helper, driversToNotify: 1, isReserved: false
+ -> emitting new_order to driverUser._id: 6a453f1cecb0e2672c8b06aa
+
+[2026-07-21T09:38:02.062Z] Created order ORD-20260721-NGTXN4 type: helper, driversToNotify: 1, isReserved: false
+ -> emitting new_order to driverUser._id: 6a453f1cecb0e2672c8b06aa
+
+[2026-07-21T09:44:39.713Z] Created order ORD-20260721-AS2RMR type: helper, driversToNotify: 1, isReserved: false
+ -> emitting new_order to driverUser._id: 6a5f3f415f35a1dd09c40353
+
+[2026-07-21T09:44:50.507Z] Created order ORD-20260721-3Q8U9Z type: helper, driversToNotify: 1, isReserved: false
+ -> emitting new_order to driverUser._id: 6a5f3f415f35a1dd09c40353
+
+[2026-07-21T09:45:04.554Z] Created order ORD-20260721-2TBTLY type: helper, driversToNotify: 1, isReserved: false
+ -> emitting new_order to driverUser._id: 6a5f3f415f35a1dd09c40353
+
+[2026-07-21T09:45:21.262Z] Created order ORD-20260721-0EJBO4 type: helper, driversToNotify: 1, isReserved: false
+ -> emitting new_order to driverUser._id: 6a5f3f415f35a1dd09c40353
+
+[2026-07-21T09:45:55.080Z] Created order ORD-20260721-73JNFD type: helper, driversToNotify: 3, isReserved: false
+ -> emitting new_order to driverUser._id: 6a5f3f415f35a1dd09c40353
+ -> emitting new_order to driverUser._id: 6a5f3f415f35a1dd09c40364
+ -> emitting new_order to driverUser._id: 6a5f3f415f35a1dd09c40375
+
+[2026-07-21T09:46:55.126Z] Created order ORD-20260721-6ESFUB type: helper, driversToNotify: 3, isReserved: false
+ -> emitting new_order to driverUser._id: 6a5f3f415f35a1dd09c40364
+ -> emitting new_order to driverUser._id: 6a5f3f415f35a1dd09c40353
+ -> emitting new_order to driverUser._id: 6a5f3f415f35a1dd09c40375
+
+[2026-07-21T09:48:29.562Z] Created order ORD-20260721-X0W8I3 type: helper, driversToNotify: 3, isReserved: false
+ -> emitting new_order to driverUser._id: 6a5f3f415f35a1dd09c40364
+ -> emitting new_order to driverUser._id: 6a5f3f415f35a1dd09c40353
+ -> emitting new_order to driverUser._id: 6a5f3f415f35a1dd09c40375
+
+[2026-07-21T09:48:44.641Z] Created order ORD-20260721-5SVMQL type: helper, driversToNotify: 3, isReserved: false
+ -> emitting new_order to driverUser._id: 6a5f3f415f35a1dd09c40364
+ -> emitting new_order to driverUser._id: 6a5f3f415f35a1dd09c40353
+ -> emitting new_order to driverUser._id: 6a5f3f415f35a1dd09c40375
+
+[2026-07-21T09:59:34.088Z] Created order ORD-20260721-4V803J type: helper, driversToNotify: 1, isReserved: false
+ -> emitting new_order to driverUser._id: 6a453f1cecb0e2672c8b06aa
+
+[2026-07-21T10:07:52.130Z] Created order ORD-20260721-UJ5AF0 type: helper, driversToNotify: 10, isReserved: false
+ -> emitting new_order to driverUser._id: 6a5f43225f35a1dd09c4043e
+ -> emitting new_order to driverUser._id: 6a5f43225f35a1dd09c4042d
+ -> emitting new_order to driverUser._id: 6a5f43225f35a1dd09c4044f
+ -> emitting new_order to driverUser._id: 6a5f43225f35a1dd09c40427
+ -> emitting new_order to driverUser._id: 6a5f43225f35a1dd09c40433
+ -> emitting new_order to driverUser._id: 6a5f43225f35a1dd09c40438
+ -> emitting new_order to driverUser._id: 6a5f43225f35a1dd09c40444
+ -> emitting new_order to driverUser._id: 6a5f43225f35a1dd09c40449
+ -> emitting new_order to driverUser._id: 6a5f43235f35a1dd09c40455
+ -> emitting new_order to driverUser._id: 6a5f43235f35a1dd09c4045a
+
+[2026-07-21T10:09:05.055Z] Created order ORD-20260721-Y6YXIM type: helper, driversToNotify: 0, isReserved: false
+
+[2026-07-21T10:09:18.131Z] Created order ORD-20260721-OZKG0U type: helper, driversToNotify: 1, isReserved: false
+ -> emitting new_order to driverUser._id: 6a453f1cecb0e2672c8b06aa
+
+[2026-07-21T10:15:40.343Z] Created order ORD-20260721-4AG34O type: helper, driversToNotify: 10, isReserved: false
+ -> emitting new_order to driverUser._id: 6a5f45df5f35a1dd09c40497
+ -> emitting new_order to driverUser._id: 6a5f45e05f35a1dd09c4049d
+ -> emitting new_order to driverUser._id: 6a5f45e05f35a1dd09c404a3
+ -> emitting new_order to driverUser._id: 6a5f45e05f35a1dd09c404a8
+ -> emitting new_order to driverUser._id: 6a5f45e05f35a1dd09c404ae
+ -> emitting new_order to driverUser._id: 6a5f45e05f35a1dd09c404b4
+ -> emitting new_order to driverUser._id: 6a5f45e05f35a1dd09c404b9
+ -> emitting new_order to driverUser._id: 6a5f45e05f35a1dd09c404bf
+ -> emitting new_order to driverUser._id: 6a5f45e05f35a1dd09c404c5
+ -> emitting new_order to driverUser._id: 6a5f45e05f35a1dd09c404ca
+
+[2026-07-21T10:16:42.584Z] Created order ORD-20260721-3PH66K type: helper, driversToNotify: 1, isReserved: false
+ -> emitting new_order to driverUser._id: 6a453f1cecb0e2672c8b06aa
+
+[2026-07-21T10:23:31.728Z] Created order ORD-20260721-M0PXUL type: helper, driversToNotify: 10, isReserved: false
+ -> emitting new_order to driverUser._id: 6a5f481c5f35a1dd09c40567
+ -> emitting new_order to driverUser._id: 6a5f481c5f35a1dd09c4056d
+ -> emitting new_order to driverUser._id: 6a5f481c5f35a1dd09c40573
+ -> emitting new_order to driverUser._id: 6a5f481c5f35a1dd09c40578
+ -> emitting new_order to driverUser._id: 6a5f481c5f35a1dd09c4057e
+ -> emitting new_order to driverUser._id: 6a5f481c5f35a1dd09c40584
+ -> emitting new_order to driverUser._id: 6a5f481c5f35a1dd09c40589
+ -> emitting new_order to driverUser._id: 6a5f481c5f35a1dd09c4058f
+ -> emitting new_order to driverUser._id: 6a5f481d5f35a1dd09c40595
+ -> emitting new_order to driverUser._id: 6a5f481d5f35a1dd09c4059a
+
+[2026-07-21T10:26:07.334Z] Created order ORD-20260721-OXNZXQ type: helper, driversToNotify: 1, isReserved: false
+ -> emitting new_order to driverUser._id: 6a453f1cecb0e2672c8b06aa
+
+[2026-07-21T10:28:13.502Z] Created order ORD-20260721-RAO95G type: helper, driversToNotify: 2, isReserved: false
+ -> emitting new_order to driverUser._id: 6a453f1cecb0e2672c8b06aa
+ -> emitting new_order to driverUser._id: 6a4bc52da685d9f0c3950bb0
+
+[2026-07-21T10:41:13.491Z] Created order ORD-20260721-TBSM4D type: helper, driversToNotify: 1, isReserved: false
+ -> emitting new_order to driverUser._id: 6a453f1cecb0e2672c8b06aa
+
+[2026-07-21T10:42:58.384Z] Created order ORD-20260721-9RPOHU type: helper, driversToNotify: 1, isReserved: false
+ -> emitting new_order to driverUser._id: 6a453f1cecb0e2672c8b06aa
+
+[2026-07-21T10:46:20.850Z] Created order ORD-20260721-IE5J3A type: helper, driversToNotify: 1, isReserved: false
+ -> emitting new_order to driverUser._id: 6a453f1cecb0e2672c8b06aa
+
+[2026-07-21T10:48:04.115Z] Created order ORD-20260721-YH6XR9 type: helper, driversToNotify: 1, isReserved: false
+ -> emitting new_order to driverUser._id: 6a453f1cecb0e2672c8b06aa
+
+[2026-07-21T10:53:49.677Z] Created order ORD-20260721-NNQKTU type: helper, driversToNotify: 0, isReserved: false
+
+[2026-07-21T10:54:03.740Z] Created order ORD-20260721-J4ZTJ9 type: helper, driversToNotify: 0, isReserved: false
+
+[2026-07-21T10:54:14.123Z] Created order ORD-20260721-SZ9GY9 type: helper, driversToNotify: 0, isReserved: false
+
+[2026-07-21T10:54:51.117Z] Created order ORD-20260721-41A571 type: helper, driversToNotify: 0, isReserved: false

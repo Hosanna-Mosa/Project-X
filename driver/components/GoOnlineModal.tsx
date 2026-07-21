@@ -199,7 +199,7 @@ export function GoOnlineModal({ visible, onClose, onGoOnline }: GoOnlineModalPro
 const styles = StyleSheet.create({
   overlay: {
     flex: 1,
-    backgroundColor: Colors.overlay,
+    backgroundColor: "transparent",
     justifyContent: "flex-end",
   },
   sheet: {
