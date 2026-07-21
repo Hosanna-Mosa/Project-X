@@ -88,6 +88,8 @@ export interface IOrder extends Omit<Document, "_id"> {
   restaurantPickupCode?: string;
   polyline?: string;
   notified15Min?: boolean;
+  isReviewed?: boolean;
+  review?: mongoose.Types.ObjectId;
   declineReasons?: { driverId: string; reason: string }[];
   createdAt: Date;
   updatedAt: Date;
@@ -173,6 +175,8 @@ const OrderSchema: Schema = new Schema(
     restaurantPickupCode: { type: String },
     polyline: { type: String },
     notified15Min: { type: Boolean, default: false },
+    isReviewed: { type: Boolean, default: false },
+    review: { type: Schema.Types.ObjectId, ref: "Review" },
   },
   { timestamps: true }
 );

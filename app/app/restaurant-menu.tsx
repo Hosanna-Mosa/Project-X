@@ -90,6 +90,9 @@ export default function RestaurantMenu() {
 
   const itemCount = getItemCount();
 
+  const categoryPositions = useRef<Record<string, number>>({});
+  const isProgrammaticScroll = useRef(false);
+
   const handleScroll = (event: any) => {
     const y = event.nativeEvent.contentOffset.y;
     // Trigger when scrolled past the hero image (hero image height is 220px)
@@ -98,16 +101,42 @@ export default function RestaurantMenu() {
     } else {
       setScrolledPast(false);
     }
+
+    if (!isProgrammaticScroll.current) {
+      const sortedCats = Object.keys(categoryPositions.current).sort(
+        (a, b) => categoryPositions.current[a] - categoryPositions.current[b]
+      );
+      let matchedCat = "Recommended";
+      for (const cat of sortedCats) {
+        if (y >= categoryPositions.current[cat] - 120) {
+          matchedCat = cat;
+        }
+      }
+      if (matchedCat && matchedCat !== activeCategory) {
+        setActiveCategory(matchedCat);
+      }
+    }
   };
 
   const handleCategoryPress = (category: string) => {
     setActiveCategory(category);
+    isProgrammaticScroll.current = true;
+    let targetY = 340;
+    if (category !== "Recommended") {
+      const posY = categoryPositions.current[category];
+      if (posY !== undefined) {
+        targetY = Math.max(340, posY - 10);
+      }
+    }
     if (scrollViewRef.current) {
       scrollViewRef.current.scrollTo({
-        y: 280,
+        y: targetY,
         animated: true,
       });
     }
+    setTimeout(() => {
+      isProgrammaticScroll.current = false;
+    }, 600);
   };
 
   useEffect(() => {
@@ -181,8 +210,8 @@ export default function RestaurantMenu() {
   }, {} as Record<string, FoodItem[]>);
 
   const categories = Object.keys(groupedMenu);
-  const recommendedItems = menu.slice(0, 4);
-  const showRecommended = !searchQuery && activeCategory === "Recommended" && recommendedItems.length > 0;
+  const recommendedItems = menu.slice(0, 6);
+  const showRecommended = !searchQuery && recommendedItems.length > 0;
   const tabCategories = searchQuery ? categories : (menu.length > 0 ? ["Recommended", ...categories] : categories);
 
   // Auto-select category if search renders current category empty, or if Recommended is active when searching
@@ -333,7 +362,7 @@ export default function RestaurantMenu() {
 
       <ScrollView 
         ref={scrollViewRef}
-        contentContainerStyle={{ paddingBottom: 150 }} 
+        contentContainerStyle={{ paddingBottom: 400 }} 
         showsVerticalScrollIndicator={false}
         onScroll={handleScroll}
         scrollEventThrottle={16}
@@ -516,10 +545,14 @@ export default function RestaurantMenu() {
             )}
 
             {/* Standard Category Menu List */}
-            {categories
-              .filter((category) => activeCategory === "Recommended" || category === activeCategory)
-              .map((category) => (
-                <View key={category} style={styles.categorySection}>
+            {categories.map((category) => (
+                <View 
+                  key={category} 
+                  style={styles.categorySection}
+                  onLayout={(e) => {
+                    categoryPositions.current[category] = e.nativeEvent.layout.y;
+                  }}
+                >
                   {/* Category Header */}
                   <View style={styles.categoryHeader}>
                     <Text style={styles.categoryTitle}>{category}</Text>

@@ -247,7 +247,6 @@ export default function HomeScreen() {
   const [hasMore, setHasMore] = useState(true);
   const { theme } = useThemeStore();
   const [scrollOffset, setScrollOffset] = useState(0);
-  const categoriesScrollRef = useRef<ScrollView>(null);
   const colors = Colors[theme];
   const styles = React.useMemo(() => createStyles(colors), [theme]);
   const searchGlowSpin = useRef(new Animated.Value(0)).current;
@@ -590,7 +589,7 @@ export default function HomeScreen() {
         try {
           // Add a 5 second timeout so we don't hang on skeletons forever
           const fetchPromise = Promise.all([
-            // checkNearbyDrivers(lat, lng), // Temporarily disabled to check if this is hanging
+            checkNearbyDrivers(lat, lng),
             activeService === 'Meat' 
               ? fetchMeatCenters(lat, lng, 1) 
               : Promise.all([
@@ -695,10 +694,10 @@ export default function HomeScreen() {
       ? filteredItems
       : filteredItems.filter(r => foodFilter === 'veg' ? r.isPureVeg : !r.isPureVeg);
 
-  const showCategories = !hasNoLocation && (showHomeSkeleton || (nearbyDriversCount !== 0 && visibleItems.length > 0));
+  const showCategories = !hasNoLocation && (showHomeSkeleton || loadingDrivers || nearbyDriversCount > 0);
 
   const renderHeader = () => {
-    if (!showCategories) return null;
+    if (!showCategories || (!showHomeSkeleton && visibleItems.length === 0)) return null;
     return (
       <>
         {activeService === 'Food' && (
@@ -767,38 +766,28 @@ export default function HomeScreen() {
                   <View style={styles.dishesRowsContainer}>
                     <View style={styles.dishesRow}>
                       {popularTags.slice(0, 7).map((tag, index) => (
-                        <TouchableOpacity
+                        <View
                           key={index}
                           style={styles.dishChip}
-                          activeOpacity={0.8}
-                          onPress={() => {
-                            setSearchText(tag.name);
-                            setIsSearchActive(true);
-                          }}
                         >
                           <View style={[styles.dishIconCircle, { backgroundColor: tag.color + '15' }]}>
                             {renderTagIcon(tag)}
                           </View>
                           <Text style={styles.dishChipText}>{tag.name}</Text>
-                        </TouchableOpacity>
+                        </View>
                       ))}
                     </View>
                     <View style={styles.dishesRow}>
                       {popularTags.slice(7, 14).map((tag, index) => (
-                        <TouchableOpacity
+                        <View
                           key={index}
                           style={styles.dishChip}
-                          activeOpacity={0.8}
-                          onPress={() => {
-                            setSearchText(tag.name);
-                            setIsSearchActive(true);
-                          }}
                         >
                           <View style={[styles.dishIconCircle, { backgroundColor: tag.color + '15' }]}>
                             {renderTagIcon(tag)}
                           </View>
                           <Text style={styles.dishChipText}>{tag.name}</Text>
-                        </TouchableOpacity>
+                        </View>
                       ))}
                     </View>
                   </View>
@@ -1061,14 +1050,13 @@ export default function HomeScreen() {
             );
           }
 
-          if (visibleItems.length === 0) {
-            const serviceName = activeService === "Meat" ? "meat" : "food";
+          if (nearbyDriversCount === 0) {
             return (
               <View style={styles.noServiceContainer}>
-                <Ionicons name="location-outline" size={80} color={colors.error} />
-                <Text style={[styles.noServiceTitle, { color: colors.text }]}>No Service in this Location</Text>
+                <Ionicons name="bicycle-outline" size={80} color={colors.error} />
+                <Text style={[styles.noServiceTitle, { color: colors.text }]}>No Riders Available</Text>
                 <Text style={[styles.noServiceSubtitle, { color: colors.textSecondary }]}>
-                  We don't have {serviceName} delivery services in this location. Please try changing your location.
+                  We don't have riders in this location to deliver your orders. Please try changing your location.
                 </Text>
                 <TouchableOpacity
                   style={[styles.noServiceButton, { backgroundColor: colors.primary }]}
@@ -1080,13 +1068,14 @@ export default function HomeScreen() {
             );
           }
 
-          if (nearbyDriversCount === 0) {
+          if (visibleItems.length === 0) {
+            const serviceName = activeService === "Meat" ? "meat" : "food";
             return (
               <View style={styles.noServiceContainer}>
-                <Ionicons name="bicycle-outline" size={80} color={colors.error} />
-                <Text style={[styles.noServiceTitle, { color: colors.text }]}>No Riders Available</Text>
+                <Ionicons name="location-outline" size={80} color={colors.error} />
+                <Text style={[styles.noServiceTitle, { color: colors.text }]}>Services are not available in this location</Text>
                 <Text style={[styles.noServiceSubtitle, { color: colors.textSecondary }]}>
-                  We don't have riders in this location to deliver your orders. Please try changing your location.
+                  We don't have {serviceName} outlets or delivery services available in this location. Please try changing your location.
                 </Text>
                 <TouchableOpacity
                   style={[styles.noServiceButton, { backgroundColor: colors.primary }]}
@@ -1120,6 +1109,7 @@ export default function HomeScreen() {
           setPage(1);
           setHasMore(true);
           const { lat, lng } = await getCoords();
+          checkNearbyDrivers(lat, lng);
           if (activeService === 'Meat') {
             fetchMeatCenters(lat, lng, 1);
           } else {
@@ -1180,13 +1170,7 @@ export default function HomeScreen() {
               {showHomeSkeleton ? (
                 <CategorySkeleton colors={colors} />
               ) : (
-                <ScrollView
-                  ref={categoriesScrollRef}
-                  horizontal
-                  showsHorizontalScrollIndicator={false}
-                  contentContainerStyle={styles.categoriesScrollContent}
-                  scrollEventThrottle={16}
-                >
+                <View style={styles.categoriesFlexContent}>
                   <ServiceCategory
                     icon="bag-outline"
                     label="Task"
@@ -1204,30 +1188,13 @@ export default function HomeScreen() {
                     onPress={() => handleServiceSwitch('Food')}
                   />
                   <ServiceCategory
-                    icon="heart-pulse"
-                    iconFamily="MaterialCommunityIcons"
-                    label="Health"
-                    onPress={() => router.push({
-                      pathname: "/service-selection",
-                      params: appliedDistanceKm ? { label: "Health", radiusKm: String(appliedDistanceKm) } : { label: "Health" },
-                    })}
-                  />
-                  <ServiceCategory
                     icon="food-steak"
                     iconFamily="MaterialCommunityIcons"
                     label="Meat"
                     active={activeService === 'Meat'}
                     onPress={() => handleServiceSwitch('Meat')}
                   />
-                  <ServiceCategory
-                    icon="paw-outline"
-                    label="Pets"
-                    onPress={() => router.push({
-                      pathname: "/service-selection",
-                      params: appliedDistanceKm ? { label: "pets", radiusKm: String(appliedDistanceKm) } : { label: "pets" },
-                    })}
-                  />
-                </ScrollView>
+                </View>
               )}
             </Animated.View>
           )}
@@ -1615,9 +1582,9 @@ function CategorySkeleton({ colors }: { colors: typeof Colors.light }) {
   }, [shimmer]);
 
   return (
-    <View style={{ flexDirection: 'row', gap: 16, paddingLeft: 16, paddingVertical: 10 }}>
-      {[1, 2, 3, 4, 5, 6].map((i) => (
-        <View key={i} style={{ alignItems: 'center' }}>
+    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16, paddingVertical: 10 }}>
+      {[1, 2, 3, 4].map((i) => (
+        <View key={i} style={{ width: 64, alignItems: 'center' }}>
           <SkeletonBlock
             style={{ width: 56, height: 56, borderRadius: 28, backgroundColor: colors.border }}
             shimmer={shimmer}
@@ -1996,9 +1963,11 @@ const createStyles = (colors: typeof Colors.light) => StyleSheet.create({
     marginTop: 8,
     paddingBottom: 4,
   },
-  categoriesScrollContent: {
+  categoriesFlexContent: {
     flexDirection: "row",
-    gap: 16,
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 16,
   },
   greetingSection: {
     paddingHorizontal: 16,

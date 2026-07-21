@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState, forwardRef, useImperativeHandle, useRef } from 'react';
-import { StyleSheet, View, Platform, ViewStyle, Text, TouchableOpacity } from 'react-native';
+import { StyleSheet, View, Platform, ViewStyle, Text, TouchableOpacity, Image } from 'react-native';
 import MapView, { PROVIDER_GOOGLE, Region, MapType, Marker, Polyline, Circle } from 'react-native-maps';
 import * as Location from 'expo-location';
 import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
@@ -8,6 +8,9 @@ import Colors from '@/constants/colors';
 import { customFetch } from '@/utils/api/custom-fetch';
 
 const DRIVER_MARKER_IMAGE = require('@/assets/images/driver-marker.png');
+const VEHICLE_BIKE_3D = require('@/assets/images/services/scooter_blue_transparent.png');
+const VEHICLE_AUTO_3D = require('@/assets/images/services/auto.png');
+const VEHICLE_CAB_3D = require('@/assets/images/services/cab.png');
 
 interface Props {
   children?: React.ReactNode;
@@ -41,15 +44,15 @@ const FALLBACK_REGION: Region = {
   longitudeDelta: 0.05,
 };
 
-export const MapBackground = forwardRef<MapBackgroundRef, Props>(({ 
-  children, 
-  style, 
-  mapType = 'standard', 
+export const MapBackground = forwardRef<MapBackgroundRef, Props>(({
+  children,
+  style,
+  mapType = 'standard',
   stops = [],
-  markers = [], 
+  markers = [],
   driverMarkers = [],
   initialRegion,
-  polyline, 
+  polyline,
   driverLocation,
   userLocation,
   onLocationUpdate,
@@ -72,7 +75,7 @@ export const MapBackground = forwardRef<MapBackgroundRef, Props>(({
     internalMapRef.current.animateToRegion(newRegion, 300);
   };
   const internalMapRef = useRef<MapView>(null);
-  const locationRef = useRef<{lat: number, lng: number} | null>(null);
+  const locationRef = useRef<{ lat: number, lng: number } | null>(null);
   const validRouteStops = useMemo(
     () =>
       stops
@@ -105,15 +108,15 @@ export const MapBackground = forwardRef<MapBackgroundRef, Props>(({
     },
     fitToRoute: () => {
       if (!internalMapRef.current) return;
-      
+
       const coords: { latitude: number, longitude: number }[] = [];
-      
+
       stops.forEach(s => {
         if (s.lat && s.lng) {
           coords.push({ latitude: s.lat, longitude: s.lng });
         }
       });
-      
+
       if (locationRef.current) {
         coords.push({ latitude: locationRef.current.lat, longitude: locationRef.current.lng });
       }
@@ -266,14 +269,14 @@ export const MapBackground = forwardRef<MapBackgroundRef, Props>(({
       // 1 degree is approximately 111.32 km. We multiply by a padding factor (~2.5) to ensure the circle fits nicely.
       const latDelta = (radiusMeters / 111320) * 2.5;
       const lngDelta = (radiusMeters / (111320 * Math.cos(radiusCenter.lat * (Math.PI / 180)))) * 2.5;
-      
+
       const regionForCircle = {
         latitude: radiusCenter.lat,
         longitude: radiusCenter.lng,
         latitudeDelta: latDelta,
         longitudeDelta: lngDelta,
       };
-      
+
       internalMapRef.current.animateToRegion(regionForCircle, 800);
     }
   }, [radiusCenter, radiusMeters]);
@@ -310,9 +313,9 @@ export const MapBackground = forwardRef<MapBackgroundRef, Props>(({
             />
             <Marker
               key="radius-badge"
-              coordinate={{ 
-                latitude: Number(radiusCenter.lat) - (Number(radiusMeters) / 111320), 
-                longitude: Number(radiusCenter.lng) 
+              coordinate={{
+                latitude: Number(radiusCenter.lat) - (Number(radiusMeters) / 111320),
+                longitude: Number(radiusCenter.lng)
               }}
               anchor={{ x: 0.5, y: 0.5 }}
               tracksViewChanges={false}
@@ -351,8 +354,13 @@ export const MapBackground = forwardRef<MapBackgroundRef, Props>(({
         ))}
 
         {driverMarkers.map((driver) => {
-          const vehicleType = driver.vehicleType || driver.vehicle || "bike";
-          const iconName = vehicleType === "auto" ? "taxi" : vehicleType === "car" ? "car" : "motorbike";
+          const vehicleType = (driver.vehicleType || driver.vehicle || "bike").toLowerCase();
+          
+          // Disable auto & car/cab markers for now as requested
+          if (vehicleType.includes("auto") || vehicleType.includes("rickshaw") || vehicleType.includes("car") || vehicleType.includes("cab") || vehicleType.includes("prime")) {
+            return null;
+          }
+
           return (
             <Marker
               key={driver.id || driver._id}
@@ -361,8 +369,13 @@ export const MapBackground = forwardRef<MapBackgroundRef, Props>(({
               title={driver.name || "Driver"}
               tracksViewChanges={true}
             >
-              <View style={styles.vehicleMarker}>
-                <MaterialCommunityIcons name={iconName as any} size={16} color="#FFFFFF" />
+              <View style={styles.scooterMarkerContainer} collapsable={false}>
+                <Image
+                  source={VEHICLE_BIKE_3D}
+                  style={styles.scooterMarkerImage}
+                  resizeMode="contain"
+                  fadeDuration={0}
+                />
               </View>
             </Marker>
           );
@@ -378,7 +391,7 @@ export const MapBackground = forwardRef<MapBackgroundRef, Props>(({
             />
           ) : null
         ))}
-          
+
         {userLocation && (
           <Marker
             key="user-location-pin"
@@ -413,15 +426,15 @@ export const MapBackground = forwardRef<MapBackgroundRef, Props>(({
 
       {/* Clean Zoom Controls */}
       <View style={styles.zoomControlsContainer}>
-        <TouchableOpacity 
-          style={styles.zoomButton} 
+        <TouchableOpacity
+          style={styles.zoomButton}
           onPress={() => handleZoom(0.5)}
           activeOpacity={0.7}
         >
           <Feather name="plus" size={18} color="#111827" />
         </TouchableOpacity>
-        <TouchableOpacity 
-          style={styles.zoomButton} 
+        <TouchableOpacity
+          style={styles.zoomButton}
           onPress={() => handleZoom(2.0)}
           activeOpacity={0.7}
         >
@@ -563,6 +576,27 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.25,
     shadowRadius: 3.84,
+  },
+  vehicleMarker3DContainer: {
+    width: 64,
+    height: 64,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'transparent',
+    overflow: 'visible',
+  },
+  scooterMarkerContainer: {
+    width: 42,
+    height: 42,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'transparent',
+    overflow: 'visible',
+  },
+  scooterMarkerImage: {
+    width: 42,
+    height: 42,
+    backgroundColor: 'transparent',
   },
   zoomControlsContainer: {
     position: 'absolute',

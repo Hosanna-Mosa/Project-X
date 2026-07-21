@@ -6,6 +6,8 @@ import Colors from "@/constants/colors";
 import { useThemeStore } from "@/contexts/themeStore";
 import { useAuthStore } from "@/contexts/authStore";
 
+import { Modal, Pressable, Animated, Easing } from "react-native";
+
 interface Props {
   _id: string;
   name: string;
@@ -38,7 +40,64 @@ export function RestaurantListItem({
 }: Props) {
   const { theme } = useThemeStore();
   const colors = Colors[theme];
-  const styles = React.useMemo(() => createStyles(colors), [theme]);
+  const styles = React.useMemo(() => createStyles(colors, theme), [theme]);
+
+  const [isModalVisible, setIsModalVisible] = React.useState(false);
+  const scaleAnim = React.useRef(new Animated.Value(0.35)).current;
+  const translateYAnim = React.useRef(new Animated.Value(90)).current;
+  const fadeAnim = React.useRef(new Animated.Value(0)).current;
+
+  const openModal = () => {
+    setIsModalVisible(true);
+    scaleAnim.setValue(0.35);
+    translateYAnim.setValue(90);
+    fadeAnim.setValue(0);
+
+    Animated.parallel([
+      Animated.spring(scaleAnim, {
+        toValue: 1,
+        bounciness: 16,
+        speed: 12,
+        useNativeDriver: true,
+      }),
+      Animated.spring(translateYAnim, {
+        toValue: 0,
+        bounciness: 16,
+        speed: 12,
+        useNativeDriver: true,
+      }),
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 180,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  };
+
+  const closeModal = (callback?: () => void) => {
+    Animated.parallel([
+      Animated.timing(scaleAnim, {
+        toValue: 0.4,
+        duration: 200,
+        easing: Easing.in(Easing.back(1)),
+        useNativeDriver: true,
+      }),
+      Animated.timing(translateYAnim, {
+        toValue: 60,
+        duration: 200,
+        easing: Easing.in(Easing.ease),
+        useNativeDriver: true,
+      }),
+      Animated.timing(fadeAnim, {
+        toValue: 0,
+        duration: 180,
+        useNativeDriver: true,
+      }),
+    ]).start(() => {
+      setIsModalVisible(false);
+      if (callback) callback();
+    });
+  };
 
   const user = useAuthStore((s) => s.user);
   const toggleFavorite = useAuthStore((s) => s.toggleFavorite);
@@ -57,9 +116,11 @@ export function RestaurantListItem({
   }, [_id]);
 
   const handlePress = () => {
-    router.push({
-      pathname: "/restaurant-menu",
-      params: { id: _id, name, image, rating, reviews, isMeat: isMeat ? "true" : "false" }
+    closeModal(() => {
+      router.push({
+        pathname: "/restaurant-menu",
+        params: { id: _id, name, image, rating, reviews, isMeat: isMeat ? "true" : "false" }
+      });
     });
   };
 
@@ -83,6 +144,7 @@ export function RestaurantListItem({
 
   return (
     <View style={styles.container}>
+      {/* Image click opens details page directly */}
       <View style={styles.imageWrapper}>
         <ScrollView
           horizontal
@@ -110,9 +172,13 @@ export function RestaurantListItem({
         </View>
       </View>
 
-      <TouchableOpacity style={styles.details} activeOpacity={0.95} onPress={handlePress}>
+      <View style={styles.details}>
         <View style={styles.nameRow}>
-          <Text style={styles.name} numberOfLines={1}>{name}</Text>
+          {/* Clicking ONLY restaurant name opens dialogue form modal */}
+          <TouchableOpacity activeOpacity={0.7} onPress={openModal} style={{ flex: 1, marginRight: 8 }}>
+            <Text style={styles.name} numberOfLines={1}>{name}</Text>
+          </TouchableOpacity>
+
           <TouchableOpacity 
             hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
             onPress={() => toggleFavorite(_id)}
@@ -125,7 +191,7 @@ export function RestaurantListItem({
           </TouchableOpacity>
         </View>
 
-        {/* Rating, Distance, Delivery Time, and Delivery Fee Row (Combined) */}
+        {/* Rating, Distance, Delivery Time, and Delivery Fee Row */}
         <View style={styles.metadataRow}>
           <View style={styles.statsRow}>
             <Text style={styles.statsText}>{rating}</Text>
@@ -149,12 +215,81 @@ export function RestaurantListItem({
             <Text style={styles.sponsoredText}>Sponsored</Text>
           </View>
         )}
-      </TouchableOpacity>
+      </View>
+
+      {/* Restaurant Details Dialogue Form Modal */}
+      <Modal
+        visible={isModalVisible}
+        transparent
+        animationType="none"
+        onRequestClose={() => closeModal()}
+      >
+        <Animated.View style={[styles.modalOverlay, { opacity: fadeAnim }]}>
+          <Pressable style={{ width: "100%", height: "100%", justifyContent: "center", alignItems: "center" }} onPress={() => closeModal()}>
+            <Animated.View 
+              style={[
+                styles.modalCard, 
+                { 
+                  transform: [
+                    { translateY: translateYAnim },
+                    { scale: scaleAnim }
+                  ],
+                  opacity: fadeAnim 
+                }
+              ]} 
+              onStartShouldSetResponder={() => true}
+            >
+              {/* Header with image, name & price rating */}
+              <View style={styles.modalHeaderRow}>
+                <Image source={{ uri: image }} style={styles.modalImage} resizeMode="cover" />
+                <View style={styles.modalHeaderTextWrap}>
+                  <Text style={styles.modalTitle}>{name}</Text>
+                  <View style={styles.modalRatingRow}>
+                    <MaterialIcons name="star" size={14} color="#F59E0B" />
+                    <Text style={styles.modalRatingText}>{rating} ({reviews} ratings)</Text>
+                  </View>
+                </View>
+              </View>
+
+              {/* Customers say / Info card */}
+              <View style={styles.modalInfoBox}>
+                <Text style={styles.modalInfoTitle}>Customers say</Text>
+                <Text style={styles.modalInfoDescription}>
+                  Customers find {name} to be a top dining choice, with fresh ingredients, quick delivery, and rich authentic taste...
+                </Text>
+                <Text style={styles.modalAiTag}>✨ Top rated by food lovers nearby</Text>
+
+                <View style={styles.modalFeaturesRow}>
+                  <View style={styles.modalFeatureItem}>
+                    <Ionicons name="checkmark" size={14} color="#10B981" />
+                    <Text style={styles.modalFeatureText}>Hygiene Verified</Text>
+                  </View>
+                  <View style={styles.modalFeatureItem}>
+                    <Ionicons name="checkmark" size={14} color="#10B981" />
+                    <Text style={styles.modalFeatureText}>Fast Prep</Text>
+                  </View>
+                </View>
+
+                <View style={styles.modalBadgesLine}>
+                  <Text style={styles.modalBadgeText}>— Delivery in {time}</Text>
+                  <Text style={styles.modalBadgeText}>— Distance: {distance}</Text>
+                  <Text style={styles.modalBadgeText}>— Premium Quality</Text>
+                </View>
+              </View>
+
+              {/* See all details button */}
+              <TouchableOpacity style={styles.modalSeeDetailsBtn} activeOpacity={0.8} onPress={handlePress}>
+                <Text style={styles.modalSeeDetailsText}>See all details</Text>
+              </TouchableOpacity>
+            </Animated.View>
+          </Pressable>
+        </Animated.View>
+      </Modal>
     </View>
   );
 }
 
-const createStyles = (colors: typeof Colors.light) => StyleSheet.create({
+const createStyles = (colors: typeof Colors.light, theme: "light" | "dark") => StyleSheet.create({
   container: {
     marginBottom: 20,
     marginHorizontal: 16,
@@ -264,5 +399,120 @@ const createStyles = (colors: typeof Colors.light) => StyleSheet.create({
     fontSize: 12,
     color: colors.textMuted,
     fontWeight: "500",
+  },
+  // Modal Styles matching reference design
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.45)",
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 20,
+  },
+  modalCard: {
+    width: "100%",
+    backgroundColor: colors.surface,
+    borderRadius: 24,
+    padding: 20,
+    borderWidth: 1,
+    borderColor: colors.borderLight,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.15,
+    shadowRadius: 20,
+    elevation: 8,
+  },
+  modalHeaderRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 16,
+  },
+  modalImage: {
+    width: 64,
+    height: 64,
+    borderRadius: 14,
+    backgroundColor: colors.surfaceSecondary,
+  },
+  modalHeaderTextWrap: {
+    flex: 1,
+    marginLeft: 14,
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: "700",
+    color: colors.text,
+    marginBottom: 4,
+  },
+  modalRatingRow: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  modalRatingText: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: colors.textSecondary,
+    marginLeft: 4,
+  },
+  modalInfoBox: {
+    backgroundColor: theme === "light" ? "#DCE4EC" : "#242E38",
+    borderRadius: 18,
+    padding: 16,
+    marginBottom: 16,
+  },
+  modalInfoTitle: {
+    fontSize: 17,
+    fontWeight: "800",
+    color: colors.text,
+    marginBottom: 8,
+  },
+  modalInfoDescription: {
+    fontSize: 13,
+    lineHeight: 19,
+    color: colors.textSecondary,
+    fontWeight: "500",
+    marginBottom: 8,
+  },
+  modalAiTag: {
+    fontSize: 11,
+    fontWeight: "600",
+    color: colors.textMuted,
+    marginBottom: 12,
+  },
+  modalFeaturesRow: {
+    flexDirection: "row",
+    gap: 16,
+    marginBottom: 10,
+  },
+  modalFeatureItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+  },
+  modalFeatureText: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: colors.text,
+  },
+  modalBadgesLine: {
+    gap: 4,
+  },
+  modalBadgeText: {
+    fontSize: 12,
+    color: colors.textSecondary,
+    fontWeight: "500",
+  },
+  modalSeeDetailsBtn: {
+    width: "100%",
+    paddingVertical: 14,
+    borderRadius: 24,
+    borderWidth: 1,
+    borderColor: colors.border,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: colors.surface,
+  },
+  modalSeeDetailsText: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: colors.text,
   },
 });

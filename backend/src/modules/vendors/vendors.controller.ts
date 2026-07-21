@@ -5,6 +5,8 @@ import OTP from "../../database/models/OTP";
 import { sendEmail, generateOTP, getOTPEmailHtml } from "../../services/email.service";
 import type { AuthRequest } from "../../middleware/auth.middleware";
 import { ZonesService } from "../zones/zones.service";
+import { PaymentService } from "../payments/payment.service";
+import VendorPayout, { VendorPayoutStatus } from "../../database/models/VendorPayout";
 
 export const forgotVendorPassword = async (req: Request, res: Response) => {
   try {
@@ -105,10 +107,25 @@ export const getNearbyVendors = async (req: Request, res: Response) => {
       return res.json([]);
     }
 
-    const radiusInMeters = radius ? Math.max(1000, Number(radius) || 0) : 20000000;
+    const maxDefaultRadius = 15000; // 15 km max default radius
+    const radiusInMeters = radius ? Math.max(1000, Number(radius) || 0) : maxDefaultRadius;
     const skip = (Number(page) - 1) * Number(limit);
 
     console.log(`[API] Fetching nearby vendors - Lat: ${userLat}, Lng: ${userLng}, Page: ${page} (Zone: ${activeZone.name})`);
+
+    // Build spatial match query enforcing active zone boundaries
+    const geoQuery: any = { partnerType: { $ne: "meat" } };
+    if (activeZone.type === "polygon" && activeZone.boundary) {
+      geoQuery.location = {
+        $geoWithin: {
+          $geometry: activeZone.boundary
+        }
+      };
+    }
+
+    const maxDist = activeZone.type === "circle" && activeZone.radius 
+      ? Math.min(radiusInMeters, activeZone.radius) 
+      : radiusInMeters;
 
     // MongoDB Proximity Query with Pagination
     const vendors = await Vendor.aggregate([
@@ -119,10 +136,10 @@ export const getNearbyVendors = async (req: Request, res: Response) => {
             coordinates: [userLng, userLat],
           },
           distanceField: "distance",
-          ...(radiusInMeters ? { maxDistance: radiusInMeters } : {}),
+          maxDistance: maxDist,
           spherical: true,
           key: "location",
-          query: { partnerType: { $ne: "meat" } },
+          query: geoQuery,
         },
       },
       { $skip: skip },
@@ -671,6 +688,82 @@ export const deleteVendor = async (req: Request, res: Response) => {
     res.json({ message: "Vendor deleted successfully" });
   } catch (error) {
     console.error("Error deleting vendor:", error);
+    res.status(500).json({ message: "Internal server error" });
+  }
+};
+
+const paymentService = new PaymentService();
+
+export const requestVendorPayout = async (req: AuthRequest, res: Response) => {
+  try {
+    const { amount } = req.body;
+
+    const vendor = await Vendor.findById(req.user?.userId);
+    if (!vendor) {
+      return res.status(404).json({ message: "Vendor account not found" });
+    }
+
+    if (!vendor.legal?.bankAccount || !vendor.legal?.ifsc) {
+      return res.status(400).json({ message: "Verified bank account details are required before requesting payout" });
+    }
+
+    const payoutAmount = Number(amount);
+    if (isNaN(payoutAmount) || payoutAmount < 100) {
+      return res.status(400).json({ message: "Minimum payout amount is Rs.100" });
+    }
+
+    // Create payout record
+    const payoutRecord = new VendorPayout({
+      vendor: vendor._id,
+      amount: payoutAmount,
+      status: VendorPayoutStatus.PENDING,
+    });
+    await payoutRecord.save();
+
+    try {
+      // Trigger Razorpay payout
+      const result = await paymentService.createVendorPayout({
+        name: vendor.name || vendor.owner?.name || "Vendor Partner",
+        phone: vendor.phone || vendor.owner?.phone || "0000000000",
+        email: vendor.email || vendor.owner?.email,
+        accountNumber: vendor.legal.bankAccount,
+        ifsc: vendor.legal.ifsc,
+        amount: payoutAmount,
+        notes: {
+          vendorId: vendor._id.toString(),
+          payoutRecordId: payoutRecord._id.toString(),
+        },
+      });
+
+      // Update payout record status based on result
+      payoutRecord.status = result.payout.status === "processed" ? VendorPayoutStatus.PROCESSED : VendorPayoutStatus.PROCESSING;
+      payoutRecord.razorpayContactId = result.contact.id;
+      payoutRecord.razorpayFundAccountId = result.fundAccount.id;
+      payoutRecord.razorpayPayoutId = result.payout.id;
+      await payoutRecord.save();
+
+      return res.json({
+        message: "Payout request processed successfully",
+        payout: {
+          id: payoutRecord._id,
+          razorpayPayoutId: payoutRecord.razorpayPayoutId,
+          amount: payoutRecord.amount,
+          status: payoutRecord.status,
+        },
+      });
+    } catch (apiError: any) {
+      // Mark payout record as FAILED
+      payoutRecord.status = VendorPayoutStatus.FAILED;
+      payoutRecord.failureReason = apiError.message || "Razorpay API error";
+      await payoutRecord.save();
+
+      return res.status(500).json({
+        message: "Failed to initiate Razorpay payout transfer",
+        error: apiError.message,
+      });
+    }
+  } catch (error: any) {
+    console.error("Vendor payout request error:", error);
     res.status(500).json({ message: "Internal server error" });
   }
 };

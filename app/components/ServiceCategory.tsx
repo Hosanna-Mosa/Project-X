@@ -27,11 +27,7 @@ export function ServiceCategory({
   const colors = Colors[theme];
   const styles = React.useMemo(() => createStyles(colors), [theme]);
 
-  // Active icon is white (light mode) or background color (dark mode).
-  // Inactive icon is primary color.
-  const iconColor = active 
-    ? (theme === "light" ? "#ffffff" : colors.background)
-    : (color || colors.primary);
+  const iconColor = color || colors.primary;
   
   return (
     <TouchableOpacity style={styles.container} onPress={onPress} activeOpacity={0.75}>
@@ -84,9 +80,9 @@ const createStyles = (colors: typeof Colors.light) => StyleSheet.create({
     shadowOpacity: 0.04,
   },
   iconBoxActive: {
-    backgroundColor: colors.primary,
-    borderColor: colors.primary,
-    shadowOpacity: 0.12,
+    backgroundColor: colors.surface,
+    borderColor: colors.borderLight,
+    shadowOpacity: 0.04,
   },
   iconImage: {
     width: 32,

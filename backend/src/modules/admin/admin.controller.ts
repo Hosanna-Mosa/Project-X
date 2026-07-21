@@ -147,7 +147,7 @@ export class AdminController {
         const destination = o.stops?.[o.stops.length - 1]?.address || "Bay Area Logistics Hub";
         const driverName = (o.driver as any)?.user?.name || "Awaiting assignment...";
         return {
-          id: o._id.startsWith("ORD-") ? o._id : `#${o._id.substring(o._id.length - 6).toUpperCase()}`,
+          id: o._id.startsWith("FLR-") || o._id.startsWith("ORD-") ? o._id : `#${o._id.substring(o._id.length - 6).toUpperCase()}`,
           dest: destination,
           driver: driverName,
           eta: "14:45 PM",
@@ -339,7 +339,7 @@ export class AdminController {
       }).sort({ createdAt: -1 });
 
       const payments = orders.map(o => ({
-        id: o._id.startsWith("ORD-") ? o._id.replace("ORD-", "TXN-") : `#TXN-${o._id.substring(o._id.length - 6).toUpperCase()}`,
+        id: o._id.startsWith("FLR-") ? o._id.replace("FLR-", "TXN-") : o._id.startsWith("ORD-") ? o._id.replace("ORD-", "TXN-") : `#TXN-${o._id.substring(o._id.length - 6).toUpperCase()}`,
         date: new Date(o.createdAt).toLocaleDateString([], { month: "short", day: "numeric", year: "numeric" }),
         time: new Date(o.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
         route: o.stops && o.stops.length > 1 ? `${o.stops[0].address || "Pickup"} → ${o.stops[o.stops.length - 1].address || "Dropoff"}` : "Local Delivery",
@@ -542,7 +542,12 @@ export class AdminController {
         location: { type: "Point", coordinates: [81.8040 + parsedStopsCount*0.01, 17.0005 + parsedStopsCount*0.01] }
       });
 
-      const orderId = `ORD-${Date.now().toString().slice(-6)}${Math.floor(10 + Math.random() * 90)}`;
+      const now = new Date();
+      const year = String(now.getFullYear()).slice(-2);
+      const month = String(now.getMonth() + 1).padStart(2, '0');
+      const day = String(now.getDate()).padStart(2, '0');
+      const random4Digits = Math.floor(1000 + Math.random() * 9000).toString();
+      const orderId = `FLR-${year}${month}${day}-${random4Digits}`;
       const order = new Order({
         _id: orderId,
         user: customer?._id,
@@ -792,8 +797,21 @@ export class AdminController {
 
   async seedDevDrivers(req: Request, res: Response) {
     try {
-      // 1. Clean existing check users/drivers
-      const devUsers = await User.find({ name: /^check/i });
+      // 1. Clean existing check users/drivers (robust check by name, email, or phone)
+      const checkEmails = [];
+      const checkPhones = [];
+      for (let i = 1; i <= 10; i++) {
+        checkEmails.push(`check${i}@example.com`);
+        checkPhones.push(`+999999000${i}`);
+      }
+
+      const devUsers = await User.find({
+        $or: [
+          { name: /^check/i },
+          { email: { $in: checkEmails } },
+          { phone: { $in: checkPhones } }
+        ]
+      });
       const devUserIds = devUsers.map((u) => u._id);
       await Driver.deleteMany({ user: { $in: devUserIds } });
       await User.deleteMany({ _id: { $in: devUserIds } });

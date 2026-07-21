@@ -42,4 +42,18 @@ router.post(
   onboardingController.complete.bind(onboardingController)
 );
 
+router.get(
+  "/digilocker/auth-url",
+  authenticateToken,
+  authorizeRole([UserRole.DRIVER]),
+  onboardingController.getDigilockerAuthUrl.bind(onboardingController)
+);
+
+router.post(
+  "/verify-digilocker",
+  authenticateToken,
+  authorizeRole([UserRole.DRIVER]),
+  onboardingController.verifyDigilocker.bind(onboardingController)
+);
+
 export default router;
