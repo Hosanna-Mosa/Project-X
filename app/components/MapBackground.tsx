@@ -3,13 +3,13 @@ import { StyleSheet, View, Platform, ViewStyle, Text, TouchableOpacity, Image } 
 import MapView, { PROVIDER_GOOGLE, Region, MapType, Marker, Polyline, Circle } from 'react-native-maps';
 import * as Location from 'expo-location';
 import { Feather, MaterialCommunityIcons } from '@expo/vector-icons';
-import { DeliveryStop } from '@/contexts/deliveryStore';
+import { DeliveryStop, useDeliveryStore } from '@/contexts/deliveryStore';
 import Colors from '@/constants/colors';
 import { customFetch } from '@/utils/api/custom-fetch';
 
 const DRIVER_MARKER_IMAGE = require('@/assets/images/driver-marker.png');
-const VEHICLE_BIKE_3D = require('@/assets/images/services/scooter_blue_transparent.png');
-const VEHICLE_AUTO_3D = require('@/assets/images/services/auto.png');
+const VEHICLE_BIKE_3D = require('@/assets/images/services/scooter_blue_transparent_resized.png');
+const VEHICLE_AUTO_3D = require('@/assets/images/services/auto_resized.png');
 const VEHICLE_CAB_3D = require('@/assets/images/services/cab.png');
 
 interface Props {
@@ -62,6 +62,7 @@ export const MapBackground = forwardRef<MapBackgroundRef, Props>(({
 }, ref) => {
   const [region, setRegion] = useState<Region>(initialRegion || FALLBACK_REGION);
   const [autoRoutePolyline, setAutoRoutePolyline] = useState<string | null>(null);
+  const selectedService = useDeliveryStore((state) => state.serviceType);
 
   const handleZoom = (factor: number) => {
     if (!internalMapRef.current || !region) return;
@@ -356,10 +357,23 @@ export const MapBackground = forwardRef<MapBackgroundRef, Props>(({
         {driverMarkers.map((driver) => {
           const vehicleType = (driver.vehicleType || driver.vehicle || "bike").toLowerCase();
           
-          // Disable auto & car/cab markers for now as requested
-          if (vehicleType.includes("auto") || vehicleType.includes("rickshaw") || vehicleType.includes("car") || vehicleType.includes("cab") || vehicleType.includes("prime")) {
+          // Disable car/cab markers for now
+          if (vehicleType.includes("car") || vehicleType.includes("cab") || vehicleType.includes("prime")) {
             return null;
           }
+
+          const isAutoVehicle = vehicleType.includes("auto") || vehicleType.includes("rickshaw");
+          const isAutoService = selectedService === "auto";
+
+          // If selected service is auto, only show auto drivers.
+          // For all other cases (bike/default), show only scooty drivers.
+          if (isAutoService) {
+            if (!isAutoVehicle) return null;
+          } else {
+            if (isAutoVehicle) return null;
+          }
+
+          let markerImage = isAutoVehicle ? VEHICLE_AUTO_3D : VEHICLE_BIKE_3D;
 
           return (
             <Marker
@@ -367,17 +381,9 @@ export const MapBackground = forwardRef<MapBackgroundRef, Props>(({
               coordinate={{ latitude: Number(driver.lat), longitude: Number(driver.lng) }}
               anchor={{ x: 0.5, y: 0.5 }}
               title={driver.name || "Driver"}
-              tracksViewChanges={true}
-            >
-              <View style={styles.scooterMarkerContainer} collapsable={false}>
-                <Image
-                  source={VEHICLE_BIKE_3D}
-                  style={styles.scooterMarkerImage}
-                  resizeMode="contain"
-                  fadeDuration={0}
-                />
-              </View>
-            </Marker>
+              image={markerImage}
+              tracksViewChanges={false}
+            />
           );
         })}
 
@@ -586,16 +592,16 @@ const styles = StyleSheet.create({
     overflow: 'visible',
   },
   scooterMarkerContainer: {
-    width: 42,
-    height: 42,
+    width: 75,
+    height: 75,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: 'transparent',
     overflow: 'visible',
   },
   scooterMarkerImage: {
-    width: 42,
-    height: 42,
+    width: 75,
+    height: 75,
     backgroundColor: 'transparent',
   },
   zoomControlsContainer: {
