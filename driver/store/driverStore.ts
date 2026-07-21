@@ -269,7 +269,9 @@ export const useDriverStore = create<DriverState>()(
             const serviceType = data.serviceType?.toLowerCase();
             const activeServices = get().activeServices || [];
 
-            const isRide = ["bike", "auto", "cab", "cab_prime"].includes(serviceType);
+            Alert.alert("SOCKET RECEIVED", `type: ${serviceType}, active: ${JSON.stringify(activeServices)}`);
+
+            const isRide = ["bike", "auto", "cab", "cab_prime", "helper"].includes(serviceType);
             const isFood = ["delivery", "helper"].includes(serviceType);
 
             const matchesActiveServices = 
@@ -280,6 +282,7 @@ export const useDriverStore = create<DriverState>()(
               get().setIncomingOrder(data as Order);
             } else {
               console.log(`Filtering out incoming order ${data.id || data._id} of type ${serviceType}. Active services:`, activeServices);
+              Alert.alert("FILTERED OUT", `matchesActiveServices is false`);
             }
           });
           socketService.on("order_cancelled", (data: any) => {

@@ -107,8 +107,10 @@ export class DriverService {
               isAvailable: true,
               preferredZone: activeZone._id,
             };
-            if (vehicleType && ["bike", "auto", "car", "cab", "cab_prime"].includes(vehicleType)) {
-              query.vehicleType = vehicleType;
+            if (vehicleType && ["bike", "auto", "car", "cab", "cab_prime", "helper"].includes(vehicleType)) {
+              if (vehicleType !== "helper" && vehicleType !== "delivery") {
+                query.vehicleType = vehicleType;
+              }
             }
             const drivers = await Driver.find(query).populate("user");
             const driverMap = new Map(drivers.map((d: any) => [d._id.toString(), d]));
@@ -138,8 +140,11 @@ export class DriverService {
           },
         };
 
-        if (vehicleType && ["bike", "auto", "car", "cab", "cab_prime"].includes(vehicleType)) {
-          query.vehicleType = vehicleType;
+        if (vehicleType && ["bike", "auto", "car", "cab", "cab_prime", "helper"].includes(vehicleType)) {
+          // If it's a ride order, we MUST filter by vehicle type
+          if (vehicleType !== "helper" && vehicleType !== "delivery") {
+            query.vehicleType = vehicleType;
+          }
         }
 
         try {
@@ -157,8 +162,13 @@ export class DriverService {
           user: { $in: devUserIds },
           status: DriverStatus.ONLINE
         };
-        if (vehicleType && ["bike", "auto", "car", "cab", "cab_prime"].includes(vehicleType)) {
-          devDriversQuery.vehicleType = vehicleType;
+        if (vehicleType && ["bike", "auto", "car", "cab", "cab_prime", "helper"].includes(vehicleType)) {
+          if (vehicleType !== "helper" && vehicleType !== "delivery") {
+            devDriversQuery.vehicleType = vehicleType;
+          } else if (vehicleType === "helper") {
+            // Dev drivers CAN receive helper tasks during local testing
+            // We intentionally do not filter by vehicleType for helper
+          }
         }
         const devDrivers = await Driver.find(devDriversQuery).populate("user");
         for (const dd of devDrivers) {

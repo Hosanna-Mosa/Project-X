@@ -296,7 +296,10 @@ export class SocketManager {
         if (!authUser) return;
 
         try {
-          const order = await Order.findOne({ _id: orderId });
+          const query = mongoose.Types.ObjectId.isValid(orderId) 
+            ? { $or: [{ _id: orderId }, { _id: new mongoose.Types.ObjectId(orderId) }] }
+            : { _id: orderId };
+          const order = await Order.findOne(query as any);
           if (!order) {
             console.warn(`[SOCKET] Order ${orderId} not found for tracking`);
             return;
@@ -422,7 +425,10 @@ export class SocketManager {
             if (data.senderId && mongoose.Types.ObjectId.isValid(data.senderId)) {
               realSenderId = data.senderId;
             } else {
-              const orderDoc = await Order.findById(data.orderId);
+              const query = mongoose.Types.ObjectId.isValid(data.orderId) 
+                ? { $or: [{ _id: data.orderId }, { _id: new mongoose.Types.ObjectId(data.orderId) }] }
+                : { _id: data.orderId };
+              const orderDoc = await Order.findOne(query as any);
               if (orderDoc) {
                 if (from === "driver") {
                   if (orderDoc.driver) {

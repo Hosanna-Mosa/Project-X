@@ -1,6 +1,6 @@
 import React from "react";
-import { ActivityIndicator, Pressable, StyleSheet, Text, View } from "react-native";
-import { Feather } from "@expo/vector-icons";
+import { ActivityIndicator, Pressable, StyleSheet, Text, View, TouchableOpacity } from "react-native";
+import { Feather, MaterialCommunityIcons } from "@expo/vector-icons";
 import Colors from "@/constants/colors";
 
 export interface Hotspot {
@@ -22,7 +22,13 @@ interface HighDemandAreasProps {
 export function HighDemandAreas({ hotspots, isLoading = false, onAreaPress }: HighDemandAreasProps) {
   return (
     <View style={styles.section}>
-      <Text style={styles.sectionTitle}>High Demand Areas</Text>
+      <View style={styles.header}>
+        <Text style={styles.sectionTitle}>High Demand Areas</Text>
+        <TouchableOpacity style={styles.viewAllBtn}>
+          <Text style={styles.viewAllText}>View all</Text>
+          <Feather name="chevron-right" size={14} color={Colors.primary} />
+        </TouchableOpacity>
+      </View>
       <View style={styles.hotspotList}>
         {isLoading && (
           <View style={styles.loadingItem}>
@@ -35,7 +41,11 @@ export function HighDemandAreas({ hotspots, isLoading = false, onAreaPress }: Hi
             style={styles.hotspotItem}
             onPress={() => onAreaPress?.(spot)}
           >
-            <View style={styles.hotspotDot} />
+            <View style={styles.iconContainer}>
+              <View style={styles.iconCircle}>
+                <MaterialCommunityIcons name="map-marker" size={16} color={Colors.primary} />
+              </View>
+            </View>
             <View style={styles.hotspotCopy}>
               <Text style={styles.hotspotName} numberOfLines={1}>
                 {spot.name}
@@ -47,7 +57,7 @@ export function HighDemandAreas({ hotspots, isLoading = false, onAreaPress }: Hi
             <View style={styles.surgeChip}>
               <Text style={styles.surgeChipText}>{spot.surge}</Text>
             </View>
-            <Feather name="chevron-right" size={16} color={Colors.textMuted} />
+            <Feather name="chevron-right" size={20} color={Colors.textSecondary} />
           </Pressable>
         ))}
       </View>
@@ -59,38 +69,57 @@ const styles = StyleSheet.create({
   section: {
     marginTop: 4,
   },
-  sectionTitle: {
-    fontFamily: "Inter_600SemiBold",
-    fontSize: 13,
-    color: Colors.textSecondary,
-    textTransform: "uppercase",
-    letterSpacing: 0.05,
+  header: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
     marginBottom: 10,
   },
+  sectionTitle: {
+    fontFamily: "Inter_700Bold",
+    fontSize: 14,
+    color: Colors.text,
+  },
+  viewAllBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  viewAllText: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 13,
+    color: Colors.primary,
+  },
   hotspotList: {
-    gap: 8,
+    gap: 12,
   },
   hotspotItem: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 10,
+    gap: 12,
     backgroundColor: Colors.surface,
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    borderRadius: 10,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    borderRadius: 12,
     borderWidth: 1,
     borderColor: Colors.border,
   },
-  hotspotDot: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    backgroundColor: Colors.surge,
+  iconContainer: {
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  iconCircle: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#eefaff',
+    alignItems: "center",
+    justifyContent: "center",
   },
   hotspotName: {
-    fontFamily: "Inter_500Medium",
+    fontFamily: "Inter_700Bold",
     fontSize: 14,
     color: Colors.text,
+    marginBottom: 2,
   },
   hotspotCopy: {
     flex: 1,
@@ -98,15 +127,17 @@ const styles = StyleSheet.create({
   },
   hotspotAddress: {
     fontFamily: "Inter_400Regular",
-    fontSize: 11,
+    fontSize: 12,
     color: Colors.textMuted,
-    marginTop: 2,
   },
   surgeChip: {
-    backgroundColor: Colors.primaryLight,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 4,
+    backgroundColor: '#eefaff',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#d2ebff',
+    marginRight: 4,
   },
   surgeChipText: {
     fontFamily: "Inter_600SemiBold",

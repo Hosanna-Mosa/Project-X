@@ -16,6 +16,7 @@ import {
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
 import { router } from "expo-router";
+import { LinearGradient } from "expo-linear-gradient";
 
 import Colors from "@/constants/colors";
 import { StatusCard } from "@/components/StatusCard";
@@ -807,10 +808,15 @@ export default function ProfileScreen() {
 
   return (
     <SafeAreaView style={styles.safe} edges={["top"]}>
+      <LinearGradient
+        colors={["#E3F2FD", "#f8f9ff"]}
+        style={styles.headerGradient}
+      />
       <ScrollView
         style={styles.container}
         contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 104 }]}
         refreshControl={<RefreshControl refreshing={isRefreshing} onRefresh={() => loadProfile(true)} />}
+        showsVerticalScrollIndicator={false}
       >
         {isLoading ? (
           <View style={styles.loadingCard}>
@@ -829,34 +835,69 @@ export default function ProfileScreen() {
                 ) : (
                   <Text style={styles.avatarText}>{initials}</Text>
                 )}
+                <View style={styles.onlineDot} />
               </View>
               <Text style={styles.name}>{profile.account.name}</Text>
               <Text style={styles.memberSince}>Member since {formatMonthYear(profile.account.createdAt)}</Text>
               <View style={styles.ratingBadge}>
-                <Feather name="star" size={12} color={Colors.white} />
+                <Feather name="star" size={11} color={Colors.white} />
                 <Text style={styles.ratingText}>{profile.stats.rating.toFixed(1)}</Text>
               </View>
             </View>
 
-            <View style={styles.statsRow}>
-              <StatPill label="Trips" value={String(profile.stats.completedTrips)} />
-              <StatPill label="Acceptance" value={`${profile.stats.acceptanceRate}%`} />
-              <StatPill label="Status" value={profile.driver?.status || "New"} />
+            <View style={styles.statsCard}>
+              <View style={styles.statCol}>
+                <Text style={styles.statValueBold}>{profile.stats.completedTrips}</Text>
+                <Text style={styles.statLabelMuted}>Trips</Text>
+              </View>
+              <View style={styles.statDivider} />
+              <View style={styles.statCol}>
+                <Text style={styles.statValueBold}>{profile.stats.acceptanceRate}%</Text>
+                <Text style={styles.statLabelMuted}>Acceptance</Text>
+              </View>
+              <View style={styles.statDivider} />
+              <View style={styles.statCol}>
+                <Text style={styles.statValueBold}>{profile.driver?.status === "online" ? "ONLINE" : "OFFLINE"}</Text>
+                <Text style={styles.statLabelMuted}>Status</Text>
+              </View>
             </View>
 
-            <View style={styles.statusRow}>
-              <StatusCard title="Driving License" status={profile.verification.drivingLicense} />
-              <View style={{ width: 10 }} />
-              <StatusCard title="Vehicle Insurance" status={profile.vehicle.insuranceStatus} />
+            <View style={styles.docsRow}>
+              <View style={[styles.docCard, { backgroundColor: "#FFF4F4" }]}>
+                <View style={styles.docIconWrap}>
+                  <Feather name="file-text" size={24} color="#FF4B4B" />
+                </View>
+                <Text style={styles.docTitle}>Driving License</Text>
+                <View style={[styles.statusPill, { backgroundColor: "#FFD6D6" }]}>
+                  <Text style={[styles.statusPillText, { color: "#D11A1A" }]}>Expired</Text>
+                </View>
+              </View>
+
+              <View style={[styles.docCard, { backgroundColor: "#F0FFF4" }]}>
+                <View style={styles.docIconWrap}>
+                  <Feather name="shield" size={24} color="#2DB963" />
+                </View>
+                <Text style={styles.docTitle}>Vehicle Insurance</Text>
+                <View style={[styles.statusPill, { backgroundColor: "#D4F7DF" }]}>
+                  <Text style={[styles.statusPillText, { color: "#1D9F4E" }]}>Valid</Text>
+                </View>
+              </View>
             </View>
 
-            <VehicleCard
-              model={profile.vehicle.label}
-              plate={profile.driver?.dlNumber || "No license added"}
-              onPress={() => setActiveSection("vehicle")}
-            />
+            <Pressable style={styles.currentVehicleCard} onPress={() => setActiveSection("vehicle")}>
+              <View style={styles.vehicleIconBg}>
+                <Feather name="truck" size={18} color={Colors.text} />
+              </View>
+              <View style={styles.vehicleCopy}>
+                <Text style={styles.vehicleTitleSmall}>Current Vehicle</Text>
+                <Text style={styles.vehicleValue}>{profile.vehicle.label} • *********4567</Text>
+              </View>
+              <Feather name="chevron-right" size={18} color={Colors.textMuted} />
+            </Pressable>
 
-            <View style={styles.menuCard}>
+            <Text style={styles.sectionHeader}>Account</Text>
+
+            <View style={styles.menuList}>
               {sections.map((item) => (
                 <Pressable
                   key={item.key}
@@ -872,7 +913,7 @@ export default function ProfileScreen() {
                   }}
                 >
                   <View style={styles.menuIconContainer}>
-                    <Feather name={item.icon} size={18} color={Colors.primary} />
+                    <Feather name={item.icon} size={18} color="#7F56D9" />
                   </View>
                   <View style={styles.menuCopy}>
                     <Text style={styles.menuLabel}>{item.title}</Text>
@@ -883,11 +924,10 @@ export default function ProfileScreen() {
               ))}
             </View>
 
-            <Pressable
-              style={styles.signOutButton}
-              onPress={handleLogout}
-            >
-              <Text style={styles.signOutText}>Sign Out</Text>
+            <Pressable style={styles.signOutButtonWrap} onPress={handleLogout}>
+              <LinearGradient colors={["#7A5AF8", "#4C74FF"]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.signOutGradient}>
+                <Text style={styles.signOutText}>Sign Out</Text>
+              </LinearGradient>
             </Pressable>
 
             <Pressable
@@ -931,14 +971,7 @@ export default function ProfileScreen() {
 
 // ─── Sub-components ────────────────────────────────────────────────────────────
 
-function StatPill({ label, value }: { label: string; value: string }) {
-  return (
-    <View style={styles.statPill}>
-      <Text style={styles.statValue} numberOfLines={1}>{value}</Text>
-      <Text style={styles.statLabel}>{label}</Text>
-    </View>
-  );
-}
+
 
 function FieldRow({ label, value }: Field) {
   return (
@@ -1030,22 +1063,31 @@ function formatCoordinates(coordinates?: number[]) {
 const styles = StyleSheet.create({
   safe: {
     flex: 1,
-    backgroundColor: Colors.background,
+    backgroundColor: "#F8F9FF",
+  },
+  headerGradient: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 350,
   },
   container: {
     flex: 1,
   },
   content: {
-    padding: 16,
+    padding: 20,
+    paddingTop: 10,
     gap: 16,
   },
   loadingCard: {
     backgroundColor: Colors.surface,
-    borderRadius: 12,
+    borderRadius: 16,
     padding: 28,
     borderWidth: 1,
     borderColor: Colors.border,
     alignItems: "center",
+    marginTop: 20,
   },
   emptyText: {
     fontFamily: "Inter_500Medium",
@@ -1053,133 +1095,214 @@ const styles = StyleSheet.create({
   },
   header: {
     alignItems: "center",
-    paddingVertical: 16,
+    paddingTop: 10,
+    paddingBottom: 2,
   },
   avatarWrap: {
-    width: 88,
-    height: 88,
-    borderRadius: 44,
-    backgroundColor: Colors.primaryLight,
+    width: 90,
+    height: 90,
+    borderRadius: 45,
+    backgroundColor: "#DCE5F2",
     borderWidth: 3,
-    borderColor: Colors.primary,
+    borderColor: "#A9C9FF",
     alignItems: "center",
     justifyContent: "center",
     marginBottom: 12,
   },
   avatarImage: {
-    width: 82,
-    height: 82,
-    borderRadius: 41,
+    width: 84,
+    height: 84,
+    borderRadius: 42,
   },
   avatarText: {
     fontFamily: "Inter_700Bold",
     fontSize: 30,
     color: Colors.primary,
   },
+  onlineDot: {
+    position: "absolute",
+    bottom: 2,
+    right: 2,
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    backgroundColor: "#2DB963",
+    borderWidth: 2,
+    borderColor: Colors.white,
+  },
   name: {
     fontFamily: "Inter_700Bold",
-    fontSize: 20,
+    fontSize: 22,
     color: Colors.text,
     marginBottom: 4,
   },
   memberSince: {
-    fontFamily: "Inter_400Regular",
+    fontFamily: "Inter_500Medium",
     fontSize: 13,
-    color: Colors.textMuted,
+    color: Colors.textSecondary,
   },
   ratingBadge: {
     flexDirection: "row",
     alignItems: "center",
     gap: 4,
-    backgroundColor: Colors.primary,
-    paddingHorizontal: 9,
-    paddingVertical: 4,
-    borderRadius: 10,
-    marginTop: 8,
+    backgroundColor: "#4C74FF",
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+    borderRadius: 8,
+    marginTop: 10,
   },
   ratingText: {
     fontFamily: "Inter_700Bold",
-    fontSize: 12,
+    fontSize: 13,
     color: Colors.white,
   },
-  statsRow: {
+  statsCard: {
     flexDirection: "row",
-    gap: 10,
+    backgroundColor: Colors.white,
+    borderRadius: 16,
+    paddingVertical: 20,
+    marginTop: 8,
+    shadowColor: "rgba(0,0,0,0.05)",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 1,
+    shadowRadius: 10,
+    elevation: 2,
   },
-  statPill: {
+  statCol: {
     flex: 1,
-    backgroundColor: Colors.surface,
-    borderRadius: 12,
-    padding: 12,
-    borderWidth: 1,
-    borderColor: Colors.border,
     alignItems: "center",
   },
-  statValue: {
-    fontFamily: "Inter_700Bold",
-    fontSize: 18,
-    color: Colors.text,
-    marginBottom: 2,
+  statDivider: {
+    width: 1,
+    backgroundColor: Colors.border,
   },
-  statLabel: {
+  statValueBold: {
+    fontFamily: "Inter_700Bold",
+    fontSize: 16,
+    color: Colors.text,
+    marginBottom: 4,
+  },
+  statLabelMuted: {
     fontFamily: "Inter_500Medium",
     fontSize: 11,
     color: Colors.textMuted,
   },
-  statusRow: {
+  docsRow: {
     flexDirection: "row",
+    gap: 12,
   },
-  menuCard: {
-    backgroundColor: Colors.surface,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    overflow: "hidden",
+  docCard: {
+    flex: 1,
+    borderRadius: 16,
+    padding: 16,
+    alignItems: "center",
+  },
+  docIconWrap: {
+    marginBottom: 10,
+  },
+  docTitle: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 13,
+    color: Colors.text,
+    textAlign: "center",
+    marginBottom: 12,
+  },
+  statusPill: {
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderRadius: 6,
+  },
+  statusPillText: {
+    fontFamily: "Inter_700Bold",
+    fontSize: 11,
+  },
+  currentVehicleCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: Colors.white,
+    padding: 16,
+    borderRadius: 16,
+    shadowColor: "rgba(0,0,0,0.03)",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 1,
+    shadowRadius: 8,
+    elevation: 1,
+  },
+  vehicleIconBg: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: "#F1F3F5",
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: 14,
+  },
+  vehicleCopy: {
+    flex: 1,
+  },
+  vehicleTitleSmall: {
+    fontFamily: "Inter_500Medium",
+    fontSize: 12,
+    color: Colors.textMuted,
+    marginBottom: 4,
+  },
+  vehicleValue: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 14,
+    color: Colors.text,
+  },
+  sectionHeader: {
+    fontFamily: "Inter_700Bold",
+    fontSize: 16,
+    color: Colors.text,
+    marginTop: 8,
+    marginBottom: -4,
+  },
+  menuList: {
+    gap: 8,
   },
   menuItem: {
     flexDirection: "row",
     alignItems: "center",
-    paddingVertical: 14,
-    paddingHorizontal: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
+    paddingVertical: 12,
   },
   menuIconContainer: {
-    width: 36,
-    height: 36,
-    borderRadius: 10,
-    backgroundColor: Colors.surfaceContainerLow,
+    width: 44,
+    height: 44,
+    borderRadius: 12,
+    backgroundColor: "#F2F0FF",
     alignItems: "center",
     justifyContent: "center",
-    marginRight: 12,
+    marginRight: 16,
   },
   menuCopy: {
     flex: 1,
-    minWidth: 0,
   },
   menuLabel: {
     fontFamily: "Inter_600SemiBold",
     fontSize: 15,
     color: Colors.text,
+    marginBottom: 4,
   },
   menuSubtitle: {
-    fontFamily: "Inter_400Regular",
-    fontSize: 11,
+    fontFamily: "Inter_500Medium",
+    fontSize: 12,
     color: Colors.textMuted,
-    marginTop: 2,
   },
-  signOutButton: {
-    borderRadius: 12,
-    borderWidth: 1.5,
-    borderColor: Colors.error,
-    paddingVertical: 14,
+  signOutButtonWrap: {
+    marginTop: 16,
+    borderRadius: 16,
+    overflow: "hidden",
+  },
+  signOutGradient: {
+    paddingVertical: 18,
     alignItems: "center",
-    marginTop: 8,
+    justifyContent: "center",
   },
   signOutText: {
-    fontFamily: "Inter_600SemiBold",
-    fontSize: 15,
-    color: Colors.error,
+    fontFamily: "Inter_700Bold",
+    fontSize: 16,
+    color: Colors.white,
   },
   devButton: {
     flexDirection: "row",
@@ -1207,15 +1330,14 @@ const styles = StyleSheet.create({
   modalOverlay: {
     flex: 1,
     backgroundColor: "rgba(0,0,0,0.35)",
-    justifyContent: "center",
-    padding: 18,
+    justifyContent: "flex-end",
   },
   modalCard: {
-    maxHeight: "78%",
+    maxHeight: "85%",
     backgroundColor: Colors.surface,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: Colors.border,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    paddingBottom: 30,
     overflow: "hidden",
   },
   modalHeader: {
