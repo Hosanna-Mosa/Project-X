@@ -216,68 +216,88 @@ export default function HomeScreen() {
   const [isSearchActive, setIsSearchActive] = useState(false);
   const [recentSearches, setRecentSearches] = useState<string[]>([]);
 
-  const [middleText, setMiddleText] = useState("Christmas");
-  const letterAnimations = useRef(
-    Array.from({ length: 20 }, () => new Animated.Value(1))
-  ).current;
+  const getInitialWord = () => {
+    const today = new Date();
+    const days = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+    return days[today.getDay()];
+  };
 
-  const [colorOffset, setColorOffset] = useState(0);
+  const [displayText, setDisplayText] = useState(getInitialWord());
+  const [isFestival, setIsFestival] = useState(false);
+  const [cursorVisible, setCursorVisible] = useState(true);
 
   useEffect(() => {
-    const colorInterval = setInterval(() => {
-      setColorOffset((prev) => (prev + 1) % GRADIENT_COLORS.length);
-    }, 250);
-    return () => clearInterval(colorInterval);
+    const cursorInterval = setInterval(() => {
+      setCursorVisible((prev) => !prev);
+    }, 550);
+    return () => clearInterval(cursorInterval);
   }, []);
 
-  const middleTextRef = useRef(middleText);
   useEffect(() => {
-    middleTextRef.current = middleText;
-  }, [middleText]);
+    let active = true;
+    let timeoutId: any;
 
-  useEffect(() => {
-    let showChristmas = true;
-    const interval = setInterval(() => {
-      const currentWord = middleTextRef.current;
-      const fadeOutAnimations = Array.from({ length: currentWord.length }, (_, i) => {
-        return Animated.timing(letterAnimations[i], {
-          toValue: 0,
-          duration: 150,
-          useNativeDriver: false,
+    const runTypewriter = async () => {
+      const today = new Date();
+      const days = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+      const dayName = days[today.getDay()];
+
+      const month = String(today.getMonth() + 1).padStart(2, "0");
+      const date = String(today.getDate()).padStart(2, "0");
+      const key = `${month}-${date}`;
+      const festivalName = FESTIVALS[key] || "Christmas";
+
+      let currentWord = dayName;
+      let nextIsFestival = true;
+
+      // Typewriter loop
+      while (active) {
+        // Wait 4 seconds
+        await new Promise((resolve) => {
+          timeoutId = setTimeout(resolve, 4000);
         });
-      });
+        if (!active) break;
 
-      Animated.stagger(30, fadeOutAnimations).start(() => {
-        let nextWord = "";
-        if (showChristmas) {
-          const today = new Date();
-          const days = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
-          nextWord = days[today.getDay()];
-        } else {
-          nextWord = "Christmas";
-        }
-        showChristmas = !showChristmas;
-        setMiddleText(nextWord);
-
-        for (let i = 0; i < nextWord.length; i++) {
-          letterAnimations[i].setValue(0);
-        }
-
-        const fadeInAnimations = Array.from({ length: nextWord.length }, (_, i) => {
-          return Animated.timing(letterAnimations[i], {
-            toValue: 1,
-            duration: 180,
-            useNativeDriver: false,
+        // 1. Backspace (erase) current word in chunks of 2 characters
+        for (let i = currentWord.length; i >= 0; i -= 2) {
+          if (!active) break;
+          setDisplayText(currentWord.slice(0, i));
+          await new Promise((resolve) => {
+            timeoutId = setTimeout(resolve, 10);
           });
-        });
+        }
+        if (!active) break;
+        setDisplayText(""); // Ensure completely erased
 
-        Animated.stagger(40, fadeInAnimations).start();
-      });
-    }, 3000);
+        // Swap target word and toggle festival flag
+        const nextWord = nextIsFestival ? festivalName : dayName;
+        setIsFestival(nextIsFestival);
+        nextIsFestival = !nextIsFestival;
+        currentWord = nextWord;
 
-    return () => clearInterval(interval);
+        // 2. Type (write) new word in chunks of 2 characters
+        for (let i = 0; i <= currentWord.length; i += 2) {
+          if (!active) break;
+          const sliceEnd = Math.min(i, currentWord.length);
+          setDisplayText(currentWord.slice(0, sliceEnd));
+          await new Promise((resolve) => {
+            timeoutId = setTimeout(resolve, 15);
+          });
+        }
+        if (!active) break;
+        setDisplayText(currentWord); // Ensure fully typed
+        if (!active) break;
+      }
+    };
+
+    runTypewriter();
+
+    return () => {
+      active = false;
+      clearTimeout(timeoutId);
+    };
   }, []);
-  
+
   const screenWidth = Dimensions.get('window').width;
   const carouselRef = useRef<ScrollView>(null);
   const bannerScrollX = useRef(new Animated.Value(0)).current;
@@ -498,7 +518,7 @@ export default function HomeScreen() {
           let loc = null;
           try {
             const locPromise = Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
-            const timeoutPromise = new Promise<any>((_, reject) => 
+            const timeoutPromise = new Promise<any>((_, reject) =>
               setTimeout(() => reject(new Error("Location fetch timeout")), 8000)
             );
             loc = await Promise.race([locPromise, timeoutPromise]);
@@ -672,18 +692,18 @@ export default function HomeScreen() {
           // Add a 5 second timeout so we don't hang on skeletons forever
           const fetchPromise = Promise.all([
             checkNearbyDrivers(lat, lng),
-            activeService === 'Meat' 
-              ? fetchMeatCenters(lat, lng, 1) 
+            activeService === 'Meat'
+              ? fetchMeatCenters(lat, lng, 1)
               : Promise.all([
-                  fetchVendors(lat, lng, 1),
-                  fetch149StoreItems(lat, lng)
-                ])
+                fetchVendors(lat, lng, 1),
+                fetch149StoreItems(lat, lng)
+              ])
           ]);
-          
+
           const timeoutPromise = new Promise((_, reject) => {
             setTimeout(() => reject(new Error("Timeout after 15 seconds")), 15000);
           });
-          
+
           await Promise.race([fetchPromise, timeoutPromise]);
         } catch (e) {
           console.warn("Home Screen: Initial fetches timed out or failed (likely slow dev server):", e);
@@ -692,7 +712,7 @@ export default function HomeScreen() {
           setLoading(false);
           setLoadingDrivers(false);
         }
-        
+
         // Cache the coordinates and service in the shared store
         useHomeStore.setState({
           lastFetchedCoords: { lat, lng },
@@ -788,8 +808,8 @@ export default function HomeScreen() {
           alignItems: 'center', justifyContent: 'center',
           shadowColor: '#7C3AED', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.15, shadowRadius: 8, elevation: 4
         }}>
-          {iconFamily === 'MaterialCommunityIcons' ? 
-            <MaterialCommunityIcons name={icon} size={26} color="#6D28D9" /> : 
+          {iconFamily === 'MaterialCommunityIcons' ?
+            <MaterialCommunityIcons name={icon} size={26} color="#6D28D9" /> :
             <Ionicons name={icon} size={26} color="#6D28D9" />
           }
         </View>
@@ -827,15 +847,15 @@ export default function HomeScreen() {
     return (
       <View style={{ width: 160, backgroundColor: '#fff', borderRadius: 16, padding: 8, marginRight: 12, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, elevation: 2 }}>
         <View style={{ position: 'relative' }}>
-          <Image 
-            source={{ uri: item.images && item.images.length > 0 ? item.images[0] : "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=400" }} 
-            style={{ width: '100%', height: 120, borderRadius: 12 }} 
+          <Image
+            source={{ uri: item.images && item.images.length > 0 ? item.images[0] : "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=400" }}
+            style={{ width: '100%', height: 120, borderRadius: 12 }}
           />
           {/* Veg icon */}
           <View style={{ position: 'absolute', top: 8, left: 8, backgroundColor: '#fff', padding: 2, borderRadius: 4 }}>
-             <View style={{ borderWidth: 1, borderColor: item.isVeg ? '#16A34A' : '#E11D48', padding: 2, borderRadius: 2 }}>
-               <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: item.isVeg ? '#16A34A' : '#E11D48' }} />
-             </View>
+            <View style={{ borderWidth: 1, borderColor: item.isVeg ? '#16A34A' : '#E11D48', padding: 2, borderRadius: 2 }}>
+              <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: item.isVeg ? '#16A34A' : '#E11D48' }} />
+            </View>
           </View>
           {/* Rating */}
           <View style={{ position: 'absolute', top: 8, right: 8, backgroundColor: '#fff', flexDirection: 'row', alignItems: 'center', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 10 }}>
@@ -862,7 +882,7 @@ export default function HomeScreen() {
             )}
           </View>
         </View>
-        
+
         <View style={{ marginTop: 20 }}>
           <Text style={{ fontSize: 13, fontWeight: '700', color: '#111827' }} numberOfLines={1}>{item.name}</Text>
           <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4 }}>
@@ -934,7 +954,7 @@ export default function HomeScreen() {
                 </View>
               </Animated.View>
             </LinearGradient>
-            
+
             {/* TASK BANNER */}
             <LinearGradient
               colors={['#0F766E', '#042F2E']}
@@ -998,9 +1018,9 @@ export default function HomeScreen() {
                 extrapolate: 'clamp'
               });
               return (
-                <Animated.View 
-                  key={i} 
-                  style={{ width, height: 6, borderRadius: 3, backgroundColor }} 
+                <Animated.View
+                  key={i}
+                  style={{ width, height: 6, borderRadius: 3, backgroundColor }}
                 />
               );
             })}
@@ -1014,13 +1034,10 @@ export default function HomeScreen() {
               </Text>
               <Ionicons name="chevron-down" size={16} color="#fff" style={{ marginLeft: 4 }} />
             </TouchableOpacity>
-            
+
             <View style={{ flexDirection: 'row', gap: 20, alignItems: 'center' }}>
-              <TouchableOpacity onPress={() => setIsDistanceSheetOpen(true)} style={{ position: 'relative' }}>
+              <TouchableOpacity onPress={() => setIsDistanceSheetOpen(true)}>
                 <MaterialCommunityIcons name="radius-outline" size={26} color="#fff" style={{ textShadowColor: 'rgba(0,0,0,0.3)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2 }} />
-                <View style={{ position: 'absolute', top: -4, right: -4, backgroundColor: '#EF4444', borderRadius: 10, width: 16, height: 16, alignItems: 'center', justifyContent: 'center' }}>
-                  <Text style={{ color: '#fff', fontSize: 10, fontWeight: 'bold' }}>3</Text>
-                </View>
               </TouchableOpacity>
               <TouchableOpacity onPress={() => router.push("/(tabs)/profile")}>
                 <Ionicons name="person-outline" size={26} color="#fff" style={{ textShadowColor: 'rgba(0,0,0,0.3)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2 }} />
@@ -1032,7 +1049,7 @@ export default function HomeScreen() {
 
         {/* Floating Search Bar */}
         <View style={{ paddingHorizontal: 16, marginTop: -25, zIndex: 10 }}>
-          <TouchableOpacity 
+          <TouchableOpacity
             style={{ backgroundColor: '#fff', borderRadius: 30, flexDirection: 'row', alignItems: 'center', padding: 8, paddingLeft: 20, shadowColor: '#000', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.1, shadowRadius: 15, elevation: 8 }}
             activeOpacity={0.9}
             onPress={() => setIsSearchActive(true)}
@@ -1059,28 +1076,17 @@ export default function HomeScreen() {
         <View style={{ paddingHorizontal: 16 }}>
           <Text numberOfLines={1} adjustsFontSizeToFit style={{ fontSize: 22, fontWeight: 'bold', color: '#111827' }}>
             Happy{" "}
-            {middleText.split("").map((char, index) => {
-              const color = GRADIENT_COLORS[(index + colorOffset) % GRADIENT_COLORS.length];
-              return (
-                <Animated.Text
-                  key={index}
-                  style={{
-                    color: color,
-                    opacity: letterAnimations[index] || 1,
-                    transform: [
-                      {
-                        translateY: (letterAnimations[index] || new Animated.Value(1)).interpolate({
-                          inputRange: [0, 1],
-                          outputRange: [6, 0],
-                        }),
-                      },
-                    ],
-                  }}
-                >
-                  {char}
-                </Animated.Text>
-              );
-            })}
+            <Text
+              style={{
+                color: "#111827",
+                fontStyle: isFestival ? "italic" : "normal",
+                fontFamily: isFestival ? (Platform.OS === "ios" ? "Georgia" : "serif") : undefined,
+                fontWeight: isFestival ? "900" : "bold",
+              }}
+            >
+              {displayText}
+            </Text>
+            <Text style={{ color: "#7C3AED", fontWeight: "bold", opacity: cursorVisible ? 1 : 0 }}>|</Text>
             , {userName}! 👋
           </Text>
         </View>
@@ -1322,20 +1328,20 @@ export default function HomeScreen() {
           <View>
             {showCategories && activeService === 'Food' && visibleItems.length > 0 && (
               <View style={{ margin: 16, borderRadius: 20, overflow: 'hidden', backgroundColor: '#F3E8FF', padding: 20, flexDirection: 'row', alignItems: 'center' }}>
-                 <View style={{ flex: 1, zIndex: 10 }}>
-                   <Text style={{ color: '#7C3AED', fontWeight: '700', fontSize: 13 }}>Hot & Delicious</Text>
-                   <Text style={{ color: '#111827', fontWeight: '900', fontSize: 20, marginTop: 4 }}>Biryani Special</Text>
-                   <Text style={{ color: '#6D28D9', fontWeight: '600', fontSize: 13, marginTop: 4 }}>Up to 40% OFF</Text>
-                   <TouchableOpacity style={{ backgroundColor: '#6D28D9', alignSelf: 'flex-start', paddingHorizontal: 16, paddingVertical: 10, borderRadius: 20, marginTop: 16, flexDirection: 'row', alignItems: 'center' }}>
-                     <Text style={{ color: '#fff', fontSize: 13, fontWeight: 'bold' }}>Order Now</Text>
-                     <Ionicons name="arrow-forward" size={14} color="#fff" style={{ marginLeft: 4 }} />
-                   </TouchableOpacity>
-                 </View>
-                 <Image 
-                   source={{ uri: 'https://images.unsplash.com/photo-1589302168068-964664d93dc0?w=800' }} 
-                   style={{ width: 220, height: 220, position: 'absolute', right: -60, bottom: -40, borderRadius: 110 }} 
-                   resizeMode="cover"
-                 />
+                <View style={{ flex: 1, zIndex: 10 }}>
+                  <Text style={{ color: '#7C3AED', fontWeight: '700', fontSize: 13 }}>Hot & Delicious</Text>
+                  <Text style={{ color: '#111827', fontWeight: '900', fontSize: 20, marginTop: 4 }}>Biryani Special</Text>
+                  <Text style={{ color: '#6D28D9', fontWeight: '600', fontSize: 13, marginTop: 4 }}>Up to 40% OFF</Text>
+                  <TouchableOpacity style={{ backgroundColor: '#6D28D9', alignSelf: 'flex-start', paddingHorizontal: 16, paddingVertical: 10, borderRadius: 20, marginTop: 16, flexDirection: 'row', alignItems: 'center' }}>
+                    <Text style={{ color: '#fff', fontSize: 13, fontWeight: 'bold' }}>Order Now</Text>
+                    <Ionicons name="arrow-forward" size={14} color="#fff" style={{ marginLeft: 4 }} />
+                  </TouchableOpacity>
+                </View>
+                <Image
+                  source={{ uri: 'https://images.unsplash.com/photo-1589302168068-964664d93dc0?w=800' }}
+                  style={{ width: 220, height: 220, position: 'absolute', right: -60, bottom: -40, borderRadius: 110 }}
+                  resizeMode="cover"
+                />
               </View>
             )}
             {loadingMore ? <ActivityIndicator size="small" color={colors.primary} style={{ marginVertical: 20 }} /> : <View style={{ height: 120 }} />}

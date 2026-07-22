@@ -8,6 +8,7 @@ import SystemConfig from "../../database/models/SystemConfig";
 import ChatMessage from "../../database/models/ChatMessage";
 import AppVersion from "../../database/models/AppVersion";
 import Zone from "../../database/models/Zone";
+import { SocketManager } from "../../sockets/socket.manager";
 
 export class AdminController {
   async getAllOrders(req: Request, res: Response) {
@@ -496,6 +497,20 @@ export class AdminController {
       }
 
       await ticket.save();
+
+      // Emit socket event to admin support room and user personal room
+      try {
+        const io = SocketManager.getInstance().getIo();
+        if (io) {
+          io.to("support_tickets").emit("ticket_updated", ticket);
+          if (ticket.userId) {
+            io.to(ticket.userId.toString()).emit("ticket_updated", ticket);
+          }
+        }
+      } catch (err) {
+        console.error("Socket emit admin support update error:", err);
+      }
+
       return res.json(ticket);
     } catch (error) {
       return res.status(500).json({ message: "Internal server error" });

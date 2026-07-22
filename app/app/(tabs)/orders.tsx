@@ -61,6 +61,9 @@ export default function OrdersScreen() {
   const styles = React.useMemo(() => createStyles(colors), [theme]);
 
   const [filter, setFilter] = useState<FilterType>("all");
+  const [serviceFilter, setServiceFilter] = useState<"all" | "delivery" | "ride" | "helper">("all");
+  const [filterModalVisible, setFilterModalVisible] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
   const [orders, setOrders] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -139,9 +142,34 @@ export default function OrdersScreen() {
   };
 
   const filtered = orders.filter((o) => {
-    const isActive = ["SEARCHING_DRIVER", "DRIVER_ASSIGNED", "PICKED_UP"].includes(o.status);
-    if (filter === "active") return isActive;
-    if (filter === "past") return !isActive;
+    const isActive = ["SEARCHING_DRIVER", "DRIVER_ASSIGNED", "PICKED_UP", "ON_THE_WAY", "EN_ROUTE_PICKUP", "ARRIVED_PICKUP", "PICKING_ITEMS", "EN_ROUTE_DELIVERY", "ARRIVED_DELIVERY", "IN_TRANSIT"].includes(o.status);
+    
+    // Status Filter (active / past / all)
+    if (filter === "active" && !isActive) return false;
+    if (filter === "past" && isActive) return false;
+
+    // Service Type Filter
+    if (serviceFilter === "delivery" && o.serviceType !== "delivery") return false;
+    if (serviceFilter === "ride" && !["bike", "auto", "cab", "cab_prime"].includes(o.serviceType)) return false;
+    if (serviceFilter === "helper" && o.serviceType !== "helper") return false;
+
+    // Search Query Filter
+    if (searchQuery.trim().length > 0) {
+      const query = searchQuery.toLowerCase().trim();
+      const matchesId = o._id.toLowerCase().includes(query);
+      const matchesAddress = o.stops?.some((s: any) => s.address?.toLowerCase().includes(query));
+      
+      const vendorName = typeof o.vendor === "object" ? o.vendor?.name : "";
+      const matchesVendor = vendorName?.toLowerCase().includes(query);
+      
+      const serviceLabel = getServiceLabel(o.serviceType).toLowerCase();
+      const matchesService = serviceLabel.includes(query);
+
+      if (!matchesId && !matchesAddress && !matchesVendor && !matchesService) {
+        return false;
+      }
+    }
+
     return true;
   });
 
@@ -222,9 +250,29 @@ export default function OrdersScreen() {
           </TouchableOpacity>
           <Text style={styles.title}>My Orders</Text>
         </View>
-        <TouchableOpacity style={styles.filterIconBtn}>
-          <Feather name="sliders" size={moderateScale(18)} color={colors.text} />
+        <TouchableOpacity
+          style={styles.filterIconBtn}
+          onPress={() => setFilterModalVisible(true)}
+        >
+          <Feather name="sliders" size={moderateScale(18)} color={serviceFilter !== "all" ? colors.primary : colors.text} />
         </TouchableOpacity>
+      </View>
+
+      {/* Search Input Bar */}
+      <View style={[styles.searchBarContainer, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+        <Feather name="search" size={moderateScale(16)} color={colors.textMuted} style={{ marginRight: 8 }} />
+        <TextInput
+          placeholder="Search by Order ID, store, or address..."
+          placeholderTextColor={colors.textMuted}
+          value={searchQuery}
+          onChangeText={setSearchQuery}
+          style={[styles.searchInput, { color: colors.text }]}
+        />
+        {searchQuery.length > 0 && (
+          <TouchableOpacity onPress={() => setSearchQuery("")}>
+            <Feather name="x" size={moderateScale(16)} color={colors.textMuted} />
+          </TouchableOpacity>
+        )}
       </View>
 
       <View style={styles.filterRow}>
@@ -487,6 +535,64 @@ export default function OrdersScreen() {
                 )}
               </TouchableOpacity>
             </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Filter Modal */}
+      <Modal
+        visible={filterModalVisible}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setFilterModalVisible(false)}
+      >
+        <View style={styles.filterModalOverlay}>
+          <View style={[styles.filterModalContent, { backgroundColor: colors.surface }]}>
+            <View style={styles.filterModalHeader}>
+              <Text style={[styles.filterModalTitle, { color: colors.text }]}>Filter Orders</Text>
+              <TouchableOpacity onPress={() => setFilterModalVisible(false)}>
+                <Feather name="x" size={moderateScale(24)} color={colors.text} />
+              </TouchableOpacity>
+            </View>
+
+            <Text style={[styles.filterGroupTitle, { color: colors.textSecondary }]}>SERVICE TYPE</Text>
+            <View style={styles.filterOptionsContainer}>
+              {[
+                { label: "All Services", value: "all" },
+                { label: "Food & Parcel Delivery", value: "delivery" },
+                { label: "Rides & Cabs", value: "ride" },
+                { label: "Helper Bookings", value: "helper" }
+              ].map((opt) => {
+                const isSelected = serviceFilter === opt.value;
+                return (
+                  <TouchableOpacity
+                    key={opt.value}
+                    style={[
+                      styles.filterOptionCard,
+                      { borderColor: colors.border },
+                      isSelected && { borderColor: colors.primary, backgroundColor: `${colors.primary}10` }
+                    ]}
+                    onPress={() => setServiceFilter(opt.value as any)}
+                  >
+                    <Text style={[
+                      styles.filterOptionText,
+                      { color: colors.text },
+                      isSelected && { color: colors.primary, fontWeight: "700" }
+                    ]}>
+                      {opt.label}
+                    </Text>
+                    {isSelected && <Feather name="check" size={moderateScale(16)} color={colors.primary} />}
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+
+            <TouchableOpacity
+              style={[styles.applyFilterBtn, { backgroundColor: colors.primary }]}
+              onPress={() => setFilterModalVisible(false)}
+            >
+              <Text style={styles.applyFilterBtnText}>Apply Filters</Text>
+            </TouchableOpacity>
           </View>
         </View>
       </Modal>
@@ -758,5 +864,76 @@ const createStyles = (colors: typeof Colors.light) => StyleSheet.create({
     borderRadius: moderateScale(10),
     alignItems: "center",
     justifyContent: "center",
+  },
+  searchBarContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginHorizontal: 20,
+    marginBottom: 12,
+    paddingHorizontal: 12,
+    height: moderateScale(42),
+    borderRadius: moderateScale(12),
+    borderWidth: 1,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: moderateScale(13),
+    fontFamily: "Inter_500Medium",
+    padding: 0,
+  },
+  filterModalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.4)",
+    justifyContent: "flex-end",
+  },
+  filterModalContent: {
+    borderTopLeftRadius: moderateScale(24),
+    borderTopRightRadius: moderateScale(24),
+    padding: 24,
+    paddingBottom: 40,
+  },
+  filterModalHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 20,
+  },
+  filterModalTitle: {
+    fontSize: moderateScale(18),
+    fontWeight: "800",
+    letterSpacing: -0.3,
+  },
+  filterGroupTitle: {
+    fontSize: moderateScale(11),
+    fontWeight: "800",
+    letterSpacing: 0.8,
+    marginBottom: 12,
+  },
+  filterOptionsContainer: {
+    gap: 8,
+    marginBottom: 24,
+  },
+  filterOptionCard: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    padding: 14,
+    borderRadius: moderateScale(12),
+    borderWidth: 1.5,
+  },
+  filterOptionText: {
+    fontSize: moderateScale(13),
+    fontWeight: "600",
+  },
+  applyFilterBtn: {
+    padding: 14,
+    borderRadius: moderateScale(12),
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  applyFilterBtnText: {
+    color: "#fff",
+    fontSize: moderateScale(14),
+    fontWeight: "700",
   },
 });
