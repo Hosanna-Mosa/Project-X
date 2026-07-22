@@ -19,6 +19,7 @@ import {
   SlidersHorizontal,
   Sun,
   ChevronDown,
+  MessageSquare,
 } from "lucide-react";
 
 const navItems = [
@@ -34,6 +35,8 @@ const navItems = [
   { title: "Payments", url: "/payments", icon: CreditCard },
   { title: "Analytics", url: "/analytics", icon: BarChart3 },
   { title: "Support", url: "/support", icon: Headphones },
+  { title: "Support Cases", url: "/support-cases", icon: Headphones },
+  { title: "Active Chats", url: "/support/chats", icon: MessageSquare },
   { title: "Coupons", url: "/coupons", icon: Ticket },
   { title: "App Updates", url: "/app-updates", icon: RefreshCw },
 ];
@@ -43,8 +46,12 @@ export function AppSidebar() {
   const navigate = useNavigate();
 
   const handleLogout = () => {
+    localStorage.removeItem("admin_token");
+    localStorage.removeItem("admin_data");
     localStorage.removeItem("vendor_token");
     localStorage.removeItem("vendor_data");
+    localStorage.removeItem("support_token");
+    localStorage.removeItem("support_data");
     navigate("/vendor-login");
   };
 
@@ -59,7 +66,13 @@ export function AppSidebar() {
         </div>
 
         <nav className="mt-2 flex flex-col gap-0.5">
-          {navItems.map((item) => {
+          {(() => {
+            const isSupport = !!localStorage.getItem("support_token");
+            const filteredNavItems = isSupport
+              ? navItems.filter(item => item.url === "/support-cases" || item.url === "/support/chats")
+              : navItems;
+            
+            return filteredNavItems.map((item) => {
             const isActive =
               item.url === "/"
                 ? location.pathname === "/"
@@ -85,7 +98,8 @@ export function AppSidebar() {
                 )}
               </Link>
             );
-          })}
+          })
+        })()}
         </nav>
       </div>
 
@@ -117,6 +131,17 @@ export function AppSidebar() {
               Light Mode
             </span>
             <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
+          </button>
+        </div>
+
+        {/* Logout Button */}
+        <div className="px-6 pt-3 border-t border-border">
+          <button 
+            onClick={handleLogout}
+            className="w-full flex items-center gap-3 px-3 py-2 text-xs font-bold text-destructive hover:bg-destructive/10 rounded-xl transition-colors"
+          >
+            <LogOut className="h-[18px] w-[18px]" />
+            <span>Sign Out</span>
           </button>
         </div>
       </div>

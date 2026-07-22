@@ -9,6 +9,8 @@ import Drivers from "./pages/Drivers";
 import Analytics from "./pages/Analytics";
 import Payments from "./pages/Payments";
 import Support from "./pages/Support";
+import SupportIssues from "./pages/SupportIssues";
+import SupportChat from "./pages/SupportChat";
 import OrderDetail from "./pages/OrderDetail";
 import Users from "./pages/Users";
 import Vendors from "./pages/Vendors";
@@ -32,8 +34,10 @@ import DevDrivers from "./pages/DevDrivers";
 const RootRedirect = () => {
   const adminToken = localStorage.getItem("admin_token");
   const vendorToken = localStorage.getItem("vendor_token");
+  const supportToken = localStorage.getItem("support_token");
   
   if (adminToken) return <Dashboard />;
+  if (supportToken) return <Navigate to="/support-cases" replace />;
   if (vendorToken) return <Navigate to="/vendor/dashboard" replace />;
   return <Navigate to="/vendor-login" replace />;
 };
@@ -56,6 +60,9 @@ const App = () => (
           <Route path="/analytics" element={<Analytics />} />
           <Route path="/payments" element={<Payments />} />
           <Route path="/support" element={<Support />} />
+          <Route path="/support-cases" element={<SupportIssues />} />
+          <Route path="/support/chats" element={<SupportChat />} />
+          <Route path="/support/chats/:id" element={<SupportChat />} />
           <Route path="/users" element={<Users />} />
           <Route path="/vendors" element={<Vendors />} />
           <Route path="/meat-centers" element={<MeatCenters />} />

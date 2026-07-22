@@ -1,7 +1,7 @@
 export const BASE_URL = import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_API_URL || "http://localhost:5000/api/v1";
 
 export async function adminFetch<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
-  const token = localStorage.getItem("admin_token") || localStorage.getItem("vendor_token");
+  const token = localStorage.getItem("admin_token") || localStorage.getItem("vendor_token") || localStorage.getItem("support_token");
   const headers = {
     "Content-Type": "application/json",
     ...(token ? { Authorization: `Bearer ${token}` } : {}),

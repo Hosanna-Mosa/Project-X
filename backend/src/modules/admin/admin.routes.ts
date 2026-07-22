@@ -23,9 +23,9 @@ router.post("/orders", authenticateToken, authorizeRole([UserRole.ADMIN]), admin
 router.get("/payments", authenticateToken, authorizeRole([UserRole.ADMIN]), adminController.getPayments.bind(adminController));
 router.get("/analytics", authenticateToken, authorizeRole([UserRole.ADMIN]), adminController.getAnalytics.bind(adminController));
 router.get("/multistop", authenticateToken, authorizeRole([UserRole.ADMIN]), adminController.getMultiStop.bind(adminController));
-router.get("/tickets", authenticateToken, authorizeRole([UserRole.ADMIN]), adminController.getSupportTickets.bind(adminController));
-router.post("/tickets", authenticateToken, authorizeRole([UserRole.ADMIN]), adminController.createSupportTicket.bind(adminController));
-router.put("/tickets/:id", authenticateToken, authorizeRole([UserRole.ADMIN]), adminController.updateSupportTicket.bind(adminController));
+router.get("/tickets", authenticateToken, authorizeRole([UserRole.ADMIN, UserRole.SUPPORT]), adminController.getSupportTickets.bind(adminController));
+router.post("/tickets", authenticateToken, authorizeRole([UserRole.ADMIN, UserRole.SUPPORT]), adminController.createSupportTicket.bind(adminController));
+router.put("/tickets/:id", authenticateToken, authorizeRole([UserRole.ADMIN, UserRole.SUPPORT]), adminController.updateSupportTicket.bind(adminController));
 
 // Settings and Coupons routes
 router.get("/config", authenticateToken, authorizeRole([UserRole.ADMIN]), adminController.getSystemConfig.bind(adminController));
