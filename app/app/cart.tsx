@@ -11,6 +11,7 @@ import {
 import { Feather, Ionicons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { moderateScale } from "react-native-size-matters";
 import { useCartStore } from "@/contexts/cartStore";
 import { customFetch } from "@/utils/api/custom-fetch";
 import { useHomeStore } from "@/contexts/homeStore";
@@ -119,13 +120,13 @@ export default function CartScreen() {
   };
 
   return (
-    <View style={[styles.root, { backgroundColor: '#ffffff' }]}>
+    <View style={styles.container}>
       <StatusBar barStyle="dark-content" translucent backgroundColor="transparent" />
       
       {/* Header Layout */}
-      <View style={[styles.header, { paddingTop: insets.top + 10 }]}>
-        <TouchableOpacity style={styles.headerButton} onPress={() => router.back()} activeOpacity={0.7}>
-          <Feather name="x" size={28} color="#000000" />
+      <View style={[styles.header, { paddingTop: insets.top + 16 }]}>
+        <TouchableOpacity style={styles.headerButton} onPress={() => router.back()}>
+          <Feather name="x" size={moderateScale(28)} color="#000000" />
         </TouchableOpacity>
         
         <View style={styles.headerTitleContainer}>
@@ -161,13 +162,19 @@ export default function CartScreen() {
                   <View style={styles.priceAndQtyRow}>
                     <Text style={styles.itemPrice}>₹{item.price.toFixed(2)}</Text>
                     <View style={styles.qtyController}>
-                      <TouchableOpacity onPress={() => updateQuantity(item._id, item.quantity - 1)} style={styles.qtyBtn}>
-                        <Feather name="minus" size={16} color="#000000" />
-                      </TouchableOpacity>
-                      <Text style={styles.qtyText}>{item.quantity}</Text>
-                      <TouchableOpacity onPress={() => updateQuantity(item._id, item.quantity + 1)} style={styles.qtyBtn}>
-                        <Feather name="plus" size={16} color="#000000" />
-                      </TouchableOpacity>
+                        <TouchableOpacity
+                          onPress={() => updateQuantity(item._id, item.quantity - 1)}
+                          style={styles.qtyBtn}
+                        >
+                          <Feather name="minus" size={moderateScale(16)} color="#000000" />
+                        </TouchableOpacity>
+                        <Text style={styles.qtyText}>{item.quantity}</Text>
+                        <TouchableOpacity
+                          onPress={() => updateQuantity(item._id, item.quantity + 1)}
+                          style={styles.qtyBtn}
+                        >
+                          <Feather name="plus" size={moderateScale(16)} color="#000000" />
+                        </TouchableOpacity>
                     </View>
                   </View>
                 </View>
@@ -199,15 +206,11 @@ export default function CartScreen() {
                 <View key={comp._id} style={styles.complementCard}>
                   <View style={styles.compImageContainer}>
                     <Image source={{ uri: comp.images?.[0] || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=300' }} style={styles.compImage} />
-                    <TouchableOpacity 
+                    <TouchableOpacity
+                      onPress={() => addItem({ ...comp, _id: comp.id || comp._id, description: "", category: "", isVeg: true, images: [comp.image] }, vendorId)}
                       style={styles.compAddBtn}
-                      onPress={() => {
-                        if (vendorId) {
-                          addItem(comp, vendorId);
-                        }
-                      }}
                     >
-                      <Feather name="plus" size={16} color="#000000" />
+                      <Feather name="plus" size={moderateScale(16)} color="#000000" />
                     </TouchableOpacity>
                   </View>
                   <Text style={styles.compName} numberOfLines={1}>{comp.name}</Text>
@@ -224,35 +227,44 @@ export default function CartScreen() {
           <Text style={styles.summaryTitle}>Summary</Text>
           
           <TouchableOpacity style={styles.dealsRow}>
-            <Ionicons name="pricetag-outline" size={24} color="#000000" />
-            <Text style={styles.dealsText}>Deals</Text>
+            <Ionicons name="pricetag-outline" size={moderateScale(24)} color="#000000" />
+            <Text style={styles.dealsText}>Offers and Coupons</Text>
           </TouchableOpacity>
 
           <View style={styles.summaryRow}>
             <Text style={styles.summaryLabel}>Subtotal</Text>
             <Text style={styles.summaryValue}>₹{subtotal.toFixed(2)}</Text>
           </View>
+
           <View style={styles.summaryRow}>
             <View style={styles.labelContainer}>
-              <Text style={styles.summaryLabel}>Estimated Tax</Text>
-              <Feather name="info" size={12} color="#74777f" />
-            </View>
-            <Text style={styles.summaryValue}>₹{TAXES_AND_FEES.toFixed(2)}</Text>
-          </View>
-          <View style={styles.summaryRow}>
-            <View style={styles.labelContainer}>
-              <Text style={styles.summaryLabel}>Delivery fee</Text>
-              <Feather name="info" size={12} color="#74777f" />
+              <Text style={styles.summaryLabel}>Delivery Fee</Text>
+              <TouchableOpacity onPress={() => Alert.alert("Delivery Fee", "Standard delivery partner fee based on distance.")}>
+                <Feather name="info" size={moderateScale(12)} color="#74777f" />
+              </TouchableOpacity>
             </View>
             <View style={styles.feeContainer}>
               <Text style={styles.crossedOutValue}>₹{DELIVERY_FEE_ORIGINAL.toFixed(2)}</Text>
               <Text style={styles.summaryValue}>₹{DELIVERY_FEE.toFixed(2)}</Text>
             </View>
           </View>
+
           <View style={styles.summaryRow}>
             <View style={styles.labelContainer}>
-              <Text style={styles.summaryLabel}>Service Fee</Text>
-              <Feather name="info" size={12} color="#74777f" />
+              <Text style={styles.summaryLabel}>Taxes & Charges</Text>
+              <TouchableOpacity onPress={() => Alert.alert("Taxes & Charges", "Includes GST and restaurant handling charges.")}>
+                <Feather name="info" size={moderateScale(12)} color="#74777f" />
+              </TouchableOpacity>
+            </View>
+            <Text style={styles.summaryValue}>₹{TAXES_AND_FEES.toFixed(2)}</Text>
+          </View>
+
+          <View style={styles.summaryRow}>
+            <View style={styles.labelContainer}>
+              <Text style={styles.summaryLabel}>Platform Fee</Text>
+              <TouchableOpacity onPress={() => Alert.alert("Platform Fee", "This small fee helps us run the platform efficiently.")}>
+                <Feather name="info" size={moderateScale(12)} color="#74777f" />
+              </TouchableOpacity>
             </View>
             <Text style={styles.summaryValue}>₹{SERVICE_FEE.toFixed(2)}</Text>
           </View>
@@ -295,8 +307,9 @@ export default function CartScreen() {
 }
 
 const styles = StyleSheet.create({
-  root: {
+  container: {
     flex: 1,
+    backgroundColor: "#ffffff",
   },
   header: {
     flexDirection: "row",
@@ -306,8 +319,8 @@ const styles = StyleSheet.create({
     paddingBottom: 16,
   },
   headerButton: {
-    width: 40,
-    height: 40,
+    width: moderateScale(40),
+    height: moderateScale(40),
     alignItems: "flex-start",
     justifyContent: "center",
   },
@@ -317,12 +330,12 @@ const styles = StyleSheet.create({
     paddingLeft: 4,
   },
   headerSubtitle: {
-    fontSize: 13,
+    fontSize: moderateScale(13),
     color: "#191c1e",
     fontWeight: "600",
   },
   headerTitle: {
-    fontSize: 20,
+    fontSize: moderateScale(20),
     fontWeight: "800",
     color: "#000000",
     marginTop: 2,
@@ -366,7 +379,7 @@ const styles = StyleSheet.create({
   itemImage: {
     width: 80,
     height: 80,
-    borderRadius: 8,
+    borderRadius: moderateScale(8),
     resizeMode: "cover",
   },
   itemDetails: {
@@ -375,17 +388,17 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   itemName: {
-    fontSize: 16,
+    fontSize: moderateScale(16),
     fontWeight: "700",
     color: "#000000",
   },
   itemCustomization: {
-    fontSize: 14,
+    fontSize: moderateScale(14),
     color: "#74777f",
-    lineHeight: 20,
+    lineHeight: moderateScale(20),
   },
   itemPrice: {
-    fontSize: 16,
+    fontSize: moderateScale(16),
     fontWeight: "700",
     color: "#000000",
   },
@@ -399,7 +412,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     backgroundColor: "#eceef0",
-    borderRadius: 16,
+    borderRadius: moderateScale(16),
     paddingHorizontal: 8,
     paddingVertical: 4,
     gap: 12,
@@ -408,7 +421,7 @@ const styles = StyleSheet.create({
     padding: 4,
   },
   qtyText: {
-    fontSize: 14,
+    fontSize: moderateScale(14),
     fontWeight: "700",
     color: "#000000",
   },
@@ -423,16 +436,16 @@ const styles = StyleSheet.create({
     backgroundColor: "#f2f2f2",
     paddingHorizontal: 16,
     paddingVertical: 10,
-    borderRadius: 20,
+    borderRadius: moderateScale(20),
     gap: 6,
   },
   addMoreBtnText: {
-    fontSize: 14,
+    fontSize: moderateScale(14),
     fontWeight: "700",
     color: "#000000",
   },
   sectionTitle: {
-    fontSize: 18,
+    fontSize: moderateScale(18),
     fontWeight: "800",
     color: "#000000",
     paddingHorizontal: 20,
@@ -448,7 +461,7 @@ const styles = StyleSheet.create({
   compImageContainer: {
     width: 120,
     height: 120,
-    borderRadius: 12,
+    borderRadius: moderateScale(12),
     borderWidth: 1,
     borderColor: "#eceef0",
     overflow: "hidden",
@@ -465,9 +478,9 @@ const styles = StyleSheet.create({
     bottom: 8,
     right: 8,
     backgroundColor: "#ffffff",
-    borderRadius: 16,
-    width: 32,
-    height: 32,
+    borderRadius: moderateScale(16),
+    width: moderateScale(32),
+    height: moderateScale(32),
     alignItems: "center",
     justifyContent: "center",
     shadowColor: "#000",
@@ -477,13 +490,13 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
   compName: {
-    fontSize: 14,
+    fontSize: moderateScale(14),
     fontWeight: "600",
     color: "#000000",
     marginBottom: 4,
   },
   compPrice: {
-    fontSize: 14,
+    fontSize: moderateScale(14),
     color: "#74777f",
   },
   summaryContainer: {
@@ -491,7 +504,7 @@ const styles = StyleSheet.create({
     paddingBottom: 20,
   },
   summaryTitle: {
-    fontSize: 20,
+    fontSize: moderateScale(20),
     fontWeight: "800",
     color: "#000000",
     marginBottom: 16,
@@ -506,7 +519,7 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   dealsText: {
-    fontSize: 16,
+    fontSize: moderateScale(16),
     fontWeight: "600",
     color: "#000000",
   },
@@ -522,12 +535,12 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   summaryLabel: {
-    fontSize: 16,
+    fontSize: moderateScale(16),
     fontWeight: "600",
     color: "#43474e",
   },
   summaryValue: {
-    fontSize: 16,
+    fontSize: moderateScale(16),
     fontWeight: "600",
     color: "#000000",
   },
@@ -537,7 +550,7 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   crossedOutValue: {
-    fontSize: 16,
+    fontSize: moderateScale(16),
     fontWeight: "600",
     color: "#74777f",
     textDecorationLine: "line-through",
@@ -550,7 +563,7 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   totalLabel: {
-    fontSize: 20,
+    fontSize: moderateScale(20),
     fontWeight: "800",
     color: "#000000",
   },
@@ -560,13 +573,13 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   crossedOutTotal: {
-    fontSize: 18,
+    fontSize: moderateScale(18),
     color: "#74777f",
     fontWeight: "600",
     textDecorationLine: "line-through",
   },
   finalTotalValue: {
-    fontSize: 20,
+    fontSize: moderateScale(20),
     fontWeight: "800",
     color: "#000000",
   },
@@ -586,29 +599,17 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 10,
   },
-  savingsBanner: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    marginBottom: 16,
-    alignSelf: "flex-start",
-  },
-  savingsText: {
-    fontSize: 14,
-    fontWeight: "800",
-    color: "#000000",
-  },
   continueBtn: {
-    backgroundColor: "#000000", // Black button
-    borderRadius: 12,
-    height: 56,
+    backgroundColor: "#000000",
+    borderRadius: moderateScale(12),
+    height: moderateScale(56),
     alignItems: "center",
     justifyContent: "center",
     width: "100%",
   },
   continueBtnText: {
     color: "#ffffff",
-    fontSize: 18,
+    fontSize: moderateScale(18),
     fontWeight: "700",
   },
 });

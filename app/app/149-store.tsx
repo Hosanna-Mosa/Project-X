@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Image, Dimensions
 import { Ionicons, Feather } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
+import { moderateScale } from 'react-native-size-matters';
 import { customFetch } from '@/utils/api/custom-fetch';
 import { useDeliveryStore } from '@/contexts/deliveryStore';
 import { useCartStore } from '@/contexts/cartStore';
@@ -94,7 +95,7 @@ export default function Store149Screen() {
             {/* Top Bar Navigation */}
             <View style={styles.topNav}>
               <TouchableOpacity style={styles.navButton} onPress={() => router.back()}>
-                <Ionicons name="arrow-back" size={24} color="#1F2937" />
+                <Ionicons name="arrow-back" size={moderateScale(24)} color="#1F2937" />
               </TouchableOpacity>
             </View>
 
@@ -118,23 +119,23 @@ export default function Store149Screen() {
 
                {/* Particle System (Food Icons and Stars) */}
                <Animated.View style={[styles.floatingElement, { top: -10, left: 30 }, getFloatStyle(floatAnim2, 20), getRotateStyle(rotateAnimFast)]}>
-                 <Ionicons name="fast-food" size={32} color="#FDE047" />
+                 <Ionicons name="fast-food" size={moderateScale(32)} color="#FDE047" />
                </Animated.View>
                <Animated.View style={[styles.floatingElement, { bottom: 15, left: 15 }, getFloatStyle(floatAnim3, 15), getRotateStyle(rotateAnim)]}>
-                 <Ionicons name="pizza" size={38} color="#F59E0B" />
+                 <Ionicons name="pizza" size={moderateScale(38)} color="#F59E0B" />
                </Animated.View>
                <Animated.View style={[styles.floatingElement, { top: 15, right: 30 }, getFloatStyle(floatAnim2, 25), getRotateStyle(rotateAnim, true)]}>
-                 <Ionicons name="restaurant" size={28} color="#FDE047" />
+                 <Ionicons name="restaurant" size={moderateScale(28)} color="#FDE047" />
                </Animated.View>
                <Animated.View style={[styles.floatingElement, { bottom: 25, right: 15 }, getFloatStyle(floatAnim3, 20), getRotateStyle(rotateAnimFast, true)]}>
-                 <Ionicons name="ice-cream" size={36} color="#F59E0B" />
+                 <Ionicons name="ice-cream" size={moderateScale(36)} color="#F59E0B" />
                </Animated.View>
 
                <Animated.View style={[styles.floatingElement, { top: 50, left: -5 }, getFloatStyle(floatAnim, 10)]}>
-                 <Ionicons name="star" size={20} color="#FEF08A" />
+                 <Ionicons name="star" size={moderateScale(20)} color="#FEF08A" />
                </Animated.View>
                <Animated.View style={[styles.floatingElement, { top: 65, right: -5 }, getFloatStyle(floatAnim, 15)]}>
-                 <Ionicons name="sparkles" size={24} color="#FEF08A" />
+                 <Ionicons name="sparkles" size={moderateScale(24)} color="#FEF08A" />
                </Animated.View>
 
                {/* Center 3D-like Badge */}
@@ -190,7 +191,7 @@ export default function Store149Screen() {
 
                     {/* Rating overlay (top-right) */}
                     <View style={styles.ratingOverlay}>
-                      <Ionicons name="star" size={9} color="#F59E0B" />
+                      <Ionicons name="star" size={moderateScale(9)} color="#F59E0B" />
                       <Text style={styles.ratingOverlayText}>{item.rating || "4.2"}</Text>
                     </View>
 
@@ -202,7 +203,7 @@ export default function Store149Screen() {
                           style={styles.qtyBtn}
                           activeOpacity={0.7}
                         >
-                          <Feather name="minus" size={11} color="#002045" />
+                          <Feather name="minus" size={moderateScale(11)} color="#002045" />
                         </TouchableOpacity>
                         <Text style={styles.qtyText}>{cartItem.quantity}</Text>
                         <TouchableOpacity
@@ -210,7 +211,7 @@ export default function Store149Screen() {
                           style={styles.qtyBtn}
                           activeOpacity={0.7}
                         >
-                          <Feather name="plus" size={11} color="#002045" />
+                          <Feather name="plus" size={moderateScale(11)} color="#002045" />
                         </TouchableOpacity>
                       </View>
                     ) : (
@@ -256,8 +257,8 @@ const styles = StyleSheet.create({
   },
   headerGradient: {
     paddingTop: Platform.OS === 'android' ? 20 : 0,
-    borderBottomLeftRadius: 24,
-    borderBottomRightRadius: 24,
+    borderBottomLeftRadius: moderateScale(24),
+    borderBottomRightRadius: moderateScale(24),
     overflow: 'hidden',
     paddingBottom: 20,
   },
@@ -269,9 +270,9 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   navButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: moderateScale(36),
+    height: moderateScale(36),
+    borderRadius: moderateScale(18),
     backgroundColor: 'rgba(255, 255, 255, 0.4)',
     alignItems: 'center',
     justifyContent: 'center',
@@ -289,32 +290,32 @@ const styles = StyleSheet.create({
   logoBadge: {
     borderWidth: 2,
     borderColor: '#FFD700',
-    borderRadius: 12,
+    borderRadius: moderateScale(12),
     paddingHorizontal: 12,
     paddingVertical: 4,
     marginRight: 8,
   },
   logoBadgeText: {
     color: '#FFD700',
-    fontSize: 24,
+    fontSize: moderateScale(24),
     fontWeight: '900',
   },
   brandText: {
     color: '#FFFFFF',
-    fontSize: 28,
+    fontSize: moderateScale(28),
     fontWeight: '800',
   },
   headerTitle: {
     textAlign: 'center',
     color: '#FFFFFF',
-    fontSize: 22,
+    fontSize: moderateScale(22),
     fontWeight: '800',
     marginBottom: 4,
   },
   headerSubtitle: {
     textAlign: 'center',
     color: '#E5E7EB',
-    fontSize: 14,
+    fontSize: moderateScale(14),
     fontWeight: '500',
     marginBottom: 20,
   },
@@ -348,15 +349,15 @@ const styles = StyleSheet.create({
     elevation: 10,
   },
   centerBadge: {
-    width: 140,
-    height: 140,
-    borderRadius: 70,
+    width: moderateScale(140),
+    height: moderateScale(140),
+    borderRadius: moderateScale(70),
     padding: 6,
   },
   centerBadgeInner: {
     flex: 1,
     backgroundColor: '#7E3AF2',
-    borderRadius: 64,
+    borderRadius: moderateScale(64),
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 2,
@@ -365,14 +366,14 @@ const styles = StyleSheet.create({
   },
   badgeTextTop: {
     color: '#FEF08A',
-    fontSize: 12,
+    fontSize: moderateScale(12),
     fontWeight: '800',
     letterSpacing: 1.5,
     marginBottom: 2,
   },
   badgeTextMain: {
     color: '#FFFFFF',
-    fontSize: 42,
+    fontSize: moderateScale(42),
     fontWeight: '900',
     textShadowColor: 'rgba(0, 0, 0, 0.3)',
     textShadowOffset: { width: 0, height: 3 },
@@ -380,7 +381,7 @@ const styles = StyleSheet.create({
   },
   badgeTextBottom: {
     color: '#FEF08A',
-    fontSize: 14,
+    fontSize: moderateScale(14),
     fontWeight: '800',
     letterSpacing: 1,
     marginTop: 2,
@@ -399,7 +400,7 @@ const styles = StyleSheet.create({
     width: '100%',
     aspectRatio: 1,
     backgroundColor: '#F3F4F6',
-    borderRadius: 8,
+    borderRadius: moderateScale(8),
     marginBottom: 8,
     position: 'relative',
     overflow: 'hidden',
@@ -415,7 +416,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
     paddingHorizontal: 8,
     paddingVertical: 4,
-    borderRadius: 6,
+    borderRadius: moderateScale(6),
     borderWidth: 1,
     borderColor: '#E5E7EB',
     shadowColor: '#000',
@@ -426,7 +427,7 @@ const styles = StyleSheet.create({
   },
   selectButtonText: {
     color: '#2563EB',
-    fontSize: 10,
+    fontSize: moderateScale(10),
     fontWeight: '700',
   },
   quantityPill: {
@@ -434,16 +435,16 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
     paddingHorizontal: 12,
     paddingVertical: 4,
-    borderRadius: 12,
+    borderRadius: moderateScale(12),
     marginBottom: 8,
   },
   quantityText: {
-    fontSize: 10,
+    fontSize: moderateScale(10),
     color: '#4B5563',
     fontWeight: '600',
   },
   productName: {
-    fontSize: 12,
+    fontSize: moderateScale(12),
     fontWeight: '600',
     color: '#1F2937',
     marginBottom: 8,
@@ -454,13 +455,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   discountPrice: {
-    fontSize: 14,
+    fontSize: moderateScale(14),
     fontWeight: '800',
     color: '#1F2937',
     marginRight: 6,
   },
   originalPrice: {
-    fontSize: 12,
+    fontSize: moderateScale(12),
     color: '#9CA3AF',
     textDecorationLine: 'line-through',
     fontWeight: '500',
@@ -470,20 +471,20 @@ const styles = StyleSheet.create({
     top: 4,
     left: 4,
     backgroundColor: 'rgba(255,255,255,0.9)',
-    borderRadius: 4,
+    borderRadius: moderateScale(4),
     padding: 2,
   },
   dietIcon: {
-    width: 10,
-    height: 10,
+    width: moderateScale(10),
+    height: moderateScale(10),
     borderWidth: 1,
     alignItems: "center",
     justifyContent: "center",
   },
   dietDot: {
-    width: 4,
-    height: 4,
-    borderRadius: 2,
+    width: moderateScale(4),
+    height: moderateScale(4),
+    borderRadius: moderateScale(2),
   },
   ratingOverlay: {
     position: 'absolute',
@@ -494,10 +495,10 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.9)',
     paddingHorizontal: 4,
     paddingVertical: 2,
-    borderRadius: 4,
+    borderRadius: moderateScale(4),
   },
   ratingOverlayText: {
-    fontSize: 9,
+    fontSize: moderateScale(9),
     fontWeight: '700',
     color: '#1F2937',
     marginLeft: 2,
@@ -509,7 +510,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#FFFFFF',
-    borderRadius: 6,
+    borderRadius: moderateScale(6),
     borderWidth: 1,
     borderColor: '#E5E7EB',
     shadowColor: '#000',
@@ -522,7 +523,7 @@ const styles = StyleSheet.create({
     padding: 4,
   },
   qtyText: {
-    fontSize: 10,
+    fontSize: moderateScale(10),
     fontWeight: '700',
     color: '#1F2937',
     paddingHorizontal: 4,

@@ -31,7 +31,7 @@ interface SupportTicket {
   ticketId: string;
   title: string;
   category: string;
-  status: "OPEN" | "RESOLVED";
+  status: "OPEN" | "RESOLVED" | "PENDING_RESOLVE";
   message: string;
   messages: ChatMessage[];
   createdAt: string;
@@ -409,10 +409,10 @@ export default function SupportChatScreen() {
           </View>
         </View>
       ) : (
-        <View style={[styles.inputBar, { paddingBottom: insets.bottom + 8 }]}>
-          <View style={styles.inputContainer}>
+        <View style={[styles.inputBar as any, { paddingBottom: insets.bottom + 8 }]}>
+          <View style={styles.inputContainer as any}>
             <TextInput
-              style={styles.textInput}
+              style={styles.textInput as any}
               placeholder="Type a message to Support..."
               placeholderTextColor={Colors.textMuted}
               value={inputText}
@@ -422,7 +422,7 @@ export default function SupportChatScreen() {
             />
           </View>
           <TouchableOpacity
-            style={[styles.sendBtn, !inputText.trim() && styles.sendBtnDisabled]}
+            style={[styles.sendBtn as any, !inputText.trim() && styles.sendBtnDisabled]}
             onPress={handleSendMessage}
             disabled={!inputText.trim() || submittingReply}
           >
@@ -467,7 +467,7 @@ const styles = StyleSheet.create({
   },
   headerTitle: {
     fontSize: 18,
-    fontWeight: "850",
+    fontWeight: "800",
     color: Colors.text,
   },
   headerCenter: {
@@ -497,7 +497,7 @@ const styles = StyleSheet.create({
   },
   headerName: {
     fontSize: 14,
-    fontWeight: "750",
+    fontWeight: "700",
     color: Colors.text,
   },
   headerStatus: {
@@ -708,8 +708,8 @@ const styles = StyleSheet.create({
     padding: 16,
     alignItems: "center",
     borderTopWidth: 1,
-    borderTopColor: Colors.borderLight,
-    backgroundColor: Colors.surfaceSecondary,
+    borderTopColor: Colors.border,
+    backgroundColor: Colors.surfaceAlt,
   },
   resolveRequestTitle: {
     fontSize: 16,

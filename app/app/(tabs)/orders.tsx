@@ -11,6 +11,7 @@ import {
 } from "react-native";
 import { Feather } from "@expo/vector-icons";
 import { router, useFocusEffect } from "expo-router";
+import { moderateScale } from "react-native-size-matters";
 import Colors from "@/constants/colors";
 import { useThemeStore } from "@/contexts/themeStore";
 import { ScreenWrapper } from "@/components/ScreenWrapper";
@@ -217,12 +218,12 @@ export default function OrdersScreen() {
               else router.replace("/(tabs)");
             }}
           >
-            <Feather name="arrow-left" size={18} color={colors.text} />
+            <Feather name="arrow-left" size={moderateScale(18)} color={colors.text} />
           </TouchableOpacity>
           <Text style={styles.title}>My Orders</Text>
         </View>
         <TouchableOpacity style={styles.filterIconBtn}>
-          <Feather name="sliders" size={18} color={colors.text} />
+          <Feather name="sliders" size={moderateScale(18)} color={colors.text} />
         </TouchableOpacity>
       </View>
 
@@ -256,7 +257,7 @@ export default function OrdersScreen() {
           </View>
         ) : filtered.length === 0 ? (
           <View style={styles.emptyState}>
-            <Feather name="box" size={48} color={colors.textMuted} />
+            <Feather name="box" size={moderateScale(48)} color={colors.textMuted} />
             <Text style={styles.emptyTitle}>No Orders</Text>
             <Text style={styles.emptySubtitle}>Your orders will appear here</Text>
           </View>
@@ -272,7 +273,7 @@ export default function OrdersScreen() {
               : (order.serviceType === "delivery" 
                 ? (order.stops?.length > 1 ? "Multi-Stop Delivery" : "Single Stop Delivery") 
                 : serviceLabel);
-
+ 
             return (
               <TouchableOpacity
                 key={order._id}
@@ -296,7 +297,7 @@ export default function OrdersScreen() {
                   <View style={styles.orderTypeIcon}>
                     <Feather
                       name={iconName}
-                      size={16}
+                      size={moderateScale(16)}
                       color={colors.primary}
                     />
                   </View>
@@ -330,20 +331,20 @@ export default function OrdersScreen() {
                 <View style={styles.orderDetails}>
                   {order.isReserved && (
                     <View style={styles.scheduledBadge}>
-                      <Feather name="calendar" size={12} color={colors.primary} />
+                      <Feather name="calendar" size={moderateScale(12)} color={colors.primary} />
                       <Text style={styles.scheduledBadgeText}>
                         Scheduled: {new Date(order.reservedAt).toLocaleString([], { weekday: 'short', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
                       </Text>
                     </View>
                   )}
                   <View style={styles.detailRow}>
-                    <Feather name="map-pin" size={12} color={colors.textMuted} />
+                    <Feather name="map-pin" size={moderateScale(12)} color={colors.textMuted} />
                     <Text style={styles.detailText} numberOfLines={1}>
                       {order.stops?.map((s: any) => s.address).join(" → ")}
                     </Text>
                   </View>
                   <View style={styles.detailRow}>
-                    <Feather name="clock" size={12} color={colors.textMuted} />
+                    <Feather name="clock" size={moderateScale(12)} color={colors.textMuted} />
                     <Text style={styles.detailText}>{new Date(order.createdAt).toLocaleString()}</Text>
                   </View>
                 </View>
@@ -359,7 +360,7 @@ export default function OrdersScreen() {
                       })}
                     >
                       <Text style={styles.trackBtnText}>Track Order</Text>
-                      <Feather name="arrow-right" size={12} color={colors.primary} />
+                      <Feather name="arrow-right" size={moderateScale(12)} color={colors.primary} />
                     </TouchableOpacity>
                   )}
                   {!isActive && (
@@ -367,7 +368,7 @@ export default function OrdersScreen() {
                       {["DELIVERED", "COMPLETED", "delivered", "completed"].includes(order.status) && (
                         order.isReviewed ? (
                           <View style={[styles.reviewedBadge, { backgroundColor: "#F59E0B15" }]}>
-                            <Feather name="star" size={12} color="#F59E0B" />
+                            <Feather name="star" size={moderateScale(12)} color="#F59E0B" />
                             <Text style={[styles.reviewedText, { color: "#F59E0B" }]}>Rated</Text>
                           </View>
                         ) : (
@@ -375,7 +376,7 @@ export default function OrdersScreen() {
                             style={[styles.rateBtn, { borderColor: colors.primary, backgroundColor: colors.primary + "10" }]}
                             onPress={() => handleOpenReviewModal(order)}
                           >
-                            <Feather name="star" size={12} color={colors.primary} />
+                            <Feather name="star" size={moderateScale(12)} color={colors.primary} />
                             <Text style={[styles.rateBtnText, { color: colors.primary }]}>Rate</Text>
                           </TouchableOpacity>
                         )
@@ -385,7 +386,7 @@ export default function OrdersScreen() {
                         onPress={() => handleReorder(order)}
                       >
                         <Text style={styles.trackBtnText}>Reorder</Text>
-                        <Feather name="refresh-cw" size={12} color={colors.primary} />
+                        <Feather name="refresh-cw" size={moderateScale(12)} color={colors.primary} />
                       </TouchableOpacity>
                     </View>
                   )}
@@ -407,11 +408,11 @@ export default function OrdersScreen() {
             <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", width: "100%", marginBottom: 12 }}>
               <Text style={[styles.modalTitle, { color: colors.text }]}>Rate Your Order</Text>
               <TouchableOpacity onPress={() => setReviewModalVisible(false)}>
-                <Feather name="x" size={20} color={colors.textMuted} />
+                <Feather name="x" size={moderateScale(20)} color={colors.textMuted} />
               </TouchableOpacity>
             </View>
 
-            <Text style={{ fontSize: 13, color: colors.textSecondary, marginBottom: 12 }}>
+            <Text style={{ fontSize: moderateScale(13), color: colors.textSecondary, marginBottom: 12 }}>
               How was your experience with order #{selectedOrderForReview?._id?.slice(-8).toUpperCase()}?
             </Text>
 
@@ -421,7 +422,7 @@ export default function OrdersScreen() {
                 <TouchableOpacity key={star} onPress={() => setReviewRating(star)}>
                   <Feather
                     name="star"
-                    size={32}
+                    size={moderateScale(32)}
                     color={star <= reviewRating ? "#F59E0B" : colors.border}
                   />
                 </TouchableOpacity>
@@ -444,7 +445,7 @@ export default function OrdersScreen() {
                     ]}
                     onPress={() => handleToggleReviewTag(tag)}
                   >
-                    <Text style={{ fontSize: 12, fontWeight: "500", color: isSelected ? "#FFFFFF" : colors.text }}>
+                    <Text style={{ fontSize: moderateScale(12), fontWeight: "500", color: isSelected ? "#FFFFFF" : colors.text }}>
                       {tag}
                     </Text>
                   </TouchableOpacity>
@@ -472,7 +473,7 @@ export default function OrdersScreen() {
                 style={[styles.modalCancelBtn, { borderColor: colors.border }]}
                 onPress={() => setReviewModalVisible(false)}
               >
-                <Text style={{ fontSize: 14, fontWeight: "600", color: colors.textSecondary }}>Cancel</Text>
+                <Text style={{ fontSize: moderateScale(14), fontWeight: "600", color: colors.textSecondary }}>Cancel</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={[styles.modalSubmitBtn, { backgroundColor: colors.primary, opacity: submittingReview ? 0.7 : 1 }]}
@@ -482,7 +483,7 @@ export default function OrdersScreen() {
                 {submittingReview ? (
                   <ActivityIndicator size="small" color="#FFFFFF" />
                 ) : (
-                  <Text style={{ fontSize: 14, fontWeight: "700", color: "#FFFFFF" }}>Submit Review</Text>
+                  <Text style={{ fontSize: moderateScale(14), fontWeight: "700", color: "#FFFFFF" }}>Submit Review</Text>
                 )}
               </TouchableOpacity>
             </View>
@@ -510,9 +511,9 @@ const createStyles = (colors: typeof Colors.light) => StyleSheet.create({
     gap: 10,
   },
   backBtn: {
-    width: 34,
-    height: 34,
-    borderRadius: 10,
+    width: moderateScale(34),
+    height: moderateScale(34),
+    borderRadius: moderateScale(10),
     backgroundColor: colors.surface,
     alignItems: "center",
     justifyContent: "center",
@@ -520,15 +521,15 @@ const createStyles = (colors: typeof Colors.light) => StyleSheet.create({
     borderColor: colors.border,
   },
   title: {
-    fontSize: 18,
+    fontSize: moderateScale(18),
     fontWeight: "800",
     color: colors.text,
     letterSpacing: -0.3,
   },
   filterIconBtn: {
-    width: 30,
-    height: 30,
-    borderRadius: 8,
+    width: moderateScale(30),
+    height: moderateScale(30),
+    borderRadius: moderateScale(8),
     backgroundColor: colors.surface,
     alignItems: "center",
     justifyContent: "center",
@@ -544,7 +545,7 @@ const createStyles = (colors: typeof Colors.light) => StyleSheet.create({
   filterBtn: {
     paddingHorizontal: 12,
     paddingVertical: 5,
-    borderRadius: 15,
+    borderRadius: moderateScale(15),
     backgroundColor: colors.surface,
     borderWidth: 1,
     borderColor: colors.border,
@@ -554,7 +555,7 @@ const createStyles = (colors: typeof Colors.light) => StyleSheet.create({
     borderColor: colors.primary,
   },
   filterBtnText: {
-    fontSize: 11,
+    fontSize: moderateScale(11),
     fontWeight: "600",
     color: colors.textSecondary,
   },
@@ -571,17 +572,17 @@ const createStyles = (colors: typeof Colors.light) => StyleSheet.create({
     gap: 12,
   },
   emptyTitle: {
-    fontSize: 20,
+    fontSize: moderateScale(20),
     fontWeight: "700",
     color: colors.text,
   },
   emptySubtitle: {
-    fontSize: 14,
+    fontSize: moderateScale(14),
     color: colors.textMuted,
   },
   orderCard: {
     backgroundColor: colors.surface,
-    borderRadius: 12,
+    borderRadius: moderateScale(12),
     padding: 10,
     gap: 10,
     shadowColor: "#000",
@@ -596,9 +597,9 @@ const createStyles = (colors: typeof Colors.light) => StyleSheet.create({
     gap: 10,
   },
   orderTypeIcon: {
-    width: 32,
-    height: 32,
-    borderRadius: 8,
+    width: moderateScale(32),
+    height: moderateScale(32),
+    borderRadius: moderateScale(8),
     backgroundColor: `${colors.primary}15`,
     alignItems: "center",
     justifyContent: "center",
@@ -608,12 +609,12 @@ const createStyles = (colors: typeof Colors.light) => StyleSheet.create({
     gap: 2,
   },
   orderType: {
-    fontSize: 12,
+    fontSize: moderateScale(12),
     fontWeight: "700",
     color: colors.text,
   },
   orderId: {
-    fontSize: 10,
+    fontSize: moderateScale(10),
     color: colors.textMuted,
   },
   statusBadge: {
@@ -622,15 +623,15 @@ const createStyles = (colors: typeof Colors.light) => StyleSheet.create({
     gap: 4,
     paddingHorizontal: 8,
     paddingVertical: 3,
-    borderRadius: 12,
+    borderRadius: moderateScale(12),
   },
   statusDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
+    width: moderateScale(6),
+    height: moderateScale(6),
+    borderRadius: moderateScale(3),
   },
   statusText: {
-    fontSize: 10,
+    fontSize: moderateScale(10),
     fontWeight: "700",
   },
   orderDetails: {
@@ -643,7 +644,7 @@ const createStyles = (colors: typeof Colors.light) => StyleSheet.create({
   },
   detailText: {
     flex: 1,
-    fontSize: 11,
+    fontSize: moderateScale(11),
     color: colors.textSecondary,
   },
   orderCardBottom: {
@@ -655,7 +656,7 @@ const createStyles = (colors: typeof Colors.light) => StyleSheet.create({
     paddingTop: 10,
   },
   orderAmount: {
-    fontSize: 14,
+    fontSize: moderateScale(14),
     fontWeight: "800",
     color: colors.text,
   },
@@ -665,7 +666,7 @@ const createStyles = (colors: typeof Colors.light) => StyleSheet.create({
     gap: 4,
   },
   trackBtnText: {
-    fontSize: 11,
+    fontSize: moderateScale(11),
     fontWeight: "600",
     color: colors.primary,
   },
@@ -675,12 +676,12 @@ const createStyles = (colors: typeof Colors.light) => StyleSheet.create({
     backgroundColor: `${colors.primary}10`,
     paddingVertical: 6,
     paddingHorizontal: 10,
-    borderRadius: 8,
+    borderRadius: moderateScale(8),
     gap: 6,
     marginBottom: 4,
   },
   scheduledBadgeText: {
-    fontSize: 11,
+    fontSize: moderateScale(11),
     fontWeight: "700",
     color: colors.primary,
   },
@@ -690,11 +691,11 @@ const createStyles = (colors: typeof Colors.light) => StyleSheet.create({
     gap: 4,
     paddingHorizontal: 8,
     paddingVertical: 4,
-    borderRadius: 8,
+    borderRadius: moderateScale(8),
     borderWidth: 1,
   },
   rateBtnText: {
-    fontSize: 11,
+    fontSize: moderateScale(11),
     fontWeight: "700",
   },
   reviewedBadge: {
@@ -703,10 +704,10 @@ const createStyles = (colors: typeof Colors.light) => StyleSheet.create({
     gap: 4,
     paddingHorizontal: 8,
     paddingVertical: 4,
-    borderRadius: 8,
+    borderRadius: moderateScale(8),
   },
   reviewedText: {
-    fontSize: 11,
+    fontSize: moderateScale(11),
     fontWeight: "700",
   },
   modalBackdrop: {
@@ -718,35 +719,35 @@ const createStyles = (colors: typeof Colors.light) => StyleSheet.create({
   },
   modalCard: {
     width: "100%",
-    borderRadius: 16,
+    borderRadius: moderateScale(16),
     borderWidth: 1,
     padding: 20,
     alignItems: "center",
   },
   modalTitle: {
-    fontSize: 18,
+    fontSize: moderateScale(18),
     fontWeight: "700",
   },
   modalTagChip: {
     paddingHorizontal: 10,
     paddingVertical: 5,
-    borderRadius: 14,
+    borderRadius: moderateScale(14),
     borderWidth: 1,
   },
   modalCommentInput: {
     width: "100%",
-    borderRadius: 10,
+    borderRadius: moderateScale(10),
     borderWidth: 1,
     padding: 10,
-    fontSize: 13,
+    fontSize: moderateScale(13),
     marginTop: 6,
     textAlignVertical: "top",
-    minHeight: 50,
+    minHeight: moderateScale(50),
   },
   modalCancelBtn: {
     flex: 1,
     paddingVertical: 12,
-    borderRadius: 10,
+    borderRadius: moderateScale(10),
     borderWidth: 1,
     alignItems: "center",
     justifyContent: "center",
@@ -754,7 +755,7 @@ const createStyles = (colors: typeof Colors.light) => StyleSheet.create({
   modalSubmitBtn: {
     flex: 1,
     paddingVertical: 12,
-    borderRadius: 10,
+    borderRadius: moderateScale(10),
     alignItems: "center",
     justifyContent: "center",
   },

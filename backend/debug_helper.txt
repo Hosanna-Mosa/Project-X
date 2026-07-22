@@ -607,3 +607,43 @@
 [2026-07-22T06:01:18.526Z] Created order FLR-260722-8281 type: bike, driversToNotify: 2, isReserved: false
  -> emitting new_order to driverUser._id: 6a453f1cecb0e2672c8b06aa
  -> emitting new_order to driverUser._id: 6a4bc52da685d9f0c3950bb0
+
+[2026-07-22T09:42:30.136Z] Created order FLR-260722-9871 type: bike, driversToNotify: 10, isReserved: false
+ -> emitting new_order to driverUser._id: 6a60906b5f35a1dd09c40cda
+ -> emitting new_order to driverUser._id: 6a60906b5f35a1dd09c40cc9
+ -> emitting new_order to driverUser._id: 6a60906c5f35a1dd09c40ceb
+ -> emitting new_order to driverUser._id: 6a60906b5f35a1dd09c40cc3
+ -> emitting new_order to driverUser._id: 6a60906b5f35a1dd09c40ccf
+ -> emitting new_order to driverUser._id: 6a60906b5f35a1dd09c40cd4
+ -> emitting new_order to driverUser._id: 6a60906c5f35a1dd09c40ce0
+ -> emitting new_order to driverUser._id: 6a60906c5f35a1dd09c40ce5
+ -> emitting new_order to driverUser._id: 6a60906c5f35a1dd09c40cf1
+ -> emitting new_order to driverUser._id: 6a60906c5f35a1dd09c40cf6
+
+[2026-07-22T09:42:37.165Z] Created order FLR-260722-7250 type: bike, driversToNotify: 12, isReserved: false
+ -> emitting new_order to driverUser._id: 6a453f1cecb0e2672c8b06aa
+ -> emitting new_order to driverUser._id: 6a4bc52da685d9f0c3950bb0
+ -> emitting new_order to driverUser._id: 6a60906b5f35a1dd09c40cc3
+ -> emitting new_order to driverUser._id: 6a60906b5f35a1dd09c40cc9
+ -> emitting new_order to driverUser._id: 6a60906b5f35a1dd09c40ccf
+ -> emitting new_order to driverUser._id: 6a60906b5f35a1dd09c40cd4
+ -> emitting new_order to driverUser._id: 6a60906b5f35a1dd09c40cda
+ -> emitting new_order to driverUser._id: 6a60906c5f35a1dd09c40ce0
+ -> emitting new_order to driverUser._id: 6a60906c5f35a1dd09c40ce5
+ -> emitting new_order to driverUser._id: 6a60906c5f35a1dd09c40ceb
+ -> emitting new_order to driverUser._id: 6a60906c5f35a1dd09c40cf1
+ -> emitting new_order to driverUser._id: 6a60906c5f35a1dd09c40cf6
+
+[2026-07-22T09:42:37.407Z] Created order FLR-260722-8650 type: bike, driversToNotify: 12, isReserved: false
+ -> emitting new_order to driverUser._id: 6a453f1cecb0e2672c8b06aa
+ -> emitting new_order to driverUser._id: 6a4bc52da685d9f0c3950bb0
+ -> emitting new_order to driverUser._id: 6a60906b5f35a1dd09c40cc3
+ -> emitting new_order to driverUser._id: 6a60906b5f35a1dd09c40cc9
+ -> emitting new_order to driverUser._id: 6a60906b5f35a1dd09c40ccf
+ -> emitting new_order to driverUser._id: 6a60906b5f35a1dd09c40cd4
+ -> emitting new_order to driverUser._id: 6a60906b5f35a1dd09c40cda
+ -> emitting new_order to driverUser._id: 6a60906c5f35a1dd09c40ce0
+ -> emitting new_order to driverUser._id: 6a60906c5f35a1dd09c40ce5
+ -> emitting new_order to driverUser._id: 6a60906c5f35a1dd09c40ceb
+ -> emitting new_order to driverUser._id: 6a60906c5f35a1dd09c40cf1
+ -> emitting new_order to driverUser._id: 6a60906c5f35a1dd09c40cf6

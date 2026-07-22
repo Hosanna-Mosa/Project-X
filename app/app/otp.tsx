@@ -11,6 +11,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
+import { moderateScale } from "react-native-size-matters";
 import Colors from "@/constants/colors";
 import { useAuthStore } from "@/contexts/authStore";
 import { useThemeStore } from "@/contexts/themeStore";
@@ -65,7 +66,7 @@ export default function OTPScreen() {
   return (
     <ScreenWrapper style={styles.container}>
       <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
-        <Feather name="arrow-left" size={22} color={colors.text} />
+        <Feather name="arrow-left" size={moderateScale(22)} color={colors.text} />
       </TouchableOpacity>
 
       <View style={styles.header}>
@@ -107,7 +108,7 @@ export default function OTPScreen() {
         ) : (
           <>
             <Text style={styles.verifyBtnText}>Verify &amp; Continue</Text>
-            <Feather name="arrow-right" size={18} color="#fff" />
+            <Feather name="arrow-right" size={moderateScale(18)} color="#fff" />
           </>
         )}
       </TouchableOpacity>
@@ -124,14 +125,14 @@ export default function OTPScreen() {
 
 const createStyles = (colors: typeof Colors.light) => StyleSheet.create({
   container: {
-    paddingHorizontal: 28,
-    paddingTop: 20,
+    paddingHorizontal: 24,
+    paddingTop: 24,
     gap: 32,
   },
   backBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 10,
+    width: moderateScale(36),
+    height: moderateScale(36),
+    borderRadius: moderateScale(10),
     backgroundColor: colors.surface,
     alignItems: "center",
     justifyContent: "center",
@@ -142,28 +143,28 @@ const createStyles = (colors: typeof Colors.light) => StyleSheet.create({
     gap: 8,
   },
   title: {
-    fontSize: 22,
+    fontSize: moderateScale(22),
     fontWeight: "800",
     color: colors.text,
     letterSpacing: -0.5,
   },
   subtitle: {
-    fontSize: 12,
+    fontSize: moderateScale(12),
     color: colors.textSecondary,
-    lineHeight: 16,
+    lineHeight: moderateScale(16),
   },
   otpRow: {
     flexDirection: "row",
-    gap: 10,
+    gap: 8,
     justifyContent: "center",
   },
   otpInput: {
-    width: 38,
-    height: 46,
-    borderRadius: 10,
+    width: moderateScale(38),
+    height: moderateScale(46),
+    borderRadius: moderateScale(10),
     borderWidth: 1.5,
     borderColor: colors.border,
-    fontSize: 18,
+    fontSize: moderateScale(18),
     fontWeight: "700",
     color: colors.text,
     backgroundColor: colors.surface,
@@ -174,8 +175,8 @@ const createStyles = (colors: typeof Colors.light) => StyleSheet.create({
   },
   verifyBtn: {
     backgroundColor: colors.primary,
-    borderRadius: 12,
-    paddingVertical: 14,
+    borderRadius: moderateScale(12),
+    minHeight: moderateScale(50),
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
@@ -192,14 +193,14 @@ const createStyles = (colors: typeof Colors.light) => StyleSheet.create({
   },
   verifyBtnText: {
     color: "#fff",
-    fontSize: 15,
+    fontSize: moderateScale(15),
     fontWeight: "700",
   },
   resendBtn: {
     alignItems: "center",
   },
   resendText: {
-    fontSize: 12,
+    fontSize: moderateScale(12),
     color: colors.textSecondary,
   },
   resendLink: {

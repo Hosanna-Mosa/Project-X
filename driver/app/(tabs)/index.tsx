@@ -1,6 +1,8 @@
 import React, { useCallback, useEffect, useState } from "react";
-import { Alert, Linking, Pressable, ScrollView, StyleSheet, Text, View, TouchableOpacity, Image, Animated, Easing } from "react-native";
+import { Alert, Linking, Pressable, ScrollView, StyleSheet, Text, View, TouchableOpacity, Image, Animated, Easing, Dimensions } from "react-native";
+const { height: SCREEN_HEIGHT } = Dimensions.get("window");
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { moderateScale } from "react-native-size-matters";
 import { Feather } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 
@@ -46,6 +48,7 @@ const fallbackHotspots: Hotspot[] = [
 export default function HomeScreen() {
   const insets = useSafeAreaInsets();
   const [mode, setMode] = useState<"ride" | "delivery">("ride");
+  const overlapMargin = (SCREEN_HEIGHT >= 700 && SCREEN_HEIGHT <= 850) ? 0 : -46;
   const [showOnlineModal, setShowOnlineModal] = useState(false);
   const [hotspots, setHotspots] = useState<Hotspot[]>(fallbackHotspots);
   const [isLoadingHotspots, setIsLoadingHotspots] = useState(false);
@@ -278,7 +281,7 @@ export default function HomeScreen() {
         </LinearGradient>
 
         <View style={styles.content}>
-            <View style={{ position: 'relative', zIndex: 10, marginTop: -46, marginBottom: 8 }}>
+            <View style={{ position: 'relative', zIndex: 10, marginTop: overlapMargin, marginBottom: 8 }}>
               {/* Online Status Banner (Overlapping) */}
               <Pressable
                 style={styles.statusCard}
@@ -495,7 +498,7 @@ export default function HomeScreen() {
 
         {/* Safety Alerts */}
         <View style={styles.safetyAlert}>
-          <Feather name="alert-triangle" size={24} color="#f59e0b" style={{ marginTop: 2 }} />
+          <Feather name="alert-triangle" size={moderateScale(24)} color="#f59e0b" style={{ marginTop: 2 }} />
           <View style={styles.safetyContent}>
             <Text style={styles.safetyTitle}>Safety Alert</Text>
             <Text style={styles.safetyText}>
@@ -538,16 +541,16 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.primary,
     paddingHorizontal: 16,
     paddingVertical: 8,
-    borderRadius: 20,
+    borderRadius: moderateScale(20),
   },
   startRideBtnText: {
     color: '#fff',
     fontFamily: 'Inter_600SemiBold',
-    fontSize: 14,
+    fontSize: moderateScale(14),
   },
   headerGradient: {
-    borderBottomLeftRadius: 24,
-    borderBottomRightRadius: 24,
+    borderBottomLeftRadius: moderateScale(24),
+    borderBottomRightRadius: moderateScale(24),
     overflow: 'hidden',
     position: 'relative',
   },
@@ -569,9 +572,9 @@ const styles = StyleSheet.create({
     zIndex: 2,
   },
   menuButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: moderateScale(40),
+    height: moderateScale(40),
+    borderRadius: moderateScale(20),
     backgroundColor: '#fff',
     alignItems: 'center',
     justifyContent: 'center',
@@ -583,12 +586,12 @@ const styles = StyleSheet.create({
   },
   greeting: {
     fontFamily: "Inter_700Bold",
-    fontSize: 20,
+    fontSize: moderateScale(20),
     color: '#fff',
   },
   subGreeting: {
     fontFamily: "Inter_500Medium",
-    fontSize: 13,
+    fontSize: moderateScale(13),
     color: 'rgba(255,255,255,0.9)',
     marginTop: 2,
   },
@@ -607,7 +610,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.95)',
     paddingHorizontal: 6,
     paddingVertical: 3,
-    borderRadius: 10,
+    borderRadius: moderateScale(10),
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
@@ -621,12 +624,12 @@ const styles = StyleSheet.create({
   },
   onlineBadgeText: {
     fontFamily: 'Inter_700Bold',
-    fontSize: 9,
+    fontSize: moderateScale(9),
     color: Colors.success,
   },
   statusCard: {
     backgroundColor: '#fff',
-    borderRadius: 16,
+    borderRadius: moderateScale(16),
     padding: 16,
     flexDirection: 'row',
     alignItems: 'center',
@@ -640,9 +643,9 @@ const styles = StyleSheet.create({
     zIndex: 5,
   },
   statusIconBg: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
+    width: moderateScale(48),
+    height: moderateScale(48),
+    borderRadius: moderateScale(24),
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 12,
@@ -652,19 +655,19 @@ const styles = StyleSheet.create({
   },
   statusCardTitle: {
     fontFamily: 'Inter_700Bold',
-    fontSize: 15,
+    fontSize: moderateScale(15),
     color: Colors.text,
     marginBottom: 2,
   },
   statusCardDesc: {
     fontFamily: 'Inter_500Medium',
-    fontSize: 12,
+    fontSize: moderateScale(12),
     color: Colors.textMuted,
   },
   powerButton: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
+    width: moderateScale(48),
+    height: moderateScale(48),
+    borderRadius: moderateScale(24),
     backgroundColor: '#f1f5f9',
     alignItems: 'center',
     justifyContent: 'center',
@@ -679,7 +682,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
     backgroundColor: Colors.surface,
-    borderRadius: 14,
+    borderRadius: moderateScale(14),
     padding: 14,
     borderWidth: 1,
     borderColor: Colors.border,
@@ -695,9 +698,9 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   homeModeIconWrap: {
-    width: 38,
-    height: 38,
-    borderRadius: 10,
+    width: moderateScale(38),
+    height: moderateScale(38),
+    borderRadius: moderateScale(10),
     backgroundColor: '#e0f2fe',
     alignItems: "center",
     justifyContent: "center",
@@ -710,7 +713,7 @@ const styles = StyleSheet.create({
   },
   homeModeLabel: {
     fontFamily: "Inter_600SemiBold",
-    fontSize: 14,
+    fontSize: moderateScale(14),
     color: Colors.text,
     marginBottom: 2,
   },
@@ -719,13 +722,13 @@ const styles = StyleSheet.create({
   },
   homeModeDesc: {
     fontFamily: "Inter_400Regular",
-    fontSize: 12,
+    fontSize: moderateScale(12),
     color: Colors.textMuted,
   },
   homeModeSwitch: {
-    width: 44,
-    height: 24,
-    borderRadius: 12,
+    width: moderateScale(44),
+    height: moderateScale(24),
+    borderRadius: moderateScale(12),
     backgroundColor: Colors.border,
     justifyContent: "center",
     paddingHorizontal: 3,
@@ -734,9 +737,9 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.primary,
   },
   homeModeSwitchThumb: {
-    width: 18,
-    height: 18,
-    borderRadius: 9,
+    width: moderateScale(18),
+    height: moderateScale(18),
+    borderRadius: moderateScale(9),
     backgroundColor: Colors.white,
     shadowColor: Colors.black,
     shadowOffset: { width: 0, height: 1 },
@@ -754,7 +757,7 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     fontFamily: "Inter_700Bold",
-    fontSize: 15,
+    fontSize: moderateScale(15),
     color: Colors.text,
   },
   sectionSpacing: {
@@ -762,7 +765,7 @@ const styles = StyleSheet.create({
   },
   emptyTasksCard: {
     backgroundColor: Colors.surface,
-    borderRadius: 16,
+    borderRadius: moderateScale(16),
     padding: 20,
     flexDirection: 'row',
     alignItems: 'center',
@@ -779,20 +782,20 @@ const styles = StyleSheet.create({
   },
   emptyTasksTitle: {
     fontFamily: 'Inter_700Bold',
-    fontSize: 15,
+    fontSize: moderateScale(15),
     color: Colors.text,
     marginBottom: 4,
   },
   emptyTasksDesc: {
     fontFamily: 'Inter_400Regular',
-    fontSize: 12,
+    fontSize: moderateScale(12),
     color: Colors.textSecondary,
     lineHeight: 18,
   },
   calendarBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: moderateScale(40),
+    height: moderateScale(40),
+    borderRadius: moderateScale(20),
     backgroundColor: Colors.surfaceContainerLow,
     alignItems: 'center',
     justifyContent: 'center',
@@ -801,7 +804,7 @@ const styles = StyleSheet.create({
   safetyAlert: {
     flexDirection: "row",
     backgroundColor: "#fff5e6",
-    borderRadius: 16,
+    borderRadius: moderateScale(16),
     padding: 16,
     borderWidth: 1,
     borderColor: "#fde68a",
@@ -811,17 +814,17 @@ const styles = StyleSheet.create({
   },
   safetyContent: {
     flex: 1,
-    marginRight: 60, // Make room for image
+    marginRight: 60,
   },
   safetyTitle: {
     fontFamily: "Inter_700Bold",
-    fontSize: 15,
+    fontSize: moderateScale(15),
     color: '#92400e',
     marginBottom: 4,
   },
   safetyText: {
     fontFamily: "Inter_500Medium",
-    fontSize: 12,
+    fontSize: moderateScale(12),
     color: '#b45309',
     lineHeight: 18,
   },
@@ -834,7 +837,7 @@ const styles = StyleSheet.create({
   },
   scheduledCard: {
     backgroundColor: Colors.surface,
-    borderRadius: 14,
+    borderRadius: moderateScale(14),
     padding: 14,
     borderWidth: 1,
     borderColor: Colors.border,
@@ -855,12 +858,12 @@ const styles = StyleSheet.create({
   },
   scheduledTime: {
     fontFamily: "Inter_600SemiBold",
-    fontSize: 14,
+    fontSize: moderateScale(14),
     color: Colors.text,
   },
   scheduledPrice: {
     fontFamily: "Inter_700Bold",
-    fontSize: 15,
+    fontSize: moderateScale(15),
     color: Colors.success,
   },
   scheduledBody: {
@@ -879,7 +882,7 @@ const styles = StyleSheet.create({
   },
   addressText: {
     fontFamily: "Inter_400Regular",
-    fontSize: 13,
+    fontSize: moderateScale(13),
     color: Colors.textSecondary,
     flex: 1,
   },
@@ -901,18 +904,18 @@ const styles = StyleSheet.create({
   },
   customerName: {
     fontFamily: "Inter_500Medium",
-    fontSize: 12,
+    fontSize: moderateScale(12),
     color: Colors.textMuted,
   },
   badge: {
     backgroundColor: Colors.primaryLight,
     paddingHorizontal: 8,
     paddingVertical: 3,
-    borderRadius: 6,
+    borderRadius: moderateScale(6),
   },
   badgeText: {
     fontFamily: "Inter_700Bold",
-    fontSize: 10,
+    fontSize: moderateScale(10),
     color: Colors.primaryDark,
   },
 });
