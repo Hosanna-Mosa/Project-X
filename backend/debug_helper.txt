@@ -647,3 +647,11 @@
  -> emitting new_order to driverUser._id: 6a60906c5f35a1dd09c40ceb
  -> emitting new_order to driverUser._id: 6a60906c5f35a1dd09c40cf1
  -> emitting new_order to driverUser._id: 6a60906c5f35a1dd09c40cf6
+
+[2026-07-22T10:37:09.985Z] Created order FLR-260722-1216 type: helper, driversToNotify: 4, isReserved: false
+ -> emitting new_order to driverUser._id: 6a42576a48525b57267766c9
+ -> emitting new_order to driverUser._id: 6a49ef4e3556cfd4b550c001
+ -> emitting new_order to driverUser._id: 6a4933ed1c45737b5916e2fd
+
+[2026-07-22T10:37:49.374Z] Created order FLR-260722-2110 type: helper, driversToNotify: 2, isReserved: false
+ -> emitting new_order to driverUser._id: 6a4933ed1c45737b5916e2fd

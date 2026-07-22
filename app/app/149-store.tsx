@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Image, Dimensions, SafeAreaView, Platform, StatusBar, ActivityIndicator, Animated, Easing } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Image, Dimensions, SafeAreaView, Platform, StatusBar, ActivityIndicator, Animated, Easing, Modal } from 'react-native';
 import { Ionicons, Feather } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -16,6 +16,8 @@ export default function Store149Screen() {
   const { items: cartItems, addItem: addCartItem, updateQuantity: updateCartQuantity } = useCartStore();
   const [store149Items, setStore149Items] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [selectedItem, setSelectedItem] = useState<any>(null);
+  const [isSheetVisible, setIsSheetVisible] = useState(false);
 
   const floatAnim = useRef(new Animated.Value(0)).current;
   const floatAnim2 = useRef(new Animated.Value(0)).current;
@@ -176,7 +178,15 @@ export default function Store149Screen() {
               };
 
               return (
-                <View key={item._id} style={styles.productCard}>
+                <TouchableOpacity
+                  key={item._id}
+                  style={styles.productCard}
+                  activeOpacity={0.95}
+                  onPress={() => {
+                    setSelectedItem(item);
+                    setIsSheetVisible(true);
+                  }}
+                >
                   
                   {/* Product Image & Select Button */}
                   <View style={styles.imageContainer}>
@@ -239,13 +249,131 @@ export default function Store149Screen() {
                     )}
                   </View>
                   
-                </View>
+                </TouchableOpacity>
               );
             })}
           </View>
         )}
 
       </ScrollView>
+
+      {/* Bottom Sheet Modal */}
+      <Modal
+        visible={isSheetVisible}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setIsSheetVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <TouchableOpacity 
+            style={styles.modalCloseBackdrop} 
+            activeOpacity={1} 
+            onPress={() => setIsSheetVisible(false)} 
+          />
+          
+          <View style={styles.sheetContainer}>
+            {/* Close Button overlapping the top center */}
+            <TouchableOpacity 
+              style={styles.sheetCloseButton} 
+              onPress={() => setIsSheetVisible(false)}
+            >
+              <Ionicons name="close" size={24} color="#FFF" />
+            </TouchableOpacity>
+
+            {selectedItem && (
+              <View style={styles.sheetContent}>
+                {/* Image */}
+                <Image 
+                  source={{ uri: selectedItem.images && selectedItem.images.length > 0 ? selectedItem.images[0] : "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=400" }} 
+                  style={styles.sheetImage}
+                  resizeMode="cover"
+                />
+
+                {/* Info Container */}
+                <View style={styles.sheetInfoContainer}>
+                  {/* First row: Veg/Bestseller and ADD button */}
+                  <View style={styles.sheetRow}>
+                    <View style={styles.sheetBadgeContainer}>
+                      <View style={[styles.dietIcon, { borderColor: selectedItem.isVeg ? "#16A34A" : "#E11D48", marginRight: 6 }]}>
+                        <View style={[styles.dietDot, { backgroundColor: selectedItem.isVeg ? "#16A34A" : "#E11D48" }]} />
+                      </View>
+                      <Ionicons name="star" size={14} color="#E11D48" style={{ marginRight: 2 }} />
+                      <Text style={styles.bestsellerText}>Bestseller</Text>
+                    </View>
+
+                    {/* Add button inside sheet */}
+                    <View>
+                      {cartItems.find((i) => i._id === selectedItem._id) ? (
+                        <View style={styles.sheetQtyPill}>
+                          <TouchableOpacity
+                            onPress={() => updateCartQuantity(selectedItem._id, cartItems.find((i) => i._id === selectedItem._id)!.quantity - 1)}
+                            style={styles.sheetQtyBtn}
+                          >
+                            <Feather name="minus" size={16} color="#7E3AF2" />
+                          </TouchableOpacity>
+                          <Text style={styles.sheetQtyText}>{cartItems.find((i) => i._id === selectedItem._id)!.quantity}</Text>
+                          <TouchableOpacity
+                            onPress={() => {
+                              const foodItem = {
+                                _id: selectedItem._id,
+                                name: selectedItem.name,
+                                description: selectedItem.description || "",
+                                price: selectedItem.price,
+                                category: selectedItem.category || "149 Store",
+                                isVeg: selectedItem.isVeg,
+                                images: selectedItem.images && selectedItem.images.length > 0 ? selectedItem.images : ["https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=400"]
+                              };
+                              addCartItem(foodItem, selectedItem.vendorId);
+                            }}
+                            style={styles.sheetQtyBtn}
+                          >
+                            <Feather name="plus" size={16} color="#7E3AF2" />
+                          </TouchableOpacity>
+                        </View>
+                      ) : (
+                        <TouchableOpacity 
+                          style={styles.sheetAddButton} 
+                          onPress={() => {
+                            const foodItem = {
+                              _id: selectedItem._id,
+                              name: selectedItem.name,
+                              description: selectedItem.description || "",
+                              price: selectedItem.price,
+                              category: selectedItem.category || "149 Store",
+                              isVeg: selectedItem.isVeg,
+                              images: selectedItem.images && selectedItem.images.length > 0 ? selectedItem.images : ["https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=400"]
+                            };
+                            addCartItem(foodItem, selectedItem.vendorId);
+                          }}
+                        >
+                          <Text style={styles.sheetAddButtonText}>ADD</Text>
+                        </TouchableOpacity>
+                      )}
+                    </View>
+                  </View>
+
+                  {/* Title */}
+                  <Text style={styles.sheetTitle}>{selectedItem.name}</Text>
+                  
+                  {/* Price */}
+                  <Text style={styles.sheetPrice}>₹{selectedItem.price}</Text>
+
+                  {/* Rating */}
+                  <View style={styles.sheetRatingRow}>
+                    <Ionicons name="star" size={14} color="#16A34A" />
+                    <Text style={styles.sheetRatingText}> {selectedItem.rating || "4.2"} ({selectedItem.ratingCount || "34"})</Text>
+                  </View>
+
+                  {/* Description */}
+                  <Text style={styles.sheetDescription}>
+                    {selectedItem.description || "Fresh and delicious meal prepared with the best ingredients by our top partners."}
+                  </Text>
+                </View>
+              </View>
+            )}
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -527,5 +655,129 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#1F2937',
     paddingHorizontal: 4,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    justifyContent: 'flex-end',
+  },
+  modalCloseBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  sheetContainer: {
+    backgroundColor: '#FFFFFF',
+    borderTopLeftRadius: moderateScale(24),
+    borderTopRightRadius: moderateScale(24),
+    paddingBottom: Platform.OS === 'ios' ? 40 : 24,
+    position: 'relative',
+    overflow: 'visible',
+  },
+  sheetCloseButton: {
+    position: 'absolute',
+    top: -22,
+    alignSelf: 'center',
+    width: moderateScale(44),
+    height: moderateScale(44),
+    borderRadius: moderateScale(22),
+    backgroundColor: '#111827',
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 999,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 5,
+  },
+  sheetContent: {
+    width: '100%',
+  },
+  sheetImage: {
+    width: '100%',
+    height: moderateScale(240),
+    borderTopLeftRadius: moderateScale(24),
+    borderTopRightRadius: moderateScale(24),
+  },
+  sheetInfoContainer: {
+    padding: 20,
+  },
+  sheetRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  sheetBadgeContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  bestsellerText: {
+    color: '#E11D48',
+    fontSize: moderateScale(12),
+    fontWeight: '700',
+  },
+  sheetAddButton: {
+    backgroundColor: '#FFFFFF',
+    borderWidth: 1.5,
+    borderColor: '#7E3AF2',
+    paddingHorizontal: 28,
+    paddingVertical: 8,
+    borderRadius: moderateScale(20),
+    shadowColor: '#7E3AF2',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  sheetAddButtonText: {
+    color: '#7E3AF2',
+    fontWeight: '800',
+    fontSize: moderateScale(14),
+  },
+  sheetQtyPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    borderRadius: moderateScale(20),
+    borderWidth: 1.5,
+    borderColor: '#7E3AF2',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
+  sheetQtyBtn: {
+    padding: 4,
+  },
+  sheetQtyText: {
+    fontSize: moderateScale(14),
+    fontWeight: '800',
+    color: '#7E3AF2',
+    paddingHorizontal: 12,
+  },
+  sheetTitle: {
+    fontSize: moderateScale(20),
+    fontWeight: '800',
+    color: '#1F2937',
+    marginBottom: 8,
+  },
+  sheetPrice: {
+    fontSize: moderateScale(18),
+    fontWeight: '800',
+    color: '#1F2937',
+    marginBottom: 8,
+  },
+  sheetRatingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  sheetRatingText: {
+    fontSize: moderateScale(13),
+    fontWeight: '600',
+    color: '#4B5563',
+  },
+  sheetDescription: {
+    fontSize: moderateScale(14),
+    color: '#6B7280',
+    lineHeight: moderateScale(20),
   },
 });
