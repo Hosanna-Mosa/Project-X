@@ -72,6 +72,7 @@ function RootLayoutNav() {
         <Stack.Screen name="restaurant-menu" options={{ headerShown: false }} />
         <Stack.Screen name="restaurant-details" options={{ headerShown: false }} />
         <Stack.Screen name="chat" options={{ headerShown: false }} />
+        <Stack.Screen name="149-store" options={{ headerShown: false, animation: "slide_from_right" }} />
       </Stack>
       {Platform.OS === "android" && insets.bottom > 0 && (
         <View style={{ height: insets.bottom, backgroundColor: "#FFFFFF" }} />

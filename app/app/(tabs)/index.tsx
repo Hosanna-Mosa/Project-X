@@ -212,6 +212,23 @@ export default function HomeScreen() {
   const [searchText, setSearchText] = useState("");
   const [isSearchActive, setIsSearchActive] = useState(false);
   const [recentSearches, setRecentSearches] = useState<string[]>([]);
+  
+  const screenWidth = Dimensions.get('window').width;
+  const carouselRef = useRef<ScrollView>(null);
+  const bannerScrollX = useRef(new Animated.Value(0)).current;
+  const bannerIndexRef = useRef(0);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      let next = bannerIndexRef.current + 1;
+      if (next > 3) next = 0;
+      if (carouselRef.current) {
+        carouselRef.current.scrollTo({ x: next * screenWidth, animated: true });
+      }
+      bannerIndexRef.current = next;
+    }, 4000);
+    return () => clearInterval(interval);
+  }, [screenWidth]);
 
   useEffect(() => {
     (async () => {
@@ -694,251 +711,336 @@ export default function HomeScreen() {
       ? filteredItems
       : filteredItems.filter(r => foodFilter === 'veg' ? r.isPureVeg : !r.isPureVeg);
 
-  const showCategories = !hasNoLocation && (showHomeSkeleton || loadingDrivers || nearbyDriversCount > 0);
+  const showCategories = !hasNoLocation && (showHomeSkeleton || loadingDrivers || (nearbyDriversCount ?? 0) > 0);
 
-  const renderHeader = () => {
-    if (!showCategories || (!showHomeSkeleton && visibleItems.length === 0)) return null;
+
+  const ServiceCategoryNew = ({ icon, label, active, onPress, iconFamily = 'Ionicons' }: any) => {
     return (
-      <>
-        {activeService === 'Food' && (
-          <>
-            {showHomeSkeleton ? (
-              <GreetingSectionSkeleton colors={colors} styles={styles} />
-            ) : (
-              <View style={styles.greetingSection}>
-                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-                  <Text style={[styles.greetingTitle, { marginBottom: 0, flex: 1, marginRight: 10 }]}>
-                    {getGreeting(userName)}
-                  </Text>
-
-                  <TouchableOpacity
-                    activeOpacity={0.85}
-                    onPress={() => setFoodFilter(foodFilter === 'veg' ? 'all' : 'veg')}
-                  >
-                    <Animated.View style={[
-                      styles.vegMorphBadge,
-                      {
-                        width: vegAnim.interpolate({ inputRange: [0, 1], outputRange: [38, 85] }),
-                        backgroundColor: vegAnim.interpolate({
-                          inputRange: [0, 1],
-                          outputRange: [colors.surface, '#16A34A']
-                        }),
-                        borderColor: vegAnim.interpolate({
-                          inputRange: [0, 1],
-                          outputRange: [colors.border, '#15803D']
-                        }),
-                      }
-                    ]}>
-                      <View style={styles.vegMorphIconWrap}>
-                        <Ionicons
-                          name="leaf"
-                          size={14}
-                          color={foodFilter === 'veg' ? '#FFFFFF' : '#16A34A'}
-                        />
-                      </View>
-                      <Animated.Text
-                        numberOfLines={1}
-                        style={[
-                          styles.vegMorphText,
-                          {
-                            opacity: vegAnim,
-                            transform: [{
-                              translateX: vegAnim.interpolate({
-                                inputRange: [0, 1],
-                                outputRange: [-10, 0]
-                              })
-                            }]
-                          }
-                        ]}
-                      >
-                        VEG
-                      </Animated.Text>
-                    </Animated.View>
-                  </TouchableOpacity>
-                </View>
-
-                <ScrollView
-                  horizontal
-                  showsHorizontalScrollIndicator={false}
-                  contentContainerStyle={styles.dishesScrollContent}
-                  style={styles.dishesScroll}
-                >
-                  <View style={styles.dishesRowsContainer}>
-                    <View style={styles.dishesRow}>
-                      {popularTags.slice(0, 7).map((tag, index) => (
-                        <View
-                          key={index}
-                          style={styles.dishChip}
-                        >
-                          <View style={[styles.dishIconCircle, { backgroundColor: tag.color + '15' }]}>
-                            {renderTagIcon(tag)}
-                          </View>
-                          <Text style={styles.dishChipText}>{tag.name}</Text>
-                        </View>
-                      ))}
-                    </View>
-                    <View style={styles.dishesRow}>
-                      {popularTags.slice(7, 14).map((tag, index) => (
-                        <View
-                          key={index}
-                          style={styles.dishChip}
-                        >
-                          <View style={[styles.dishIconCircle, { backgroundColor: tag.color + '15' }]}>
-                            {renderTagIcon(tag)}
-                          </View>
-                          <Text style={styles.dishChipText}>{tag.name}</Text>
-                        </View>
-                      ))}
-                    </View>
-                  </View>
-                </ScrollView>
-              </View>
-            )}
-
-            {showHomeSkeleton ? (
-              activeService === 'Food' && (
-                <Store149Skeleton colors={colors} theme={theme} styles={styles} />
-              )
-            ) : (
-              store149Items.length > 0 && (
-                <LinearGradient
-                  colors={theme === 'light' ? ['#F5F3FF', '#EDE9FE', '#F5F3FF'] : ['#2E1065', '#4C1D95', '#2E1065']}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 1 }}
-                  style={styles.store149Container}
-                >
-                  <View style={styles.store149Header}>
-                    <View style={{ flex: 1 }}>
-                      <View style={styles.store149LogoContainer}>
-                        <View style={styles.store149LogoCircle}>
-                          <Text style={styles.store149LogoText}>149</Text>
-                        </View>
-                        <Text style={styles.store149BrandText}>store</Text>
-                      </View>
-                      <View style={styles.store149Subheader}>
-                        <Ionicons name="checkmark-circle" size={14} color={theme === 'light' ? '#7C3AED' : '#C4B5FD'} />
-                        <Text style={[styles.store149SubText, { color: theme === 'light' ? '#6D28D9' : '#C4B5FD' }]}>Meals at ₹149 + Free Delivery</Text>
-                      </View>
-                    </View>
-                    <TouchableOpacity style={styles.store149ViewAllBtn} activeOpacity={0.7}>
-                      <Text style={styles.store149ViewAllText}>View All</Text>
-                      <Ionicons name="chevron-forward" size={12} color="#0284C7" />
-                    </TouchableOpacity>
-                  </View>
-
-                  <ScrollView
-                    horizontal
-                    showsHorizontalScrollIndicator={false}
-                    contentContainerStyle={styles.store149ScrollContent}
-                  >
-                    {store149Items.map((item) => {
-                      const cartItem = cartItems.find((i) => i._id === item._id);
-
-                      const handleAdd = () => {
-                        const foodItem = {
-                          _id: item._id,
-                          name: item.name,
-                          description: item.description || "",
-                          price: item.price,
-                          category: item.category || "149 Store",
-                          isVeg: item.isVeg,
-                          images: item.images && item.images.length > 0 ? item.images : ["https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=400"]
-                        };
-                        addCartItem(foodItem, item.vendorId);
-                      };
-
-                      return (
-                        <View key={item._id} style={styles.store149Card}>
-                          <View style={styles.store149ImageContainer}>
-                            <Image
-                              source={{ uri: item.images && item.images.length > 0 ? item.images[0] : "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=400" }}
-                              style={styles.store149Image}
-                            />
-
-                            {/* Diet overlay (top-left) */}
-                            <View style={styles.store149DietOverlay}>
-                              <View style={[styles.store149DietIcon, { borderColor: item.isVeg ? "#16A34A" : "#E11D48" }]}>
-                                <View style={[styles.store149DietDot, { backgroundColor: item.isVeg ? "#16A34A" : "#E11D48" }]} />
-                              </View>
-                            </View>
-
-                            {/* Rating overlay (top-right) */}
-                            <View style={styles.store149RatingOverlay}>
-                              <Ionicons name="star" size={9} color="#F59E0B" />
-                              <Text style={styles.store149RatingOverlayText}>{item.rating || "4.2"}</Text>
-                            </View>
-
-                            {/* Add button overlay */}
-                            <View style={styles.store149AddButtonOverlay}>
-                              {cartItem ? (
-                                <View style={styles.store149QtyPill}>
-                                  <TouchableOpacity
-                                    onPress={() => updateCartQuantity(item._id, cartItem.quantity - 1)}
-                                    style={styles.store149QtyBtn}
-                                    activeOpacity={0.7}
-                                  >
-                                    <Feather name="minus" size={11} color="#002045" />
-                                  </TouchableOpacity>
-                                  <Text style={styles.store149QtyText}>{cartItem.quantity}</Text>
-                                  <TouchableOpacity
-                                    onPress={handleAdd}
-                                    style={styles.store149QtyBtn}
-                                    activeOpacity={0.7}
-                                  >
-                                    <Feather name="plus" size={11} color="#002045" />
-                                  </TouchableOpacity>
-                                </View>
-                              ) : (
-                                <TouchableOpacity
-                                  onPress={handleAdd}
-                                  style={styles.store149AddPill}
-                                  activeOpacity={0.85}
-                                >
-                                  <Text style={styles.store149AddText}>ADD</Text>
-                                  <Feather name="plus" size={10} color="#16A34A" style={{ marginLeft: 2 }} />
-                                </TouchableOpacity>
-                              )}
-                            </View>
-                          </View>
-
-                          <View style={styles.store149Details}>
-                            <Text style={styles.store149Name} numberOfLines={1}>
-                              {item.name}
-                            </Text>
-
-                            <View style={styles.store149PriceRow}>
-                              <Text style={styles.store149OriginalPrice}>₹{item.originalPrice}</Text>
-                              <View style={styles.store149PriceHighlight}>
-                                <Text style={styles.store149DealPrice}>₹{item.price}</Text>
-                              </View>
-                            </View>
-
-                            <Text style={styles.store149Brand} numberOfLines={1}>
-                              {item.brand || "KFC"}
-                            </Text>
-                          </View>
-                        </View>
-                      );
-                    })}
-                  </ScrollView>
-                </LinearGradient>
-              )
-            )}
-          </>
-        )}
-
-        {activeService === 'Meat' && (
-          <View style={styles.meatBannerRow}>
-            <Text style={styles.meatBannerTitle}>🥩 Nearby Meat Centers</Text>
-            <Text style={styles.meatBannerSubtitle}>Fresh meat delivered to your door</Text>
-          </View>
-        )}
-
-
-      </>
+      <TouchableOpacity onPress={onPress} style={{ alignItems: 'center', width: 64 }}>
+        <View style={{
+          width: 60, height: 60, borderRadius: 30,
+          backgroundColor: '#F5F3FF',
+          alignItems: 'center', justifyContent: 'center',
+          shadowColor: '#7C3AED', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.15, shadowRadius: 8, elevation: 4
+        }}>
+          {iconFamily === 'MaterialCommunityIcons' ? 
+            <MaterialCommunityIcons name={icon} size={26} color="#6D28D9" /> : 
+            <Ionicons name={icon} size={26} color="#6D28D9" />
+          }
+        </View>
+        <Text style={{ marginTop: 10, fontSize: 11, fontWeight: '800', color: '#374151', letterSpacing: 0.5 }}>{label}</Text>
+      </TouchableOpacity>
     );
   };
 
+  const TagPill = ({ tag }: any) => {
+    return (
+      <TouchableOpacity style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#fff', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 20, borderWidth: 1, borderColor: '#F3F4F6' }}>
+        {renderTagIcon(tag)}
+        <Text style={{ marginLeft: 6, fontSize: 12, fontWeight: '600', color: '#374151' }}>{tag.name}</Text>
+      </TouchableOpacity>
+    );
+  };
+
+  const Store149Card = ({ item }: { item: any }) => {
+    const { items: cartItems, addItem: addCartItem, updateQuantity: updateCartQuantity } = useCartStore();
+    const cartItem = cartItems.find((i) => i._id === item._id);
+
+    const handleAdd = () => {
+      const foodItem = {
+        _id: item._id,
+        name: item.name,
+        description: item.description || "",
+        price: item.price,
+        category: item.category || "149 Store",
+        isVeg: item.isVeg,
+        images: item.images && item.images.length > 0 ? item.images : ["https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=400"]
+      };
+      addCartItem(foodItem, item.vendorId);
+    };
+
+    return (
+      <View style={{ width: 160, backgroundColor: '#fff', borderRadius: 16, padding: 8, marginRight: 12, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, elevation: 2 }}>
+        <View style={{ position: 'relative' }}>
+          <Image 
+            source={{ uri: item.images && item.images.length > 0 ? item.images[0] : "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=400" }} 
+            style={{ width: '100%', height: 120, borderRadius: 12 }} 
+          />
+          {/* Veg icon */}
+          <View style={{ position: 'absolute', top: 8, left: 8, backgroundColor: '#fff', padding: 2, borderRadius: 4 }}>
+             <View style={{ borderWidth: 1, borderColor: item.isVeg ? '#16A34A' : '#E11D48', padding: 2, borderRadius: 2 }}>
+               <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: item.isVeg ? '#16A34A' : '#E11D48' }} />
+             </View>
+          </View>
+          {/* Rating */}
+          <View style={{ position: 'absolute', top: 8, right: 8, backgroundColor: '#fff', flexDirection: 'row', alignItems: 'center', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 10 }}>
+            <Ionicons name="star" size={10} color="#F59E0B" />
+            <Text style={{ fontSize: 10, fontWeight: 'bold', marginLeft: 2, color: '#111827' }}>{item.rating || "4.8"}</Text>
+          </View>
+          {/* ADD Button */}
+          <View style={{ position: 'absolute', bottom: -12, alignSelf: 'center', zIndex: 10 }}>
+            {cartItem ? (
+              <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#fff', borderRadius: 20, paddingHorizontal: 8, paddingVertical: 4, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, elevation: 3, borderWidth: 1, borderColor: '#16A34A' }}>
+                <TouchableOpacity onPress={() => updateCartQuantity(item._id, cartItem.quantity - 1)} style={{ padding: 4 }}>
+                  <Feather name="minus" size={12} color="#16A34A" />
+                </TouchableOpacity>
+                <Text style={{ marginHorizontal: 8, fontWeight: 'bold', color: '#16A34A' }}>{cartItem.quantity}</Text>
+                <TouchableOpacity onPress={handleAdd} style={{ padding: 4 }}>
+                  <Feather name="plus" size={12} color="#16A34A" />
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <TouchableOpacity onPress={handleAdd} style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#fff', borderRadius: 20, paddingHorizontal: 16, paddingVertical: 6, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, elevation: 3 }}>
+                <Text style={{ color: '#16A34A', fontWeight: '800', fontSize: 12 }}>ADD</Text>
+                <Feather name="plus" size={12} color="#16A34A" style={{ marginLeft: 2 }} />
+              </TouchableOpacity>
+            )}
+          </View>
+        </View>
+        
+        <View style={{ marginTop: 20 }}>
+          <Text style={{ fontSize: 13, fontWeight: '700', color: '#111827' }} numberOfLines={1}>{item.name}</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4 }}>
+            <Text style={{ fontSize: 11, color: '#9CA3AF', textDecorationLine: 'line-through' }}>₹{item.originalPrice || item.price + 50}</Text>
+            <View style={{ backgroundColor: '#FEF08A', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, marginLeft: 6 }}>
+              <Text style={{ fontSize: 11, fontWeight: '800', color: '#B45309' }}>₹{item.price}</Text>
+            </View>
+          </View>
+          <Text style={{ fontSize: 11, color: '#6B7280', marginTop: 4 }} numberOfLines={1}>{item.brand || "Minerva Coffee Shop"}</Text>
+        </View>
+      </View>
+    );
+  };
+
+  const renderHeader = () => {
+    if (!showCategories || (!showHomeSkeleton && visibleItems.length === 0)) return null;
+
+    const getParallaxStyle = (index: number) => {
+      const inputRange = [(index - 1) * screenWidth, index * screenWidth, (index + 1) * screenWidth];
+      const translateX = bannerScrollX.interpolate({
+        inputRange,
+        outputRange: [screenWidth * 0.5, 0, -screenWidth * 0.5],
+        extrapolate: 'clamp'
+      });
+      const opacity = bannerScrollX.interpolate({
+        inputRange,
+        outputRange: [0, 1, 0],
+        extrapolate: 'clamp'
+      });
+      const scale = bannerScrollX.interpolate({
+        inputRange,
+        outputRange: [0.8, 1, 0.8],
+        extrapolate: 'clamp'
+      });
+      return { opacity, transform: [{ translateX }, { scale }] };
+    };
+    return (
+      <View style={{ backgroundColor: '#FAFAFA', paddingBottom: 20 }}>
+        {/* NEW HEADER AREA */}
+        <View style={{ overflow: 'hidden', borderBottomLeftRadius: 24, borderBottomRightRadius: 24, backgroundColor: '#4C1D95' }}>
+          <Animated.ScrollView
+            ref={carouselRef}
+            horizontal
+            pagingEnabled
+            showsHorizontalScrollIndicator={false}
+            bounces={false}
+            scrollEventThrottle={16}
+            onScroll={Animated.event(
+              [{ nativeEvent: { contentOffset: { x: bannerScrollX } } }],
+              { useNativeDriver: false }
+            )}
+            onMomentumScrollEnd={(e) => {
+              const newIndex = Math.round(e.nativeEvent.contentOffset.x / screenWidth);
+              bannerIndexRef.current = newIndex;
+            }}
+          >
+            {/* FOOD BANNER */}
+            <LinearGradient
+              colors={['#4C1D95', '#2E1065']}
+              style={{ width: screenWidth, paddingBottom: 50, paddingTop: insets.top + 70 }}
+            >
+              <Animated.View style={[{ flexDirection: 'row', paddingHorizontal: 16, minHeight: 140 }, getParallaxStyle(0)]}>
+                <View style={{ flex: 1.2, justifyContent: 'center' }}>
+                  <Text style={{ color: '#fff', fontSize: 30, fontWeight: '800', lineHeight: 36 }}>Craving something delicious?</Text>
+                  <Text style={{ color: '#C4B5FD', fontSize: 15, marginTop: 12 }}>Good food, good mood!</Text>
+                </View>
+                <View style={{ flex: 0.8, justifyContent: 'center', alignItems: 'center' }}>
+                  <Image source={{ uri: 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=400' }} style={{ width: 180, height: 180, borderRadius: 90, position: 'absolute', right: -30, top: -10 }} resizeMode="cover" />
+                </View>
+              </Animated.View>
+            </LinearGradient>
+            
+            {/* TASK BANNER */}
+            <LinearGradient
+              colors={['#0F766E', '#042F2E']}
+              style={{ width: screenWidth, paddingBottom: 50, paddingTop: insets.top + 70 }}
+            >
+              <Animated.View style={[{ flexDirection: 'row', paddingHorizontal: 16, minHeight: 140 }, getParallaxStyle(1)]}>
+                <View style={{ flex: 1.2, justifyContent: 'center' }}>
+                  <Text style={{ color: '#fff', fontSize: 30, fontWeight: '800', lineHeight: 36 }}>Need a helping hand today?</Text>
+                  <Text style={{ color: '#99F6E4', fontSize: 15, marginTop: 12 }}>We get your chores done!</Text>
+                </View>
+                <View style={{ flex: 0.8, justifyContent: 'center', alignItems: 'center' }}>
+                  <Image source={{ uri: 'https://images.unsplash.com/photo-1558981806-ec527fa84c39?w=400' }} style={{ width: 180, height: 180, borderRadius: 90, position: 'absolute', right: -30, top: -10 }} resizeMode="cover" />
+                </View>
+              </Animated.View>
+            </LinearGradient>
+
+            {/* RIDES BANNER */}
+            <LinearGradient
+              colors={['#C2410C', '#7F1D1D']}
+              style={{ width: screenWidth, paddingBottom: 50, paddingTop: insets.top + 70 }}
+            >
+              <Animated.View style={[{ flexDirection: 'row', paddingHorizontal: 16, minHeight: 140 }, getParallaxStyle(2)]}>
+                <View style={{ flex: 1.2, justifyContent: 'center' }}>
+                  <Text style={{ color: '#fff', fontSize: 30, fontWeight: '800', lineHeight: 36 }}>Going somewhere?</Text>
+                  <Text style={{ color: '#FED7AA', fontSize: 15, marginTop: 12 }}>Book a comfortable ride now!</Text>
+                </View>
+                <View style={{ flex: 0.8, justifyContent: 'center', alignItems: 'center' }}>
+                  <Image source={{ uri: 'https://images.unsplash.com/photo-1558981403-c5f9899a28bc?w=400' }} style={{ width: 180, height: 180, borderRadius: 90, position: 'absolute', right: -30, top: -10 }} resizeMode="cover" />
+                </View>
+              </Animated.View>
+            </LinearGradient>
+
+            {/* MEAT BANNER */}
+            <LinearGradient
+              colors={['#9F1239', '#4C0519']}
+              style={{ width: screenWidth, paddingBottom: 50, paddingTop: insets.top + 70 }}
+            >
+              <Animated.View style={[{ flexDirection: 'row', paddingHorizontal: 16, minHeight: 140 }, getParallaxStyle(3)]}>
+                <View style={{ flex: 1.2, justifyContent: 'center' }}>
+                  <Text style={{ color: '#fff', fontSize: 30, fontWeight: '800', lineHeight: 36 }}>Fresh Meat Daily!</Text>
+                  <Text style={{ color: '#FECDD3', fontSize: 15, marginTop: 12 }}>High quality cuts delivered.</Text>
+                </View>
+                <View style={{ flex: 0.8, justifyContent: 'center', alignItems: 'center' }}>
+                  <Image source={{ uri: 'https://images.unsplash.com/photo-1588168333986-50845fce0ba9?w=400' }} style={{ width: 180, height: 180, borderRadius: 90, position: 'absolute', right: -30, top: -10 }} resizeMode="cover" />
+                </View>
+              </Animated.View>
+            </LinearGradient>
+          </Animated.ScrollView>
+
+          {/* Dots Indicator */}
+          <View style={{ position: 'absolute', bottom: 50, left: 0, right: 0, justifyContent: 'center', alignItems: 'center', flexDirection: 'row', gap: 6, zIndex: 5 }}>
+            {[0, 1, 2, 3].map((i) => {
+              const width = bannerScrollX.interpolate({
+                inputRange: [(i - 1) * screenWidth, i * screenWidth, (i + 1) * screenWidth],
+                outputRange: [6, 20, 6],
+                extrapolate: 'clamp'
+              });
+              const backgroundColor = bannerScrollX.interpolate({
+                inputRange: [(i - 1) * screenWidth, i * screenWidth, (i + 1) * screenWidth],
+                outputRange: ['rgba(255,255,255,0.4)', 'rgba(255,255,255,1)', 'rgba(255,255,255,0.4)'],
+                extrapolate: 'clamp'
+              });
+              return (
+                <Animated.View 
+                  key={i} 
+                  style={{ width, height: 6, borderRadius: 3, backgroundColor }} 
+                />
+              );
+            })}
+          </View>
+
+          {/* Fixed Top Bar */}
+          <View style={{ position: 'absolute', top: insets.top + 15, left: 16, right: 16, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }} pointerEvents="box-none">
+            <TouchableOpacity onPress={() => router.push("/delivery/saved-addresses")} style={{ flexDirection: 'row', alignItems: 'center' }}>
+              <Text style={{ color: '#fff', fontSize: 16, fontWeight: '700', textShadowColor: 'rgba(0,0,0,0.3)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2 }}>
+                {selectedAddress ? (selectedAddress.label && selectedAddress.label !== "Other" ? selectedAddress.label.toUpperCase() : "ADDRESS") : "ADDRESS"}
+              </Text>
+              <Ionicons name="chevron-down" size={16} color="#fff" style={{ marginLeft: 4 }} />
+            </TouchableOpacity>
+            
+            <View style={{ flexDirection: 'row', gap: 20, alignItems: 'center' }}>
+              <TouchableOpacity style={{ position: 'relative' }}>
+                <MaterialCommunityIcons name="radius-outline" size={26} color="#fff" style={{ textShadowColor: 'rgba(0,0,0,0.3)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2 }} />
+                <View style={{ position: 'absolute', top: -4, right: -4, backgroundColor: '#EF4444', borderRadius: 10, width: 16, height: 16, alignItems: 'center', justifyContent: 'center' }}>
+                  <Text style={{ color: '#fff', fontSize: 10, fontWeight: 'bold' }}>3</Text>
+                </View>
+              </TouchableOpacity>
+              <TouchableOpacity onPress={() => router.push("/(tabs)/profile")}>
+                <Ionicons name="person-outline" size={26} color="#fff" style={{ textShadowColor: 'rgba(0,0,0,0.3)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2 }} />
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+
+
+        {/* Floating Search Bar */}
+        <View style={{ paddingHorizontal: 16, marginTop: -25, zIndex: 10 }}>
+          <TouchableOpacity 
+            style={{ backgroundColor: '#fff', borderRadius: 30, flexDirection: 'row', alignItems: 'center', padding: 8, paddingLeft: 20, shadowColor: '#000', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.1, shadowRadius: 15, elevation: 8 }}
+            activeOpacity={0.9}
+            onPress={() => setIsSearchActive(true)}
+          >
+            <Ionicons name="search" size={22} color="#9CA3AF" />
+            <Text style={{ flex: 1, marginLeft: 12, color: '#9CA3AF', fontSize: 14 }}>Search for biryani, pizza, burger...</Text>
+            <View style={{ backgroundColor: '#7C3AED', width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' }}>
+              <Ionicons name="search" size={20} color="#fff" />
+            </View>
+          </TouchableOpacity>
+        </View>
+
+        {/* Service Categories */}
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 16, marginTop: 35 }}>
+          <ServiceCategoryNew icon="bag-outline" label="TASK" active={false} onPress={() => router.push("/helper-task")} />
+          <ServiceCategoryNew icon="car-outline" label="RIDES" active={false} onPress={() => router.push("/all-services")} />
+          <ServiceCategoryNew icon="fast-food-outline" label="FOOD" active={false} onPress={() => handleServiceSwitch('Food')} />
+          <ServiceCategoryNew icon="food-steak" iconFamily="MaterialCommunityIcons" label="MEAT" active={false} onPress={() => handleServiceSwitch('Meat')} />
+        </View>
+
+        <View style={{ height: 1, backgroundColor: '#E5E7EB', marginHorizontal: 16, marginTop: 24, marginBottom: 24 }} />
+
+        {/* Greeting and See All */}
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 16 }}>
+          <Text style={{ fontSize: 22, fontWeight: 'bold', color: '#111827' }}>{getGreeting(userName)} 👋</Text>
+          <TouchableOpacity style={{ backgroundColor: '#F3E8FF', paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, flexDirection: 'row', alignItems: 'center' }}>
+            <Text style={{ color: '#6D28D9', fontSize: 13, fontWeight: '700' }}>See All</Text>
+            <Ionicons name="chevron-forward" size={14} color="#6D28D9" style={{ marginLeft: 2 }} />
+          </TouchableOpacity>
+        </View>
+
+        {/* Tag Pills */}
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 16, paddingVertical: 16 }}>
+          <View>
+            <View style={{ flexDirection: 'row', gap: 10, marginBottom: 12 }}>
+              {popularTags.slice(0, 7).map((tag, idx) => <TagPill key={idx} tag={tag} />)}
+            </View>
+            <View style={{ flexDirection: 'row', gap: 10 }}>
+              {popularTags.slice(7, 14).map((tag, idx) => <TagPill key={idx} tag={tag} />)}
+            </View>
+          </View>
+        </ScrollView>
+
+        {/* 149 Store */}
+        {store149Items.length > 0 && (
+          <View style={{ margin: 16, backgroundColor: '#F5F3FF', borderRadius: 24, padding: 16 }}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+              <View>
+                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                  <View style={{ backgroundColor: '#7C3AED', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4 }}>
+                    <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 16 }}>149</Text>
+                  </View>
+                  <Text style={{ fontSize: 20, fontWeight: '800', marginLeft: 8, color: '#111827' }}>store</Text>
+                </View>
+                <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4 }}>
+                  <Ionicons name="checkmark-circle" size={14} color="#7C3AED" />
+                  <Text style={{ color: '#6D28D9', fontSize: 12, marginLeft: 4, fontWeight: '600' }}>Meals at ₹149 + Free Delivery</Text>
+                </View>
+              </View>
+              <TouchableOpacity style={{ flexDirection: 'row', alignItems: 'center' }} onPress={() => router.push("/149-store")}>
+                <Text style={{ color: '#7C3AED', fontSize: 14, fontWeight: '700' }}>View All</Text>
+                <Ionicons name="chevron-forward" size={14} color="#7C3AED" />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+              {store149Items.map(item => <Store149Card key={item._id} item={item} />)}
+            </ScrollView>
+          </View>
+        )}
+      </View>
+    );
+  };
   const scrollY = useRef(new Animated.Value(0)).current;
 
   const headerTranslateY = scrollY.interpolate({
@@ -1016,7 +1118,7 @@ export default function HomeScreen() {
           }
           return null;
         }}
-        ListHeaderComponent={renderHeader}
+        ListHeaderComponent={renderHeader()}
         ListEmptyComponent={() => {
           if (showHomeSkeleton || loadingDrivers) return null;
 
@@ -1090,7 +1192,27 @@ export default function HomeScreen() {
           return null;
         }}
         ListFooterComponent={() => (
-          loadingMore ? <ActivityIndicator size="small" color={colors.primary} style={{ marginVertical: 20 }} /> : <View style={{ height: 120 }} />
+          <View>
+            {showCategories && activeService === 'Food' && visibleItems.length > 0 && (
+              <View style={{ margin: 16, borderRadius: 20, overflow: 'hidden', backgroundColor: '#F3E8FF', padding: 20, flexDirection: 'row', alignItems: 'center' }}>
+                 <View style={{ flex: 1, zIndex: 10 }}>
+                   <Text style={{ color: '#7C3AED', fontWeight: '700', fontSize: 13 }}>Hot & Delicious</Text>
+                   <Text style={{ color: '#111827', fontWeight: '900', fontSize: 20, marginTop: 4 }}>Biryani Special</Text>
+                   <Text style={{ color: '#6D28D9', fontWeight: '600', fontSize: 13, marginTop: 4 }}>Up to 40% OFF</Text>
+                   <TouchableOpacity style={{ backgroundColor: '#6D28D9', alignSelf: 'flex-start', paddingHorizontal: 16, paddingVertical: 10, borderRadius: 20, marginTop: 16, flexDirection: 'row', alignItems: 'center' }}>
+                     <Text style={{ color: '#fff', fontSize: 13, fontWeight: 'bold' }}>Order Now</Text>
+                     <Ionicons name="arrow-forward" size={14} color="#fff" style={{ marginLeft: 4 }} />
+                   </TouchableOpacity>
+                 </View>
+                 <Image 
+                   source={{ uri: 'https://images.unsplash.com/photo-1589302168068-964664d93dc0?w=800' }} 
+                   style={{ width: 220, height: 220, position: 'absolute', right: -60, bottom: -40, borderRadius: 110 }} 
+                   resizeMode="cover"
+                 />
+              </View>
+            )}
+            {loadingMore ? <ActivityIndicator size="small" color={colors.primary} style={{ marginVertical: 20 }} /> : <View style={{ height: 120 }} />}
+          </View>
         )}
         onEndReached={loadMore}
         onEndReachedThreshold={0.5}
@@ -1098,7 +1220,7 @@ export default function HomeScreen() {
           styles.mainScrollContent,
           {
             flexGrow: showCategories ? undefined : 1,
-            paddingTop: showCategories ? topPadding + 175 : topPadding + 60,
+            paddingTop: showCategories ? 0 : 0,
             paddingBottom: keyboardHeight > 0 ? keyboardHeight + 100 : 120
           }
         ]}
@@ -1123,140 +1245,7 @@ export default function HomeScreen() {
         )}
       />
 
-      <View style={styles.overlay} pointerEvents="box-none">
-        <Animated.View style={[
-          styles.flushHeader,
-          {
-            paddingTop: topPadding + 8,
-            transform: [{ translateY: headerTranslateY }]
-          }
-        ]}>
-          <Animated.View style={[styles.headerTopRow, { opacity: topRowOpacity, transform: [{ translateY: headerTopRowTranslateY }] }]}>
-            <View style={styles.locationInfoBox}>
-              <TouchableOpacity
-                style={styles.addressSelector}
-                activeOpacity={0.7}
-                onPress={() => router.push("/delivery/saved-addresses")}
-              >
-                <View style={{ flexDirection: "row", alignItems: "center", flexShrink: 1 }}>
-                  <Text style={styles.addressHeaderText}>
-                    {selectedAddress
-                      ? (selectedAddress.label === "Home" || selectedAddress.label === "Work"
-                        ? selectedAddress.label.toUpperCase()
-                        : (selectedAddress.label && selectedAddress.label !== "Other" ? selectedAddress.label.toUpperCase() : "ADDRESS"))
-                      : "ADDRESS"}
-                  </Text>
-                  <Ionicons name="chevron-down" size={14} color={colors.textMuted} style={{ marginLeft: 4 }} />
-                </View>
-              </TouchableOpacity>
-            </View>
-            {showCategories && (
-              <View style={{ flexDirection: 'row', gap: 12, alignItems: 'center' }}>
-                <TouchableOpacity style={styles.iconBtn} onPress={() => setIsDistanceSheetOpen(true)}>
-                  <MaterialCommunityIcons name="radius-outline" size={24} color={colors.primary} />
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.iconBtn} onPress={() => router.push("/(tabs)/profile")}>
-                  <Ionicons name="person-outline" size={24} color={colors.primary} />
-                </TouchableOpacity>
-              </View>
-            )}
-          </Animated.View>
 
-          {showCategories && (
-            <Animated.View style={[
-              styles.categoriesContainer,
-              { transform: [{ translateY: categoriesTranslateY }] }
-            ]}>
-              {showHomeSkeleton ? (
-                <CategorySkeleton colors={colors} />
-              ) : (
-                <View style={styles.categoriesFlexContent}>
-                  <ServiceCategory
-                    icon="bag-outline"
-                    label="Task"
-                    onPress={() => router.push({ pathname: "/helper-task" })}
-                  />
-                  <ServiceCategory
-                    icon="car-outline"
-                    label="Rides"
-                    onPress={() => router.push({ pathname: "/all-services" })}
-                  />
-                  <ServiceCategory
-                    icon="fast-food-outline"
-                    label="Food"
-                    active={activeService === 'Food'}
-                    onPress={() => handleServiceSwitch('Food')}
-                  />
-                  <ServiceCategory
-                    icon="food-steak"
-                    iconFamily="MaterialCommunityIcons"
-                    label="Meat"
-                    active={activeService === 'Meat'}
-                    onPress={() => handleServiceSwitch('Meat')}
-                  />
-                </View>
-              )}
-            </Animated.View>
-          )}
-        </Animated.View>
-      </View>
-
-      {showCategories && (
-        <View
-          style={[
-            styles.bottomSearchOverlay,
-            {
-              bottom: keyboardHeight > 0
-                ? keyboardHeight + (Platform.OS === "ios" ? 10 : 12)
-                : insets.bottom + 18
-            }
-          ]}
-          pointerEvents="box-none"
-        >
-          {showHomeSkeleton ? (
-            <SearchBarSkeleton colors={colors} />
-          ) : (
-            /* Search Bar Dropzone */
-            <Animated.View
-              style={[
-                styles.searchGlowShell,
-                {
-                  transform: [{ scale: searchBarScale }],
-                  borderColor: isHoveringSearch ? (theme === 'light' ? '#0F172A' : '#FFFFFF') : colors.border,
-                  borderWidth: isHoveringSearch ? 2.5 : 2,
-                },
-              ]}
-            >
-              <Animated.View
-                style={[
-                  styles.searchGlowLayer,
-                  {
-                    opacity: isHoveringSearch ? 1 : searchGlowOpacity,
-                    transform: [{ rotate: searchGlowRotate }],
-                  },
-                ]}
-              >
-                <LinearGradient
-                  colors={["#22D3EE", "#A855F7", "#F97316", "#10B981", "#22D3EE"]}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 1 }}
-                  style={StyleSheet.absoluteFill}
-                />
-              </Animated.View>
-              <TouchableOpacity
-                style={styles.searchBar}
-                activeOpacity={0.9}
-                onPress={() => setIsSearchActive(true)}
-              >
-                <Ionicons name="search" size={18} color={colors.primary} />
-                <Text style={[styles.searchInput, { color: searchText ? colors.text : colors.textSecondary, paddingTop: Platform.OS === 'ios' ? 0 : 3 }]}>
-                  {searchText || 'Search "milk", "eggs", "bread"'}
-                </Text>
-              </TouchableOpacity>
-            </Animated.View>
-          )}
-        </View>
-      )}
 
       {/* DOORDASH STYLE SEARCH SCREEN OVERLAY */}
       <Modal

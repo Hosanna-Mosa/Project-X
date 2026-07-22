@@ -42,7 +42,7 @@ export function FloatingCart() {
   // Check if we are in the main app area
   // (tabs) group or specific menu/checkout screens
   const isTabArea = (segments as string[]).includes('(tabs)');
-  const isMenuArea = pathname.includes('restaurant-menu');
+  const isMenuArea = pathname.includes('restaurant-menu') || pathname.includes('149-store');
   const isFoodOrderArea = pathname.includes('cart') || pathname.includes('checkout') || pathname.includes('payment');
   const shouldShow = !!token && (isTabArea || isMenuArea) && !isFoodOrderArea && itemCount > 0;
 
