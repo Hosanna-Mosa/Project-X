@@ -41,7 +41,9 @@ export default function SupportChatScreen() {
   const { theme } = useThemeStore();
   const colors = Colors[theme];
 
+  const [viewMode, setViewMode] = useState<"loading" | "list" | "chat" | "create">("loading");
   const [loading, setLoading] = useState(true);
+  const [allTickets, setAllTickets] = useState<SupportTicket[]>([]);
   const [ticket, setTicket] = useState<SupportTicket | null>(null);
   const [inputText, setInputText] = useState("");
   const [submittingReply, setSubmittingReply] = useState(false);
@@ -53,17 +55,44 @@ export default function SupportChatScreen() {
   const [creatingTicket, setCreatingTicket] = useState(false);
 
   const flatListRef = useRef<FlatList>(null);
+  const ticketRef = useRef<SupportTicket | null>(null);
+
+  useEffect(() => {
+    ticketRef.current = ticket;
+  }, [ticket]);
 
   // Fetch current ticket(s)
   const fetchTickets = async (showLoading = false) => {
     if (showLoading) setLoading(true);
     try {
       const tickets = await customFetch<SupportTicket[]>("/api/v1/support/tickets");
+      setAllTickets(tickets || []);
       if (tickets && tickets.length > 0) {
-        // Use the latest ticket
-        setTicket(tickets[0]);
+        if (showLoading) {
+          if (tickets.length === 1) {
+            const latest = tickets[0];
+            setTicket(latest);
+            if (latest.status === "RESOLVED") {
+              setViewMode("list");
+            } else {
+              setViewMode("chat");
+            }
+          } else {
+            setViewMode("list");
+          }
+        } else {
+          // Background poll: update active ticket details if we are currently viewing it
+          const currentActive = ticketRef.current;
+          if (currentActive) {
+            const activeT = tickets.find(t => t._id === currentActive._id);
+            if (activeT) setTicket(activeT);
+          }
+        }
       } else {
-        setTicket(null);
+        if (showLoading) {
+          setTicket(null);
+          setViewMode("create");
+        }
       }
     } catch (error) {
       console.error("Failed to fetch support tickets:", error);
@@ -79,8 +108,8 @@ export default function SupportChatScreen() {
     socketService.connect();
     const handleTicketUpdate = (updatedTicket: any) => {
       console.log("[SOCKET] Support ticket updated:", updatedTicket);
-      // Make sure this matches the current ticket to avoid updating with wrong ticket data
-      setTicket(updatedTicket);
+      setTicket((prev) => (prev && prev._id === updatedTicket._id ? updatedTicket : prev));
+      setAllTickets((prev) => prev.map((t) => (t._id === updatedTicket._id ? updatedTicket : t)));
     };
     socketService.on("ticket_updated", handleTicketUpdate);
 
@@ -120,6 +149,8 @@ export default function SupportChatScreen() {
         }),
       });
       setTicket(created);
+      setAllTickets(prev => [created, ...prev]);
+      setViewMode("chat");
       Alert.alert("Ticket Created", "Our support executives will review your case shortly.");
     } catch (error: any) {
       Alert.alert("Error", error.message || "Failed to create support ticket");
@@ -199,12 +230,114 @@ export default function SupportChatScreen() {
     );
   }
 
-  // If no ticket, show Creation Form
-  if (!ticket) {
+  // If list screen view
+  if (viewMode === "list") {
     return (
       <View style={[styles.root, { backgroundColor: colors.surface }]}>
         <View style={[styles.header, { paddingTop: insets.top + 16, borderBottomColor: colors.borderLight }]}>
           <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
+            <Ionicons name="arrow-back" size={24} color={colors.text} />
+          </TouchableOpacity>
+          <Text style={[styles.headerTitle, { color: colors.text }]}>Support Sessions</Text>
+        </View>
+
+        <FlatList
+          data={allTickets}
+          keyExtractor={(item) => item._id}
+          contentContainerStyle={{ padding: 16, gap: 16 }}
+          renderItem={({ item }) => {
+            const isOpen = item.status === "OPEN" || item.status === "PENDING_RESOLVE";
+            return (
+              <TouchableOpacity
+                onPress={() => {
+                  setTicket(item);
+                  setViewMode("chat");
+                }}
+                style={{
+                  backgroundColor: colors.surfaceSecondary,
+                  borderColor: colors.borderLight,
+                  borderWidth: 1,
+                  borderRadius: 16,
+                  padding: 16,
+                }}
+              >
+                <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 8 }}>
+                  <View style={{ flex: 1, marginRight: 8 }}>
+                    <Text style={{ fontSize: 15, fontWeight: "800", color: colors.text }} numberOfLines={1}>
+                      {item.title}
+                    </Text>
+                    <Text style={{ fontSize: 11, fontWeight: "600", color: colors.textMuted, marginTop: 2 }}>
+                      ID: {item.ticketId} • {item.category}
+                    </Text>
+                  </View>
+                  <View
+                    style={{
+                      paddingHorizontal: 8,
+                      paddingVertical: 4,
+                      borderRadius: 8,
+                      backgroundColor: isOpen ? "#DCFCE7" : "#F3F4F6",
+                    }}
+                  >
+                    <Text
+                      style={{
+                        fontSize: 10,
+                        fontWeight: "800",
+                        color: isOpen ? "#15803D" : "#4B5563",
+                      }}
+                    >
+                      {item.status}
+                    </Text>
+                  </View>
+                </View>
+                <Text style={{ fontSize: 13, color: colors.textSecondary, marginBottom: 8 }} numberOfLines={2}>
+                  {item.message}
+                </Text>
+                <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+                  <Text style={{ fontSize: 11, color: colors.textMuted }}>
+                    {new Date(item.createdAt).toLocaleDateString()}
+                  </Text>
+                  <Text style={{ fontSize: 12, fontWeight: "bold", color: colors.primary }}>
+                    Continue Chat →
+                  </Text>
+                </View>
+              </TouchableOpacity>
+            );
+          }}
+          ListFooterComponent={() => (
+            <TouchableOpacity
+              style={[
+                styles.submitBtn,
+                { backgroundColor: colors.primary, marginTop: 8, marginBottom: 24 },
+              ]}
+              onPress={() => {
+                setNewTitle("");
+                setNewMessage("");
+                setViewMode("create");
+              }}
+            >
+              <Text style={styles.submitBtnText}>+ Start New Support Chat</Text>
+            </TouchableOpacity>
+          )}
+        />
+      </View>
+    );
+  }
+
+  // If creation Form view
+  if (viewMode === "create") {
+    return (
+      <View style={[styles.root, { backgroundColor: colors.surface }]}>
+        <View style={[styles.header, { paddingTop: insets.top + 16, borderBottomColor: colors.borderLight }]}>
+          <TouchableOpacity
+            style={styles.backBtn}
+            onPress={() => {
+              if (allTickets.length > 0) {
+                setViewMode("list");
+              } else {
+                router.back();
+              }
+            }}
+          >
             <Ionicons name="arrow-back" size={24} color={colors.text} />
           </TouchableOpacity>
           <Text style={[styles.headerTitle, { color: colors.text }]}>Create Support Ticket</Text>
@@ -296,59 +429,87 @@ export default function SupportChatScreen() {
     >
       {/* Header */}
       <View style={[styles.header, { paddingTop: insets.top + (Platform.OS === "web" ? 67 : 0) + 12, borderBottomColor: colors.borderLight }]}>
-        <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
+        <TouchableOpacity
+          style={styles.backBtn}
+          onPress={() => {
+            if (allTickets.length > 0) {
+              setViewMode("list");
+            } else {
+              router.back();
+            }
+          }}
+        >
           <Feather name="arrow-left" size={22} color={colors.text} />
         </TouchableOpacity>
         <View style={styles.headerCenter}>
           <View style={[styles.headerAvatar, { backgroundColor: colors.surfaceSecondary }]}>
             <Feather name="headphones" size={18} color={colors.primary} />
-            <View style={styles.onlineDot} />
+            {ticket && ticket.status !== "RESOLVED" && <View style={styles.onlineDot} />}
           </View>
-          <View>
-            <Text style={[styles.headerName, { color: colors.text }]}>Support Resolution</Text>
-            <Text style={styles.headerStatus}>Ticket {ticket.ticketId} • {ticket.status}</Text>
-          </View>
+          {ticket && (
+            <View>
+              <Text style={[styles.headerName, { color: colors.text }]}>Support Resolution</Text>
+              <Text style={styles.headerStatus}>Ticket {ticket.ticketId} • {ticket.status}</Text>
+            </View>
+          )}
         </View>
       </View>
 
       {/* Message List */}
-      <FlatList
-        ref={flatListRef}
-        data={ticket.messages}
-        keyExtractor={(_, index) => index.toString()}
-        renderItem={renderMessageItem}
-        contentContainerStyle={styles.messagesList}
-        showsVerticalScrollIndicator={false}
-        onLayout={() => flatListRef.current?.scrollToEnd({ animated: false })}
-      />
+      {ticket && (
+        <FlatList
+          ref={flatListRef}
+          data={ticket.messages}
+          keyExtractor={(_, index) => index.toString()}
+          renderItem={renderMessageItem}
+          contentContainerStyle={styles.messagesList}
+          showsVerticalScrollIndicator={false}
+          onLayout={() => flatListRef.current?.scrollToEnd({ animated: false })}
+        />
+      )}
 
       {/* Input Bar */}
-      {ticket.status === "RESOLVED" ? (
+      {ticket && ticket.status === "RESOLVED" ? (
         <View style={[styles.resolvedNotice, { backgroundColor: colors.surfaceSecondary, paddingBottom: insets.bottom + 16 }]}>
           <Feather name="check-circle" size={16} color={colors.teal} />
           <Text style={[styles.resolvedText, { color: colors.textSecondary }]}>This ticket has been marked as resolved.</Text>
-          <TouchableOpacity
-            style={[styles.reopenBtn, { borderColor: colors.primary }]}
-            onPress={async () => {
-              try {
-                setLoading(true);
-                // Submitting a new message reopens the ticket
-                await customFetch(`/api/v1/support/tickets/${ticket._id}/messages`, {
-                  method: "POST",
-                  body: JSON.stringify({ text: "Re-opening this case. I still need assistance." }),
-                });
-                await fetchTickets(true);
-              } catch (err: any) {
-                Alert.alert("Error", err.message || "Failed to reopen ticket");
-              } finally {
-                setLoading(false);
-              }
-            }}
-          >
-            <Text style={[styles.reopenBtnText, { color: colors.primary }]}>Reopen Case</Text>
-          </TouchableOpacity>
+          <View style={{ flexDirection: "row", gap: 12, marginTop: 4 }}>
+            <TouchableOpacity
+              style={[styles.reopenBtn, { borderColor: colors.primary }]}
+              onPress={async () => {
+                try {
+                  setLoading(true);
+                  // Submitting a new message reopens the ticket
+                  await customFetch(`/api/v1/support/tickets/${ticket._id}/messages`, {
+                    method: "POST",
+                    body: JSON.stringify({ text: "Re-opening this case. I still need assistance." }),
+                  });
+                  await fetchTickets(true);
+                  setViewMode("chat");
+                } catch (err: any) {
+                  Alert.alert("Error", err.message || "Failed to reopen ticket");
+                } finally {
+                  setLoading(false);
+                }
+              }}
+            >
+              <Text style={[styles.reopenBtnText, { color: colors.primary }]}>Reopen Case</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.reopenBtn, { backgroundColor: colors.primary, borderColor: colors.primary }]}
+              onPress={() => {
+                setNewTitle("");
+                setNewMessage("");
+                setTicket(null);
+                setViewMode("create");
+              }}
+            >
+              <Text style={[styles.reopenBtnText, { color: "#fff" }]}>Start New Chat</Text>
+            </TouchableOpacity>
+          </View>
         </View>
-      ) : ticket.status === "PENDING_RESOLVE" ? (
+      ) : ticket && ticket.status === "PENDING_RESOLVE" ? (
         <View style={[styles.resolveRequestContainer, { backgroundColor: colors.surfaceSecondary, paddingBottom: insets.bottom + 16, borderTopColor: colors.borderLight }]}>
           <Ionicons name="help-circle-outline" size={24} color={colors.primary} />
           <Text style={[styles.resolveRequestTitle, { color: colors.text }]}>Resolve this ticket?</Text>

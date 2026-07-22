@@ -123,17 +123,6 @@ export function AppSidebar() {
           </button>
         </div>
 
-        {/* Light Mode Selector */}
-        <div className="px-6 pt-3 border-t border-border flex items-center justify-between">
-          <button className="flex items-center gap-2.5 text-xs font-semibold text-foreground w-full justify-between py-1">
-            <span className="flex items-center gap-2">
-              <Sun className="h-4.5 w-4.5 text-amber-500" />
-              Light Mode
-            </span>
-            <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
-          </button>
-        </div>
-
         {/* Logout Button */}
         <div className="px-6 pt-3 border-t border-border">
           <button 
