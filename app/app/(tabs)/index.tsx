@@ -51,6 +51,8 @@ const FESTIVALS: { [key: string]: string } = {
   "12-25": "Christmas",
 };
 
+const GRADIENT_COLORS = ["#7C3AED", "#EC4899", "#EF4444", "#F97316", "#F59E0B", "#10B981", "#06B6D4", "#3B82F6"];
+
 const getGreeting = (name: string) => {
   const today = new Date();
   const month = String(today.getMonth() + 1).padStart(2, "0");
@@ -213,6 +215,68 @@ export default function HomeScreen() {
   const [searchText, setSearchText] = useState("");
   const [isSearchActive, setIsSearchActive] = useState(false);
   const [recentSearches, setRecentSearches] = useState<string[]>([]);
+
+  const [middleText, setMiddleText] = useState("Christmas");
+  const letterAnimations = useRef(
+    Array.from({ length: 20 }, () => new Animated.Value(1))
+  ).current;
+
+  const [colorOffset, setColorOffset] = useState(0);
+
+  useEffect(() => {
+    const colorInterval = setInterval(() => {
+      setColorOffset((prev) => (prev + 1) % GRADIENT_COLORS.length);
+    }, 250);
+    return () => clearInterval(colorInterval);
+  }, []);
+
+  const middleTextRef = useRef(middleText);
+  useEffect(() => {
+    middleTextRef.current = middleText;
+  }, [middleText]);
+
+  useEffect(() => {
+    let showChristmas = true;
+    const interval = setInterval(() => {
+      const currentWord = middleTextRef.current;
+      const fadeOutAnimations = Array.from({ length: currentWord.length }, (_, i) => {
+        return Animated.timing(letterAnimations[i], {
+          toValue: 0,
+          duration: 150,
+          useNativeDriver: false,
+        });
+      });
+
+      Animated.stagger(30, fadeOutAnimations).start(() => {
+        let nextWord = "";
+        if (showChristmas) {
+          const today = new Date();
+          const days = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+          nextWord = days[today.getDay()];
+        } else {
+          nextWord = "Christmas";
+        }
+        showChristmas = !showChristmas;
+        setMiddleText(nextWord);
+
+        for (let i = 0; i < nextWord.length; i++) {
+          letterAnimations[i].setValue(0);
+        }
+
+        const fadeInAnimations = Array.from({ length: nextWord.length }, (_, i) => {
+          return Animated.timing(letterAnimations[i], {
+            toValue: 1,
+            duration: 180,
+            useNativeDriver: false,
+          });
+        });
+
+        Animated.stagger(40, fadeInAnimations).start();
+      });
+    }, 3000);
+
+    return () => clearInterval(interval);
+  }, []);
   
   const screenWidth = Dimensions.get('window').width;
   const carouselRef = useRef<ScrollView>(null);
@@ -858,15 +922,15 @@ export default function HomeScreen() {
             {/* FOOD BANNER */}
             <LinearGradient
               colors={['#4C1D95', '#2E1065']}
-              style={{ width: screenWidth, paddingBottom: 50, paddingTop: insets.top + 70 }}
+              style={{ width: screenWidth, paddingBottom: moderateScale(45), paddingTop: insets.top + moderateScale(50) }}
             >
-              <Animated.View style={[{ flexDirection: 'row', paddingHorizontal: 16, minHeight: 140 }, getParallaxStyle(0)]}>
-                <View style={{ flex: 1.2, justifyContent: 'center' }}>
-                  <Text style={{ color: '#fff', fontSize: 30, fontWeight: '800', lineHeight: 36 }}>Craving something delicious?</Text>
-                  <Text style={{ color: '#C4B5FD', fontSize: 15, marginTop: 12 }}>Good food, good mood!</Text>
+              <Animated.View style={[{ flexDirection: 'row', paddingHorizontal: 16, minHeight: moderateScale(120), alignItems: 'center' }, getParallaxStyle(0)]}>
+                <View style={{ flex: 1.4, justifyContent: 'center', paddingRight: 8 }}>
+                  <Text style={{ color: '#fff', fontSize: moderateScale(24), fontWeight: '800', lineHeight: moderateScale(28) }}>Craving something delicious?</Text>
+                  <Text style={{ color: '#C4B5FD', fontSize: moderateScale(13), marginTop: moderateScale(8) }}>Good food, good mood!</Text>
                 </View>
-                <View style={{ flex: 0.8, justifyContent: 'center', alignItems: 'center' }}>
-                  <Image source={{ uri: 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=400' }} style={{ width: 180, height: 180, borderRadius: 90, position: 'absolute', right: -30, top: -10 }} resizeMode="cover" />
+                <View style={{ flex: 0.9, justifyContent: 'center', alignItems: 'flex-end' }}>
+                  <Image source={{ uri: 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=400' }} style={{ width: moderateScale(120), height: moderateScale(120), borderRadius: moderateScale(60) }} resizeMode="cover" />
                 </View>
               </Animated.View>
             </LinearGradient>
@@ -874,15 +938,15 @@ export default function HomeScreen() {
             {/* TASK BANNER */}
             <LinearGradient
               colors={['#0F766E', '#042F2E']}
-              style={{ width: screenWidth, paddingBottom: 50, paddingTop: insets.top + 70 }}
+              style={{ width: screenWidth, paddingBottom: moderateScale(45), paddingTop: insets.top + moderateScale(50) }}
             >
-              <Animated.View style={[{ flexDirection: 'row', paddingHorizontal: 16, minHeight: 140 }, getParallaxStyle(1)]}>
-                <View style={{ flex: 1.2, justifyContent: 'center' }}>
-                  <Text style={{ color: '#fff', fontSize: 30, fontWeight: '800', lineHeight: 36 }}>Need a helping hand today?</Text>
-                  <Text style={{ color: '#99F6E4', fontSize: 15, marginTop: 12 }}>We get your chores done!</Text>
+              <Animated.View style={[{ flexDirection: 'row', paddingHorizontal: 16, minHeight: moderateScale(120), alignItems: 'center' }, getParallaxStyle(1)]}>
+                <View style={{ flex: 1.4, justifyContent: 'center', paddingRight: 8 }}>
+                  <Text style={{ color: '#fff', fontSize: moderateScale(24), fontWeight: '800', lineHeight: moderateScale(28) }}>Need a helping hand today?</Text>
+                  <Text style={{ color: '#99F6E4', fontSize: moderateScale(13), marginTop: moderateScale(8) }}>We get your chores done!</Text>
                 </View>
-                <View style={{ flex: 0.8, justifyContent: 'center', alignItems: 'center' }}>
-                  <Image source={{ uri: 'https://images.unsplash.com/photo-1558981806-ec527fa84c39?w=400' }} style={{ width: 180, height: 180, borderRadius: 90, position: 'absolute', right: -30, top: -10 }} resizeMode="cover" />
+                <View style={{ flex: 0.9, justifyContent: 'center', alignItems: 'flex-end' }}>
+                  <Image source={{ uri: 'https://images.unsplash.com/photo-1558981806-ec527fa84c39?w=400' }} style={{ width: moderateScale(120), height: moderateScale(120), borderRadius: moderateScale(60) }} resizeMode="cover" />
                 </View>
               </Animated.View>
             </LinearGradient>
@@ -890,15 +954,15 @@ export default function HomeScreen() {
             {/* RIDES BANNER */}
             <LinearGradient
               colors={['#C2410C', '#7F1D1D']}
-              style={{ width: screenWidth, paddingBottom: 50, paddingTop: insets.top + 70 }}
+              style={{ width: screenWidth, paddingBottom: moderateScale(45), paddingTop: insets.top + moderateScale(50) }}
             >
-              <Animated.View style={[{ flexDirection: 'row', paddingHorizontal: 16, minHeight: 140 }, getParallaxStyle(2)]}>
-                <View style={{ flex: 1.2, justifyContent: 'center' }}>
-                  <Text style={{ color: '#fff', fontSize: 30, fontWeight: '800', lineHeight: 36 }}>Going somewhere?</Text>
-                  <Text style={{ color: '#FED7AA', fontSize: 15, marginTop: 12 }}>Book a comfortable ride now!</Text>
+              <Animated.View style={[{ flexDirection: 'row', paddingHorizontal: 16, minHeight: moderateScale(120), alignItems: 'center' }, getParallaxStyle(2)]}>
+                <View style={{ flex: 1.4, justifyContent: 'center', paddingRight: 8 }}>
+                  <Text style={{ color: '#fff', fontSize: moderateScale(24), fontWeight: '800', lineHeight: moderateScale(28) }}>Going somewhere?</Text>
+                  <Text style={{ color: '#FED7AA', fontSize: moderateScale(13), marginTop: moderateScale(8) }}>Book a comfortable ride now!</Text>
                 </View>
-                <View style={{ flex: 0.8, justifyContent: 'center', alignItems: 'center' }}>
-                  <Image source={{ uri: 'https://images.unsplash.com/photo-1558981403-c5f9899a28bc?w=400' }} style={{ width: 180, height: 180, borderRadius: 90, position: 'absolute', right: -30, top: -10 }} resizeMode="cover" />
+                <View style={{ flex: 0.9, justifyContent: 'center', alignItems: 'flex-end' }}>
+                  <Image source={{ uri: 'https://images.unsplash.com/photo-1558981403-c5f9899a28bc?w=400' }} style={{ width: moderateScale(120), height: moderateScale(120), borderRadius: moderateScale(60) }} resizeMode="cover" />
                 </View>
               </Animated.View>
             </LinearGradient>
@@ -906,15 +970,15 @@ export default function HomeScreen() {
             {/* MEAT BANNER */}
             <LinearGradient
               colors={['#9F1239', '#4C0519']}
-              style={{ width: screenWidth, paddingBottom: 50, paddingTop: insets.top + 70 }}
+              style={{ width: screenWidth, paddingBottom: moderateScale(45), paddingTop: insets.top + moderateScale(50) }}
             >
-              <Animated.View style={[{ flexDirection: 'row', paddingHorizontal: 16, minHeight: 140 }, getParallaxStyle(3)]}>
-                <View style={{ flex: 1.2, justifyContent: 'center' }}>
-                  <Text style={{ color: '#fff', fontSize: 30, fontWeight: '800', lineHeight: 36 }}>Fresh Meat Daily!</Text>
-                  <Text style={{ color: '#FECDD3', fontSize: 15, marginTop: 12 }}>High quality cuts delivered.</Text>
+              <Animated.View style={[{ flexDirection: 'row', paddingHorizontal: 16, minHeight: moderateScale(120), alignItems: 'center' }, getParallaxStyle(3)]}>
+                <View style={{ flex: 1.4, justifyContent: 'center', paddingRight: 8 }}>
+                  <Text style={{ color: '#fff', fontSize: moderateScale(24), fontWeight: '800', lineHeight: moderateScale(28) }}>Fresh Meat Daily!</Text>
+                  <Text style={{ color: '#FECDD3', fontSize: moderateScale(13), marginTop: moderateScale(8) }}>High quality cuts delivered.</Text>
                 </View>
-                <View style={{ flex: 0.8, justifyContent: 'center', alignItems: 'center' }}>
-                  <Image source={{ uri: 'https://images.unsplash.com/photo-1588168333986-50845fce0ba9?w=400' }} style={{ width: 180, height: 180, borderRadius: 90, position: 'absolute', right: -30, top: -10 }} resizeMode="cover" />
+                <View style={{ flex: 0.9, justifyContent: 'center', alignItems: 'flex-end' }}>
+                  <Image source={{ uri: 'https://images.unsplash.com/photo-1588168333986-50845fce0ba9?w=400' }} style={{ width: moderateScale(120), height: moderateScale(120), borderRadius: moderateScale(60) }} resizeMode="cover" />
                 </View>
               </Animated.View>
             </LinearGradient>
@@ -952,7 +1016,7 @@ export default function HomeScreen() {
             </TouchableOpacity>
             
             <View style={{ flexDirection: 'row', gap: 20, alignItems: 'center' }}>
-              <TouchableOpacity style={{ position: 'relative' }}>
+              <TouchableOpacity onPress={() => setIsDistanceSheetOpen(true)} style={{ position: 'relative' }}>
                 <MaterialCommunityIcons name="radius-outline" size={26} color="#fff" style={{ textShadowColor: 'rgba(0,0,0,0.3)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2 }} />
                 <View style={{ position: 'absolute', top: -4, right: -4, backgroundColor: '#EF4444', borderRadius: 10, width: 16, height: 16, alignItems: 'center', justifyContent: 'center' }}>
                   <Text style={{ color: '#fff', fontSize: 10, fontWeight: 'bold' }}>3</Text>
@@ -992,12 +1056,33 @@ export default function HomeScreen() {
         <View style={{ height: 1, backgroundColor: '#E5E7EB', marginHorizontal: 16, marginTop: 24, marginBottom: 24 }} />
 
         {/* Greeting and See All */}
-        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 16 }}>
-          <Text style={{ fontSize: 22, fontWeight: 'bold', color: '#111827' }}>{getGreeting(userName)} 👋</Text>
-          <TouchableOpacity style={{ backgroundColor: '#F3E8FF', paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, flexDirection: 'row', alignItems: 'center' }}>
-            <Text style={{ color: '#6D28D9', fontSize: 13, fontWeight: '700' }}>See All</Text>
-            <Ionicons name="chevron-forward" size={14} color="#6D28D9" style={{ marginLeft: 2 }} />
-          </TouchableOpacity>
+        <View style={{ paddingHorizontal: 16 }}>
+          <Text numberOfLines={1} adjustsFontSizeToFit style={{ fontSize: 22, fontWeight: 'bold', color: '#111827' }}>
+            Happy{" "}
+            {middleText.split("").map((char, index) => {
+              const color = GRADIENT_COLORS[(index + colorOffset) % GRADIENT_COLORS.length];
+              return (
+                <Animated.Text
+                  key={index}
+                  style={{
+                    color: color,
+                    opacity: letterAnimations[index] || 1,
+                    transform: [
+                      {
+                        translateY: (letterAnimations[index] || new Animated.Value(1)).interpolate({
+                          inputRange: [0, 1],
+                          outputRange: [6, 0],
+                        }),
+                      },
+                    ],
+                  }}
+                >
+                  {char}
+                </Animated.Text>
+              );
+            })}
+            , {userName}! 👋
+          </Text>
         </View>
 
         {/* Tag Pills */}
@@ -1043,6 +1128,18 @@ export default function HomeScreen() {
     );
   };
   const scrollY = useRef(new Animated.Value(0)).current;
+
+  const stickyHeaderTranslateY = scrollY.interpolate({
+    inputRange: [330, 360],
+    outputRange: [-120, 0],
+    extrapolate: 'clamp',
+  });
+
+  const stickyHeaderOpacity = scrollY.interpolate({
+    inputRange: [330, 350],
+    outputRange: [0, 1],
+    extrapolate: 'clamp',
+  });
 
   const headerTranslateY = scrollY.interpolate({
     inputRange: [0, 100],
@@ -1101,6 +1198,35 @@ export default function HomeScreen() {
 
   return (
     <View style={styles.root}>
+      <Animated.View style={[
+        {
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
+          zIndex: 100,
+          backgroundColor: '#FAFAFA',
+          paddingTop: insets.top + 8,
+          paddingBottom: 8,
+          borderBottomWidth: 1,
+          borderBottomColor: '#E5E7EB',
+          shadowColor: '#000',
+          shadowOffset: { width: 0, height: 2 },
+          shadowOpacity: 0.05,
+          shadowRadius: 4,
+          elevation: 3,
+          transform: [{ translateY: stickyHeaderTranslateY }],
+          opacity: stickyHeaderOpacity,
+        }
+      ]}>
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 16 }}>
+          <ServiceCategoryNew icon="bag-outline" label="TASK" active={false} onPress={() => router.push("/helper-task")} />
+          <ServiceCategoryNew icon="car-outline" label="RIDES" active={false} onPress={() => router.push("/all-services")} />
+          <ServiceCategoryNew icon="fast-food-outline" label="FOOD" active={false} onPress={() => handleServiceSwitch('Food')} />
+          <ServiceCategoryNew icon="food-steak" iconFamily="MaterialCommunityIcons" label="MEAT" active={false} onPress={() => handleServiceSwitch('Meat')} />
+        </View>
+      </Animated.View>
+
       <Animated.FlatList
         data={listData}
         keyExtractor={(item) => item._id}
