@@ -181,6 +181,9 @@ export default function FindingDriverScreen() {
       try {
         const orderData = await customFetch<any>(`/api/v1/orders/${orderId}`, { responseType: "json" });
         if (orderData) {
+          if (orderData.serviceType) {
+            useDeliveryStore.getState().setServiceType(orderData.serviceType);
+          }
           if (orderData.stops && orderData.stops.length > 0) {
             const mappedStops = orderData.stops.map((s: any) => ({
               id: s._id,

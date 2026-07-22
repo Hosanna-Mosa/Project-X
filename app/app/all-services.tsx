@@ -13,6 +13,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import Colors from "@/constants/colors";
 import { useThemeStore } from "@/contexts/themeStore";
+import { useDeliveryStore } from "@/contexts/deliveryStore";
 
 const { width } = Dimensions.get("window");
 const HORIZONTAL_PADDING = 16;
@@ -39,6 +40,7 @@ export default function AllServicesScreen() {
   const { theme } = useThemeStore();
   const colors = Colors[theme];
   const styles = React.useMemo(() => createStyles(colors), [theme]);
+  const setServiceType = useDeliveryStore((state) => state.setServiceType);
 
   return (
     <View style={styles.root}>
@@ -55,7 +57,10 @@ export default function AllServicesScreen() {
             <TouchableOpacity 
               key={service.id} 
               style={styles.serviceItem}
-              onPress={() => router.push({ pathname: "/drop-location", params: { serviceId: service.id, name: service.name } })}
+              onPress={() => {
+                setServiceType(service.id);
+                router.push({ pathname: "/drop-location", params: { serviceId: service.id, name: service.name } });
+              }}
             >
               <View style={styles.iconContainer}>
                 <Image source={service.image} style={styles.serviceIcon} resizeMode="contain" />

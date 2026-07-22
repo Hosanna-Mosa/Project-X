@@ -22,6 +22,7 @@ import * as Location from "expo-location";
 import Colors from "@/constants/colors";
 import { useThemeStore } from "@/contexts/themeStore";
 import { customFetch } from "@/utils/api/custom-fetch";
+import { useDeliveryStore } from "@/contexts/deliveryStore";
 
 const { width, height } = Dimensions.get("window");
 const GOOGLE_MAPS_APIKEY = process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY;
@@ -133,6 +134,12 @@ export default function RideConfirmationScreen() {
     latitude: parseFloat(params.dropLat || "0"),
     longitude: parseFloat(params.dropLng || "0"),
   };
+
+  React.useEffect(() => {
+    if (params.serviceId) {
+      useDeliveryStore.getState().setServiceType(params.serviceId);
+    }
+  }, [params.serviceId]);
 
   React.useEffect(() => {
     const canEstimate =
