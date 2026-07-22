@@ -166,7 +166,7 @@ export class OrdersController {
   async increasePrice(req: AuthRequest, res: Response, next: NextFunction) {
     try {
       const { id } = req.params;
-      const { amount } = req.body;
+      const amount = Number(req.body.amount);
       const userId = req.user?.userId;
 
       if (!userId) {

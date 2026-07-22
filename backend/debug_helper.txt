@@ -160,3 +160,374 @@
  -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c4094b
  -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c40957
  -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c4095c
+
+[2026-07-21T15:59:52.032Z] Created order FLR-260721-1444 type: helper, driversToNotify: 11, isReserved: false
+ -> emitting new_order to driverUser._id: 6a453f1cecb0e2672c8b06aa
+ -> emitting new_order to driverUser._id: 6a5f8e145f35a1dd09c40929
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c4092f
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c40935
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c4093a
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c40940
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c40946
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c4094b
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c40951
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c40957
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c4095c
+
+[2026-07-21T16:01:46.907Z] Created order FLR-260721-1025 type: helper, driversToNotify: 11, isReserved: false
+ -> emitting new_order to driverUser._id: 6a453f1cecb0e2672c8b06aa
+ -> emitting new_order to driverUser._id: 6a5f8e145f35a1dd09c40929
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c4092f
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c40935
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c4093a
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c40940
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c40946
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c4094b
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c40951
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c40957
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c4095c
+
+[2026-07-21T16:02:40.021Z] Created order FLR-260721-3214 type: helper, driversToNotify: 11, isReserved: false
+ -> emitting new_order to driverUser._id: 6a453f1cecb0e2672c8b06aa
+ -> emitting new_order to driverUser._id: 6a5f8e145f35a1dd09c40929
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c4092f
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c40935
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c4093a
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c40940
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c40946
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c4094b
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c40951
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c40957
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c4095c
+
+[2026-07-21T16:11:53.021Z] Created order FLR-260721-9200 type: helper, driversToNotify: 11, isReserved: false
+ -> emitting new_order to driverUser._id: 6a453f1cecb0e2672c8b06aa
+ -> emitting new_order to driverUser._id: 6a5f8e145f35a1dd09c40929
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c4092f
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c40935
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c4093a
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c40940
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c40946
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c4094b
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c40951
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c40957
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c4095c
+
+[2026-07-21T16:15:24.543Z] Created order FLR-260721-9818 type: helper, driversToNotify: 10, isReserved: false
+ -> emitting new_order to driverUser._id: 6a5f8e145f35a1dd09c40929
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c4092f
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c40935
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c4093a
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c40940
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c40946
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c4094b
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c40951
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c40957
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c4095c
+
+[2026-07-21T16:15:50.066Z] Created order FLR-260721-8701 type: helper, driversToNotify: 10, isReserved: false
+ -> emitting new_order to driverUser._id: 6a5f8e145f35a1dd09c40929
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c4092f
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c40935
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c4093a
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c40940
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c40946
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c4094b
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c40951
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c40957
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c4095c
+
+[2026-07-21T16:16:01.701Z] Created order FLR-260721-7450 type: helper, driversToNotify: 10, isReserved: false
+ -> emitting new_order to driverUser._id: 6a5f8e145f35a1dd09c40929
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c4092f
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c40935
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c4093a
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c40940
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c40946
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c4094b
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c40951
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c40957
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c4095c
+
+[2026-07-21T16:16:24.266Z] Created order FLR-260721-9219 type: helper, driversToNotify: 10, isReserved: false
+ -> emitting new_order to driverUser._id: 6a5f8e145f35a1dd09c40929
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c4092f
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c40935
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c4093a
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c40940
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c40946
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c4094b
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c40951
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c40957
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c4095c
+
+[2026-07-21T16:17:42.591Z] Created order FLR-260721-3979 type: helper, driversToNotify: 10, isReserved: false
+ -> emitting new_order to driverUser._id: 6a5f8e145f35a1dd09c40929
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c4092f
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c40935
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c4093a
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c40940
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c40946
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c4094b
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c40951
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c40957
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c4095c
+
+[2026-07-21T16:18:14.597Z] Created order FLR-260721-3330 type: helper, driversToNotify: 10, isReserved: false
+ -> emitting new_order to driverUser._id: 6a5f8e145f35a1dd09c40929
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c4092f
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c40935
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c4093a
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c40940
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c40946
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c4094b
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c40951
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c40957
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c4095c
+
+[2026-07-21T16:18:38.869Z] Created order FLR-260721-5391 type: helper, driversToNotify: 10, isReserved: false
+ -> emitting new_order to driverUser._id: 6a5f8e145f35a1dd09c40929
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c4092f
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c40935
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c4093a
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c40940
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c40946
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c4094b
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c40951
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c40957
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c4095c
+
+[2026-07-21T16:19:36.655Z] Created order FLR-260721-5933 type: helper, driversToNotify: 11, isReserved: false
+ -> emitting new_order to driverUser._id: 6a453f1cecb0e2672c8b06aa
+ -> emitting new_order to driverUser._id: 6a5f8e145f35a1dd09c40929
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c4092f
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c40935
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c4093a
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c40940
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c40946
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c4094b
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c40951
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c40957
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c4095c
+
+[2026-07-21T16:20:38.993Z] Created order FLR-260721-8484 type: helper, driversToNotify: 11, isReserved: false
+ -> emitting new_order to driverUser._id: 6a453f1cecb0e2672c8b06aa
+ -> emitting new_order to driverUser._id: 6a5f8e145f35a1dd09c40929
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c4092f
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c40935
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c4093a
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c40940
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c40946
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c4094b
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c40951
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c40957
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c4095c
+
+[2026-07-21T16:25:54.136Z] Created order FLR-260721-4422 type: helper, driversToNotify: 10, isReserved: false
+ -> emitting new_order to driverUser._id: 6a5f8e145f35a1dd09c40929
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c4092f
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c40935
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c4093a
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c40940
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c40946
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c4094b
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c40951
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c40957
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c4095c
+
+[2026-07-21T16:31:22.455Z] Created order FLR-260721-2729 type: helper, driversToNotify: 10, isReserved: false
+ -> emitting new_order to driverUser._id: 6a5f8e145f35a1dd09c40929
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c4092f
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c40935
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c4093a
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c40940
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c40946
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c4094b
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c40951
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c40957
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c4095c
+
+[2026-07-21T16:32:25.482Z] Created order FLR-260721-4393 type: helper, driversToNotify: 10, isReserved: false
+ -> emitting new_order to driverUser._id: 6a5f8e145f35a1dd09c40929
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c4092f
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c40935
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c4093a
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c40940
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c40946
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c4094b
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c40951
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c40957
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c4095c
+
+[2026-07-21T16:37:50.990Z] Created order FLR-260721-2766 type: helper, driversToNotify: 10, isReserved: false
+ -> emitting new_order to driverUser._id: 6a5f8e145f35a1dd09c40929
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c4092f
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c40935
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c4093a
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c40940
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c40946
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c4094b
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c40951
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c40957
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c4095c
+
+[2026-07-21T16:39:24.139Z] Created order FLR-260721-5414 type: helper, driversToNotify: 10, isReserved: false
+ -> emitting new_order to driverUser._id: 6a5f8e145f35a1dd09c40929
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c4092f
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c40935
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c4093a
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c40940
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c40946
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c4094b
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c40951
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c40957
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c4095c
+
+[2026-07-21T16:41:37.516Z] Created order FLR-260721-5043 type: helper, driversToNotify: 10, isReserved: false
+ -> emitting new_order to driverUser._id: 6a5f8e145f35a1dd09c40929
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c4092f
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c40935
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c4093a
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c40940
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c40946
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c4094b
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c40951
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c40957
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c4095c
+
+[2026-07-21T16:47:00.120Z] Created order FLR-260721-9504 type: helper, driversToNotify: 10, isReserved: false
+ -> emitting new_order to driverUser._id: 6a5f8e145f35a1dd09c40929
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c4092f
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c40935
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c4093a
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c40940
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c40946
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c4094b
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c40951
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c40957
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c4095c
+
+[2026-07-21T16:51:14.233Z] Created order FLR-260721-4978 type: helper, driversToNotify: 10, isReserved: false
+ -> emitting new_order to driverUser._id: 6a5f8e145f35a1dd09c40929
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c4092f
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c40935
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c4093a
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c40940
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c40946
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c4094b
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c40951
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c40957
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c4095c
+
+[2026-07-21T16:51:38.833Z] Created order FLR-260721-1805 type: helper, driversToNotify: 10, isReserved: false
+ -> emitting new_order to driverUser._id: 6a5f8e145f35a1dd09c40929
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c4092f
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c40935
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c4093a
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c40940
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c40946
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c4094b
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c40951
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c40957
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c4095c
+
+[2026-07-21T16:52:26.822Z] Created order FLR-260721-8654 type: helper, driversToNotify: 10, isReserved: false
+ -> emitting new_order to driverUser._id: 6a5f8e145f35a1dd09c40929
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c4092f
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c40935
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c4093a
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c40940
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c40946
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c4094b
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c40951
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c40957
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c4095c
+
+[2026-07-21T16:59:41.750Z] Created order FLR-260721-6024 type: helper, driversToNotify: 11, isReserved: false
+ -> emitting new_order to driverUser._id: 6a453f1cecb0e2672c8b06aa
+ -> emitting new_order to driverUser._id: 6a5f8e145f35a1dd09c40929
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c4092f
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c40935
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c4093a
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c40940
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c40946
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c4094b
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c40951
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c40957
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c4095c
+
+[2026-07-21T17:00:34.685Z] Created order FLR-260721-7894 type: helper, driversToNotify: 11, isReserved: false
+ -> emitting new_order to driverUser._id: 6a453f1cecb0e2672c8b06aa
+ -> emitting new_order to driverUser._id: 6a5f8e145f35a1dd09c40929
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c4092f
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c40935
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c4093a
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c40940
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c40946
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c4094b
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c40951
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c40957
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c4095c
+
+[2026-07-21T17:01:11.169Z] Created order FLR-260721-5752 type: helper, driversToNotify: 11, isReserved: false
+ -> emitting new_order to driverUser._id: 6a453f1cecb0e2672c8b06aa
+ -> emitting new_order to driverUser._id: 6a5f8e145f35a1dd09c40929
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c4092f
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c40935
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c4093a
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c40940
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c40946
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c4094b
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c40951
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c40957
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c4095c
+
+[2026-07-21T17:01:38.226Z] Created order FLR-260721-9174 type: helper, driversToNotify: 11, isReserved: false
+ -> emitting new_order to driverUser._id: 6a453f1cecb0e2672c8b06aa
+ -> emitting new_order to driverUser._id: 6a5f8e145f35a1dd09c40929
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c4092f
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c40935
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c4093a
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c40940
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c40946
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c4094b
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c40951
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c40957
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c4095c
+
+[2026-07-21T17:02:18.524Z] Created order FLR-260721-8172 type: helper, driversToNotify: 11, isReserved: false
+ -> emitting new_order to driverUser._id: 6a453f1cecb0e2672c8b06aa
+ -> emitting new_order to driverUser._id: 6a5f8e145f35a1dd09c40929
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c4092f
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c40935
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c4093a
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c40940
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c40946
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c4094b
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c40951
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c40957
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c4095c
+
+[2026-07-21T17:18:02.865Z] Created order FLR-260721-4185 type: delivery, driversToNotify: 10, isReserved: false
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c4094b
+ -> emitting new_order to driverUser._id: 6a5f8e145f35a1dd09c40929
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c4092f
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c40935
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c4093a
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c40940
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c40946
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c40951
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c40957
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c4095c
+
+[2026-07-22T05:16:20.090Z] Created order FLR-260722-3944 type: helper, driversToNotify: 10, isReserved: false
+ -> emitting new_order to driverUser._id: 6a5f8e145f35a1dd09c40929
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c4092f
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c40935
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c4093a
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c40940
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c40946
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c4094b
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c40951
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c40957
+ -> emitting new_order to driverUser._id: 6a5f8e155f35a1dd09c4095c

@@ -65,6 +65,17 @@ export default function HelperTaskScreen() {
   const cardRotateAnim = React.useRef(new Animated.Value(15)).current;
   const lockOnAnim = React.useRef(new Animated.Value(0)).current; // 0 = searching, 1 = matched
   
+  // New Cinematic Transition Animations
+  const rippleScaleAnim = React.useRef(new Animated.Value(0)).current;
+  const rippleOpacityAnim = React.useRef(new Animated.Value(0)).current;
+  const blackoutOpacityAnim = React.useRef(new Animated.Value(0)).current;
+  const stampScaleAnim = React.useRef(new Animated.Value(3)).current;
+  const stampOpacityAnim = React.useRef(new Animated.Value(0)).current;
+  const stampGlowAnim = React.useRef(new Animated.Value(0)).current;
+  
+  const [isTransitioningToSearch, setIsTransitioningToSearch] = useState(false);
+  const [isTransitioningToAssigned, setIsTransitioningToAssigned] = useState(false);
+  
   // Dummy data for the rapid sorting effect
   const [dummyIndex, setDummyIndex] = useState(0);
   const [characterIndex, setCharacterIndex] = React.useState(0);
@@ -492,6 +503,7 @@ export default function HelperTaskScreen() {
     setTaskState("idle");
     setAssignedDriver(null);
     setOrderId(null);
+    setLocalOrderId(null);
   };
 
   const handleProceed = async () => {
@@ -504,19 +516,35 @@ export default function HelperTaskScreen() {
       return;
     }
     
-    setTaskState("searching");
+    // START RIPPLE TRANSITION
+    setIsTransitioningToSearch(true);
+    rippleScaleAnim.setValue(0);
+    rippleOpacityAnim.setValue(1);
     
-    try {
-      const stops: any[] = [
-        {
-          sequence: 1,
-          type: "pickup",
-          address: pickupLocation,
-          lat: pickupCoords?.lat,
-          lng: pickupCoords?.lng,
-          instructions: description,
-        }
-      ];
+    Animated.parallel([
+      Animated.timing(rippleScaleAnim, { toValue: 50, duration: 600, easing: Easing.out(Easing.poly(4)), useNativeDriver: true }),
+      Animated.sequence([
+        Animated.delay(400),
+        Animated.timing(rippleOpacityAnim, { toValue: 0, duration: 400, useNativeDriver: true })
+      ])
+    ]).start(() => {
+       setIsTransitioningToSearch(false);
+    });
+    
+    setTimeout(async () => {
+      setTaskState("searching");
+      
+      try {
+        const stops: any[] = [
+          {
+            sequence: 1,
+            type: "pickup",
+            address: pickupLocation,
+            lat: pickupCoords?.lat,
+            lng: pickupCoords?.lng,
+            instructions: description,
+          }
+        ];
 
       if (isDropoffValid && dropoffCoords?.lat) {
          stops.push({
@@ -545,6 +573,7 @@ export default function HelperTaskScreen() {
          throw new Error("Invalid response from server. No order ID returned.");
       }
       setOrderId(order._id);
+      setLocalOrderId(order._id);
       setCurrentTaskPrice(order.customerPrice || order.totalPrice || calculatedFare);
 
       // Track the order via sockets
@@ -568,8 +597,34 @@ export default function HelperTaskScreen() {
          socketService.off("order_accepted", handleOrderAccepted);
          socketService.off("order_status_update", handleOrderStatus);
          
-         // Trigger the assignment animation which will then route to chat
-         setTaskState("assigned");
+         // START HELPER ACCEPTED CINEMATIC TRANSITION
+         setIsTransitioningToAssigned(true);
+         
+         blackoutOpacityAnim.setValue(0);
+         stampScaleAnim.setValue(3);
+         stampOpacityAnim.setValue(0);
+         stampGlowAnim.setValue(0);
+         
+         Animated.sequence([
+           // 1. Blackout
+           Animated.timing(blackoutOpacityAnim, { toValue: 0.8, duration: 200, useNativeDriver: true }),
+           // 2. Slam Stamp
+           Animated.parallel([
+             Animated.timing(stampOpacityAnim, { toValue: 1, duration: 150, useNativeDriver: true }),
+             Animated.spring(stampScaleAnim, { toValue: 1, friction: 4, tension: 80, useNativeDriver: true })
+           ]),
+           // 3. Pulse Glow
+           Animated.timing(stampGlowAnim, { toValue: 1, duration: 800, useNativeDriver: true }),
+           // 4. Fade out transition & trigger assigned state
+           Animated.parallel([
+             Animated.timing(blackoutOpacityAnim, { toValue: 0, duration: 400, useNativeDriver: true }),
+             Animated.timing(stampOpacityAnim, { toValue: 0, duration: 400, useNativeDriver: true }),
+             Animated.timing(stampScaleAnim, { toValue: 5, duration: 400, useNativeDriver: true })
+           ])
+         ]).start(() => {
+           setIsTransitioningToAssigned(false);
+           setTaskState("assigned");
+         });
       };
       
       const handleOrderStatus = (data: any) => {
@@ -594,6 +649,7 @@ export default function HelperTaskScreen() {
       Alert.alert("Error", error.message || "Failed to create task");
       setTaskState("idle");
     }
+    }, 400);
   };
 
   // Dropoff is optional for General Work. We require Pickup and Description.
@@ -632,7 +688,7 @@ export default function HelperTaskScreen() {
 
   const animatedHeaderHeight = formHeightAnim.interpolate({
     inputRange: [0, 1],
-    outputRange: [550, 350] // Expand header when searching to push the form down seamlessly
+    outputRange: [480, 360] // 0 = Searching (480px ensures cards are not clipped), 1 = Idle/Assigned (360px)
   });
 
   return (
@@ -645,7 +701,13 @@ export default function HelperTaskScreen() {
         behavior={Platform.OS === "ios" ? "padding" : undefined}
         keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 20}
       >
-        <ScrollView ref={scrollViewRef} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+        <ScrollView 
+          ref={scrollViewRef} 
+          contentContainerStyle={styles.scrollContent} 
+          showsVerticalScrollIndicator={false} 
+          keyboardShouldPersistTaps="handled"
+          scrollEnabled={taskState !== "searching"}
+        >
           
           {/* Dynamic Purple Header */}
       <Animated.View style={{ backgroundColor: '#5c52eb', paddingTop: insets.top, paddingBottom: 120, height: animatedHeaderHeight, overflow: 'hidden' }}>
@@ -811,7 +873,7 @@ export default function HelperTaskScreen() {
            </View>
              
            {/* The AI Matching Deck (Visible during search/assigned) */}
-           <Animated.View style={[{ position: 'absolute', top: 180, height: 320, left: 0, right: 0 }, { zIndex: 100, opacity: deckOpacityAnim, justifyContent: 'center', alignItems: 'center' }]} pointerEvents="none">
+           <Animated.View style={[{ position: 'absolute', top: taskState === "searching" ? 130 : 180, height: 320, left: 0, right: 0 }, { zIndex: 100, opacity: deckOpacityAnim, justifyContent: 'center', alignItems: 'center' }]} pointerEvents="none">
                 
                 {/* Telemetry HUD */}
                 <View style={{ position: 'absolute', top: -20, width: '100%', alignItems: 'center' }}>
@@ -908,62 +970,88 @@ export default function HelperTaskScreen() {
             <View style={{ alignSelf: 'center', width: 40, height: 5, borderRadius: 3, backgroundColor: colors.border, marginBottom: 20 }} />
             
             {taskState === "searching" ? (
-              <View style={{ flex: 1, alignItems: 'center', paddingTop: 5 }}>
-                {currentTaskPrice !== null && (
-                  <View style={{ marginBottom: 24, paddingVertical: 16, paddingHorizontal: 24, backgroundColor: '#F8FAFC', borderRadius: 20, borderWidth: 1, borderColor: '#E2E8F0', alignItems: 'center', width: '90%', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 4, elevation: 2 }}>
-                    <Text style={{ color: '#64748B', fontSize: 12, fontWeight: '800', letterSpacing: 1.5, marginBottom: 4 }}>CURRENT OFFER</Text>
-                    <Text style={{ color: '#5c52eb', fontSize: 36, fontWeight: '900', letterSpacing: -1 }}>₹{currentTaskPrice}</Text>
-                  </View>
-                )}
+              <View style={{ flex: 1, width: '100%' }}>
+                <View style={{ flex: 1, justifyContent: 'space-between', paddingBottom: 12 }}>
+                  
+                  {/* CURRENT OFFER */}
+                  {currentTaskPrice !== null && (
+                    <View style={{ paddingVertical: 16, paddingHorizontal: 20, backgroundColor: '#fff', borderRadius: 20, borderWidth: 1, borderColor: '#F1F5F9', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', width: '100%', shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.05, shadowRadius: 12, elevation: 2 }}>
+                      <View>
+                         <Text style={{ color: '#475569', fontSize: 12, fontWeight: '800', letterSpacing: 1, marginBottom: 4 }}>CURRENT OFFER</Text>
+                         <Text style={{ color: '#5c52eb', fontSize: 38, fontWeight: '900', letterSpacing: -1 }}>₹{currentTaskPrice}</Text>
+                      </View>
+                      <View style={{ width: 50, height: 50, borderRadius: 25, backgroundColor: '#F3F0FF', alignItems: 'center', justifyContent: 'center' }}>
+                         <Ionicons name="pricetag" size={24} color="#5c52eb" style={{ transform: [{ rotate: '-45deg' }] }} />
+                      </View>
+                    </View>
+                  )}
 
-                {/* Simulated Market Response Demo UI */}
-                {totalContacted > 0 && (
-                  <View style={{ marginBottom: 24, width: '90%', flexDirection: 'row', alignItems: 'center', backgroundColor: '#FEF2F2', padding: 14, borderRadius: 16, borderWidth: 1, borderColor: '#FECACA', shadowColor: '#EF4444', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.1, shadowRadius: 8, elevation: 3 }}>
-                     <View style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: '#FEE2E2', alignItems: 'center', justifyContent: 'center', marginRight: 14 }}>
-                       <Ionicons name="people-outline" size={22} color="#EF4444" />
-                     </View>
-                     <View style={{ flex: 1 }}>
-                       <Text style={{ fontSize: 11, fontWeight: '800', color: '#991B1B', marginBottom: 2, letterSpacing: 1 }}>MARKET RESPONSE</Text>
-                       <View style={{ flexDirection: 'row', alignItems: 'baseline' }}>
-                         <Text style={{ fontSize: 22, fontWeight: '900', color: '#DC2626' }}>{rejectedCount}</Text>
-                         <Text style={{ fontSize: 13, fontWeight: '700', color: '#B91C1C', marginLeft: 6 }}>declined out of {totalContacted}</Text>
+                  {/* MARKET RESPONSE */}
+                  {totalContacted > 0 && (
+                    <View style={{ width: '100%', backgroundColor: '#FFF5F5', padding: 16, borderRadius: 20, shadowColor: '#EF4444', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.05, shadowRadius: 8, elevation: 2 }}>
+                       <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
+                          <View style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: '#FEE2E2', alignItems: 'center', justifyContent: 'center', marginRight: 12 }}>
+                            <Ionicons name="people-outline" size={22} color="#DC2626" />
+                          </View>
+                          <View style={{ flex: 1 }}>
+                            <Text style={{ fontSize: 11, fontWeight: '800', color: '#B91C1C', marginBottom: 2, letterSpacing: 1 }}>MARKET RESPONSE</Text>
+                            <View style={{ flexDirection: 'row', alignItems: 'baseline' }}>
+                              <Text style={{ fontSize: 24, fontWeight: '900', color: '#DC2626' }}>{rejectedCount}</Text>
+                              <Text style={{ fontSize: 14, fontWeight: '700', color: '#DC2626', marginLeft: 6 }}>declined out of {totalContacted}</Text>
+                            </View>
+                          </View>
+                          <Ionicons name="bar-chart-outline" size={22} color="#FCA5A5" />
                        </View>
-                     </View>
+                       <Text style={{ fontSize: 13, color: '#475569', fontWeight: '500' }}>We're finding the best match for you.</Text>
+                    </View>
+                  )}
+                  
+                  {/* ATTRACT HELPERS */}
+                  <View>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}>
+                      <Ionicons name="flash" size={16} color="#5c52eb" style={{ marginRight: 8 }} />
+                      <Text style={{ color: '#5c52eb', fontSize: 13, fontWeight: '800', letterSpacing: 1 }}>ATTRACT HELPERS FASTER</Text>
+                    </View>
+
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ width: '100%' }} contentContainerStyle={{ gap: 10, paddingHorizontal: 4 }}>
+                      {[10, 20, 30, 40, 50].map(amount => (
+                        <TouchableOpacity
+                          key={amount}
+                          onPress={() => handleIncreasePrice(amount)}
+                          disabled={isIncreasingPrice === amount}
+                          style={{
+                            width: 65,
+                            height: 75,
+                            borderRadius: 16,
+                            backgroundColor: isIncreasingPrice === amount ? '#E5E7EB' : '#fff',
+                            borderWidth: 1,
+                            borderColor: isIncreasingPrice === amount ? '#D1D5DB' : '#F1F5F9',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 4, elevation: 1
+                          }}
+                        >
+                          <Ionicons name="trending-up" size={20} color="#5c52eb" style={{ marginBottom: 6 }} />
+                          <Text style={{ color: '#5c52eb', fontWeight: '900', fontSize: 16 }}>+₹{amount}</Text>
+                        </TouchableOpacity>
+                      ))}
+                    </ScrollView>
                   </View>
-                )}
+                </View>
                 
-                <Text style={{ textAlign: 'center', color: '#94A3B8', fontSize: 12, fontWeight: '800', marginBottom: 12, letterSpacing: 1.5 }}>ATTRACT HELPERS FASTER</Text>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 20, width: '100%', paddingHorizontal: 10 }} contentContainerStyle={{ paddingHorizontal: 10, paddingRight: 40, gap: 12 }}>
-                  {[10, 20, 30, 40, 50].map(amount => (
-                    <TouchableOpacity
-                      key={amount}
-                      onPress={() => handleIncreasePrice(amount)}
-                      disabled={isIncreasingPrice === amount}
-                      style={{
-                        paddingVertical: 12,
-                        paddingHorizontal: 20,
-                        borderRadius: 20,
-                        backgroundColor: isIncreasingPrice === amount ? '#E5E7EB' : '#F3F4F6',
-                        borderWidth: 1,
-                        borderColor: isIncreasingPrice === amount ? '#D1D5DB' : '#E5E7EB',
-                        minWidth: 75,
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 3, elevation: 1
-                      }}
-                    >
-                      <Text style={{ color: '#5c52eb', fontWeight: '800', fontSize: 16 }}>+₹{amount}</Text>
-                    </TouchableOpacity>
-                  ))}
-                </ScrollView>
-                
-                {/* Minimal Cancel Button (Background is handling the UI) */}
-                <TouchableOpacity 
-                  style={{ paddingVertical: 14, paddingHorizontal: 32, borderRadius: 30, backgroundColor: 'rgba(239, 68, 68, 0.1)', borderWidth: 1, borderColor: 'rgba(239, 68, 68, 0.3)' }}
-                  onPress={handleCancelSearch}
-                >
-                  <Text style={{ color: '#EF4444', fontSize: 16, fontWeight: '700', letterSpacing: 1 }}>CANCEL SCAN</Text>
-                </TouchableOpacity>
+                {/* CANCEL BUTTON */}
+                <View style={{ width: '100%', alignItems: 'center', marginTop: 4 }}>
+                  <TouchableOpacity 
+                    style={{ width: '100%', paddingVertical: 16, borderRadius: 24, backgroundColor: '#5c52eb', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginBottom: 8 }}
+                    onPress={handleCancelSearch}
+                  >
+                    <View style={{ width: 28, height: 28, borderRadius: 14, backgroundColor: 'rgba(255,255,255,0.2)', alignItems: 'center', justifyContent: 'center', position: 'absolute', left: 16 }}>
+                      <Ionicons name="close" size={18} color="#fff" />
+                    </View>
+                    <Text style={{ color: '#fff', fontSize: 15, fontWeight: '800', letterSpacing: 0.5 }}>CANCEL SCAN</Text>
+                  </TouchableOpacity>
+                  <Text style={{ color: '#94A3B8', fontSize: 12, fontWeight: '500' }}>You can cancel anytime</Text>
+                </View>
               </View>
             ) : taskState === "assigned" && driver ? (
                <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', paddingTop: 0, paddingBottom: 24, minHeight: 400 }}>
@@ -1235,6 +1323,39 @@ export default function HelperTaskScreen() {
           </Animated.View>
         </ScrollView>
       </KeyboardAvoidingView>
+      {/* RIPPLE TRANSITION OVERLAY */}
+      {isTransitioningToSearch && (
+         <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 1000, pointerEvents: 'none', alignItems: 'center', justifyContent: 'flex-end', paddingBottom: 150 }}>
+            <Animated.View style={{
+               width: 100, height: 100, borderRadius: 50, backgroundColor: '#5c52eb',
+               opacity: rippleOpacityAnim,
+               transform: [{ scale: rippleScaleAnim }]
+            }} />
+            <Animated.Text style={{
+               position: 'absolute', top: '45%', color: '#fff', fontSize: 28, fontWeight: '900', letterSpacing: 2,
+               opacity: rippleOpacityAnim.interpolate({ inputRange: [0.5, 1], outputRange: [0, 1] }),
+               textShadowColor: 'rgba(255,255,255,0.5)', textShadowOffset: { width: 0, height: 0 }, textShadowRadius: 10
+            }}>INITIALIZING...</Animated.Text>
+         </View>
+      )}
+
+      {/* HELPER FOUND CINEMATIC OVERLAY */}
+      {isTransitioningToAssigned && (
+         <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 2000, justifyContent: 'center', alignItems: 'center' }}>
+            <Animated.View style={{ position: 'absolute', width: '100%', height: '100%', backgroundColor: '#000', opacity: blackoutOpacityAnim }} />
+            <Animated.View style={{
+               transform: [{ scale: stampScaleAnim }, { rotate: '-10deg' }],
+               opacity: stampOpacityAnim,
+               alignItems: 'center', justifyContent: 'center'
+            }}>
+               <Animated.Text style={{
+                  color: '#4ADE80', fontSize: 48, fontWeight: '900', letterSpacing: 4, textShadowColor: '#22C55E', textShadowOffset: { width: 0, height: 0 },
+                  textShadowRadius: stampGlowAnim.interpolate({ inputRange: [0, 1], outputRange: [10, 40] }),
+                  borderWidth: 6, borderColor: '#4ADE80', padding: 20, borderRadius: 16
+               }}>MATCH FOUND</Animated.Text>
+            </Animated.View>
+         </View>
+      )}
     </View>
   );
 }
