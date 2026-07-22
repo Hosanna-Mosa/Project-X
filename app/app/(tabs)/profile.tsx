@@ -16,6 +16,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather, MaterialIcons, Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import * as ImagePicker from "expo-image-picker";
+import { moderateScale } from "react-native-size-matters";
 import Colors from "@/constants/colors";
 import { useThemeStore } from "@/contexts/themeStore";
 import { useAuthStore } from "@/contexts/authStore";
@@ -227,7 +228,7 @@ export default function ProfileScreen() {
         }}
         activeOpacity={0.85}
       >
-        <Feather name="arrow-left" size={22} color={colors.primary} />
+        <Feather name="arrow-left" size={moderateScale(22)} color={colors.primary} />
       </TouchableOpacity>
 
       <ScrollView 
@@ -247,7 +248,7 @@ export default function ProfileScreen() {
               )}
             </View>
             <View style={[styles.cameraButton, { backgroundColor: colors.primary, borderColor: colors.background }]}>
-              <Feather name="edit-2" size={12} color="#fff" />
+              <Feather name="edit-2" size={moderateScale(12)} color="#fff" />
             </View>
           </TouchableOpacity>
 
@@ -256,7 +257,7 @@ export default function ProfileScreen() {
               {firstName}{lastName ? `\n${lastName}` : ""}
             </Text>
             <View style={styles.verifiedRow}>
-              <MaterialIcons name="verified" size={14} color={colors.teal} />
+              <MaterialIcons name="verified" size={moderateScale(14)} color={colors.teal} />
               <Text style={[styles.verifiedText, { color: colors.teal }]}>Premium Member</Text>
             </View>
           </View>
@@ -271,7 +272,7 @@ export default function ProfileScreen() {
               activeOpacity={0.9}
               onPress={() => router.replace("/(tabs)/orders")}
             >
-              <Feather name="folder" size={24} color={colors.teal} style={styles.neoCardIcon} />
+              <Feather name="folder" size={moderateScale(24)} color={colors.teal} style={styles.neoCardIcon} />
               <View>
                 <Text style={[styles.neoCardValue, { color: colors.primary }]}>{ordersCount}</Text>
                 <Text style={[styles.neoCardLabel, { color: colors.textSecondary }]}>TOTAL ORDERS</Text>
@@ -284,7 +285,7 @@ export default function ProfileScreen() {
               activeOpacity={0.9}
               onPress={() => router.push("/delivery/saved-addresses")}
             >
-              <Ionicons name="location-outline" size={26} color={colors.teal} style={styles.neoCardIcon} />
+              <Ionicons name="location-outline" size={moderateScale(26)} color={colors.teal} style={styles.neoCardIcon} />
               <View>
                 <Text style={[styles.neoCardValue, { color: colors.primary }]}>
                   {user?.addresses?.length || 0} Places
@@ -303,7 +304,7 @@ export default function ProfileScreen() {
               onPress={() => setEditing(true)}
             >
               <View style={[styles.softCardIconWrapper, { backgroundColor: colors.surfaceSecondary }]}>
-                <Feather name="user" size={20} color={colors.primary} />
+                <Feather name="user" size={moderateScale(20)} color={colors.primary} />
               </View>
               <Text style={[styles.softCardLabel, { color: colors.text }]}>Info</Text>
             </TouchableOpacity>
@@ -313,31 +314,29 @@ export default function ProfileScreen() {
               onPress={() => router.push("/delivery/saved-addresses")}
             >
               <View style={[styles.softCardIconWrapper, { backgroundColor: colors.surfaceSecondary }]}>
-                <Feather name="map-pin" size={20} color={colors.primary} />
+                <Feather name="map-pin" size={moderateScale(20)} color={colors.primary} />
               </View>
               <Text style={[styles.softCardLabel, { color: colors.text }]}>Places</Text>
             </TouchableOpacity>
-
-  
 
             <TouchableOpacity 
               style={[styles.softCard, { borderColor: colors.borderLight }]}
               onPress={() => router.push("/support")}
             >
               <View style={[styles.softCardIconWrapper, { backgroundColor: colors.surfaceSecondary }]}>
-                <Feather name="help-circle" size={20} color={colors.primary} />
+                <Feather name="help-circle" size={moderateScale(20)} color={colors.primary} />
               </View>
               <Text style={[styles.softCardLabel, { color: colors.text }]}>Support</Text>
             </TouchableOpacity>
           </View>
 
           <View style={[styles.controlGrid, { marginTop: 10 }]}>
-          <TouchableOpacity 
+            <TouchableOpacity 
               style={[styles.softCard, { borderColor: colors.borderLight }]}
               onPress={() => router.push("/favorites")}
             >
               <View style={[styles.softCardIconWrapper, { backgroundColor: colors.surfaceSecondary }]}>
-                <Feather name="heart" size={20} color={colors.primary} />
+                <Feather name="heart" size={moderateScale(20)} color={colors.primary} />
               </View>
               <Text style={[styles.softCardLabel, { color: colors.text }]}>Favorites</Text>
             </TouchableOpacity>
@@ -346,7 +345,7 @@ export default function ProfileScreen() {
               onPress={() => setNotificationsVisible(true)}
             >
               <View style={[styles.softCardIconWrapper, { backgroundColor: colors.surfaceSecondary }]}>
-                <Feather name="bell" size={20} color={colors.primary} />
+                <Feather name="bell" size={moderateScale(20)} color={colors.primary} />
               </View>
               <Text style={[styles.softCardLabel, { color: colors.text }]}>Notifications</Text>
             </TouchableOpacity>
@@ -356,7 +355,7 @@ export default function ProfileScreen() {
               onPress={() => setSecurityVisible(true)}
             >
               <View style={[styles.softCardIconWrapper, { backgroundColor: colors.surfaceSecondary }]}>
-                <Feather name="shield" size={20} color={colors.primary} />
+                <Feather name="shield" size={moderateScale(20)} color={colors.primary} />
               </View>
               <Text style={[styles.softCardLabel, { color: colors.text }]}>Security</Text>
             </TouchableOpacity>
@@ -412,7 +411,7 @@ export default function ProfileScreen() {
             <View style={styles.modalHeader}>
               <Text style={[styles.modalTitle, { color: colors.primary }]}>Personal Details</Text>
               <TouchableOpacity onPress={() => setEditing(false)}>
-                <Feather name="x" size={24} color={colors.text} />
+                <Feather name="x" size={moderateScale(24)} color={colors.text} />
               </TouchableOpacity>
             </View>
 
@@ -484,7 +483,7 @@ export default function ProfileScreen() {
             <View style={styles.modalHeader}>
               <Text style={[styles.modalTitle, { color: colors.primary }]}>Notification Settings</Text>
               <TouchableOpacity onPress={() => setNotificationsVisible(false)}>
-                <Feather name="x" size={24} color={colors.text} />
+                <Feather name="x" size={moderateScale(24)} color={colors.text} />
               </TouchableOpacity>
             </View>
 
@@ -567,7 +566,7 @@ export default function ProfileScreen() {
                 setNewPassword("");
                 setConfirmPassword("");
               }}>
-                <Feather name="x" size={24} color={colors.text} />
+                <Feather name="x" size={moderateScale(24)} color={colors.text} />
               </TouchableOpacity>
             </View>
 
@@ -630,9 +629,9 @@ const styles = StyleSheet.create({
   backButton: {
     position: 'absolute',
     left: 20,
-    width: 42,
-    height: 42,
-    borderRadius: 21,
+    width: moderateScale(42),
+    height: moderateScale(42),
+    borderRadius: moderateScale(21),
     borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
@@ -656,9 +655,9 @@ const styles = StyleSheet.create({
     position: 'relative',
   },
   avatarBorder: {
-    width: 96,
-    height: 96,
-    borderRadius: 48,
+    width: moderateScale(96),
+    height: moderateScale(96),
+    borderRadius: moderateScale(48),
     borderWidth: 2,
     padding: 2,
     overflow: 'hidden',
@@ -666,7 +665,7 @@ const styles = StyleSheet.create({
   avatarImage: {
     width: '100%',
     height: '100%',
-    borderRadius: 44,
+    borderRadius: moderateScale(44),
   },
   avatarPlaceholder: {
     backgroundColor: '#0061a5',
@@ -674,7 +673,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   avatarInitial: {
-    fontSize: 32,
+    fontSize: moderateScale(32),
     fontFamily: 'Inter_700Bold',
     color: '#ffffff',
   },
@@ -682,9 +681,9 @@ const styles = StyleSheet.create({
     position: 'absolute',
     bottom: -4,
     right: -4,
-    width: 32,
-    height: 32,
-    borderRadius: 8,
+    width: moderateScale(32),
+    height: moderateScale(32),
+    borderRadius: moderateScale(8),
     borderWidth: 2,
     alignItems: 'center',
     justifyContent: 'center',
@@ -698,9 +697,9 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   userHeadline: {
-    fontSize: 24,
+    fontSize: moderateScale(24),
     fontFamily: 'Inter_700Bold',
-    lineHeight: 28,
+    lineHeight: moderateScale(28),
   },
   verifiedRow: {
     flexDirection: 'row',
@@ -709,7 +708,7 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   verifiedText: {
-    fontSize: 11,
+    fontSize: moderateScale(11),
     fontFamily: 'Inter_600SemiBold',
     letterSpacing: 1,
     textTransform: 'uppercase',
@@ -724,13 +723,13 @@ const styles = StyleSheet.create({
   },
   neoCard: {
     flex: 1,
-    height: 96,
+    height: moderateScale(96),
     backgroundColor: '#ffffff',
     borderWidth: 2,
     borderColor: '#191c1e',
     padding: 16,
     justifyContent: 'space-between',
-    borderRadius: 8,
+    borderRadius: moderateScale(8),
     // Neobrutalist shadow
     shadowOffset: { width: 4, height: 4 },
     shadowOpacity: 1,
@@ -741,12 +740,12 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   neoCardValue: {
-    fontSize: 18,
+    fontSize: moderateScale(18),
     fontFamily: 'Inter_700Bold',
-    lineHeight: 20,
+    lineHeight: moderateScale(20),
   },
   neoCardLabel: {
-    fontSize: 10,
+    fontSize: moderateScale(10),
     fontFamily: 'Inter_500Medium',
     letterSpacing: 0.5,
     marginTop: 2,
@@ -762,7 +761,7 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#ffffff',
     borderWidth: 1,
-    borderRadius: 8,
+    borderRadius: moderateScale(8),
     padding: 16,
     alignItems: 'center',
     gap: 12,
@@ -773,14 +772,14 @@ const styles = StyleSheet.create({
     elevation: 1,
   },
   softCardIconWrapper: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: moderateScale(40),
+    height: moderateScale(40),
+    borderRadius: moderateScale(20),
     alignItems: 'center',
     justifyContent: 'center',
   },
   softCardLabel: {
-    fontSize: 12,
+    fontSize: moderateScale(12),
     fontFamily: 'Inter_600SemiBold',
     textAlign: 'center',
   },
@@ -790,31 +789,31 @@ const styles = StyleSheet.create({
   },
   actionButtonOutline: {
     width: '100%',
-    height: 52,
+    height: moderateScale(52),
     borderWidth: 2,
-    borderRadius: 12,
+    borderRadius: moderateScale(12),
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
   },
   actionButtonOutlineText: {
-    fontSize: 12,
+    fontSize: moderateScale(12),
     fontFamily: 'Inter_700Bold',
     textTransform: 'uppercase',
     letterSpacing: 1,
   },
   actionButtonSolid: {
     width: '100%',
-    height: 52,
-    borderRadius: 12,
+    height: moderateScale(52),
+    borderRadius: moderateScale(12),
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
   },
   actionButtonSolidText: {
-    fontSize: 12,
+    fontSize: moderateScale(12),
     fontFamily: 'Inter_700Bold',
     textTransform: 'uppercase',
     letterSpacing: 1,
@@ -822,22 +821,22 @@ const styles = StyleSheet.create({
   },
   actionButtonError: {
     width: '100%',
-    height: 52,
-    borderRadius: 12,
+    height: moderateScale(52),
+    borderRadius: moderateScale(12),
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
   },
   actionButtonErrorText: {
-    fontSize: 12,
+    fontSize: moderateScale(12),
     fontFamily: 'Inter_700Bold',
     textTransform: 'uppercase',
     letterSpacing: 1,
   },
   version: {
     textAlign: 'center',
-    fontSize: 11,
+    fontSize: moderateScale(11),
     fontFamily: 'Inter_400Regular',
     marginTop: 12,
   },
@@ -846,8 +845,8 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   modalBody: { 
-    borderTopLeftRadius: 32, 
-    borderTopRightRadius: 32, 
+    borderTopLeftRadius: moderateScale(32), 
+    borderTopRightRadius: moderateScale(32), 
     padding: 24, 
     maxHeight: '90%',
     paddingBottom: 40,
@@ -864,7 +863,7 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   modalTitle: { 
-    fontSize: 22, 
+    fontSize: moderateScale(22), 
     fontFamily: 'Inter_700Bold',
   },
   modalScroll: { 
@@ -875,20 +874,20 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   inputLabel: { 
-    fontSize: 14, 
+    fontSize: moderateScale(14), 
     fontFamily: 'Inter_600SemiBold', 
     marginLeft: 4,
   },
   textInput: {
     borderWidth: 1,
-    borderRadius: 12,
+    borderRadius: moderateScale(12),
     padding: 14,
-    fontSize: 16,
+    fontSize: moderateScale(16),
     fontFamily: 'Inter_500Medium',
   },
   saveBtn: {
     padding: 16,
-    borderRadius: 12,
+    borderRadius: moderateScale(12),
     alignItems: 'center',
     shadowColor: '#002045',
     shadowOffset: { width: 0, height: 4 },
@@ -901,7 +900,7 @@ const styles = StyleSheet.create({
   },
   saveBtnText: { 
     color: '#ffffff', 
-    fontSize: 16, 
+    fontSize: moderateScale(16), 
     fontFamily: 'Inter_700Bold',
   },
   settingRow: {
@@ -916,13 +915,13 @@ const styles = StyleSheet.create({
     paddingRight: 16,
   },
   settingLabel: {
-    fontSize: 14,
+    fontSize: moderateScale(14),
     fontFamily: 'Inter_600SemiBold',
     marginBottom: 4,
   },
   settingSub: {
-    fontSize: 11,
+    fontSize: moderateScale(11),
     fontFamily: 'Inter_400Regular',
-    lineHeight: 14,
+    lineHeight: moderateScale(14),
   },
 });

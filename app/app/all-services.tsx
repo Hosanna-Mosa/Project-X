@@ -11,6 +11,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
+import { moderateScale } from "react-native-size-matters";
 import Colors from "@/constants/colors";
 import { useThemeStore } from "@/contexts/themeStore";
 import { useDeliveryStore } from "@/contexts/deliveryStore";
@@ -46,7 +47,7 @@ export default function AllServicesScreen() {
     <View style={styles.root}>
       <View style={[styles.header, { paddingTop: insets.top + 44 }]}>
         <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
-          <Ionicons name="arrow-back" size={24} color={colors.text} />
+          <Ionicons name="arrow-back" size={moderateScale(24)} color={colors.text} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>All Services</Text>
       </View>
@@ -66,12 +67,12 @@ export default function AllServicesScreen() {
                 <Image source={service.image} style={styles.serviceIcon} resizeMode="contain" />
                 {service.isLite && (
                   <View style={styles.badge}>
-                    <Ionicons name="pricetag" size={10} color="#fff" />
+                    <Ionicons name="pricetag" size={moderateScale(10)} color="#fff" />
                   </View>
                 )}
                 {service.isPremium && (
                   <View style={styles.premiumBadge}>
-                    <Ionicons name="sparkles" size={10} color="#fff" />
+                    <Ionicons name="sparkles" size={moderateScale(10)} color="#fff" />
                   </View>
                 )}
               </View>
@@ -100,7 +101,7 @@ const createStyles = (colors: typeof Colors.light) =>
       marginRight: 16,
     },
     headerTitle: {
-      fontSize: 22,
+      fontSize: moderateScale(22),
       fontWeight: "900",
       color: colors.text,
     },
@@ -123,17 +124,17 @@ const createStyles = (colors: typeof Colors.light) =>
       width: ITEM_WIDTH,
       height: 68,
       backgroundColor: "#F8FAFC",
-      borderRadius: 8,
+      borderRadius: moderateScale(8),
       alignItems: "center",
       justifyContent: "center",
       position: "relative",
     },
     serviceIcon: {
-      width: 48,
-      height: 48,
+      width: moderateScale(48),
+      height: moderateScale(48),
     },
     serviceName: {
-      fontSize: 14,
+      fontSize: moderateScale(14),
       fontWeight: "700",
       color: colors.text,
       textAlign: "center",
@@ -145,7 +146,7 @@ const createStyles = (colors: typeof Colors.light) =>
       right: 10,
       backgroundColor: "#16A34A",
       padding: 4,
-      borderRadius: 8,
+      borderRadius: moderateScale(8),
     },
     premiumBadge: {
       position: "absolute",
@@ -153,6 +154,6 @@ const createStyles = (colors: typeof Colors.light) =>
       right: 10,
       backgroundColor: "#F59E0B",
       padding: 4,
-      borderRadius: 8,
+      borderRadius: moderateScale(8),
     },
   });

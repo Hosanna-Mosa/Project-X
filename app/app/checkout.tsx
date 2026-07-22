@@ -14,6 +14,7 @@ import {
 import { Feather, Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { router, useLocalSearchParams, useFocusEffect } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { moderateScale } from "react-native-size-matters";
 import { useCartStore } from "@/contexts/cartStore";
 import { useDeliveryStore } from "@/contexts/deliveryStore";
 import { useThemeStore } from "@/contexts/themeStore";
@@ -241,7 +242,7 @@ export default function FoodCheckoutScreen() {
       {/* Header */}
       <View style={[styles.header, { paddingTop: insets.top + 10 }]}>
         <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
-          <Feather name="arrow-left" size={24} color="#000" />
+          <Feather name="arrow-left" size={moderateScale(24)} color="#000" />
         </TouchableOpacity>
         <View style={styles.headerTitles}>
           <Text style={styles.headerSubtitle}>Checkout</Text>
@@ -256,7 +257,7 @@ export default function FoodCheckoutScreen() {
         {/* Delivery Address Card */}
         <TouchableOpacity style={styles.addressCard} onPress={() => router.push("/delivery/saved-addresses")} activeOpacity={0.8}>
           <View style={styles.addressIconWrapper}>
-            <Ionicons name="home" size={20} color="#fff" />
+            <Ionicons name="home" size={moderateScale(20)} color="#fff" />
           </View>
           <View style={styles.addressInfo}>
             <Text style={styles.addressLabel}>{selectedAddress ? selectedAddress.label || "Work" : "Work"}</Text>
@@ -264,17 +265,17 @@ export default function FoodCheckoutScreen() {
               {selectedAddress ? selectedAddress.addressLine : "Rajamahendravaram, Andhra Pradesh, India [Apt: 2RWR+P33]"}
             </Text>
           </View>
-          <Feather name="edit-2" size={18} color="#000" />
+          <Feather name="edit-2" size={moderateScale(18)} color="#000" />
         </TouchableOpacity>
 
         {/* Cart Summary Section */}
         <View style={styles.divider} />
         <View style={styles.section}>
           <View style={styles.sectionHeaderRow}>
-            <Feather name="shopping-cart" size={20} color="#000" />
+            <Feather name="shopping-cart" size={moderateScale(20)} color="#000" />
             <Text style={styles.sectionTitle}>Cart Summary</Text>
             <View style={{ flex: 1 }} />
-            <Feather name="chevron-up" size={20} color="#000" />
+            <Feather name="chevron-up" size={moderateScale(20)} color="#000" />
           </View>
           <Text style={styles.cartSub}>{vendorName} • {getItemCount()} items</Text>
           
@@ -474,12 +475,12 @@ const createStyles = () => StyleSheet.create({
     flex: 1,
   },
   headerSubtitle: {
-    fontSize: 12,
+    fontSize: moderateScale(12),
     color: "#666",
     fontWeight: "600",
   },
   headerTitle: {
-    fontSize: 20,
+    fontSize: moderateScale(20),
     fontWeight: "bold",
     color: "#000",
   },
@@ -494,13 +495,13 @@ const createStyles = () => StyleSheet.create({
     backgroundColor: "#FAFAFA",
     borderWidth: 1,
     borderColor: "#F0F0F0",
-    borderRadius: 16,
+    borderRadius: moderateScale(16),
     padding: 16,
   },
   addressIconWrapper: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: moderateScale(40),
+    height: moderateScale(40),
+    borderRadius: moderateScale(20),
     backgroundColor: "#000",
     justifyContent: "center",
     alignItems: "center",
@@ -510,13 +511,13 @@ const createStyles = () => StyleSheet.create({
     flex: 1,
   },
   addressLabel: {
-    fontSize: 15,
+    fontSize: moderateScale(15),
     fontWeight: "bold",
     color: "#000",
     marginBottom: 2,
   },
   addressText: {
-    fontSize: 13,
+    fontSize: moderateScale(13),
     color: "#888",
   },
   divider: {
@@ -532,13 +533,13 @@ const createStyles = () => StyleSheet.create({
     alignItems: "center",
   },
   sectionTitle: {
-    fontSize: 18,
+    fontSize: moderateScale(18),
     fontWeight: "bold",
     color: "#000",
     marginLeft: 8,
   },
   cartSub: {
-    fontSize: 13,
+    fontSize: moderateScale(13),
     color: "#888",
     marginTop: 4,
     marginBottom: 16,
@@ -557,7 +558,7 @@ const createStyles = () => StyleSheet.create({
     paddingRight: 16,
   },
   itemQuantity: {
-    fontSize: 14,
+    fontSize: moderateScale(14),
     fontWeight: "bold",
     color: "#000",
     marginRight: 12,
@@ -567,17 +568,17 @@ const createStyles = () => StyleSheet.create({
     flex: 1,
   },
   itemName: {
-    fontSize: 15,
+    fontSize: moderateScale(15),
     fontWeight: "bold",
     color: "#000",
     marginBottom: 4,
   },
   itemDesc: {
-    fontSize: 13,
+    fontSize: moderateScale(13),
     color: "#888",
   },
   itemPrice: {
-    fontSize: 15,
+    fontSize: moderateScale(15),
     fontWeight: "bold",
     color: "#000",
   },
@@ -593,7 +594,7 @@ const createStyles = () => StyleSheet.create({
     alignItems: "center",
   },
   dealText: {
-    fontSize: 15,
+    fontSize: moderateScale(15),
     fontWeight: "bold",
     color: "#000",
     marginLeft: 12,
@@ -609,20 +610,20 @@ const createStyles = () => StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     backgroundColor: "#F5F5F5",
-    borderRadius: 8,
+    borderRadius: moderateScale(8),
     paddingHorizontal: 12,
-    height: 48,
+    height: moderateScale(48),
   },
   promoTextInput: {
     flex: 1,
     marginLeft: 8,
-    fontSize: 15,
+    fontSize: moderateScale(15),
     color: "#000",
   },
   promoApplyBtn: {
     backgroundColor: "#000",
-    borderRadius: 8,
-    height: 48,
+    borderRadius: moderateScale(8),
+    height: moderateScale(48),
     paddingHorizontal: 20,
     justifyContent: "center",
     alignItems: "center",
@@ -630,7 +631,7 @@ const createStyles = () => StyleSheet.create({
   promoApplyText: {
     color: "#fff",
     fontWeight: "bold",
-    fontSize: 15,
+    fontSize: moderateScale(15),
   },
   priceList: {
     gap: 12,
@@ -646,12 +647,12 @@ const createStyles = () => StyleSheet.create({
     alignItems: "center",
   },
   priceLabel: {
-    fontSize: 14,
+    fontSize: moderateScale(14),
     color: "#444",
     fontWeight: "600",
   },
   priceValue: {
-    fontSize: 14,
+    fontSize: moderateScale(14),
     color: "#000",
     fontWeight: "bold",
   },
@@ -661,7 +662,7 @@ const createStyles = () => StyleSheet.create({
     gap: 6,
   },
   struckPrice: {
-    fontSize: 14,
+    fontSize: moderateScale(14),
     color: "#999",
     textDecorationLine: "line-through",
   },
@@ -674,7 +675,7 @@ const createStyles = () => StyleSheet.create({
   tipPill: {
     paddingHorizontal: 16,
     paddingVertical: 8,
-    borderRadius: 20,
+    borderRadius: moderateScale(20),
     backgroundColor: "#F5F5F5",
     borderWidth: 1,
     borderColor: "#E5E5E5",
@@ -684,7 +685,7 @@ const createStyles = () => StyleSheet.create({
     borderColor: "#000",
   },
   tipPillText: {
-    fontSize: 14,
+    fontSize: moderateScale(14),
     fontWeight: "bold",
     color: "#000",
   },
@@ -693,15 +694,15 @@ const createStyles = () => StyleSheet.create({
   },
   otherTipInput: {
     backgroundColor: "#F5F5F5",
-    borderRadius: 8,
+    borderRadius: moderateScale(8),
     padding: 12,
-    fontSize: 15,
+    fontSize: moderateScale(15),
     fontWeight: "bold",
     marginTop: 8,
     marginBottom: 8,
   },
   tipFooterText: {
-    fontSize: 12,
+    fontSize: moderateScale(12),
     color: "#888",
     marginTop: 8,
   },
@@ -712,7 +713,7 @@ const createStyles = () => StyleSheet.create({
     alignItems: "center",
   },
   totalTitle: {
-    fontSize: 22,
+    fontSize: moderateScale(22),
     fontWeight: "900",
     color: "#000",
   },
@@ -722,13 +723,13 @@ const createStyles = () => StyleSheet.create({
     gap: 8,
   },
   struckTotal: {
-    fontSize: 18,
+    fontSize: moderateScale(18),
     color: "#999",
     textDecorationLine: "line-through",
     fontWeight: "600",
   },
   finalTotal: {
-    fontSize: 24,
+    fontSize: moderateScale(24),
     fontWeight: "900",
     color: "#000",
   },
@@ -751,21 +752,21 @@ const createStyles = () => StyleSheet.create({
     gap: 6,
   },
   savingsText: {
-    fontSize: 14,
+    fontSize: moderateScale(14),
     fontWeight: "bold",
     color: "#000",
   },
   placeOrderBtn: {
     backgroundColor: "#000",
     width: "100%",
-    height: 54,
-    borderRadius: 12,
+    height: moderateScale(54),
+    borderRadius: moderateScale(12),
     justifyContent: "center",
     alignItems: "center",
   },
   placeOrderBtnText: {
     color: "#fff",
-    fontSize: 16,
+    fontSize: moderateScale(16),
     fontWeight: "bold",
   },
 });

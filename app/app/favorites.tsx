@@ -11,6 +11,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { router, useFocusEffect } from "expo-router";
+import { moderateScale } from "react-native-size-matters";
 import Colors from "@/constants/colors";
 import { useThemeStore } from "@/contexts/themeStore";
 import { RestaurantListItem } from "@/components/RestaurantListItem";
@@ -66,7 +67,7 @@ export default function FavoritesScreen() {
       {/* Header */}
       <View style={[styles.header, { paddingTop: insets.top + 16 }]}>
         <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
-          <Ionicons name="arrow-back" size={24} color={colors.text} />
+          <Ionicons name="arrow-back" size={moderateScale(24)} color={colors.text} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Favorites</Text>
       </View>
@@ -106,7 +107,7 @@ export default function FavoritesScreen() {
           ListEmptyComponent={() => (
             <View style={styles.emptyContainer}>
               <View style={styles.heartCircle}>
-                <Ionicons name="heart" size={54} color={colors.primary} />
+                <Ionicons name="heart" size={moderateScale(54)} color={colors.primary} />
               </View>
               <Text style={styles.emptyTitle}>No Favorites Yet</Text>
               <Text style={styles.emptySubtitle}>
@@ -146,7 +147,7 @@ const createStyles = (colors: typeof Colors.light) =>
       marginRight: 16,
     },
     headerTitle: {
-      fontSize: 22,
+      fontSize: moderateScale(22),
       fontWeight: "900",
       color: colors.text,
     },
@@ -167,33 +168,33 @@ const createStyles = (colors: typeof Colors.light) =>
       paddingHorizontal: 32,
     },
     heartCircle: {
-      width: 100,
-      height: 100,
-      borderRadius: 50,
+      width: moderateScale(100),
+      height: moderateScale(100),
+      borderRadius: moderateScale(50),
       backgroundColor: colors.primary + "15",
       alignItems: "center",
       justifyContent: "center",
       marginBottom: 20,
     },
     emptyTitle: {
-      fontSize: 20,
+      fontSize: moderateScale(20),
       fontWeight: "800",
       color: colors.text,
       marginBottom: 8,
       textAlign: "center",
     },
     emptySubtitle: {
-      fontSize: 14,
+      fontSize: moderateScale(14),
       color: colors.textSecondary,
       textAlign: "center",
-      lineHeight: 20,
+      lineHeight: moderateScale(20),
       marginBottom: 24,
     },
     browseButton: {
       backgroundColor: colors.primary,
       paddingVertical: 12,
       paddingHorizontal: 24,
-      borderRadius: 25,
+      borderRadius: moderateScale(25),
       shadowColor: colors.primary,
       shadowOffset: { width: 0, height: 4 },
       shadowOpacity: 0.2,
@@ -202,7 +203,7 @@ const createStyles = (colors: typeof Colors.light) =>
     },
     browseButtonText: {
       color: "#fff",
-      fontSize: 15,
+      fontSize: moderateScale(15),
       fontWeight: "700",
     },
   });

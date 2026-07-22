@@ -1,6 +1,7 @@
 import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { router } from "expo-router";
+import { moderateScale } from "react-native-size-matters";
 import * as React from "react";
 import { useRef, useState } from "react";
 import {
@@ -410,7 +411,7 @@ export default function AuthScreen() {
       >
         <View style={styles.logoSection}>
           <View style={styles.logoContainer}>
-            <Feather name="truck" size={40} color={Colors.white} />
+            <Feather name="truck" size={moderateScale(40)} color={Colors.white} />
           </View>
           <Text style={styles.appName}>DeliverPro</Text>
           <Text style={styles.tagline}>Driver Partner App</Text>
@@ -438,9 +439,9 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   logoContainer: {
-    width: 72,
-    height: 72,
-    borderRadius: 22,
+    width: moderateScale(72),
+    height: moderateScale(72),
+    borderRadius: moderateScale(22),
     backgroundColor: Colors.primary,
     justifyContent: "center",
     alignItems: "center",
@@ -451,13 +452,13 @@ const styles = StyleSheet.create({
     elevation: 8,
   },
   appName: {
-    fontSize: 26,
+    fontSize: moderateScale(26),
     fontWeight: "800",
     color: Colors.text,
     letterSpacing: -0.5,
   },
   tagline: {
-    fontSize: 14,
+    fontSize: moderateScale(14),
     color: Colors.textSecondary,
     fontWeight: "500",
   },
@@ -465,37 +466,36 @@ const styles = StyleSheet.create({
     gap: 14,
   },
   formTitle: {
-    fontSize: 22,
+    fontSize: moderateScale(22),
     fontWeight: "700",
     color: Colors.text,
   },
   formSubtitle: {
-    fontSize: 14,
+    fontSize: moderateScale(14),
     color: Colors.textSecondary,
     lineHeight: 20,
     marginTop: -6,
   },
   demoHint: {
-    fontSize: 13,
+    fontSize: moderateScale(13),
     color: Colors.primary,
     backgroundColor: Colors.primaryLight,
     paddingHorizontal: 12,
     paddingVertical: 6,
-    borderRadius: 8,
+    borderRadius: moderateScale(8),
     alignSelf: "flex-start",
     fontWeight: "500",
   },
-  // ── Tabs ──
   tabRow: {
     flexDirection: "row",
     backgroundColor: Colors.surfaceAlt,
-    borderRadius: 10,
+    borderRadius: moderateScale(10),
     padding: 3,
   },
   tab: {
     flex: 1,
     paddingVertical: 8,
-    borderRadius: 8,
+    borderRadius: moderateScale(8),
     alignItems: "center",
   },
   tabActive: {
@@ -507,19 +507,18 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   tabText: {
-    fontSize: 14,
+    fontSize: moderateScale(14),
     fontWeight: "600",
     color: Colors.textSecondary,
   },
   tabTextActive: {
     color: Colors.primary,
   },
-  // ── Inputs ──
   inputGroup: {
     gap: 5,
   },
   inputLabel: {
-    fontSize: 13,
+    fontSize: moderateScale(13),
     fontWeight: "600",
     color: Colors.text,
   },
@@ -528,14 +527,14 @@ const styles = StyleSheet.create({
     alignItems: "center",
     borderWidth: 1.5,
     borderColor: Colors.border,
-    borderRadius: 12,
+    borderRadius: moderateScale(12),
     paddingHorizontal: 14,
-    height: 48,
+    height: moderateScale(48),
     gap: 10,
     backgroundColor: Colors.surface,
   },
   countryCode: {
-    fontSize: 16,
+    fontSize: moderateScale(16),
     fontWeight: "600",
     color: Colors.text,
   },
@@ -546,13 +545,12 @@ const styles = StyleSheet.create({
   },
   input: {
     flex: 1,
-    fontSize: 16,
+    fontSize: moderateScale(16),
     color: Colors.text,
   },
-  // ── Buttons ──
   primaryButton: {
-    height: 50,
-    borderRadius: 25,
+    height: moderateScale(50),
+    borderRadius: moderateScale(25),
     backgroundColor: Colors.primary,
     flexDirection: "row",
     justifyContent: "center",
@@ -570,10 +568,9 @@ const styles = StyleSheet.create({
   },
   primaryButtonText: {
     color: Colors.white,
-    fontSize: 16,
+    fontSize: moderateScale(16),
     fontWeight: "700",
   },
-  // ── OTP ──
   otpContainer: {
     flexDirection: "row",
     gap: 8,
@@ -581,14 +578,14 @@ const styles = StyleSheet.create({
     marginVertical: 4,
   },
   otpBox: {
-    width: 44,
-    height: 50,
-    borderRadius: 10,
+    width: moderateScale(44),
+    height: moderateScale(50),
+    borderRadius: moderateScale(10),
     borderWidth: 1.5,
     borderColor: Colors.border,
     backgroundColor: Colors.surface,
     textAlign: "center",
-    fontSize: 20,
+    fontSize: moderateScale(20),
     fontWeight: "700",
     color: Colors.text,
   },
@@ -596,11 +593,10 @@ const styles = StyleSheet.create({
     borderColor: Colors.primary,
     backgroundColor: Colors.primaryLight,
   },
-  // ── Navigation ──
   backButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: moderateScale(40),
+    height: moderateScale(40),
+    borderRadius: moderateScale(20),
     backgroundColor: Colors.surfaceAlt,
     justifyContent: "center",
     alignItems: "center",
@@ -611,7 +607,7 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
   },
   resendText: {
-    fontSize: 15,
+    fontSize: moderateScale(15),
     color: Colors.primary,
     fontWeight: "600",
   },
@@ -620,7 +616,7 @@ const styles = StyleSheet.create({
     paddingVertical: 2,
   },
   switchText: {
-    fontSize: 14,
+    fontSize: moderateScale(14),
     color: Colors.textSecondary,
     fontWeight: "500",
   },

@@ -13,6 +13,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
 import { router } from "expo-router";
+import { moderateScale } from "react-native-size-matters";
 import Colors from "@/constants/colors";
 import { socketService } from "@/utils/socketService";
 import { useDeliveryStore } from "@/contexts/deliveryStore";
@@ -257,9 +258,9 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
   backBtn: {
-    width: 30,
-    height: 30,
-    borderRadius: 8,
+    width: moderateScale(30),
+    height: moderateScale(30),
+    borderRadius: moderateScale(8),
     backgroundColor: "#F1F5F9",
     alignItems: "center",
     justifyContent: "center",
@@ -271,9 +272,9 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   headerAvatar: {
-    width: 32,
-    height: 32,
-    borderRadius: 10,
+    width: moderateScale(32),
+    height: moderateScale(32),
+    borderRadius: moderateScale(10),
     backgroundColor: "#F1F5F9",
     alignItems: "center",
     justifyContent: "center",
@@ -290,20 +291,20 @@ const styles = StyleSheet.create({
     right: 0,
   },
   headerName: {
-    fontSize: 13,
+    fontSize: moderateScale(13),
     fontWeight: "700",
     color: Colors.light.text,
     letterSpacing: -0.3,
   },
   headerStatus: {
-    fontSize: 10,
+    fontSize: moderateScale(10),
     color: "#22C55E",
     fontWeight: "600",
   },
   callBtn: {
-    width: 30,
-    height: 30,
-    borderRadius: 8,
+    width: moderateScale(30),
+    height: moderateScale(30),
+    borderRadius: moderateScale(8),
     backgroundColor: "#F0F9FF",
     alignItems: "center",
     justifyContent: "center",
@@ -327,9 +328,9 @@ const styles = StyleSheet.create({
     justifyContent: "flex-start",
   },
   driverAvatar: {
-    width: 24,
-    height: 24,
-    borderRadius: 8,
+    width: moderateScale(24),
+    height: moderateScale(24),
+    borderRadius: moderateScale(8),
     backgroundColor: "#F1F5F9",
     alignItems: "center",
     justifyContent: "center",
@@ -337,18 +338,18 @@ const styles = StyleSheet.create({
   },
   bubble: {
     maxWidth: "75%",
-    borderRadius: 12,
+    borderRadius: moderateScale(12),
     paddingHorizontal: 10,
     paddingVertical: 8,
     gap: 3,
   },
   bubbleUser: {
     backgroundColor: "#0EA5E9",
-    borderBottomRightRadius: 6,
+    borderBottomRightRadius: moderateScale(6),
   },
   bubbleDriver: {
     backgroundColor: "#FFFFFF",
-    borderBottomLeftRadius: 6,
+    borderBottomLeftRadius: moderateScale(6),
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.06,
@@ -356,25 +357,25 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   bubbleTextUser: {
-    fontSize: 13,
+    fontSize: moderateScale(13),
     color: "#fff",
     fontWeight: "500",
-    lineHeight: 18,
+    lineHeight: moderateScale(18),
   },
   bubbleTextDriver: {
-    fontSize: 13,
+    fontSize: moderateScale(13),
     color: Colors.light.text,
     fontWeight: "500",
-    lineHeight: 18,
+    lineHeight: moderateScale(18),
   },
   timeUser: {
-    fontSize: 10,
+    fontSize: moderateScale(10),
     color: "rgba(255,255,255,0.7)",
     fontWeight: "500",
     alignSelf: "flex-end",
   },
   timeDriver: {
-    fontSize: 10,
+    fontSize: moderateScale(10),
     color: Colors.light.textMuted,
     fontWeight: "500",
     alignSelf: "flex-end",
@@ -391,7 +392,7 @@ const styles = StyleSheet.create({
   },
   quickReplyChip: {
     backgroundColor: "#FFFFFF",
-    borderRadius: 20,
+    borderRadius: moderateScale(20),
     paddingHorizontal: 12,
     paddingVertical: 5,
     borderWidth: 1.5,
@@ -403,7 +404,7 @@ const styles = StyleSheet.create({
     elevation: 1,
   },
   quickReplyText: {
-    fontSize: 11,
+    fontSize: moderateScale(11),
     fontWeight: "600",
     color: Colors.light.textSecondary,
   },
@@ -420,23 +421,23 @@ const styles = StyleSheet.create({
   inputContainer: {
     flex: 1,
     backgroundColor: "#F1F5F9",
-    borderRadius: 22,
-    height: 44,
+    borderRadius: moderateScale(22),
+    height: moderateScale(44),
     paddingHorizontal: 14,
     justifyContent: "center",
   },
   textInput: {
     flex: 1,
-    fontSize: 15,
+    fontSize: moderateScale(15),
     color: Colors.light.text,
     fontWeight: "500",
     paddingVertical: 0,
     textAlignVertical: "center",
   },
   sendBtn: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+    width: moderateScale(44),
+    height: moderateScale(44),
+    borderRadius: moderateScale(22),
     backgroundColor: "#0EA5E9",
     alignItems: "center",
     justifyContent: "center",

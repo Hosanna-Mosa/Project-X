@@ -15,6 +15,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
+import { moderateScale } from "react-native-size-matters";
 import Colors from "@/constants/colors";
 import { useAuthStore } from "@/contexts/authStore";
 import { useThemeStore } from "@/contexts/themeStore";
@@ -212,7 +213,7 @@ export default function AuthScreen() {
               <View style={styles.fieldWrapper}>
                 <Text style={styles.fieldLabel}>Phone Number</Text>
                 <View style={styles.inputContainer}>
-                  <Ionicons name="phone-portrait-outline" size={18} color="#43474e" style={styles.inputIcon} />
+                  <Ionicons name="phone-portrait-outline" size={moderateScale(18)} color="#43474e" style={styles.inputIcon} />
                   <TextInput
                     style={styles.input}
                     placeholder="e.g. 9876543210"
@@ -228,7 +229,7 @@ export default function AuthScreen() {
               <View style={styles.fieldWrapper}>
                 <Text style={styles.fieldLabel}>Email Address</Text>
                 <View style={styles.inputContainer}>
-                  <Ionicons name="mail-outline" size={18} color="#43474e" style={styles.inputIcon} />
+                  <Ionicons name="mail-outline" size={moderateScale(18)} color="#43474e" style={styles.inputIcon} />
                   <TextInput
                     style={styles.input}
                     placeholder="name@example.com"
@@ -252,7 +253,7 @@ export default function AuthScreen() {
                 </TouchableOpacity>
               </View>
               <View style={styles.inputContainer}>
-                <Ionicons name="lock-closed-outline" size={18} color="#43474e" style={styles.inputIcon} />
+                <Ionicons name="lock-closed-outline" size={moderateScale(18)} color="#43474e" style={styles.inputIcon} />
                 <TextInput
                   style={styles.input}
                   placeholder="••••••••"
@@ -270,7 +271,7 @@ export default function AuthScreen() {
                 >
                   <Ionicons
                     name={isPasswordVisible ? "eye-off-outline" : "eye-outline"}
-                    size={20}
+                    size={moderateScale(20)}
                     color="#43474e"
                   />
                 </TouchableOpacity>
@@ -292,7 +293,7 @@ export default function AuthScreen() {
               ) : (
                 <>
                   <Text style={styles.signInBtnText}>Sign In</Text>
-                  <Ionicons name="arrow-forward" size={18} color="#002045" style={{ marginLeft: 6 }} />
+                  <Ionicons name="arrow-forward" size={moderateScale(18)} color="#002045" style={{ marginLeft: 8 }} />
                 </>
               )}
             </TouchableOpacity>
@@ -321,19 +322,19 @@ const createStyles = (colors: typeof Colors.light) => StyleSheet.create({
   },
   headerRow: {
     paddingHorizontal: 24,
-    paddingBottom: 20,
+    paddingBottom: 16,
     backgroundColor: "#f7f9fb",
     alignItems: "center",
   },
   brandTitle: {
-    fontSize: 32,
+    fontSize: moderateScale(32),
     fontWeight: "800",
     color: "#002045",
     letterSpacing: -1,
     marginBottom: 4,
   },
   brandTagline: {
-    fontSize: 14,
+    fontSize: moderateScale(14),
     color: "#43474e",
     fontWeight: "500",
   },
@@ -342,14 +343,14 @@ const createStyles = (colors: typeof Colors.light) => StyleSheet.create({
     justifyContent: "center",
     paddingHorizontal: 24,
     paddingTop: 8,
-    paddingBottom: 40,
+    paddingBottom: 32,
   },
   card: {
     backgroundColor: "#ffffff",
-    borderRadius: 20,
+    borderRadius: moderateScale(20),
     borderWidth: 1,
     borderColor: "#e6e8ea",
-    padding: 28,
+    padding: 24,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.06,
@@ -358,32 +359,32 @@ const createStyles = (colors: typeof Colors.light) => StyleSheet.create({
     width: "100%",
   },
   cardTitle: {
-    fontSize: 26,
+    fontSize: moderateScale(26),
     fontWeight: "700",
     color: "#191c1e",
     textAlign: "center",
     marginBottom: 8,
   },
   cardSubtitle: {
-    fontSize: 14,
+    fontSize: moderateScale(14),
     color: "#43474e",
     textAlign: "center",
-    lineHeight: 20,
+    lineHeight: moderateScale(20),
     marginBottom: 24,
   },
   tabContainer: {
     flexDirection: "row",
     backgroundColor: "#eceef0",
-    borderRadius: 10,
+    borderRadius: moderateScale(10),
     padding: 4,
-    height: 46,
-    marginBottom: 20,
+    height: moderateScale(46),
+    marginBottom: 16,
   },
   tab: {
     flex: 1,
     alignItems: "center",
     justifyContent: "center",
-    borderRadius: 8,
+    borderRadius: moderateScale(8),
   },
   tabActive: {
     backgroundColor: "#ffffff",
@@ -394,7 +395,7 @@ const createStyles = (colors: typeof Colors.light) => StyleSheet.create({
     elevation: 2,
   },
   tabText: {
-    fontSize: 14,
+    fontSize: moderateScale(14),
     fontWeight: "600",
     color: "#43474e",
   },
@@ -406,7 +407,7 @@ const createStyles = (colors: typeof Colors.light) => StyleSheet.create({
     gap: 16,
   },
   fieldWrapper: {
-    gap: 6,
+    gap: 8,
   },
   labelRow: {
     flexDirection: "row",
@@ -414,12 +415,12 @@ const createStyles = (colors: typeof Colors.light) => StyleSheet.create({
     alignItems: "center",
   },
   fieldLabel: {
-    fontSize: 12,
+    fontSize: moderateScale(12),
     fontWeight: "600",
     color: "#191c1e",
   },
   forgotText: {
-    fontSize: 12,
+    fontSize: moderateScale(12),
     fontWeight: "600",
     color: "#0061a5",
   },
@@ -427,25 +428,25 @@ const createStyles = (colors: typeof Colors.light) => StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     backgroundColor: "#f2f4f6",
-    borderRadius: 10,
-    height: 50,
-    paddingHorizontal: 14,
+    borderRadius: moderateScale(10),
+    height: moderateScale(50),
+    paddingHorizontal: 12,
   },
   inputIcon: {
-    marginRight: 10,
+    marginRight: 8,
   },
   input: {
     flex: 1,
-    fontSize: 14,
+    fontSize: moderateScale(14),
     color: "#191c1e",
     height: "100%",
   },
   eyeBtn: {
-    padding: 6,
+    padding: 8,
   },
   signInBtn: {
-    height: 52,
-    borderRadius: 12,
+    height: moderateScale(52),
+    borderRadius: moderateScale(12),
     backgroundColor: "#ffffff",
     borderWidth: 2,
     borderColor: "#002045",
@@ -460,7 +461,7 @@ const createStyles = (colors: typeof Colors.light) => StyleSheet.create({
   },
   signInBtnText: {
     color: "#002045",
-    fontSize: 16,
+    fontSize: moderateScale(16),
     fontWeight: "700",
   },
   signUpLinkRow: {
@@ -468,7 +469,7 @@ const createStyles = (colors: typeof Colors.light) => StyleSheet.create({
     alignItems: "center",
   },
   signUpLinkText: {
-    fontSize: 14,
+    fontSize: moderateScale(14),
     color: "#43474e",
   },
   signUpLinkHighlight: {

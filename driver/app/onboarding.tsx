@@ -488,7 +488,7 @@ export default function OnboardingScreen() {
     }
     try {
       const token = useDriverStore.getState().token;
-      const headers = {};
+      const headers: Record<string, string> = {};
       if (token) headers["Authorization"] = `Bearer ${token}`;
 
       const res = await fetch(`${API_URL}/api/v1/places/autocomplete?input=${encodeURIComponent(query)}`, { headers });
