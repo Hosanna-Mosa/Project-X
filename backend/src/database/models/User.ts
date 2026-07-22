@@ -5,6 +5,7 @@ export enum UserRole {
   USER = "USER",
   DRIVER = "DRIVER",
   ADMIN = "ADMIN",
+  SUPPORT = "SUPPORT",
 }
 
 export interface IUserMethods {

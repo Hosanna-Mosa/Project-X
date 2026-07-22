@@ -61,7 +61,16 @@ export default function VendorLogin() {
             });
             loginType = "admin";
           } catch (adminErr: any) {
-            throw new Error("Invalid credentials for Vendor or Admin");
+            // 4. If admin fails, try Support login
+            try {
+              data = await adminFetch<any>("/auth/login-password", {
+                method: "POST",
+                body: JSON.stringify({ ...payload, role: "SUPPORT" }),
+              });
+              loginType = "support";
+            } catch (supportErr: any) {
+              throw new Error("Invalid credentials for Vendor, Admin or Support");
+            }
           }
         }
       }
@@ -71,6 +80,11 @@ export default function VendorLogin() {
         localStorage.setItem("admin_data", JSON.stringify(data.user));
         toast.success(`Welcome back, Admin ${data.user.name}`);
         navigate("/");
+      } else if (loginType === "support") {
+        localStorage.setItem("support_token", data.token);
+        localStorage.setItem("support_data", JSON.stringify(data.user));
+        toast.success(`Welcome back, Support ${data.user.name}`);
+        navigate("/support-cases");
       } else {
         localStorage.setItem("vendor_token", data.token);
         localStorage.setItem("vendor_data", JSON.stringify(data));
