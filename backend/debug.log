@@ -924,3 +924,10 @@ Driver 6a5db6a62b4c19e29ec7d8ab has homeMode OFF. Adding unconditionally.
   Dropoff: [81.78395742550492, 16.984042932212915]
   Distances: d_h = 46521.5m, d_p = 3981.7m, p_d = 615.4m, drop_h = 45176.5m
   -> Detour overhead: 3252.1m, Max allowed detour: 13956.5m. Result: true
+[DETOUR CHECK] Driver: 6a42577448525b572677670d
+  Driver: [81.7834891, 16.9525948]
+  Home: [82.1842504, 17.120459]
+  Pickup: [81.84567100000001, 17.0636495]
+  Dropoff: [81.841671, 17.0596495]
+  Distances: d_h = 46516.4m, d_p = 14007.4m, p_d = 615.3m, drop_h = 37033.6m
+  -> Detour overhead: 5140.0m, Max allowed detour: 13954.9m. Result: true
