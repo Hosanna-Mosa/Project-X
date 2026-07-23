@@ -191,6 +191,34 @@ const renderTagIcon = (tag: typeof popularTags[0]) => {
 
 const HOME_SKELETON_ITEMS = Array.from({ length: 4 }, (_, index) => ({ _id: `home-skeleton-${index}` }));
 
+const ServiceCategoryNew = ({ icon, label, active, onPress, iconFamily = 'Ionicons' }: any) => {
+  return (
+    <TouchableOpacity onPress={onPress} style={{ alignItems: 'center', width: 64 }}>
+      <View style={{
+        width: 60, height: 60, borderRadius: 30,
+        backgroundColor: '#F5F3FF',
+        alignItems: 'center', justifyContent: 'center',
+        shadowColor: '#7C3AED', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.15, shadowRadius: 8, elevation: 4
+      }}>
+        {iconFamily === 'MaterialCommunityIcons' ?
+          <MaterialCommunityIcons name={icon} size={26} color="#6D28D9" /> :
+          <Ionicons name={icon} size={26} color="#6D28D9" />
+        }
+      </View>
+      <Text style={{ marginTop: 10, fontSize: 11, fontWeight: '800', color: '#374151', letterSpacing: 0.5 }}>{label}</Text>
+    </TouchableOpacity>
+  );
+};
+
+const TagPill = ({ tag }: any) => {
+  return (
+    <TouchableOpacity style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#fff', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 20, borderWidth: 1, borderColor: '#F3F4F6' }}>
+      {renderTagIcon(tag)}
+      <Text style={{ marginLeft: 6, fontSize: 12, fontWeight: '600', color: '#374151' }}>{tag.name}</Text>
+    </TouchableOpacity>
+  );
+};
+
 import * as Location from "expo-location";
 
 export default function HomeScreen() {
@@ -799,33 +827,7 @@ export default function HomeScreen() {
   const showCategories = !hasNoLocation && (showHomeSkeleton || loadingDrivers || (nearbyDriversCount ?? 0) > 0);
 
 
-  const ServiceCategoryNew = ({ icon, label, active, onPress, iconFamily = 'Ionicons' }: any) => {
-    return (
-      <TouchableOpacity onPress={onPress} style={{ alignItems: 'center', width: 64 }}>
-        <View style={{
-          width: 60, height: 60, borderRadius: 30,
-          backgroundColor: '#F5F3FF',
-          alignItems: 'center', justifyContent: 'center',
-          shadowColor: '#7C3AED', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.15, shadowRadius: 8, elevation: 4
-        }}>
-          {iconFamily === 'MaterialCommunityIcons' ?
-            <MaterialCommunityIcons name={icon} size={26} color="#6D28D9" /> :
-            <Ionicons name={icon} size={26} color="#6D28D9" />
-          }
-        </View>
-        <Text style={{ marginTop: 10, fontSize: 11, fontWeight: '800', color: '#374151', letterSpacing: 0.5 }}>{label}</Text>
-      </TouchableOpacity>
-    );
-  };
 
-  const TagPill = ({ tag }: any) => {
-    return (
-      <TouchableOpacity style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#fff', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 20, borderWidth: 1, borderColor: '#F3F4F6' }}>
-        {renderTagIcon(tag)}
-        <Text style={{ marginLeft: 6, fontSize: 12, fontWeight: '600', color: '#374151' }}>{tag.name}</Text>
-      </TouchableOpacity>
-    );
-  };
 
   const Store149Card = ({ item }: { item: any }) => {
     const { items: cartItems, addItem: addCartItem, updateQuantity: updateCartQuantity } = useCartStore();
@@ -1064,10 +1066,10 @@ export default function HomeScreen() {
 
         {/* Service Categories */}
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 16, marginTop: 35 }}>
-          <ServiceCategoryNew icon="bag-outline" label="TASK" active={false} onPress={() => router.push("/helper-task")} />
-          <ServiceCategoryNew icon="car-outline" label="RIDES" active={false} onPress={() => router.push("/all-services")} />
-          <ServiceCategoryNew icon="fast-food-outline" label="FOOD" active={false} onPress={() => handleServiceSwitch('Food')} />
-          <ServiceCategoryNew icon="food-steak" iconFamily="MaterialCommunityIcons" label="MEAT" active={false} onPress={() => handleServiceSwitch('Meat')} />
+          <ServiceCategoryNew icon="bag-outline" label="TASK" active={false} onPress={() => { console.log(">>> [CLICK] TASK button pressed (main header)"); router.push("/helper-task"); }} />
+          <ServiceCategoryNew icon="car-outline" label="RIDES" active={false} onPress={() => { console.log(">>> [CLICK] RIDES button pressed (main header)"); router.push("/all-services"); }} />
+          <ServiceCategoryNew icon="fast-food-outline" label="FOOD" active={false} onPress={() => { console.log(">>> [CLICK] FOOD button pressed (main header)"); handleServiceSwitch('Food'); }} />
+          <ServiceCategoryNew icon="food-steak" iconFamily="MaterialCommunityIcons" label="MEAT" active={false} onPress={() => { console.log(">>> [CLICK] MEAT button pressed (main header)"); handleServiceSwitch('Meat'); }} />
         </View>
 
         <View style={{ height: 1, backgroundColor: '#E5E7EB', marginHorizontal: 16, marginTop: 24, marginBottom: 24 }} />
@@ -1134,6 +1136,17 @@ export default function HomeScreen() {
     );
   };
   const scrollY = useRef(new Animated.Value(0)).current;
+  const [isStickyVisible, setIsStickyVisible] = useState(false);
+
+  useEffect(() => {
+    const listenerId = scrollY.addListener(({ value }) => {
+      const visible = value >= 330;
+      setIsStickyVisible(visible);
+    });
+    return () => {
+      scrollY.removeListener(listenerId);
+    };
+  }, [scrollY]);
 
   const stickyHeaderTranslateY = scrollY.interpolate({
     inputRange: [330, 360],
@@ -1204,34 +1217,37 @@ export default function HomeScreen() {
 
   return (
     <View style={styles.root}>
-      <Animated.View style={[
-        {
-          position: 'absolute',
-          top: 0,
-          left: 0,
-          right: 0,
-          zIndex: 100,
-          backgroundColor: '#FAFAFA',
-          paddingTop: insets.top + 8,
-          paddingBottom: 8,
-          borderBottomWidth: 1,
-          borderBottomColor: '#E5E7EB',
-          shadowColor: '#000',
-          shadowOffset: { width: 0, height: 2 },
-          shadowOpacity: 0.05,
-          shadowRadius: 4,
-          elevation: 3,
-          transform: [{ translateY: stickyHeaderTranslateY }],
-          opacity: stickyHeaderOpacity,
-        }
-      ]}>
-        <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 16 }}>
-          <ServiceCategoryNew icon="bag-outline" label="TASK" active={false} onPress={() => router.push("/helper-task")} />
-          <ServiceCategoryNew icon="car-outline" label="RIDES" active={false} onPress={() => router.push("/all-services")} />
-          <ServiceCategoryNew icon="fast-food-outline" label="FOOD" active={false} onPress={() => handleServiceSwitch('Food')} />
-          <ServiceCategoryNew icon="food-steak" iconFamily="MaterialCommunityIcons" label="MEAT" active={false} onPress={() => handleServiceSwitch('Meat')} />
-        </View>
-      </Animated.View>
+      {isStickyVisible && (
+        <Animated.View 
+          style={[
+            {
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              right: 0,
+              zIndex: 100,
+              backgroundColor: '#FAFAFA',
+              paddingTop: insets.top + 8,
+              paddingBottom: 8,
+              borderBottomWidth: 1,
+              borderBottomColor: '#E5E7EB',
+              shadowColor: '#000',
+              shadowOffset: { width: 0, height: 2 },
+              shadowOpacity: 0.05,
+              shadowRadius: 4,
+              elevation: 3,
+              transform: [{ translateY: stickyHeaderTranslateY }],
+              opacity: stickyHeaderOpacity,
+            }
+          ]}>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 16 }}>
+            <ServiceCategoryNew icon="bag-outline" label="TASK" active={false} onPress={() => { console.log(">>> [CLICK] TASK button pressed (sticky header)"); router.push("/helper-task"); }} />
+            <ServiceCategoryNew icon="car-outline" label="RIDES" active={false} onPress={() => { console.log(">>> [CLICK] RIDES button pressed (sticky header)"); router.push("/all-services"); }} />
+            <ServiceCategoryNew icon="fast-food-outline" label="FOOD" active={false} onPress={() => { console.log(">>> [CLICK] FOOD button pressed (sticky header)"); handleServiceSwitch('Food'); }} />
+            <ServiceCategoryNew icon="food-steak" iconFamily="MaterialCommunityIcons" label="MEAT" active={false} onPress={() => { console.log(">>> [CLICK] MEAT button pressed (sticky header)"); handleServiceSwitch('Meat'); }} />
+          </View>
+        </Animated.View>
+      )}
 
       <Animated.FlatList
         data={listData}
@@ -1374,7 +1390,16 @@ export default function HomeScreen() {
         }}
         onScroll={Animated.event(
           [{ nativeEvent: { contentOffset: { y: scrollY } } }],
-          { useNativeDriver: true }
+          {
+            useNativeDriver: true,
+            listener: (event: any) => {
+              const y = event.nativeEvent.contentOffset.y;
+              const visible = y >= 330;
+              if (visible !== isStickyVisible) {
+                setIsStickyVisible(visible);
+              }
+            }
+          }
         )}
       />
 
