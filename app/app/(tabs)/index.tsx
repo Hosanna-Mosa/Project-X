@@ -51,6 +51,8 @@ const FESTIVALS: { [key: string]: string } = {
   "12-25": "Christmas",
 };
 
+const GRADIENT_COLORS = ["#7C3AED", "#EC4899", "#EF4444", "#F97316", "#F59E0B", "#10B981", "#06B6D4", "#3B82F6"];
+
 const getGreeting = (name: string) => {
   const today = new Date();
   const month = String(today.getMonth() + 1).padStart(2, "0");
@@ -189,6 +191,34 @@ const renderTagIcon = (tag: typeof popularTags[0]) => {
 
 const HOME_SKELETON_ITEMS = Array.from({ length: 4 }, (_, index) => ({ _id: `home-skeleton-${index}` }));
 
+const ServiceCategoryNew = ({ icon, label, active, onPress, iconFamily = 'Ionicons' }: any) => {
+  return (
+    <TouchableOpacity onPress={onPress} style={{ alignItems: 'center', width: 64 }}>
+      <View style={{
+        width: 60, height: 60, borderRadius: 30,
+        backgroundColor: '#F5F3FF',
+        alignItems: 'center', justifyContent: 'center',
+        shadowColor: '#7C3AED', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.15, shadowRadius: 8, elevation: 4
+      }}>
+        {iconFamily === 'MaterialCommunityIcons' ?
+          <MaterialCommunityIcons name={icon} size={26} color="#6D28D9" /> :
+          <Ionicons name={icon} size={26} color="#6D28D9" />
+        }
+      </View>
+      <Text style={{ marginTop: 10, fontSize: 11, fontWeight: '800', color: '#374151', letterSpacing: 0.5 }}>{label}</Text>
+    </TouchableOpacity>
+  );
+};
+
+const TagPill = ({ tag }: any) => {
+  return (
+    <TouchableOpacity style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#fff', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 20, borderWidth: 1, borderColor: '#F3F4F6' }}>
+      {renderTagIcon(tag)}
+      <Text style={{ marginLeft: 6, fontSize: 12, fontWeight: '600', color: '#374151' }}>{tag.name}</Text>
+    </TouchableOpacity>
+  );
+};
+
 import * as Location from "expo-location";
 
 export default function HomeScreen() {
@@ -213,7 +243,89 @@ export default function HomeScreen() {
   const [searchText, setSearchText] = useState("");
   const [isSearchActive, setIsSearchActive] = useState(false);
   const [recentSearches, setRecentSearches] = useState<string[]>([]);
-  
+
+  const getInitialWord = () => {
+    const today = new Date();
+    const days = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+    return days[today.getDay()];
+  };
+
+  const [displayText, setDisplayText] = useState(getInitialWord());
+  const [isFestival, setIsFestival] = useState(false);
+  const [cursorVisible, setCursorVisible] = useState(true);
+
+  useEffect(() => {
+    const cursorInterval = setInterval(() => {
+      setCursorVisible((prev) => !prev);
+    }, 550);
+    return () => clearInterval(cursorInterval);
+  }, []);
+
+  useEffect(() => {
+    let active = true;
+    let timeoutId: any;
+
+    const runTypewriter = async () => {
+      const today = new Date();
+      const days = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+      const dayName = days[today.getDay()];
+
+      const month = String(today.getMonth() + 1).padStart(2, "0");
+      const date = String(today.getDate()).padStart(2, "0");
+      const key = `${month}-${date}`;
+      const festivalName = FESTIVALS[key] || "Christmas";
+
+      let currentWord = dayName;
+      let nextIsFestival = true;
+
+      // Typewriter loop
+      while (active) {
+        // Wait 4 seconds
+        await new Promise((resolve) => {
+          timeoutId = setTimeout(resolve, 4000);
+        });
+        if (!active) break;
+
+        // 1. Backspace (erase) current word in chunks of 2 characters
+        for (let i = currentWord.length; i >= 0; i -= 2) {
+          if (!active) break;
+          setDisplayText(currentWord.slice(0, i));
+          await new Promise((resolve) => {
+            timeoutId = setTimeout(resolve, 10);
+          });
+        }
+        if (!active) break;
+        setDisplayText(""); // Ensure completely erased
+
+        // Swap target word and toggle festival flag
+        const nextWord = nextIsFestival ? festivalName : dayName;
+        setIsFestival(nextIsFestival);
+        nextIsFestival = !nextIsFestival;
+        currentWord = nextWord;
+
+        // 2. Type (write) new word in chunks of 2 characters
+        for (let i = 0; i <= currentWord.length; i += 2) {
+          if (!active) break;
+          const sliceEnd = Math.min(i, currentWord.length);
+          setDisplayText(currentWord.slice(0, sliceEnd));
+          await new Promise((resolve) => {
+            timeoutId = setTimeout(resolve, 15);
+          });
+        }
+        if (!active) break;
+        setDisplayText(currentWord); // Ensure fully typed
+        if (!active) break;
+      }
+    };
+
+    runTypewriter();
+
+    return () => {
+      active = false;
+      clearTimeout(timeoutId);
+    };
+  }, []);
+
   const screenWidth = Dimensions.get('window').width;
   const carouselRef = useRef<ScrollView>(null);
   const bannerScrollX = useRef(new Animated.Value(0)).current;
@@ -434,7 +546,7 @@ export default function HomeScreen() {
           let loc = null;
           try {
             const locPromise = Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
-            const timeoutPromise = new Promise<any>((_, reject) => 
+            const timeoutPromise = new Promise<any>((_, reject) =>
               setTimeout(() => reject(new Error("Location fetch timeout")), 8000)
             );
             loc = await Promise.race([locPromise, timeoutPromise]);
@@ -608,18 +720,18 @@ export default function HomeScreen() {
           // Add a 5 second timeout so we don't hang on skeletons forever
           const fetchPromise = Promise.all([
             checkNearbyDrivers(lat, lng),
-            activeService === 'Meat' 
-              ? fetchMeatCenters(lat, lng, 1) 
+            activeService === 'Meat'
+              ? fetchMeatCenters(lat, lng, 1)
               : Promise.all([
-                  fetchVendors(lat, lng, 1),
-                  fetch149StoreItems(lat, lng)
-                ])
+                fetchVendors(lat, lng, 1),
+                fetch149StoreItems(lat, lng)
+              ])
           ]);
-          
+
           const timeoutPromise = new Promise((_, reject) => {
             setTimeout(() => reject(new Error("Timeout after 15 seconds")), 15000);
           });
-          
+
           await Promise.race([fetchPromise, timeoutPromise]);
         } catch (e) {
           console.warn("Home Screen: Initial fetches timed out or failed (likely slow dev server):", e);
@@ -628,7 +740,7 @@ export default function HomeScreen() {
           setLoading(false);
           setLoadingDrivers(false);
         }
-        
+
         // Cache the coordinates and service in the shared store
         useHomeStore.setState({
           lastFetchedCoords: { lat, lng },
@@ -715,33 +827,7 @@ export default function HomeScreen() {
   const showCategories = !hasNoLocation && (showHomeSkeleton || loadingDrivers || (nearbyDriversCount ?? 0) > 0);
 
 
-  const ServiceCategoryNew = ({ icon, label, active, onPress, iconFamily = 'Ionicons' }: any) => {
-    return (
-      <TouchableOpacity onPress={onPress} style={{ alignItems: 'center', width: 64 }}>
-        <View style={{
-          width: 60, height: 60, borderRadius: 30,
-          backgroundColor: '#F5F3FF',
-          alignItems: 'center', justifyContent: 'center',
-          shadowColor: '#7C3AED', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.15, shadowRadius: 8, elevation: 4
-        }}>
-          {iconFamily === 'MaterialCommunityIcons' ? 
-            <MaterialCommunityIcons name={icon} size={26} color="#6D28D9" /> : 
-            <Ionicons name={icon} size={26} color="#6D28D9" />
-          }
-        </View>
-        <Text style={{ marginTop: 10, fontSize: 11, fontWeight: '800', color: '#374151', letterSpacing: 0.5 }}>{label}</Text>
-      </TouchableOpacity>
-    );
-  };
 
-  const TagPill = ({ tag }: any) => {
-    return (
-      <TouchableOpacity style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#fff', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 20, borderWidth: 1, borderColor: '#F3F4F6' }}>
-        {renderTagIcon(tag)}
-        <Text style={{ marginLeft: 6, fontSize: 12, fontWeight: '600', color: '#374151' }}>{tag.name}</Text>
-      </TouchableOpacity>
-    );
-  };
 
   const Store149Card = ({ item }: { item: any }) => {
     const { items: cartItems, addItem: addCartItem, updateQuantity: updateCartQuantity } = useCartStore();
@@ -763,15 +849,15 @@ export default function HomeScreen() {
     return (
       <View style={{ width: 160, backgroundColor: '#fff', borderRadius: 16, padding: 8, marginRight: 12, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, elevation: 2 }}>
         <View style={{ position: 'relative' }}>
-          <Image 
-            source={{ uri: item.images && item.images.length > 0 ? item.images[0] : "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=400" }} 
-            style={{ width: '100%', height: 120, borderRadius: 12 }} 
+          <Image
+            source={{ uri: item.images && item.images.length > 0 ? item.images[0] : "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=400" }}
+            style={{ width: '100%', height: 120, borderRadius: 12 }}
           />
           {/* Veg icon */}
           <View style={{ position: 'absolute', top: 8, left: 8, backgroundColor: '#fff', padding: 2, borderRadius: 4 }}>
-             <View style={{ borderWidth: 1, borderColor: item.isVeg ? '#16A34A' : '#E11D48', padding: 2, borderRadius: 2 }}>
-               <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: item.isVeg ? '#16A34A' : '#E11D48' }} />
-             </View>
+            <View style={{ borderWidth: 1, borderColor: item.isVeg ? '#16A34A' : '#E11D48', padding: 2, borderRadius: 2 }}>
+              <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: item.isVeg ? '#16A34A' : '#E11D48' }} />
+            </View>
           </View>
           {/* Rating */}
           <View style={{ position: 'absolute', top: 8, right: 8, backgroundColor: '#fff', flexDirection: 'row', alignItems: 'center', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 10 }}>
@@ -798,7 +884,7 @@ export default function HomeScreen() {
             )}
           </View>
         </View>
-        
+
         <View style={{ marginTop: 20 }}>
           <Text style={{ fontSize: 13, fontWeight: '700', color: '#111827' }} numberOfLines={1}>{item.name}</Text>
           <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4 }}>
@@ -858,31 +944,31 @@ export default function HomeScreen() {
             {/* FOOD BANNER */}
             <LinearGradient
               colors={['#4C1D95', '#2E1065']}
-              style={{ width: screenWidth, paddingBottom: 50, paddingTop: insets.top + 70 }}
+              style={{ width: screenWidth, paddingBottom: moderateScale(45), paddingTop: insets.top + moderateScale(50) }}
             >
-              <Animated.View style={[{ flexDirection: 'row', paddingHorizontal: 16, minHeight: 140 }, getParallaxStyle(0)]}>
-                <View style={{ flex: 1.2, justifyContent: 'center' }}>
-                  <Text style={{ color: '#fff', fontSize: 30, fontWeight: '800', lineHeight: 36 }}>Craving something delicious?</Text>
-                  <Text style={{ color: '#C4B5FD', fontSize: 15, marginTop: 12 }}>Good food, good mood!</Text>
+              <Animated.View style={[{ flexDirection: 'row', paddingHorizontal: 16, minHeight: moderateScale(120), alignItems: 'center' }, getParallaxStyle(0)]}>
+                <View style={{ flex: 1.4, justifyContent: 'center', paddingRight: 8 }}>
+                  <Text style={{ color: '#fff', fontSize: moderateScale(24), fontWeight: '800', lineHeight: moderateScale(28) }}>Craving something delicious?</Text>
+                  <Text style={{ color: '#C4B5FD', fontSize: moderateScale(13), marginTop: moderateScale(8) }}>Good food, good mood!</Text>
                 </View>
-                <View style={{ flex: 0.8, justifyContent: 'center', alignItems: 'center' }}>
-                  <Image source={{ uri: 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=400' }} style={{ width: 180, height: 180, borderRadius: 90, position: 'absolute', right: -30, top: -10 }} resizeMode="cover" />
+                <View style={{ flex: 0.9, justifyContent: 'center', alignItems: 'flex-end' }}>
+                  <Image source={{ uri: 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=400' }} style={{ width: moderateScale(120), height: moderateScale(120), borderRadius: moderateScale(60) }} resizeMode="cover" />
                 </View>
               </Animated.View>
             </LinearGradient>
-            
+
             {/* TASK BANNER */}
             <LinearGradient
               colors={['#0F766E', '#042F2E']}
-              style={{ width: screenWidth, paddingBottom: 50, paddingTop: insets.top + 70 }}
+              style={{ width: screenWidth, paddingBottom: moderateScale(45), paddingTop: insets.top + moderateScale(50) }}
             >
-              <Animated.View style={[{ flexDirection: 'row', paddingHorizontal: 16, minHeight: 140 }, getParallaxStyle(1)]}>
-                <View style={{ flex: 1.2, justifyContent: 'center' }}>
-                  <Text style={{ color: '#fff', fontSize: 30, fontWeight: '800', lineHeight: 36 }}>Need a helping hand today?</Text>
-                  <Text style={{ color: '#99F6E4', fontSize: 15, marginTop: 12 }}>We get your chores done!</Text>
+              <Animated.View style={[{ flexDirection: 'row', paddingHorizontal: 16, minHeight: moderateScale(120), alignItems: 'center' }, getParallaxStyle(1)]}>
+                <View style={{ flex: 1.4, justifyContent: 'center', paddingRight: 8 }}>
+                  <Text style={{ color: '#fff', fontSize: moderateScale(24), fontWeight: '800', lineHeight: moderateScale(28) }}>Need a helping hand today?</Text>
+                  <Text style={{ color: '#99F6E4', fontSize: moderateScale(13), marginTop: moderateScale(8) }}>We get your chores done!</Text>
                 </View>
-                <View style={{ flex: 0.8, justifyContent: 'center', alignItems: 'center' }}>
-                  <Image source={{ uri: 'https://images.unsplash.com/photo-1558981806-ec527fa84c39?w=400' }} style={{ width: 180, height: 180, borderRadius: 90, position: 'absolute', right: -30, top: -10 }} resizeMode="cover" />
+                <View style={{ flex: 0.9, justifyContent: 'center', alignItems: 'flex-end' }}>
+                  <Image source={{ uri: 'https://images.unsplash.com/photo-1558981806-ec527fa84c39?w=400' }} style={{ width: moderateScale(120), height: moderateScale(120), borderRadius: moderateScale(60) }} resizeMode="cover" />
                 </View>
               </Animated.View>
             </LinearGradient>
@@ -890,15 +976,15 @@ export default function HomeScreen() {
             {/* RIDES BANNER */}
             <LinearGradient
               colors={['#C2410C', '#7F1D1D']}
-              style={{ width: screenWidth, paddingBottom: 50, paddingTop: insets.top + 70 }}
+              style={{ width: screenWidth, paddingBottom: moderateScale(45), paddingTop: insets.top + moderateScale(50) }}
             >
-              <Animated.View style={[{ flexDirection: 'row', paddingHorizontal: 16, minHeight: 140 }, getParallaxStyle(2)]}>
-                <View style={{ flex: 1.2, justifyContent: 'center' }}>
-                  <Text style={{ color: '#fff', fontSize: 30, fontWeight: '800', lineHeight: 36 }}>Going somewhere?</Text>
-                  <Text style={{ color: '#FED7AA', fontSize: 15, marginTop: 12 }}>Book a comfortable ride now!</Text>
+              <Animated.View style={[{ flexDirection: 'row', paddingHorizontal: 16, minHeight: moderateScale(120), alignItems: 'center' }, getParallaxStyle(2)]}>
+                <View style={{ flex: 1.4, justifyContent: 'center', paddingRight: 8 }}>
+                  <Text style={{ color: '#fff', fontSize: moderateScale(24), fontWeight: '800', lineHeight: moderateScale(28) }}>Going somewhere?</Text>
+                  <Text style={{ color: '#FED7AA', fontSize: moderateScale(13), marginTop: moderateScale(8) }}>Book a comfortable ride now!</Text>
                 </View>
-                <View style={{ flex: 0.8, justifyContent: 'center', alignItems: 'center' }}>
-                  <Image source={{ uri: 'https://images.unsplash.com/photo-1558981403-c5f9899a28bc?w=400' }} style={{ width: 180, height: 180, borderRadius: 90, position: 'absolute', right: -30, top: -10 }} resizeMode="cover" />
+                <View style={{ flex: 0.9, justifyContent: 'center', alignItems: 'flex-end' }}>
+                  <Image source={{ uri: 'https://images.unsplash.com/photo-1558981403-c5f9899a28bc?w=400' }} style={{ width: moderateScale(120), height: moderateScale(120), borderRadius: moderateScale(60) }} resizeMode="cover" />
                 </View>
               </Animated.View>
             </LinearGradient>
@@ -906,15 +992,15 @@ export default function HomeScreen() {
             {/* MEAT BANNER */}
             <LinearGradient
               colors={['#9F1239', '#4C0519']}
-              style={{ width: screenWidth, paddingBottom: 50, paddingTop: insets.top + 70 }}
+              style={{ width: screenWidth, paddingBottom: moderateScale(45), paddingTop: insets.top + moderateScale(50) }}
             >
-              <Animated.View style={[{ flexDirection: 'row', paddingHorizontal: 16, minHeight: 140 }, getParallaxStyle(3)]}>
-                <View style={{ flex: 1.2, justifyContent: 'center' }}>
-                  <Text style={{ color: '#fff', fontSize: 30, fontWeight: '800', lineHeight: 36 }}>Fresh Meat Daily!</Text>
-                  <Text style={{ color: '#FECDD3', fontSize: 15, marginTop: 12 }}>High quality cuts delivered.</Text>
+              <Animated.View style={[{ flexDirection: 'row', paddingHorizontal: 16, minHeight: moderateScale(120), alignItems: 'center' }, getParallaxStyle(3)]}>
+                <View style={{ flex: 1.4, justifyContent: 'center', paddingRight: 8 }}>
+                  <Text style={{ color: '#fff', fontSize: moderateScale(24), fontWeight: '800', lineHeight: moderateScale(28) }}>Fresh Meat Daily!</Text>
+                  <Text style={{ color: '#FECDD3', fontSize: moderateScale(13), marginTop: moderateScale(8) }}>High quality cuts delivered.</Text>
                 </View>
-                <View style={{ flex: 0.8, justifyContent: 'center', alignItems: 'center' }}>
-                  <Image source={{ uri: 'https://images.unsplash.com/photo-1588168333986-50845fce0ba9?w=400' }} style={{ width: 180, height: 180, borderRadius: 90, position: 'absolute', right: -30, top: -10 }} resizeMode="cover" />
+                <View style={{ flex: 0.9, justifyContent: 'center', alignItems: 'flex-end' }}>
+                  <Image source={{ uri: 'https://images.unsplash.com/photo-1588168333986-50845fce0ba9?w=400' }} style={{ width: moderateScale(120), height: moderateScale(120), borderRadius: moderateScale(60) }} resizeMode="cover" />
                 </View>
               </Animated.View>
             </LinearGradient>
@@ -934,9 +1020,9 @@ export default function HomeScreen() {
                 extrapolate: 'clamp'
               });
               return (
-                <Animated.View 
-                  key={i} 
-                  style={{ width, height: 6, borderRadius: 3, backgroundColor }} 
+                <Animated.View
+                  key={i}
+                  style={{ width, height: 6, borderRadius: 3, backgroundColor }}
                 />
               );
             })}
@@ -950,13 +1036,10 @@ export default function HomeScreen() {
               </Text>
               <Ionicons name="chevron-down" size={16} color="#fff" style={{ marginLeft: 4 }} />
             </TouchableOpacity>
-            
+
             <View style={{ flexDirection: 'row', gap: 20, alignItems: 'center' }}>
-              <TouchableOpacity style={{ position: 'relative' }}>
+              <TouchableOpacity onPress={() => setIsDistanceSheetOpen(true)}>
                 <MaterialCommunityIcons name="radius-outline" size={26} color="#fff" style={{ textShadowColor: 'rgba(0,0,0,0.3)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2 }} />
-                <View style={{ position: 'absolute', top: -4, right: -4, backgroundColor: '#EF4444', borderRadius: 10, width: 16, height: 16, alignItems: 'center', justifyContent: 'center' }}>
-                  <Text style={{ color: '#fff', fontSize: 10, fontWeight: 'bold' }}>3</Text>
-                </View>
               </TouchableOpacity>
               <TouchableOpacity onPress={() => router.push("/(tabs)/profile")}>
                 <Ionicons name="person-outline" size={26} color="#fff" style={{ textShadowColor: 'rgba(0,0,0,0.3)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2 }} />
@@ -968,7 +1051,7 @@ export default function HomeScreen() {
 
         {/* Floating Search Bar */}
         <View style={{ paddingHorizontal: 16, marginTop: -25, zIndex: 10 }}>
-          <TouchableOpacity 
+          <TouchableOpacity
             style={{ backgroundColor: '#fff', borderRadius: 30, flexDirection: 'row', alignItems: 'center', padding: 8, paddingLeft: 20, shadowColor: '#000', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.1, shadowRadius: 15, elevation: 8 }}
             activeOpacity={0.9}
             onPress={() => setIsSearchActive(true)}
@@ -983,21 +1066,31 @@ export default function HomeScreen() {
 
         {/* Service Categories */}
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 16, marginTop: 35 }}>
-          <ServiceCategoryNew icon="bag-outline" label="TASK" active={false} onPress={() => router.push("/helper-task")} />
-          <ServiceCategoryNew icon="car-outline" label="RIDES" active={false} onPress={() => router.push("/all-services")} />
-          <ServiceCategoryNew icon="fast-food-outline" label="FOOD" active={false} onPress={() => handleServiceSwitch('Food')} />
-          <ServiceCategoryNew icon="food-steak" iconFamily="MaterialCommunityIcons" label="MEAT" active={false} onPress={() => handleServiceSwitch('Meat')} />
+          <ServiceCategoryNew icon="bag-outline" label="TASK" active={false} onPress={() => { console.log(">>> [CLICK] TASK button pressed (main header)"); router.push("/helper-task"); }} />
+          <ServiceCategoryNew icon="car-outline" label="RIDES" active={false} onPress={() => { console.log(">>> [CLICK] RIDES button pressed (main header)"); router.push("/all-services"); }} />
+          <ServiceCategoryNew icon="fast-food-outline" label="FOOD" active={false} onPress={() => { console.log(">>> [CLICK] FOOD button pressed (main header)"); handleServiceSwitch('Food'); }} />
+          <ServiceCategoryNew icon="food-steak" iconFamily="MaterialCommunityIcons" label="MEAT" active={false} onPress={() => { console.log(">>> [CLICK] MEAT button pressed (main header)"); handleServiceSwitch('Meat'); }} />
         </View>
 
         <View style={{ height: 1, backgroundColor: '#E5E7EB', marginHorizontal: 16, marginTop: 24, marginBottom: 24 }} />
 
         {/* Greeting and See All */}
-        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 16 }}>
-          <Text style={{ fontSize: 22, fontWeight: 'bold', color: '#111827' }}>{getGreeting(userName)} 👋</Text>
-          <TouchableOpacity style={{ backgroundColor: '#F3E8FF', paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, flexDirection: 'row', alignItems: 'center' }}>
-            <Text style={{ color: '#6D28D9', fontSize: 13, fontWeight: '700' }}>See All</Text>
-            <Ionicons name="chevron-forward" size={14} color="#6D28D9" style={{ marginLeft: 2 }} />
-          </TouchableOpacity>
+        <View style={{ paddingHorizontal: 16 }}>
+          <Text numberOfLines={1} adjustsFontSizeToFit style={{ fontSize: 22, fontWeight: 'bold', color: '#111827' }}>
+            Happy{" "}
+            <Text
+              style={{
+                color: "#111827",
+                fontStyle: isFestival ? "italic" : "normal",
+                fontFamily: isFestival ? (Platform.OS === "ios" ? "Georgia" : "serif") : undefined,
+                fontWeight: isFestival ? "900" : "bold",
+              }}
+            >
+              {displayText}
+            </Text>
+            <Text style={{ color: "#7C3AED", fontWeight: "bold", opacity: cursorVisible ? 1 : 0 }}>|</Text>
+            , {userName}! 👋
+          </Text>
         </View>
 
         {/* Tag Pills */}
@@ -1043,6 +1136,29 @@ export default function HomeScreen() {
     );
   };
   const scrollY = useRef(new Animated.Value(0)).current;
+  const [isStickyVisible, setIsStickyVisible] = useState(false);
+
+  useEffect(() => {
+    const listenerId = scrollY.addListener(({ value }) => {
+      const visible = value >= 330;
+      setIsStickyVisible(visible);
+    });
+    return () => {
+      scrollY.removeListener(listenerId);
+    };
+  }, [scrollY]);
+
+  const stickyHeaderTranslateY = scrollY.interpolate({
+    inputRange: [330, 360],
+    outputRange: [-120, 0],
+    extrapolate: 'clamp',
+  });
+
+  const stickyHeaderOpacity = scrollY.interpolate({
+    inputRange: [330, 350],
+    outputRange: [0, 1],
+    extrapolate: 'clamp',
+  });
 
   const headerTranslateY = scrollY.interpolate({
     inputRange: [0, 100],
@@ -1101,6 +1217,38 @@ export default function HomeScreen() {
 
   return (
     <View style={styles.root}>
+      {isStickyVisible && (
+        <Animated.View 
+          style={[
+            {
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              right: 0,
+              zIndex: 100,
+              backgroundColor: '#FAFAFA',
+              paddingTop: insets.top + 8,
+              paddingBottom: 8,
+              borderBottomWidth: 1,
+              borderBottomColor: '#E5E7EB',
+              shadowColor: '#000',
+              shadowOffset: { width: 0, height: 2 },
+              shadowOpacity: 0.05,
+              shadowRadius: 4,
+              elevation: 3,
+              transform: [{ translateY: stickyHeaderTranslateY }],
+              opacity: stickyHeaderOpacity,
+            }
+          ]}>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 16 }}>
+            <ServiceCategoryNew icon="bag-outline" label="TASK" active={false} onPress={() => { console.log(">>> [CLICK] TASK button pressed (sticky header)"); router.push("/helper-task"); }} />
+            <ServiceCategoryNew icon="car-outline" label="RIDES" active={false} onPress={() => { console.log(">>> [CLICK] RIDES button pressed (sticky header)"); router.push("/all-services"); }} />
+            <ServiceCategoryNew icon="fast-food-outline" label="FOOD" active={false} onPress={() => { console.log(">>> [CLICK] FOOD button pressed (sticky header)"); handleServiceSwitch('Food'); }} />
+            <ServiceCategoryNew icon="food-steak" iconFamily="MaterialCommunityIcons" label="MEAT" active={false} onPress={() => { console.log(">>> [CLICK] MEAT button pressed (sticky header)"); handleServiceSwitch('Meat'); }} />
+          </View>
+        </Animated.View>
+      )}
+
       <Animated.FlatList
         data={listData}
         keyExtractor={(item) => item._id}
@@ -1196,20 +1344,20 @@ export default function HomeScreen() {
           <View>
             {showCategories && activeService === 'Food' && visibleItems.length > 0 && (
               <View style={{ margin: 16, borderRadius: 20, overflow: 'hidden', backgroundColor: '#F3E8FF', padding: 20, flexDirection: 'row', alignItems: 'center' }}>
-                 <View style={{ flex: 1, zIndex: 10 }}>
-                   <Text style={{ color: '#7C3AED', fontWeight: '700', fontSize: 13 }}>Hot & Delicious</Text>
-                   <Text style={{ color: '#111827', fontWeight: '900', fontSize: 20, marginTop: 4 }}>Biryani Special</Text>
-                   <Text style={{ color: '#6D28D9', fontWeight: '600', fontSize: 13, marginTop: 4 }}>Up to 40% OFF</Text>
-                   <TouchableOpacity style={{ backgroundColor: '#6D28D9', alignSelf: 'flex-start', paddingHorizontal: 16, paddingVertical: 10, borderRadius: 20, marginTop: 16, flexDirection: 'row', alignItems: 'center' }}>
-                     <Text style={{ color: '#fff', fontSize: 13, fontWeight: 'bold' }}>Order Now</Text>
-                     <Ionicons name="arrow-forward" size={14} color="#fff" style={{ marginLeft: 4 }} />
-                   </TouchableOpacity>
-                 </View>
-                 <Image 
-                   source={{ uri: 'https://images.unsplash.com/photo-1589302168068-964664d93dc0?w=800' }} 
-                   style={{ width: 220, height: 220, position: 'absolute', right: -60, bottom: -40, borderRadius: 110 }} 
-                   resizeMode="cover"
-                 />
+                <View style={{ flex: 1, zIndex: 10 }}>
+                  <Text style={{ color: '#7C3AED', fontWeight: '700', fontSize: 13 }}>Hot & Delicious</Text>
+                  <Text style={{ color: '#111827', fontWeight: '900', fontSize: 20, marginTop: 4 }}>Biryani Special</Text>
+                  <Text style={{ color: '#6D28D9', fontWeight: '600', fontSize: 13, marginTop: 4 }}>Up to 40% OFF</Text>
+                  <TouchableOpacity style={{ backgroundColor: '#6D28D9', alignSelf: 'flex-start', paddingHorizontal: 16, paddingVertical: 10, borderRadius: 20, marginTop: 16, flexDirection: 'row', alignItems: 'center' }}>
+                    <Text style={{ color: '#fff', fontSize: 13, fontWeight: 'bold' }}>Order Now</Text>
+                    <Ionicons name="arrow-forward" size={14} color="#fff" style={{ marginLeft: 4 }} />
+                  </TouchableOpacity>
+                </View>
+                <Image
+                  source={{ uri: 'https://images.unsplash.com/photo-1589302168068-964664d93dc0?w=800' }}
+                  style={{ width: 220, height: 220, position: 'absolute', right: -60, bottom: -40, borderRadius: 110 }}
+                  resizeMode="cover"
+                />
               </View>
             )}
             {loadingMore ? <ActivityIndicator size="small" color={colors.primary} style={{ marginVertical: 20 }} /> : <View style={{ height: 120 }} />}
@@ -1242,7 +1390,16 @@ export default function HomeScreen() {
         }}
         onScroll={Animated.event(
           [{ nativeEvent: { contentOffset: { y: scrollY } } }],
-          { useNativeDriver: true }
+          {
+            useNativeDriver: true,
+            listener: (event: any) => {
+              const y = event.nativeEvent.contentOffset.y;
+              const visible = y >= 330;
+              if (visible !== isStickyVisible) {
+                setIsStickyVisible(visible);
+              }
+            }
+          }
         )}
       />
 

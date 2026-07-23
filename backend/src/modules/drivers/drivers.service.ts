@@ -92,7 +92,7 @@ export class DriverService {
       let stageDrivers: any[] = [];
 
       // 1. Redis lookup
-      if (redisClient) {
+      if (redisClient && redisClient.isReady) {
         try {
           const nearbyDriverIds = await redisClient.geoSearch("drivers:locations",
             { longitude: lng, latitude: lat },

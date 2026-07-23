@@ -1,15 +1,16 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { 
   Truck, Users as UsersIcon, Star, DollarSign, SlidersHorizontal, UserPlus, 
   Eye, Trash2, Ban, Phone, MessageSquare, MapPin, MoreVertical, 
   ChevronLeft, ChevronRight, Navigation, Compass, Calendar, ArrowUpRight, ExternalLink,
-  ShoppingBag, CheckCircle2, XCircle, Wallet
+  ShoppingBag, CheckCircle2, XCircle, Wallet, Plus
 } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { adminFetch } from "@/lib/api-client";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
@@ -120,6 +121,68 @@ export default function Drivers() {
   const [isDownloadOpen, setIsDownloadOpen] = useState(false);
   const [viewingDriver, setViewingDriver] = useState<any | null>(null);
   const [mapCenter, setMapCenter] = useState({ lat: 17.0005, lng: 81.8040 });
+
+  // Tab State
+  const [activeTab, setActiveTab] = useState<"fleet" | "zones">("fleet");
+
+  // Zone Assignment States
+  const [isAssignZoneOpen, setIsAssignZoneOpen] = useState(false);
+  const [selectedDriverForZone, setSelectedDriverForZone] = useState<string>("");
+  const [selectedZoneForDriver, setSelectedZoneForDriver] = useState<string>("");
+  const [isEditingAssignment, setIsEditingAssignment] = useState(false);
+
+  // Order Chat States
+  const [isChatModalOpen, setIsChatModalOpen] = useState(false);
+  const [chatDriver, setChatDriver] = useState<any | null>(null);
+  const [selectedOrderForChat, setSelectedOrderForChat] = useState<any | null>(null);
+  const [chatMessages, setChatMessages] = useState<any[]>([]);
+  const [loadingChatMessages, setLoadingChatMessages] = useState(false);
+
+  // Fetch all zones for assignments
+  const { data: zonesData } = useQuery({
+    queryKey: ["admin", "zones"],
+    queryFn: () => adminFetch<any>("/zones"),
+  });
+  const zonesList = zonesData?.data || [];
+
+  const handleAssignZone = (driverId: string, zoneId: string | null) => {
+    updateDriverMutation.mutate({
+      id: driverId,
+      data: { preferredZone: zoneId }
+    }, {
+      onSuccess: () => {
+        toast.success(zoneId ? "Zone assigned successfully" : "Zone unassigned successfully");
+        queryClient.invalidateQueries({ queryKey: ["admin", "drivers"] });
+      }
+    });
+  };
+
+  const handleOpenChatModal = (driver: any) => {
+    setChatDriver(driver);
+    setSelectedOrderForChat(null);
+    setChatMessages([]);
+    setIsChatModalOpen(true);
+  };
+
+  const loadOrderChat = async (orderId: string) => {
+    setLoadingChatMessages(true);
+    try {
+      const msgs = await adminFetch<any[]>(`/admin/orders/${orderId}/chat`);
+      setChatMessages(msgs || []);
+    } catch (err: any) {
+      toast.error(err.message || "Failed to load chat messages");
+    } finally {
+      setLoadingChatMessages(false);
+    }
+  };
+
+  useEffect(() => {
+    if (selectedOrderForChat?._id) {
+      loadOrderChat(selectedOrderForChat._id);
+    } else {
+      setChatMessages([]);
+    }
+  }, [selectedOrderForChat?._id]);
 
   const { isLoaded } = useJsApiLoader({
     id: "google-map-script",
@@ -503,11 +566,28 @@ export default function Drivers() {
 
         </div>
 
-        {/* SPLIT LAYOUT (Left Table, Right Widgets) */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          
-          {/* LEFT COLUMN: FLEET OVERVIEW TABLE (2/3 width) */}
-          <div className="lg:col-span-2 bg-card rounded-2xl border border-border flex flex-col shadow-sm">
+        {/* Tab Selection */}
+        <div className="flex border-b border-border mb-4 gap-2">
+          <button
+            onClick={() => setActiveTab("fleet")}
+            className={`px-6 py-3 text-sm font-bold border-b-2 transition-all ${
+              activeTab === "fleet" ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            Fleet Directory & Map
+          </button>
+          <button
+            onClick={() => setActiveTab("zones")}
+            className={`px-6 py-3 text-sm font-bold border-b-2 transition-all ${
+              activeTab === "zones" ? "border-primary text-primary" : "border-transparent text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            Zone Assignments
+          </button>
+        </div>
+
+        {activeTab === "fleet" && (
+          <div className="bg-card rounded-2xl border border-border flex flex-col shadow-sm w-full">
             
             <div className="flex flex-col sm:flex-row sm:items-center justify-between p-6 pb-4 gap-4">
               <div>
@@ -660,7 +740,7 @@ export default function Drivers() {
                               <button onClick={() => toast.success(`Calling ${d.user?.name}...`)} className="p-2 rounded-lg bg-muted/50 hover:bg-muted text-muted-foreground hover:text-foreground transition-colors" title="Call">
                                 <Phone className="h-4 w-4" />
                               </button>
-                              <button onClick={() => toast.success(`Opening chat with ${d.user?.name}...`)} className="p-2 rounded-lg bg-muted/50 hover:bg-muted text-muted-foreground hover:text-foreground transition-colors" title="Message">
+                              <button onClick={() => handleOpenChatModal(d)} className="p-2 rounded-lg bg-muted/50 hover:bg-muted text-muted-foreground hover:text-foreground transition-colors" title="View Order Chats">
                                 <MessageSquare className="h-4 w-4" />
                               </button>
                               <button onClick={() => handleFocusOnMap(d)} className="p-2 rounded-lg bg-muted/50 hover:bg-muted text-muted-foreground hover:text-foreground transition-colors" title="Pin on Map">
@@ -730,65 +810,7 @@ export default function Drivers() {
             </div>
 
           </div>
-
-          {/* RIGHT COLUMN: TODAY'S OVERVIEW (1/3 width) */}
-          <div className="space-y-6">
-
-            {/* Today's Overview Grid */}
-            <div className="bg-card rounded-2xl border border-border p-5 flex flex-col shadow-sm space-y-4">
-              <div className="flex items-center justify-between">
-                <h4 className="text-sm font-bold text-foreground">Today's Overview</h4>
-                <button className="inline-flex items-center gap-1.5 px-2.5 py-1 border border-border rounded-lg text-[11px] font-semibold text-foreground hover:bg-muted/50 transition-colors">
-                  <Calendar className="h-3.5 w-3.5 text-muted-foreground" /> Today
-                </button>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                {/* Live Orders */}
-                <div className="p-3.5 rounded-xl border border-border/80 bg-muted/5 space-y-2">
-                  <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Live Orders</p>
-                  <p className="text-xl font-bold text-foreground">{liveOrdersDisplay}</p>
-                  <div className="flex items-center justify-between gap-2 pt-1">
-                    <span className="text-[9px] font-bold text-emerald-500">↑ 12% vs yesterday</span>
-                    <GreenSparkline />
-                  </div>
-                </div>
-
-                {/* Active Drivers */}
-                <div className="p-3.5 rounded-xl border border-border/80 bg-muted/5 space-y-2">
-                  <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Active Drivers</p>
-                  <p className="text-xl font-bold text-foreground">{onlineDrivers}</p>
-                  <div className="flex items-center justify-between gap-2 pt-1">
-                    <span className="text-[9px] font-bold text-emerald-500">↑ 0% vs yesterday</span>
-                    <GreenSparkline />
-                  </div>
-                </div>
-
-                {/* Earnings */}
-                <div className="p-3.5 rounded-xl border border-border/80 bg-muted/5 space-y-2">
-                  <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Earnings</p>
-                  <p className="text-xl font-bold text-foreground">{totalEarningsToday}</p>
-                  <div className="flex items-center justify-between gap-2 pt-1">
-                    <span className="text-[9px] font-bold text-blue-500">↑ 0% vs yesterday</span>
-                    <BlueSparkline />
-                  </div>
-                </div>
-
-                {/* Avg. Delivery Time */}
-                <div className="p-3.5 rounded-xl border border-border/80 bg-muted/5 space-y-2">
-                  <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Avg. Delivery Time</p>
-                  <p className="text-xl font-bold text-foreground">28 mins</p>
-                  <div className="flex items-center justify-between gap-2 pt-1">
-                    <span className="text-[9px] font-bold text-rose-500">↓ 5% vs yesterday</span>
-                    <PurpleSparkline />
-                  </div>
-                </div>
-              </div>
-            </div>
-
-          </div>
-
-        </div>
+        )}
 
         {/* BOTTOM METRICS ROW (5 Cards) */}
         <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
@@ -1055,6 +1077,277 @@ export default function Drivers() {
           "Onboarding Status": d.onboardingStatus || "N/A"
         }))}
       />
+
+      {/* Zone Assignment Dialog */}
+      <Dialog open={isAssignZoneOpen} onOpenChange={setIsAssignZoneOpen}>
+        <DialogContent className="sm:max-w-[425px] rounded-2xl border-border">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-bold text-foreground">
+              {isEditingAssignment ? "Edit Zone Assignment" : "Assign Driver to Zone"}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            {!isEditingAssignment && (
+              <div className="space-y-1.5">
+                <label className="text-xs font-bold text-muted-foreground uppercase">Select Driver</label>
+                <Select
+                  value={selectedDriverForZone}
+                  onValueChange={setSelectedDriverForZone}
+                >
+                  <SelectTrigger className="w-full rounded-xl">
+                    <SelectValue placeholder="Choose a driver..." />
+                  </SelectTrigger>
+                  <SelectContent className="rounded-xl">
+                    {drivers.map((d: any) => (
+                      <SelectItem key={d._id} value={d._id}>
+                        {d.user?.name} ({d.user?.phone})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-muted-foreground uppercase">Select Zone</label>
+              <Select
+                value={selectedZoneForDriver || "none"}
+                onValueChange={(val) => setSelectedZoneForDriver(val === "none" ? "" : val)}
+              >
+                <SelectTrigger className="w-full rounded-xl">
+                  <SelectValue placeholder="Select Zone..." />
+                </SelectTrigger>
+                <SelectContent className="rounded-xl">
+                  <SelectItem value="none">No Zone Assigned</SelectItem>
+                  {zonesList.map((z: any) => (
+                    <SelectItem key={z._id} value={z._id}>
+                      {z.name} ({z.type})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex justify-end gap-3 pt-4">
+              <Button variant="outline" onClick={() => setIsAssignZoneOpen(false)} className="rounded-xl">
+                Cancel
+              </Button>
+              <Button
+                onClick={() => {
+                  if (!selectedDriverForZone) {
+                    toast.error("Please select a driver");
+                    return;
+                  }
+                  handleAssignZone(selectedDriverForZone, selectedZoneForDriver || null);
+                  setIsAssignZoneOpen(false);
+                }}
+                className="rounded-xl"
+              >
+                {isEditingAssignment ? "Save Changes" : "Assign Zone"}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Order Chats Dialog */}
+      <Dialog open={isChatModalOpen} onOpenChange={setIsChatModalOpen}>
+        <DialogContent className="sm:max-w-[500px] rounded-2xl border-border flex flex-col max-h-[85vh]">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-bold text-foreground">
+              Chats for Driver: {chatDriver?.user?.name}
+            </DialogTitle>
+          </DialogHeader>
+          
+          <div className="space-y-4 py-4 flex-1 flex flex-col min-h-0">
+            <div className="space-y-1.5">
+              <label className="text-xs font-bold text-muted-foreground uppercase">Select Order</label>
+              <Select
+                value={selectedOrderForChat?._id || "none"}
+                onValueChange={(val) => {
+                  const o = orders.find((order: any) => order._id === val);
+                  setSelectedOrderForChat(o || null);
+                }}
+              >
+                <SelectTrigger className="w-full rounded-xl">
+                  <SelectValue placeholder="Select an order to view chat..." />
+                </SelectTrigger>
+                <SelectContent className="rounded-xl">
+                  <SelectItem value="none">Select order...</SelectItem>
+                  {orders
+                    .filter((o: any) => o.driver?._id === chatDriver?._id || o.driver === chatDriver?._id)
+                    .map((o: any) => (
+                      <SelectItem key={o._id} value={o._id}>
+                        {o._id.startsWith("ORD-") ? o._id : `#${o._id.substring(o._id.length - 6).toUpperCase()}`} ({o.status})
+                      </SelectItem>
+                    ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="flex-1 border border-border rounded-xl p-4 bg-muted/20 overflow-y-auto flex flex-col space-y-3 min-h-[300px]">
+              {selectedOrderForChat ? (
+                loadingChatMessages ? (
+                  <div className="flex-1 flex items-center justify-center">
+                    <p className="text-sm text-muted-foreground">Loading chat messages...</p>
+                  </div>
+                ) : chatMessages.length === 0 ? (
+                  <div className="flex-1 flex items-center justify-center">
+                    <p className="text-sm text-muted-foreground text-center">No chat messages found for this order.</p>
+                  </div>
+                ) : (
+                  chatMessages.map((msg: any) => {
+                    const isDriver = msg.senderId?._id === chatDriver?.user?._id || msg.senderId === chatDriver?.user?._id;
+                    return (
+                      <div
+                        key={msg._id}
+                        className={`flex flex-col max-w-[80%] ${isDriver ? "self-end items-end" : "self-start items-start"}`}
+                      >
+                        <span className="text-[10px] text-muted-foreground font-semibold mb-0.5">
+                          {msg.senderId?.name || "System"}
+                        </span>
+                        <div
+                          className={`p-3 rounded-2xl text-sm ${
+                            isDriver
+                              ? "bg-primary text-primary-foreground rounded-tr-none"
+                              : "bg-card border border-border text-foreground rounded-tl-none"
+                          }`}
+                        >
+                          <p>{msg.text}</p>
+                          <span
+                            className={`text-[9px] block mt-1 text-right ${
+                              isDriver ? "text-primary-foreground/75" : "text-muted-foreground"
+                            }`}
+                          >
+                            {new Date(msg.createdAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })
+                )
+              ) : (
+                <div className="flex-1 flex items-center justify-center">
+                  <p className="text-sm text-muted-foreground text-center">Please select an order from the dropdown to view the conversation history between the user and driver.</p>
+                </div>
+              )}
+            </div>
+
+            <div className="flex justify-end gap-3 pt-2">
+              <Button onClick={() => setIsChatModalOpen(false)} className="rounded-xl">
+                Close Chats
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Zone Assignments Tab Rendering */}
+      {activeTab === "zones" && (
+        <div className="bg-card rounded-2xl border border-border p-6 shadow-sm space-y-6">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div>
+              <h3 className="text-lg font-bold text-foreground">Zone Assignments</h3>
+              <p className="text-sm text-muted-foreground mt-0.5">Manage and link drivers to operational regions/zones.</p>
+            </div>
+            <button
+              onClick={() => {
+                setSelectedDriverForZone("");
+                setSelectedZoneForDriver("");
+                setIsEditingAssignment(false);
+                setIsAssignZoneOpen(true);
+              }}
+              className="flex items-center gap-2 px-5 py-2.5 bg-primary text-primary-foreground rounded-xl text-sm font-semibold hover:opacity-90 transition-opacity"
+            >
+              <Plus className="h-4 w-4" /> Assign Zone to Driver
+            </button>
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead>
+                <tr className="border-t border-border bg-muted/20 text-muted-foreground uppercase text-[10px] tracking-wider font-semibold">
+                  <th className="text-left px-6 py-3.5">Driver</th>
+                  <th className="text-left px-6 py-3.5">Contact</th>
+                  <th className="text-left px-6 py-3.5">Assigned Zone</th>
+                  <th className="text-left px-6 py-3.5">Zone Type</th>
+                  <th className="text-left px-6 py-3.5">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border">
+                {drivers.map((d: any) => {
+                  const assignedZoneId = d.preferredZone?._id || d.preferredZone;
+                  const zoneObj = zonesList.find((z: any) => z._id === assignedZoneId);
+                  
+                  return (
+                    <tr key={d._id} className="hover:bg-muted/10 transition-colors">
+                      <td className="px-6 py-4">
+                        <div className="flex items-center gap-3">
+                          <img
+                            src={getAvatarUrl(d.user?.name || "")}
+                            alt={d.user?.name}
+                            className="h-10 w-10 rounded-full object-cover border border-border"
+                          />
+                          <div>
+                            <p className="text-sm font-bold text-foreground">{d.user?.name}</p>
+                            <p className="text-[10px] font-medium text-muted-foreground uppercase">{getVehicleString(d)}</p>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4">
+                        <p className="text-sm font-medium text-foreground">{d.user?.phone || "N/A"}</p>
+                        <p className="text-xs text-muted-foreground">{d.user?.email || "N/A"}</p>
+                      </td>
+                      <td className="px-6 py-4">
+                        <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold ${
+                          zoneObj ? "bg-emerald-50 text-emerald-700 border border-emerald-100" : "bg-zinc-50 text-zinc-500 border border-zinc-100"
+                        }`}>
+                          {zoneObj ? zoneObj.name : "No Zone Assigned"}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 text-sm text-muted-foreground">
+                        {zoneObj ? zoneObj.type : "N/A"}
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => {
+                              setSelectedDriverForZone(d._id);
+                              setSelectedZoneForDriver(assignedZoneId || "");
+                              setIsEditingAssignment(true);
+                              setIsAssignZoneOpen(true);
+                            }}
+                            className="px-3 py-1.5 border border-border bg-white text-xs font-semibold rounded-lg text-foreground hover:bg-muted/50 transition-colors shadow-sm"
+                          >
+                            Edit
+                          </button>
+                          {zoneObj && (
+                            <button
+                              onClick={() => {
+                                if (confirm(`Remove zone assignment for driver ${d.user?.name}?`)) {
+                                  handleAssignZone(d._id, null);
+                                }
+                              }}
+                              className="px-3 py-1.5 border border-transparent bg-rose-50 text-xs font-semibold rounded-lg text-rose-600 hover:bg-rose-100 transition-colors"
+                            >
+                              Delete
+                            </button>
+                          )}
+                          <button
+                            onClick={() => handleOpenChatModal(d)}
+                            className="p-2 rounded-lg bg-muted/50 hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+                            title="View Order Chats"
+                          >
+                            <MessageSquare className="h-4 w-4" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
 
     </DashboardLayout>
   );
