@@ -9,8 +9,12 @@ interface DeliverySliderProps {
   colors: any;
 }
 
-const BUTTON_WIDTH = Dimensions.get('window').width - 40;
-const SLIDER_WIDTH = 56;
+const { height: SCREEN_HEIGHT, width: SCREEN_WIDTH } = Dimensions.get('window');
+const isStandardOrSmall = SCREEN_HEIGHT < 850;
+
+const BUTTON_WIDTH = SCREEN_WIDTH - 40;
+const SLIDER_WIDTH = isStandardOrSmall ? 48 : 56;
+const CONTAINER_HEIGHT = isStandardOrSmall ? 54 : 64;
 const MAX_SLIDE = BUTTON_WIDTH - SLIDER_WIDTH - 8;
 
 export const DeliverySlider: React.FC<DeliverySliderProps> = ({ onConfirm, title, colors }) => {
@@ -169,7 +173,7 @@ export const DeliverySlider: React.FC<DeliverySliderProps> = ({ onConfirm, title
         >
           <MaterialCommunityIcons 
             name={isConfirmed ? "check-bold" : "moped"} 
-            size={28} 
+            size={isStandardOrSmall ? 22 : 28} 
             color="#ffffff" 
             style={{ transform: [{ translateX: isConfirmed ? 0 : 2 }] }} // Minor optical alignment
           />
@@ -182,8 +186,8 @@ export const DeliverySlider: React.FC<DeliverySliderProps> = ({ onConfirm, title
 const styles = StyleSheet.create({
   container: {
     width: BUTTON_WIDTH,
-    height: 64,
-    borderRadius: 32,
+    height: CONTAINER_HEIGHT,
+    borderRadius: CONTAINER_HEIGHT / 2,
     justifyContent: 'center',
     position: 'relative',
     borderWidth: 1,
@@ -193,6 +197,7 @@ const styles = StyleSheet.create({
   dockZone: {
     position: 'absolute',
     right: 4,
+    top: (CONTAINER_HEIGHT - SLIDER_WIDTH) / 2,
     width: SLIDER_WIDTH,
     height: SLIDER_WIDTH,
     justifyContent: 'center',
@@ -213,7 +218,7 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   title: {
-    fontSize: 15,
+    fontSize: isStandardOrSmall ? 13 : 15,
     fontWeight: '800',
     letterSpacing: 1.2,
   },
@@ -222,7 +227,7 @@ const styles = StyleSheet.create({
     left: 0,
     top: 0,
     bottom: 0,
-    borderRadius: 32,
+    borderRadius: CONTAINER_HEIGHT / 2,
     zIndex: 5,
   },
   maskedTextContainer: {
@@ -238,7 +243,7 @@ const styles = StyleSheet.create({
     borderRadius: SLIDER_WIDTH / 2,
     position: 'absolute',
     left: 4,
-    top: 4,
+    top: (CONTAINER_HEIGHT - SLIDER_WIDTH) / 2,
     shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.35,
     shadowRadius: 8,

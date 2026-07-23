@@ -39,6 +39,8 @@ import { FloatingCart } from "@/components/FloatingCart";
 import UpdateModal from "@/components/UpdateModal";
 import { useState } from "react";
 import { GlobalSocketHandler } from "@/components/GlobalSocketHandler";
+import Colors from "@/constants/colors";
+import { useThemeStore } from "@/contexts/themeStore";
 
 SplashScreen.preventAutoHideAsync();
 
@@ -47,13 +49,15 @@ const queryClient = new QueryClient();
 function RootLayoutNav() {
   const insets = useSafeAreaInsets();
   const isInitialized = useAuthStore((s) => s.isInitialized);
+  const { theme } = useThemeStore();
+  const colors = Colors[theme];
 
   if (!isInitialized) {
     return null; // Or a custom Loading/Splash view
   }
 
   return (
-    <View style={{ flex: 1, backgroundColor: "#FFFFFF" }}>
+    <View style={{ flex: 1, backgroundColor: colors.background }}>
       <Stack screenOptions={{ headerShown: false }}>
         <Stack.Screen name="index" options={{ headerShown: false }} />
         <Stack.Screen name="login" options={{ headerShown: false }} />
@@ -75,7 +79,7 @@ function RootLayoutNav() {
         <Stack.Screen name="149-store" options={{ headerShown: false, animation: "slide_from_right" }} />
       </Stack>
       {Platform.OS === "android" && insets.bottom > 0 && (
-        <View style={{ height: insets.bottom, backgroundColor: "#FFFFFF" }} />
+        <View style={{ height: insets.bottom, backgroundColor: colors.background }} />
       )}
     </View>
   );

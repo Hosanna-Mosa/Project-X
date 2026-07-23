@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { View, Text, StyleSheet, TouchableOpacity, TextInput, ScrollView, KeyboardAvoidingView, Platform, StatusBar, Alert, Image, Animated, Easing, Linking } from "react-native";
+import { View, Text, StyleSheet, TouchableOpacity, TextInput, ScrollView, KeyboardAvoidingView, Platform, StatusBar, Alert, Image, Animated, Easing, Linking, Keyboard, Dimensions } from "react-native";
 import LottieView from 'lottie-react-native';
 import { Feather, Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { router, useLocalSearchParams, Stack } from "expo-router";
@@ -11,6 +11,9 @@ import { useThemeStore } from "@/contexts/themeStore";
 import { useDeliveryStore } from "@/contexts/deliveryStore";
 import { DeliverySlider } from "@/components/DeliverySlider";
 import DateTimePicker from "@react-native-community/datetimepicker";
+
+const { height: SCREEN_HEIGHT } = Dimensions.get("window");
+const scale = SCREEN_HEIGHT < 850 ? 0.85 : 1.0;
 
 const getDistanceFromLatLonInKm = (lat1: number, lon1: number, lat2: number, lon2: number) => {
   const R = 6371; // Radius of the earth in km
@@ -80,6 +83,20 @@ export default function HelperTaskScreen() {
   const [dummyIndex, setDummyIndex] = useState(0);
   const [characterIndex, setCharacterIndex] = React.useState(0);
   const [assignedDriver, setAssignedDriver] = useState<any>(null);
+  const [isDescriptionFocused, setIsDescriptionFocused] = useState(false);
+
+  React.useEffect(() => {
+    const hideSubscription = Keyboard.addListener(
+      Platform.OS === "ios" ? "keyboardWillHide" : "keyboardDidHide",
+      () => {
+        setIsDescriptionFocused(false);
+      }
+    );
+
+    return () => {
+      hideSubscription.remove();
+    };
+  }, []);
 
   // Cinematic Delivery Animation
   const riderX = React.useRef(new Animated.Value(-300)).current;
@@ -521,6 +538,10 @@ export default function HelperTaskScreen() {
     rippleScaleAnim.setValue(0);
     rippleOpacityAnim.setValue(1);
     
+    // Set searching states immediately to show the correct UI elements (deck and offer box) instantly
+    setTaskState("searching");
+    setCurrentTaskPrice(calculatedFare);
+    
     Animated.parallel([
       Animated.timing(rippleScaleAnim, { toValue: 50, duration: 600, easing: Easing.out(Easing.poly(4)), useNativeDriver: true }),
       Animated.sequence([
@@ -532,8 +553,6 @@ export default function HelperTaskScreen() {
     });
     
     setTimeout(async () => {
-      setTaskState("searching");
-      
       try {
         const stops: any[] = [
           {
@@ -688,7 +707,7 @@ export default function HelperTaskScreen() {
 
   const animatedHeaderHeight = formHeightAnim.interpolate({
     inputRange: [0, 1],
-    outputRange: [480, 360] // 0 = Searching (480px ensures cards are not clipped), 1 = Idle/Assigned (360px)
+    outputRange: [SCREEN_HEIGHT < 850 ? 320 : 480 * scale, 360 * scale] // 0 = Searching, 1 = Idle/Assigned
   });
 
   return (
@@ -697,20 +716,21 @@ export default function HelperTaskScreen() {
       <StatusBar barStyle={theme === "dark" ? "light-content" : "dark-content"} />
 
       <KeyboardAvoidingView 
-        style={{ flex: 1 }}
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
+        style={{ flex: 1, backgroundColor: colors.background }}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
         keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 20}
       >
         <ScrollView 
           ref={scrollViewRef} 
+          style={{ flex: 1, backgroundColor: colors.background }}
           contentContainerStyle={styles.scrollContent} 
           showsVerticalScrollIndicator={false} 
           keyboardShouldPersistTaps="handled"
-          scrollEnabled={taskState !== "searching"}
+          scrollEnabled={true}
         >
           
           {/* Dynamic Purple Header */}
-      <Animated.View style={{ backgroundColor: '#5c52eb', paddingTop: insets.top, paddingBottom: 120, height: animatedHeaderHeight, overflow: 'hidden' }}>
+      <Animated.View style={{ backgroundColor: '#5c52eb', paddingTop: insets.top, paddingBottom: 120 * scale, height: animatedHeaderHeight, overflow: 'hidden' }}>
         
         {/* Animated Crowded Road Parallax Background */}
         <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 0 }}>
@@ -719,14 +739,14 @@ export default function HelperTaskScreen() {
            <View style={{ flex: 1, backgroundColor: '#5c52eb' }} />
            
            {/* Drifting Clouds */}
-           <Animated.View style={{ flexDirection: 'row', position: 'absolute', top: 50, transform: [{ translateX: cloudScroll }], width: 1000 }}>
+           <Animated.View style={{ flexDirection: 'row', position: 'absolute', top: 50 * scale, transform: [{ translateX: cloudScroll }], width: 1000 }}>
               {[...Array(6)].map((_, i) => (
                 <View key={`c${i}`} style={{ width: 60 + Math.random()*60, height: 20 + Math.random()*15, backgroundColor: 'rgba(255,255,255,0.06)', borderRadius: 20, marginLeft: 30 + Math.random()*50, marginTop: Math.random()*30 }} />
               ))}
            </Animated.View>
 
            {/* Scrolling City Skyline */}
-           <Animated.View style={{ flexDirection: 'row', position: 'absolute', bottom: 110, alignItems: 'flex-end', transform: [{ translateX: skylineScroll }], width: 1000 }}>
+           <Animated.View style={{ flexDirection: 'row', position: 'absolute', bottom: 110 * scale, alignItems: 'flex-end', transform: [{ translateX: skylineScroll }], width: 1000 }}>
               {[...Array(15)].map((_, i) => (
                  <View key={`b${i}`} style={{ width: 30 + Math.random()*40, height: 30 + Math.random()*90, backgroundColor: 'rgba(0,0,0,0.1)', marginHorizontal: 2, borderTopLeftRadius: 4, borderTopRightRadius: 4 }}>
                     {/* Tiny Windows */}
@@ -737,74 +757,72 @@ export default function HelperTaskScreen() {
            </Animated.View>
 
            {/* The Road Surface */}
-           <View style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 110, backgroundColor: 'rgba(0,0,0,0.15)', borderTopWidth: 2, borderColor: 'rgba(255,255,255,0.05)' }} />
+           <View style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 110 * scale, backgroundColor: 'rgba(0,0,0,0.15)', borderTopWidth: 2, borderColor: 'rgba(255,255,255,0.05)' }} />
 
 
 
            {/* Scrolling Dashed Road Lines */}
-           <Animated.View style={{ flexDirection: 'row', position: 'absolute', bottom: 70, width: 1000, transform: [{ translateX: roadScroll }] }}>
+           <Animated.View style={{ flexDirection: 'row', position: 'absolute', bottom: 70 * scale, width: 1000, transform: [{ translateX: roadScroll }] }}>
               {[...Array(15)].map((_, i) => (
-                 <View key={`d${i}`} style={{ width: 40, height: 3, backgroundColor: 'rgba(255,255,255,0.15)', borderRadius: 2, marginRight: 40 }} />
+                 <View key={`d${i}`} style={{ width: 40 * scale, height: 3 * scale, backgroundColor: 'rgba(255,255,255,0.15)', borderRadius: 2 * scale, marginRight: 40 * scale }} />
               ))}
            </Animated.View>
 
            {/* Moving Vehicles (Searching State) */}
            {taskState === "searching" && (
              <>
-               <Animated.View style={{ position: 'absolute', bottom: 73, transform: [{ translateX: searchTrafficAnim.interpolate({ inputRange: [0, 1], outputRange: [-200, 1200] }) }] }}>
-                 <Image source={require('@/assets/images/services/scooter_red_transparent.png')} style={{ width: 120, height: 95, opacity: 0.95 }} resizeMode="contain" />
+               <Animated.View style={{ position: 'absolute', bottom: 73 * scale, transform: [{ translateX: searchTrafficAnim.interpolate({ inputRange: [0, 1], outputRange: [-200, 1200] }) }] }}>
+                 <Image source={require('@/assets/images/services/scooter_red_transparent.png')} style={{ width: 120 * scale, height: 95 * scale, opacity: 0.95 }} resizeMode="contain" />
                </Animated.View>
-               <Animated.View style={{ position: 'absolute', bottom: 70, transform: [{ translateX: searchTrafficAnim.interpolate({ inputRange: [0, 1], outputRange: [1200, -200] }) }] }}>
-                 <Image source={require('@/assets/images/services/scooter_blue_transparent.png')} style={{ width: 120, height: 95, opacity: 0.95, transform: [{ scaleX: -1 }] }} resizeMode="contain" />
+               <Animated.View style={{ position: 'absolute', bottom: 70 * scale, transform: [{ translateX: searchTrafficAnim.interpolate({ inputRange: [0, 1], outputRange: [1200, -200] }) }] }}>
+                 <Image source={require('@/assets/images/services/scooter_blue_transparent.png')} style={{ width: 120 * scale, height: 95 * scale, opacity: 0.95, transform: [{ scaleX: -1 }] }} resizeMode="contain" />
                </Animated.View>
-               <Animated.View style={{ position: 'absolute', bottom: 75, transform: [{ translateX: searchTrafficAnim.interpolate({ inputRange: [0, 1], outputRange: [-400, 1500] }) }] }}>
-                 <Image source={require('@/assets/images/services/scooter_green_transparent.png')} style={{ width: 120, height: 95, opacity: 0.95 }} resizeMode="contain" />
+               <Animated.View style={{ position: 'absolute', bottom: 75 * scale, transform: [{ translateX: searchTrafficAnim.interpolate({ inputRange: [0, 1], outputRange: [-400, 1500] }) }] }}>
+                 <Image source={require('@/assets/images/services/scooter_green_transparent.png')} style={{ width: 120 * scale, height: 95 * scale, opacity: 0.95 }} resizeMode="contain" />
                </Animated.View>
-               <Animated.View style={{ position: 'absolute', bottom: 74, transform: [{ translateX: searchTrafficAnim.interpolate({ inputRange: [0, 1], outputRange: [-600, 1600] }) }] }}>
-                 <Image source={require('@/assets/images/services/scooter_yellow_transparent.png')} style={{ width: 120, height: 95, opacity: 0.95 }} resizeMode="contain" />
+               <Animated.View style={{ position: 'absolute', bottom: 74 * scale, transform: [{ translateX: searchTrafficAnim.interpolate({ inputRange: [0, 1], outputRange: [-600, 1600] }) }] }}>
+                 <Image source={require('@/assets/images/services/scooter_yellow_transparent.png')} style={{ width: 120 * scale, height: 95 * scale, opacity: 0.95 }} resizeMode="contain" />
                </Animated.View>
-               <Animated.View style={{ position: 'absolute', bottom: 71, transform: [{ translateX: searchTrafficAnim.interpolate({ inputRange: [0, 1], outputRange: [1500, -400] }) }] }}>
-                 <Image source={require('@/assets/images/services/scooter_orange_transparent.png')} style={{ width: 120, height: 95, opacity: 0.95, transform: [{ scaleX: -1 }] }} resizeMode="contain" />
+               <Animated.View style={{ position: 'absolute', bottom: 71 * scale, transform: [{ translateX: searchTrafficAnim.interpolate({ inputRange: [0, 1], outputRange: [1500, -400] }) }] }}>
+                 <Image source={require('@/assets/images/services/scooter_orange_transparent.png')} style={{ width: 120 * scale, height: 95 * scale, opacity: 0.95, transform: [{ scaleX: -1 }] }} resizeMode="contain" />
                </Animated.View>
-               <Animated.View style={{ position: 'absolute', bottom: 76, transform: [{ translateX: searchTrafficAnim.interpolate({ inputRange: [0, 1], outputRange: [-800, 1800] }) }] }}>
-                 <Image source={require('@/assets/images/services/scooter_black_transparent.png')} style={{ width: 120, height: 95, opacity: 0.95 }} resizeMode="contain" />
+               <Animated.View style={{ position: 'absolute', bottom: 76 * scale, transform: [{ translateX: searchTrafficAnim.interpolate({ inputRange: [0, 1], outputRange: [-800, 1800] }) }] }}>
+                 <Image source={require('@/assets/images/services/scooter_black_transparent.png')} style={{ width: 120 * scale, height: 95 * scale, opacity: 0.95 }} resizeMode="contain" />
                </Animated.View>
              </>
            )}
 
-
         </View>
 
-        <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 20, zIndex: 10 }}>
+        <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 20 * scale, zIndex: 10 }}>
           <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-            <Feather name="arrow-left" size={24} color="#fff" />
+            <Feather name="arrow-left" size={24 * scale} color="#fff" />
           </TouchableOpacity>
-          <Text style={[styles.headerTitle, { color: '#fff' }]}>Helper Task</Text>
-          <View style={{ width: 40 }} />
+          <Text style={[styles.headerTitle, { color: '#fff', fontSize: 18 * scale }]}>Helper Task</Text>
+          <View style={{ width: 40 * scale }} />
         </View>
 
         {/* Main Header Graphic Container */}
-        <View style={{ alignItems: 'center', justifyContent: 'center', marginTop: 30, zIndex: 10 }}>
+        <View style={{ alignItems: 'center', justifyContent: 'center', marginTop: 30 * scale, zIndex: 10 }}>
             {taskState === "assigned" ? (
               <LottieView
                  source={require('@/assets/images/services/success.json')} // Success Confetti
-                 style={{ width: 220, height: 180 }}
+                 style={{ width: 220 * scale, height: 180 * scale }}
                  autoPlay
                  loop={false}
               />
             ) : taskState === "searching" ? (
-              <View style={{ height: 20 }} />
+              <View style={{ height: 20 * scale }} />
             ) : (
-              <View style={{ width: 220, height: 180, alignItems: 'center', justifyContent: 'center' }}>
+              <View style={{ width: 220 * scale, height: 180 * scale, alignItems: 'center', justifyContent: 'center' }}>
                  {/* The Destination Scene (House + Waving Customer) */}
                  <Animated.View style={{ 
                     position: 'absolute',
-                    right: -35, bottom: -30,
+                    right: -35 * scale, bottom: -30 * scale,
                     opacity: personOpacity,
                     alignItems: 'flex-end', justifyContent: 'flex-end',
                     zIndex: 1
                  }}>
-
 
                     {/* Customer Waiting (Receiving Delivery) */}
                     <View style={{ zIndex: 10 }}>
@@ -813,7 +831,7 @@ export default function HelperTaskScreen() {
                            ? require('@/assets/images/services/male_customer_transparent.png') 
                            : require('@/assets/images/services/female_customer_transparent.png')} 
                          style={[
-                           { width: 125, height: 210 },
+                           { width: 125 * scale, height: 210 * scale },
                            characterIndex === 1 && { transform: [{ scaleX: -1 }] }
                          ]} 
                          resizeMode="contain" 
@@ -824,7 +842,7 @@ export default function HelperTaskScreen() {
                  {/* The Jumping Package */}
                  <Animated.View style={{
                     position: 'absolute',
-                    left: 20, top: 80,
+                    left: 20 * scale, top: 80 * scale,
                     opacity: packageOpacity,
                     transform: [
                       { translateX: packageX },
@@ -834,8 +852,8 @@ export default function HelperTaskScreen() {
                     ],
                     zIndex: 20
                  }}>
-                    <View style={{ width: 36, height: 36, backgroundColor: '#FFD700', borderRadius: 8, alignItems: 'center', justifyContent: 'center', shadowColor: '#000', shadowOffset: {width:0, height:4}, shadowOpacity: 0.3, shadowRadius: 5 }}>
-                       <Feather name="package" size={20} color="#8B4513" />
+                    <View style={{ width: 36 * scale, height: 36 * scale, backgroundColor: '#FFD700', borderRadius: 8 * scale, alignItems: 'center', justifyContent: 'center', shadowColor: '#000', shadowOffset: {width:0, height:4 * scale}, shadowOpacity: 0.3, shadowRadius: 5 * scale }}>
+                       <Feather name="package" size={20 * scale} color="#8B4513" />
                     </View>
                  </Animated.View>
 
@@ -849,7 +867,7 @@ export default function HelperTaskScreen() {
                  }}>
                    <View>
                      {/* Dynamic Engine Shadow */}
-                     <Animated.View style={{ position: 'absolute', bottom: 15, left: 40, width: 140, height: 10, backgroundColor: 'rgba(0,0,0,0.15)', borderRadius: 50, transform: [{ scale: bobAnim.interpolate({ inputRange: [-4, 0], outputRange: [0.8, 1] }) }] }} />
+                     <Animated.View style={{ position: 'absolute', bottom: 15 * scale, left: 40 * scale, width: 140 * scale, height: 10 * scale, backgroundColor: 'rgba(0,0,0,0.15)', borderRadius: 50 * scale, transform: [{ scale: bobAnim.interpolate({ inputRange: [-4, 0], outputRange: [0.8, 1] }) }] }} />
 
                      <Animated.View style={{ transform: [{ translateY: bobAnim }] }}>
                        <LottieView
@@ -873,23 +891,23 @@ export default function HelperTaskScreen() {
            </View>
              
            {/* The AI Matching Deck (Visible during search/assigned) */}
-           <Animated.View style={[{ position: 'absolute', top: taskState === "searching" ? 130 : 180, height: 320, left: 0, right: 0 }, { zIndex: 100, opacity: deckOpacityAnim, justifyContent: 'center', alignItems: 'center' }]} pointerEvents="none">
+           <Animated.View style={[{ position: 'absolute', top: taskState === "searching" ? (SCREEN_HEIGHT < 850 ? 100 : 130 * scale) : 180 * scale, height: SCREEN_HEIGHT < 850 ? 240 : 320 * scale, left: 0, right: 0 }, { zIndex: 100, opacity: deckOpacityAnim, justifyContent: 'center', alignItems: 'center' }]} pointerEvents="none">
                 
                 {/* Telemetry HUD */}
-                <View style={{ position: 'absolute', top: -20, width: '100%', alignItems: 'center' }}>
+                <View style={{ position: 'absolute', top: SCREEN_HEIGHT < 850 ? -22 : -20 * scale, width: '100%', alignItems: 'center' }}>
                    {taskState === "searching" && (
                      <>
-                       <Text style={{ color: '#fff', fontSize: 16, fontWeight: '800', letterSpacing: 2, opacity: 0.8 }}>
+                       <Text style={{ color: '#fff', fontSize: 16 * scale, fontWeight: '800', letterSpacing: 2, opacity: 0.8 }}>
                          FILTERING NEARBY HELPERS...
                        </Text>
-                       <Text style={{ color: '#00FFCC', fontSize: 12, fontWeight: '700', marginTop: 8, fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace' }}>
+                       <Text style={{ color: '#00FFCC', fontSize: 12 * scale, fontWeight: '700', marginTop: 8 * scale, fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace' }}>
                          {142 - dummyIndex * 7} ONLINE IN {radius}KM RADIUS
                        </Text>
 
                        {delayedReason && (
-                         <View style={{ marginTop: 12, backgroundColor: 'rgba(239, 68, 68, 0.9)', paddingHorizontal: 16, paddingVertical: 10, borderRadius: 12, borderWidth: 1, borderColor: '#FCA5A5', flexDirection: 'row', alignItems: 'center', width: '90%' }}>
-                           <Ionicons name="warning" size={20} color="#fff" style={{ marginRight: 8 }} />
-                           <Text style={{ color: '#fff', fontSize: 13, fontWeight: '700', flex: 1 }}>
+                         <View style={{ marginTop: 12 * scale, backgroundColor: 'rgba(239, 68, 68, 0.9)', paddingHorizontal: 16 * scale, paddingVertical: 10 * scale, borderRadius: 12 * scale, borderWidth: 1, borderColor: '#FCA5A5', flexDirection: 'row', alignItems: 'center', width: '90%' }}>
+                           <Ionicons name="warning" size={20 * scale} color="#fff" style={{ marginRight: 8 * scale }} />
+                           <Text style={{ color: '#fff', fontSize: 13 * scale, fontWeight: '700', flex: 1 }}>
                              Drivers are passing on this task because: <Text style={{ color: '#FCD34D', fontWeight: '900' }}>"{delayedReason}"</Text>. Consider increasing the price!
                            </Text>
                          </View>
@@ -901,15 +919,15 @@ export default function HelperTaskScreen() {
                 {/* Background Static Deck Cards (To give the illusion of a stack) */}
                 {taskState === "searching" && (
                   <>
-                    <View style={{ position: 'absolute', width: 220, height: 280, backgroundColor: 'transparent', borderRadius: 20, transform: [{ scale: 0.8 }, { translateY: 40 }] }} />
-                    <View style={{ position: 'absolute', width: 220, height: 280, backgroundColor: 'transparent', borderRadius: 20, transform: [{ scale: 0.9 }, { translateY: 20 }] }} />
+                    <View style={{ position: 'absolute', width: 220 * scale, height: (SCREEN_HEIGHT < 850 ? 200 : 280 * scale), backgroundColor: 'transparent', borderRadius: 20 * scale, transform: [{ scale: 0.8 }, { translateY: SCREEN_HEIGHT < 850 ? 25 : 40 * scale }] }} />
+                    <View style={{ position: 'absolute', width: 220 * scale, height: (SCREEN_HEIGHT < 850 ? 200 : 280 * scale), backgroundColor: 'transparent', borderRadius: 20 * scale, transform: [{ scale: 0.9 }, { translateY: SCREEN_HEIGHT < 850 ? 12 : 20 * scale }] }} />
                   </>
                 )}
 
                 {/* The Swiping Top Card */}
                 <Animated.View style={{
-                   width: 220, height: 280,
-                   shadowColor: '#000', shadowOffset: { width: 0, height: 10 }, shadowOpacity: 0.2, shadowRadius: 20,
+                   width: 220 * scale, height: (SCREEN_HEIGHT < 850 ? 200 : 280 * scale),
+                   shadowColor: '#000', shadowOffset: { width: 0, height: 10 * scale }, shadowOpacity: 0.2, shadowRadius: 20 * scale,
                    transform: [
                      { translateX: cardSwipeXAnim },
                      { translateY: cardSwipeYAnim },
@@ -919,39 +937,39 @@ export default function HelperTaskScreen() {
                    {/* Background Color that animates (JS Driver) */}
                    <Animated.View style={[StyleSheet.absoluteFill, {
                       backgroundColor: lockOnAnim.interpolate({ inputRange: [0, 1], outputRange: ['rgba(255,255,255,0.9)', '#10B981'] }),
-                      borderRadius: 24,
+                      borderRadius: 24 * scale,
                    }]} />
 
                    {/* Card Content inside */}
-                   <View style={{ padding: 20, alignItems: 'center', width: '100%', height: '100%' }}>
+                   <View style={{ padding: SCREEN_HEIGHT < 850 ? 12 : 20 * scale, alignItems: 'center', width: '100%', height: '100%' }}>
                      {/* Card Profile Image Placeholder */}
-                     <View style={{ width: 80, height: 80, borderRadius: 40, backgroundColor: 'rgba(0,0,0,0.1)', marginBottom: 16, justifyContent: 'center', alignItems: 'center', borderWidth: 2, borderColor: '#fff' }}>
-                       <Feather name="user" size={32} color={taskState === "assigned" ? "#fff" : "#5c52eb"} />
+                     <View style={{ width: SCREEN_HEIGHT < 850 ? 60 : 80 * scale, height: SCREEN_HEIGHT < 850 ? 60 : 80 * scale, borderRadius: SCREEN_HEIGHT < 850 ? 30 : 40 * scale, backgroundColor: 'rgba(0,0,0,0.1)', marginBottom: SCREEN_HEIGHT < 850 ? 10 : 16 * scale, justifyContent: 'center', alignItems: 'center', borderWidth: 2, borderColor: '#fff' }}>
+                       <Feather name="user" size={SCREEN_HEIGHT < 850 ? 24 : 32 * scale} color={taskState === "assigned" ? "#fff" : "#5c52eb"} />
                      </View>
                    
                    {/* Card Details */}
                    {taskState === "assigned" && driver ? (
                      <>
-                       <Text style={{ color: '#fff', fontSize: 20, fontWeight: '800', marginBottom: 4 }}>{driver.name || "Driver"}</Text>
-                       <Text style={{ color: 'rgba(255,255,255,0.8)', fontSize: 14, fontWeight: '600', marginBottom: 16 }}>{driver.vehicle || "Helper"}</Text>
+                       <Text style={{ color: '#fff', fontSize: SCREEN_HEIGHT < 850 ? 16 : 20 * scale, fontWeight: '800', marginBottom: 4 * scale }}>{driver.name || "Driver"}</Text>
+                       <Text style={{ color: 'rgba(255,255,255,0.8)', fontSize: SCREEN_HEIGHT < 850 ? 12 : 14 * scale, fontWeight: '600', marginBottom: SCREEN_HEIGHT < 850 ? 8 : 16 * scale }}>{driver.vehicle || "Helper"}</Text>
                      </>
                    ) : (
                      <>
-                       <View style={{ width: '80%', height: 12, borderRadius: 6, backgroundColor: taskState === "assigned" ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.1)', marginBottom: 12 }} />
-                       <View style={{ width: '60%', height: 12, borderRadius: 6, backgroundColor: taskState === "assigned" ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.1)', marginBottom: 24 }} />
+                       <View style={{ width: '80%', height: SCREEN_HEIGHT < 850 ? 8 : 12 * scale, borderRadius: SCREEN_HEIGHT < 850 ? 4 : 6 * scale, backgroundColor: taskState === "assigned" ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.1)', marginBottom: SCREEN_HEIGHT < 850 ? 8 : 12 * scale }} />
+                       <View style={{ width: '60%', height: SCREEN_HEIGHT < 850 ? 8 : 12 * scale, borderRadius: SCREEN_HEIGHT < 850 ? 4 : 6 * scale, backgroundColor: taskState === "assigned" ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.1)', marginBottom: SCREEN_HEIGHT < 850 ? 16 : 24 * scale }} />
                      </>
                    )}
                    
                    {/* Lock-On Checkmark or Searching Spinner */}
                    {taskState === "assigned" ? (
-                     <View style={{ width: 50, height: 50, borderRadius: 25, backgroundColor: '#fff', justifyContent: 'center', alignItems: 'center', shadowColor: '#000', shadowOpacity: 0.1, shadowRadius: 10 }}>
-                        <Feather name="check" size={24} color="#10B981" />
+                     <View style={{ width: SCREEN_HEIGHT < 850 ? 40 : 50 * scale, height: SCREEN_HEIGHT < 850 ? 40 : 50 * scale, borderRadius: SCREEN_HEIGHT < 850 ? 20 : 25 * scale, backgroundColor: '#fff', justifyContent: 'center', alignItems: 'center', shadowColor: '#000', shadowOpacity: 0.1, shadowRadius: 10 * scale }}>
+                        <Feather name="check" size={SCREEN_HEIGHT < 850 ? 20 : 24 * scale} color="#10B981" />
                      </View>
                    ) : (
-                     <View style={{ flexDirection: 'row', gap: 6 }}>
-                        <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: '#5c52eb' }} />
-                        <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: '#5c52eb', opacity: 0.6 }} />
-                        <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: '#5c52eb', opacity: 0.3 }} />
+                     <View style={{ flexDirection: 'row', gap: 6 * scale }}>
+                        <View style={{ width: 8 * scale, height: 8 * scale, borderRadius: 4 * scale, backgroundColor: '#5c52eb' }} />
+                        <View style={{ width: 8 * scale, height: 8 * scale, borderRadius: 4 * scale, backgroundColor: '#5c52eb', opacity: 0.6 }} />
+                        <View style={{ width: 8 * scale, height: 8 * scale, borderRadius: 4 * scale, backgroundColor: '#5c52eb', opacity: 0.3 }} />
                      </View>
                    )}
                    </View>
@@ -963,76 +981,76 @@ export default function HelperTaskScreen() {
         {/* Form Container */}
           <Animated.View style={{ 
             backgroundColor: colors.background, 
-            borderTopLeftRadius: 30, borderTopRightRadius: 30, 
-            marginTop: -30, padding: 24, paddingBottom: 0, flex: 1,
+            borderTopLeftRadius: 30 * scale, borderTopRightRadius: 30 * scale, 
+            marginTop: -10 * scale, padding: 24 * scale, paddingBottom: 0, flex: 1,
             elevation: 10, shadowColor: "#000", shadowOffset: { width: 0, height: -2 }, shadowOpacity: 0.1, shadowRadius: 10
           }}>
-            <View style={{ alignSelf: 'center', width: 40, height: 5, borderRadius: 3, backgroundColor: colors.border, marginBottom: 20 }} />
+            <View style={{ alignSelf: 'center', width: 40 * scale, height: 5 * scale, borderRadius: 3 * scale, backgroundColor: colors.border, marginBottom: 20 * scale }} />
             
             {taskState === "searching" ? (
               <View style={{ flex: 1, width: '100%' }}>
-                <View style={{ flex: 1, justifyContent: 'space-between', paddingBottom: 12 }}>
+                <View style={{ flex: 1, gap: 16 * scale, paddingBottom: 12 }}>
                   
                   {/* CURRENT OFFER */}
                   {currentTaskPrice !== null && (
-                    <View style={{ paddingVertical: 16, paddingHorizontal: 20, backgroundColor: '#fff', borderRadius: 20, borderWidth: 1, borderColor: '#F1F5F9', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', width: '100%', shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.05, shadowRadius: 12, elevation: 2 }}>
+                    <View style={{ paddingVertical: 16 * scale, paddingHorizontal: 20 * scale, backgroundColor: '#fff', borderRadius: 20 * scale, borderWidth: 1, borderColor: '#F1F5F9', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', width: '100%', shadowColor: '#000', shadowOffset: { width: 0, height: 4 * scale }, shadowOpacity: 0.05, shadowRadius: 12 * scale, elevation: 2 }}>
                       <View>
-                         <Text style={{ color: '#475569', fontSize: 12, fontWeight: '800', letterSpacing: 1, marginBottom: 4 }}>CURRENT OFFER</Text>
-                         <Text style={{ color: '#5c52eb', fontSize: 38, fontWeight: '900', letterSpacing: -1 }}>₹{currentTaskPrice}</Text>
+                         <Text style={{ color: '#475569', fontSize: 12 * scale, fontWeight: '800', letterSpacing: 1, marginBottom: 4 * scale }}>CURRENT OFFER</Text>
+                         <Text style={{ color: '#5c52eb', fontSize: 38 * scale, fontWeight: '900', letterSpacing: -1 }}>₹{currentTaskPrice}</Text>
                       </View>
-                      <View style={{ width: 50, height: 50, borderRadius: 25, backgroundColor: '#F3F0FF', alignItems: 'center', justifyContent: 'center' }}>
-                         <Ionicons name="pricetag" size={24} color="#5c52eb" style={{ transform: [{ rotate: '-45deg' }] }} />
+                      <View style={{ width: 50 * scale, height: 50 * scale, borderRadius: 25 * scale, backgroundColor: '#F3F0FF', alignItems: 'center', justifyContent: 'center' }}>
+                         <Ionicons name="pricetag" size={24 * scale} color="#5c52eb" style={{ transform: [{ rotate: '-45deg' }] }} />
                       </View>
                     </View>
                   )}
 
                   {/* MARKET RESPONSE */}
                   {totalContacted > 0 && (
-                    <View style={{ width: '100%', backgroundColor: '#FFF5F5', padding: 16, borderRadius: 20, shadowColor: '#EF4444', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.05, shadowRadius: 8, elevation: 2 }}>
-                       <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
-                          <View style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: '#FEE2E2', alignItems: 'center', justifyContent: 'center', marginRight: 12 }}>
-                            <Ionicons name="people-outline" size={22} color="#DC2626" />
+                    <View style={{ width: '100%', backgroundColor: '#FFF5F5', padding: 16 * scale, borderRadius: 20 * scale, shadowColor: '#EF4444', shadowOffset: { width: 0, height: 4 * scale }, shadowOpacity: 0.05, shadowRadius: 8 * scale, elevation: 2 }}>
+                       <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 * scale }}>
+                          <View style={{ width: 44 * scale, height: 44 * scale, borderRadius: 22 * scale, backgroundColor: '#FEE2E2', alignItems: 'center', justifyContent: 'center', marginRight: 12 * scale }}>
+                            <Ionicons name="people-outline" size={22 * scale} color="#DC2626" />
                           </View>
                           <View style={{ flex: 1 }}>
-                            <Text style={{ fontSize: 11, fontWeight: '800', color: '#B91C1C', marginBottom: 2, letterSpacing: 1 }}>MARKET RESPONSE</Text>
+                            <Text style={{ fontSize: 11 * scale, fontWeight: '800', color: '#B91C1C', marginBottom: 2 * scale, letterSpacing: 1 }}>MARKET RESPONSE</Text>
                             <View style={{ flexDirection: 'row', alignItems: 'baseline' }}>
-                              <Text style={{ fontSize: 24, fontWeight: '900', color: '#DC2626' }}>{rejectedCount}</Text>
-                              <Text style={{ fontSize: 14, fontWeight: '700', color: '#DC2626', marginLeft: 6 }}>declined out of {totalContacted}</Text>
+                              <Text style={{ fontSize: 24 * scale, fontWeight: '900', color: '#DC2626' }}>{rejectedCount}</Text>
+                              <Text style={{ fontSize: 14 * scale, fontWeight: '700', color: '#DC2626', marginLeft: 6 * scale }}>declined out of {totalContacted}</Text>
                             </View>
                           </View>
-                          <Ionicons name="bar-chart-outline" size={22} color="#FCA5A5" />
+                          <Ionicons name="bar-chart-outline" size={22 * scale} color="#FCA5A5" />
                        </View>
-                       <Text style={{ fontSize: 13, color: '#475569', fontWeight: '500' }}>We're finding the best match for you.</Text>
+                       <Text style={{ fontSize: 13 * scale, color: '#475569', fontWeight: '500' }}>We're finding the best match for you.</Text>
                     </View>
                   )}
                   
                   {/* ATTRACT HELPERS */}
                   <View>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 }}>
-                      <Ionicons name="flash" size={16} color="#5c52eb" style={{ marginRight: 8 }} />
-                      <Text style={{ color: '#5c52eb', fontSize: 13, fontWeight: '800', letterSpacing: 1 }}>ATTRACT HELPERS FASTER</Text>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 10 * scale }}>
+                      <Ionicons name="flash" size={16 * scale} color="#5c52eb" style={{ marginRight: 8 * scale }} />
+                      <Text style={{ color: '#5c52eb', fontSize: 13 * scale, fontWeight: '800', letterSpacing: 1 }}>ATTRACT HELPERS FASTER</Text>
                     </View>
 
-                    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ width: '100%' }} contentContainerStyle={{ gap: 10, paddingHorizontal: 4 }}>
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ width: '100%' }} contentContainerStyle={{ gap: 10 * scale, paddingHorizontal: 4 * scale }}>
                       {[10, 20, 30, 40, 50].map(amount => (
                         <TouchableOpacity
                           key={amount}
                           onPress={() => handleIncreasePrice(amount)}
                           disabled={isIncreasingPrice === amount}
                           style={{
-                            width: 65,
-                            height: 75,
-                            borderRadius: 16,
+                            width: 65 * scale,
+                            height: 75 * scale,
+                            borderRadius: 16 * scale,
                             backgroundColor: isIncreasingPrice === amount ? '#E5E7EB' : '#fff',
                             borderWidth: 1,
                             borderColor: isIncreasingPrice === amount ? '#D1D5DB' : '#F1F5F9',
                             alignItems: 'center',
                             justifyContent: 'center',
-                            shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 4, elevation: 1
+                            shadowColor: '#000', shadowOffset: { width: 0, height: 2 * scale }, shadowOpacity: 0.05, shadowRadius: 4 * scale, elevation: 1
                           }}
                         >
-                          <Ionicons name="trending-up" size={20} color="#5c52eb" style={{ marginBottom: 6 }} />
-                          <Text style={{ color: '#5c52eb', fontWeight: '900', fontSize: 16 }}>+₹{amount}</Text>
+                          <Ionicons name="trending-up" size={20 * scale} color="#5c52eb" style={{ marginBottom: 6 * scale }} />
+                          <Text style={{ color: '#5c52eb', fontWeight: '900', fontSize: 16 * scale }}>+₹{amount}</Text>
                         </TouchableOpacity>
                       ))}
                     </ScrollView>
@@ -1040,17 +1058,17 @@ export default function HelperTaskScreen() {
                 </View>
                 
                 {/* CANCEL BUTTON */}
-                <View style={{ width: '100%', alignItems: 'center', marginTop: 4 }}>
+                <View style={{ width: '100%', alignItems: 'center', marginTop: 4 * scale }}>
                   <TouchableOpacity 
-                    style={{ width: '100%', paddingVertical: 16, borderRadius: 24, backgroundColor: '#5c52eb', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginBottom: 8 }}
+                    style={{ width: '100%', paddingVertical: 16 * scale, borderRadius: 24 * scale, backgroundColor: '#5c52eb', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', marginBottom: 8 * scale }}
                     onPress={handleCancelSearch}
                   >
-                    <View style={{ width: 28, height: 28, borderRadius: 14, backgroundColor: 'rgba(255,255,255,0.2)', alignItems: 'center', justifyContent: 'center', position: 'absolute', left: 16 }}>
-                      <Ionicons name="close" size={18} color="#fff" />
+                    <View style={{ width: 28 * scale, height: 28 * scale, borderRadius: 14 * scale, backgroundColor: 'rgba(255,255,255,0.2)', alignItems: 'center', justifyContent: 'center', position: 'absolute', left: 16 * scale }}>
+                      <Ionicons name="close" size={18 * scale} color="#fff" />
                     </View>
-                    <Text style={{ color: '#fff', fontSize: 15, fontWeight: '800', letterSpacing: 0.5 }}>CANCEL SCAN</Text>
+                    <Text style={{ color: '#fff', fontSize: 15 * scale, fontWeight: '800', letterSpacing: 0.5 }}>CANCEL SCAN</Text>
                   </TouchableOpacity>
-                  <Text style={{ color: '#94A3B8', fontSize: 12, fontWeight: '500' }}>You can cancel anytime</Text>
+                  <Text style={{ color: '#94A3B8', fontSize: 12 * scale, fontWeight: '500' }}>You can cancel anytime</Text>
                 </View>
               </View>
             ) : taskState === "assigned" && driver ? (
@@ -1282,16 +1300,18 @@ export default function HelperTaskScreen() {
                   value={description}
                   onChangeText={setDescription}
                   onFocus={() => {
+                    setIsDescriptionFocused(true);
                     setTimeout(() => {
                       scrollViewRef.current?.scrollToEnd({ animated: true });
                     }, 100);
                   }}
+                  onBlur={() => setIsDescriptionFocused(false)}
                 />
               </View>
             </View>
 
             {/* Slide to Confirm Footer */}
-            <View style={[styles.footer, { paddingBottom: insets.bottom || 12, backgroundColor: colors.background }]}>
+            <View style={[styles.footer, { paddingBottom: 12, backgroundColor: colors.background }]}>
               {calculatedFare > 0 && (
                 <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 16 }}>
                   <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: `${colors.primary}15`, alignItems: 'center', justifyContent: 'center', marginRight: 10 }}>
@@ -1367,17 +1387,17 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: "row",
     alignItems: "center",
-    paddingHorizontal: 16,
-    paddingBottom: 16,
+    paddingHorizontal: 16 * scale,
+    paddingBottom: 16 * scale,
     borderBottomWidth: 1,
     borderBottomColor: "rgba(0,0,0,0.05)",
   },
   backBtn: {
-    padding: 8,
-    marginLeft: -8,
+    padding: 8 * scale,
+    marginLeft: -8 * scale,
   },
   headerTitle: {
-    fontSize: 18,
+    fontSize: 18 * scale,
     fontWeight: "bold",
     flex: 1,
     textAlign: "center",
@@ -1387,91 +1407,91 @@ const styles = StyleSheet.create({
     flexGrow: 1,
   },
   introSection: {
-    marginBottom: 32,
+    marginBottom: 32 * scale,
   },
   driverBadge: {
     alignSelf: 'flex-start',
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 20,
-    marginBottom: 12,
+    paddingHorizontal: 12 * scale,
+    paddingVertical: 6 * scale,
+    borderRadius: 20 * scale,
+    marginBottom: 12 * scale,
   },
   driverBadgeText: {
-    fontSize: 13,
+    fontSize: 13 * scale,
     fontWeight: '700',
-    marginLeft: 6,
+    marginLeft: 6 * scale,
   },
   introTitle: {
-    fontSize: 28,
+    fontSize: 28 * scale,
     fontWeight: "900",
-    marginBottom: 8,
+    marginBottom: 8 * scale,
     letterSpacing: -0.5,
   },
   introSubtitle: {
-    fontSize: 15,
-    lineHeight: 22,
+    fontSize: 15 * scale,
+    lineHeight: 22 * scale,
   },
   sectionContainer: {
-    marginBottom: 28,
+    marginBottom: 28 * scale,
   },
   sectionTitle: {
-    fontSize: 16,
+    fontSize: 16 * scale,
     fontWeight: "700",
-    marginBottom: 12,
+    marginBottom: 12 * scale,
   },
   card: {
-    borderRadius: 16,
+    borderRadius: 16 * scale,
     borderWidth: 1,
-    padding: 16,
+    padding: 16 * scale,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,
-    shadowRadius: 8,
+    shadowRadius: 8 * scale,
     elevation: 2,
   },
   inputRow: {
     flexDirection: "row",
     alignItems: "center",
-    height: 48,
-    paddingHorizontal: 8,
+    height: 48 * scale,
+    paddingHorizontal: 8 * scale,
   },
   locationDot: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-    marginRight: 12,
+    width: 12 * scale,
+    height: 12 * scale,
+    borderRadius: 6 * scale,
+    marginRight: 12 * scale,
   },
   locationSquare: {
-    width: 12,
-    height: 12,
-    borderRadius: 2,
-    marginRight: 12,
+    width: 12 * scale,
+    height: 12 * scale,
+    borderRadius: 2 * scale,
+    marginRight: 12 * scale,
   },
   timelineDottedContainer: {
-    width: 12,
-    height: 24,
+    width: 12 * scale,
+    height: 24 * scale,
     alignItems: "center",
     justifyContent: "space-evenly",
-    marginVertical: 4,
+    marginVertical: 4 * scale,
   },
   dotLine: {
-    width: 2,
-    height: 4,
-    borderRadius: 1,
+    width: 2 * scale,
+    height: 4 * scale,
+    borderRadius: 1 * scale,
   },
   input: {
     flex: 1,
-    fontSize: 15,
+    fontSize: 15 * scale,
   },
   customDropdown: {
-    marginTop: 4,
-    borderRadius: 8,
+    marginTop: 4 * scale,
+    borderRadius: 8 * scale,
     borderWidth: 1,
     overflow: "hidden",
     position: "absolute",
-    top: 52,
+    top: 52 * scale,
     left: 0,
     right: 0,
     zIndex: 3000,
@@ -1479,42 +1499,42 @@ const styles = StyleSheet.create({
   customDropdownRow: {
     flexDirection: "row",
     alignItems: "center",
-    padding: 14,
+    padding: 14 * scale,
   },
   timeChipsContainer: {
     flexDirection: "row",
-    gap: 12,
+    gap: 12 * scale,
   },
   timeChip: {
     flex: 1,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    height: 44,
-    borderRadius: 22,
+    height: 44 * scale,
+    borderRadius: 22 * scale,
     borderWidth: 1,
   },
   timeChipText: {
-    fontSize: 14,
+    fontSize: 14 * scale,
     fontWeight: "600",
-    marginLeft: 6,
+    marginLeft: 6 * scale,
   },
   customTimeSelectors: {
     flexDirection: 'row',
-    gap: 12,
-    marginTop: 16,
+    gap: 12 * scale,
+    marginTop: 16 * scale,
   },
   timeSelectorBox: {
     flex: 1,
-    borderRadius: 16,
+    borderRadius: 16 * scale,
     borderWidth: 1,
-    padding: 12,
+    padding: 12 * scale,
     alignItems: 'center',
   },
   timeSelectorLabel: {
-    fontSize: 13,
+    fontSize: 13 * scale,
     fontWeight: '600',
-    marginBottom: 12,
+    marginBottom: 12 * scale,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
   },
@@ -1523,43 +1543,43 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     width: '100%',
-    paddingHorizontal: 4,
+    paddingHorizontal: 4 * scale,
   },
   stepperBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 36 * scale,
+    height: 36 * scale,
+    borderRadius: 18 * scale,
     alignItems: 'center',
     justifyContent: 'center',
   },
   stepperValue: {
-    fontSize: 20,
+    fontSize: 20 * scale,
     fontWeight: '800',
   },
   descriptionCard: {
-    borderRadius: 16,
+    borderRadius: 16 * scale,
     borderWidth: 1,
-    padding: 16,
-    minHeight: 120,
+    padding: 16 * scale,
+    minHeight: 120 * scale,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,
-    shadowRadius: 8,
+    shadowRadius: 8 * scale,
     elevation: 2,
   },
   textArea: {
     flex: 1,
-    fontSize: 15,
-    lineHeight: 22,
+    fontSize: 15 * scale,
+    lineHeight: 22 * scale,
   },
   footer: {
-    marginTop: 20,
+    marginTop: 20 * scale,
     width: '100%',
     alignItems: 'center',
   },
   disabledHint: {
-    marginTop: 12,
-    fontSize: 13,
+    marginTop: 12 * scale,
+    fontSize: 13 * scale,
     fontWeight: '500',
     textAlign: 'center',
   },
