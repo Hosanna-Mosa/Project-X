@@ -12,6 +12,7 @@ import {
 import { Ionicons, MaterialIcons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { Audio } from "expo-av";
 
 import { useDriverStore } from "@/store/driverStore";
 
@@ -23,9 +24,31 @@ export default function IncomingOrderModal() {
   const slideAnim = React.useRef(new Animated.Value(height)).current;
   const [secondsLeft, setSecondsLeft] = React.useState(15);
   const [showDeclineReasons, setShowDeclineReasons] = React.useState(false);
+  const [sound, setSound] = React.useState<Audio.Sound>();
+
+  async function playSound() {
+    try {
+      const { sound } = await Audio.Sound.createAsync(
+        require('@/assets/sounds/notification.mp3')
+      );
+      setSound(sound);
+      await sound.playAsync();
+    } catch (e) {
+      console.warn("Could not play sound", e);
+    }
+  }
+
+  useEffect(() => {
+    return sound
+      ? () => {
+          sound.unloadAsync();
+        }
+      : undefined;
+  }, [sound]);
 
   useEffect(() => {
     if (incomingOrder) {
+      playSound();
       const totalSeconds = incomingOrder.isReserved ? 60 : 15;
       setSecondsLeft(totalSeconds);
       const timer = setInterval(() => {
@@ -100,12 +123,12 @@ export default function IncomingOrderModal() {
           style={[
             styles.sheet,
             {
+              paddingTop: Math.max(insets.top, 16) + 20,
               paddingBottom: Math.max(insets.bottom, 16) + 12,
               transform: [{ translateY: slideAnim }],
             },
           ]}
         >
-          <View style={styles.handle} />
 
           <View style={styles.header}>
             <View style={styles.headerCopy}>
@@ -261,25 +284,13 @@ const styles = StyleSheet.create({
     justifyContent: "flex-end",
   },
   sheet: {
+    flex: 1,
     backgroundColor: "#fff",
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    maxHeight: height * 0.85,
     paddingHorizontal: 20,
-    paddingTop: 10,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: -2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 10,
     elevation: 20,
   },
   handle: {
-    alignSelf: "center",
-    width: 44,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: "#D1D5DB",
-    marginBottom: 16,
+    display: "none",
   },
   header: {
     flexDirection: "row",
@@ -330,7 +341,7 @@ const styles = StyleSheet.create({
     color: "#EF4444",
   },
   body: {
-    maxHeight: height * 0.46,
+    flex: 1,
   },
   bodyContent: {
     paddingBottom: 16,

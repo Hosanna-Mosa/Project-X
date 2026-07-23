@@ -10,17 +10,20 @@ import {
   Alert,
   Linking,
   Platform,
+  Image,
 } from "react-native";
 import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 import { moderateScale } from "react-native-size-matters";
 import MapView, { Marker, Polyline, Circle, PROVIDER_GOOGLE } from "react-native-maps";
-import { Feather, Ionicons } from "@expo/vector-icons";
+import { Ionicons, Feather, MaterialIcons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import * as Location from "expo-location";
 import { useDriverStore } from "@/store/driverStore";
 import Colors from "@/constants/colors";
 import { socketService } from "@/utils/socketService";
 import Constants from "expo-constants";
+
+const VEHICLE_BIKE_3D = require('@/assets/images/scooter_marker.png');
 
 const apiUrl = process.env.EXPO_PUBLIC_API_URL || Constants.expoConfig?.extra?.apiUrl;
 
@@ -168,13 +171,26 @@ export default function ActiveOrderScreen() {
         let loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
         const initialLoc = { lat: loc.coords.latitude, lng: loc.coords.longitude };
         setDriverLocation(initialLoc);
+        // Focus map to show full route
+        const coords: { latitude: number; longitude: number }[] = [];
+        coords.push({ latitude: initialLoc.lat, longitude: initialLoc.lng });
+        if (pickupStop) coords.push({ latitude: Number(pickupStop.lat), longitude: Number(pickupStop.lng) });
+        if (deliveryStop) coords.push({ latitude: Number(deliveryStop.lat), longitude: Number(deliveryStop.lng) });
         
-        // Focus map
-        mapRef.current?.animateToRegion({
-          latitude: initialLoc.lat,
-          longitude: initialLoc.lng,
-          latitudeDelta: 0.03,
-          longitudeDelta: 0.03,
+        setTimeout(() => {
+          if (coords.length > 1) {
+            mapRef.current?.fitToCoordinates(coords, {
+              edgePadding: { top: 80, right: 50, bottom: 400, left: 50 },
+              animated: true,
+            });
+          } else {
+            mapRef.current?.animateToRegion({
+              latitude: initialLoc.lat,
+              longitude: initialLoc.lng,
+              latitudeDelta: 0.03,
+              longitudeDelta: 0.03,
+            }, 500);
+          }
         }, 500);
       } else {
         // Fallback to Bangalore
@@ -265,13 +281,25 @@ export default function ActiveOrderScreen() {
         orderId: currentOrder.id,
       });
 
-      // Center map
-      mapRef.current?.animateToRegion({
-        latitude: curLat,
-        longitude: curLng,
-        latitudeDelta: 0.015,
-        longitudeDelta: 0.015,
-      }, 1000);
+      // Center map on route
+      const coords: { latitude: number; longitude: number }[] = [];
+      coords.push({ latitude: curLat, longitude: curLng });
+      if (pickupStop) coords.push({ latitude: Number(pickupStop.lat), longitude: Number(pickupStop.lng) });
+      if (deliveryStop) coords.push({ latitude: Number(deliveryStop.lat), longitude: Number(deliveryStop.lng) });
+      
+      if (coords.length > 1) {
+        mapRef.current?.fitToCoordinates(coords, {
+          edgePadding: { top: 80, right: 50, bottom: 400, left: 50 },
+          animated: true,
+        });
+      } else {
+        mapRef.current?.animateToRegion({
+          latitude: curLat,
+          longitude: curLng,
+          latitudeDelta: 0.015,
+          longitudeDelta: 0.015,
+        }, 1000);
+      }
 
       if (step >= totalSteps) {
         clearInterval(simInterval.current!);
@@ -622,7 +650,7 @@ export default function ActiveOrderScreen() {
         return (
           <View style={styles.stepContainer}>
             <View style={styles.stepHeaderRow}>
-              <Text style={styles.stepTitle}>Travel to Rider Pickup</Text>
+              <Text style={styles.stepTitle}>Travel to User Pickup</Text>
               {isSimulating && <View style={styles.pulseDot} />}
             </View>
 
@@ -653,7 +681,7 @@ export default function ActiveOrderScreen() {
 
             <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
               <View style={{ flex: 1, marginRight: 8 }}>
-                <Text style={styles.restaurantName}>Rider: {currentOrder.customerName || "Customer"}</Text>
+                <Text style={styles.restaurantName}>User: {currentOrder.customerName || "Customer"}</Text>
                 <Text style={styles.addressText}>{pickupStop?.address}</Text>
               </View>
               <View style={{ flexDirection: "row", gap: 12, alignItems: "center" }}>
@@ -1382,7 +1410,7 @@ export default function ActiveOrderScreen() {
           ref={mapRef}
           style={StyleSheet.absoluteFill}
           provider={PROVIDER_GOOGLE}
-          showsUserLocation={true}
+          showsUserLocation={false}
           initialRegion={{
             latitude: pickupStop?.lat || 12.9716,
             longitude: pickupStop?.lng || 77.5946,
@@ -1390,39 +1418,44 @@ export default function ActiveOrderScreen() {
             longitudeDelta: 0.035,
           }}
         >
-          {/* Pickup Stop Marker */}
+          {/* Pickup Stop Marker (User place) */}
           {(pickupStop != null && pickupStop.lat != null && pickupStop.lng != null) ? (
             <Marker coordinate={{ latitude: Number(pickupStop.lat), longitude: Number(pickupStop.lng) }}>
-              <View style={styles.restaurantMarker}>
-                <Ionicons name="restaurant" size={16} color="#fff" />
+              <View style={styles.userMarkerWrap}>
+                <View style={styles.userMarkerBadge}>
+                  <Ionicons name="person" size={14} color="#fff" />
+                </View>
               </View>
             </Marker>
           ) : null}
 
-          {/* Delivery Stop Marker */}
+          {/* Delivery Stop Marker (Destination) */}
           {(deliveryStop != null && deliveryStop.lat != null && deliveryStop.lng != null) ? (
             <Marker coordinate={{ latitude: Number(deliveryStop.lat), longitude: Number(deliveryStop.lng) }}>
-              <View style={styles.userMarker}>
-                <Ionicons name="person" size={16} color="#fff" />
-              </View>
+              <View style={styles.redMarkerDot} />
             </Marker>
           ) : null}
 
-          {/* Driver Location Marker */}
+          {/* Driver Location Marker (Scooty) */}
           {(driverLocation != null && driverLocation.lat != null && driverLocation.lng != null) ? (
-            <Marker coordinate={{ latitude: Number(driverLocation.lat), longitude: Number(driverLocation.lng) }}>
-              <View style={styles.driverMarker}>
-                <Ionicons name="bicycle" size={18} color="#fff" />
-              </View>
+            <Marker 
+              coordinate={{ latitude: Number(driverLocation.lat), longitude: Number(driverLocation.lng) }}
+              anchor={{ x: 0.5, y: 0.5 }}
+            >
+              <Image 
+                source={VEHICLE_BIKE_3D}
+                style={{ width: 48, height: 48 }}
+                resizeMode="contain"
+              />
             </Marker>
           ) : null}
 
           {/* Dashed line along the road from driver to customer */}
-          {(currentOrder.polyline && ["en_route_delivery", "arrived_delivery"].includes(currentOrder.status.toLowerCase())) ? (
+          {currentOrder.polyline ? (
             <Polyline
               coordinates={decodePolyline(currentOrder.polyline)}
               strokeWidth={4}
-              strokeColor="#00B7EB"
+              strokeColor="#10B981"
             />
           ) : null}
         </MapView>
@@ -1512,38 +1545,35 @@ const styles = StyleSheet.create({
   headerTitle: { fontSize: moderateScale(17), fontWeight: "700", color: Colors.text },
   headerRightSpacer: { width: 32, height: 32 },
   mapContainer: { flex: 1 },
-  userMarker: {
-    width: moderateScale(32),
-    height: moderateScale(32),
-    borderRadius: moderateScale(16),
-    backgroundColor: "#3B82F6",
-    alignItems: "center",
-    justifyContent: "center",
-    borderWidth: 2,
-    borderColor: "#fff",
-    elevation: 4,
+  userMarkerWrap: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: 40,
+    height: 40,
   },
-  restaurantMarker: {
-    width: moderateScale(32),
-    height: moderateScale(32),
-    borderRadius: moderateScale(16),
-    backgroundColor: "#00B7EB",
-    alignItems: "center",
-    justifyContent: "center",
+  userMarkerBadge: {
+    backgroundColor: '#10B981',
+    width: 26,
+    height: 26,
+    borderRadius: 13,
     borderWidth: 2,
-    borderColor: "#fff",
+    borderColor: '#fff',
     elevation: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 3,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  driverMarker: {
-    width: moderateScale(36),
-    height: moderateScale(36),
-    borderRadius: moderateScale(18),
-    backgroundColor: "#10B981",
-    alignItems: "center",
-    justifyContent: "center",
+  redMarkerDot: {
+    width: 14,
+    height: 14,
+    borderRadius: 7,
+    backgroundColor: '#EF4444',
     borderWidth: 2,
-    borderColor: "#fff",
-    elevation: 6,
+    borderColor: '#fff',
+    elevation: 4,
   },
   bottomCard: {
     backgroundColor: Colors.surface,

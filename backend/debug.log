@@ -931,3 +931,52 @@ Driver 6a5db6a62b4c19e29ec7d8ab has homeMode OFF. Adding unconditionally.
   Dropoff: [81.841671, 17.0596495]
   Distances: d_h = 46516.4m, d_p = 14007.4m, p_d = 615.3m, drop_h = 37033.6m
   -> Detour overhead: 5140.0m, Max allowed detour: 13954.9m. Result: true
+[DETOUR CHECK] Driver: 6a42577448525b572677670d
+  Driver: [81.7835127, 16.9524636]
+  Home: [82.1842504, 17.120459]
+  Pickup: [81.7804732, 17.0050454]
+  Dropoff: [81.7804732, 17.0050454]
+  Distances: d_h = 46519.9m, d_p = 5855.8m, p_d = 0.0m, drop_h = 44799.2m
+  -> Detour overhead: 4135.1m, Max allowed detour: 13956.0m. Result: true
+[DETOUR CHECK] Driver: 6a42577448525b572677670d
+  Driver: [81.8006234, 16.9966113]
+  Home: [82.1842504, 17.120459]
+  Pickup: [81.8437224, 17.0448111]
+  Dropoff: [81.8437224, 17.0448111]
+  Distances: d_h = 43043.1m, d_p = 7051.5m, p_d = 0.0m, drop_h = 37159.0m
+  -> Detour overhead: 1167.5m, Max allowed detour: 12912.9m. Result: true
+[DETOUR CHECK] Driver: 6a42577448525b572677670d
+  Driver: [81.8006234, 16.9966113]
+  Home: [82.1842504, 17.120459]
+  Pickup: [81.7760462, 17.0097255]
+  Dropoff: [81.7760462, 17.0097255]
+  Distances: d_h = 43043.1m, d_p = 2992.7m, p_d = 0.0m, drop_h = 45104.9m
+  -> FILTERED OUT: Dropoff is further from home than driver starting point (drop_h: 45104.9m >= d_h: 43043.1m)
+[DETOUR CHECK] Driver: 6a42577448525b572677670d
+  Driver: [81.8006234, 16.9966113]
+  Home: [82.1842504, 17.120459]
+  Pickup: [81.7760462, 17.0097255]
+  Dropoff: [81.7760462, 17.0097255]
+  Distances: d_h = 43043.1m, d_p = 2992.7m, p_d = 0.0m, drop_h = 45104.9m
+  -> FILTERED OUT: Dropoff is further from home than driver starting point (drop_h: 45104.9m >= d_h: 43043.1m)
+[DETOUR CHECK] Driver: 6a42577448525b572677670d
+  Driver: [81.8006234, 16.9966113]
+  Home: [82.1842504, 17.120459]
+  Pickup: [81.7760462, 17.0097255]
+  Dropoff: [81.7760462, 17.0097255]
+  Distances: d_h = 43043.1m, d_p = 2992.7m, p_d = 0.0m, drop_h = 45104.9m
+  -> FILTERED OUT: Dropoff is further from home than driver starting point (drop_h: 45104.9m >= d_h: 43043.1m)
+[DETOUR CHECK] Driver: 6a42577448525b572677670d
+  Driver: [81.8006234, 16.9966113]
+  Home: [82.1842504, 17.120459]
+  Pickup: [81.7760462, 17.0097255]
+  Dropoff: [81.7760462, 17.0097255]
+  Distances: d_h = 43043.1m, d_p = 2992.7m, p_d = 0.0m, drop_h = 45104.9m
+  -> FILTERED OUT: Dropoff is further from home than driver starting point (drop_h: 45104.9m >= d_h: 43043.1m)
+[DETOUR CHECK] Driver: 6a42577448525b572677670d
+  Driver: [81.7834091, 16.9524922]
+  Home: [82.1842504, 17.120459]
+  Pickup: [81.7760462, 17.0097255]
+  Dropoff: [81.7760462, 17.0097255]
+  Distances: d_h = 46528.7m, d_p = 6412.0m, p_d = 0.0m, drop_h = 45104.9m
+  -> Detour overhead: 4988.2m, Max allowed detour: 13958.6m. Result: true

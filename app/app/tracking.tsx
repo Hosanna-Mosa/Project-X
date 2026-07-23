@@ -416,8 +416,8 @@ export default function TrackingScreen() {
             if (order.driver) {
               setDriver({
                 id: order.driver._id,
-                name: order.driver.name || "Driver",
-                phone: order.driver.phone || "",
+                name: order.driver.name || order.driver.user?.name || order.driver.firstName || "Driver",
+                phone: order.driver.phone || order.driver.user?.phone || "",
                 vehicle: order.driver.vehicleType || "unknown",
               });
             }
