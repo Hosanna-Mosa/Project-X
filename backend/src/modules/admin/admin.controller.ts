@@ -543,11 +543,11 @@ export class AdminController {
       });
 
       const now = new Date();
-      const year = String(now.getFullYear()).slice(-2);
-      const month = String(now.getMonth() + 1).padStart(2, '0');
       const day = String(now.getDate()).padStart(2, '0');
-      const random4Digits = Math.floor(1000 + Math.random() * 9000).toString();
-      const orderId = `FLR-${year}${month}${day}-${random4Digits}`;
+      const month = String(now.getMonth() + 1).padStart(2, '0');
+      const year = String(now.getFullYear()).slice(-2);
+      const random6Digits = Math.floor(100000 + Math.random() * 900000).toString();
+      const orderId = `F${day}${month}${year}${random6Digits}`;
       const order = new Order({
         _id: orderId,
         user: customer?._id,

@@ -5,6 +5,7 @@ import Order, { OrderStatus, ServiceType } from "../../database/models/Order";
 import Driver from "../../database/models/Driver";
 import Coupon from "../../database/models/Coupon";
 import { ValidationError, NotFoundError, UnauthorizedError, ConflictError } from "../../utils/errors";
+import { InvoiceService } from "../../services/invoice.service";
 
 const ordersService = new OrdersService();
 
@@ -101,6 +102,43 @@ export class OrdersController {
       }
 
       return res.json(order);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async getInvoice(req: Request, res: Response, next: NextFunction) {
+    try {
+      const { id } = req.params;
+      const order = await ordersService.getOrderById(id as string);
+
+      if (!order) {
+        throw new NotFoundError("Order not found");
+      }
+
+      const populatedOrder = await Order.findById(id)
+        .populate("user")
+        .populate({
+          path: "driver",
+          populate: { path: "user" }
+        })
+        .populate("vendor");
+
+      if (!populatedOrder) {
+        throw new NotFoundError("Order not found");
+      }
+
+      let invoiceHtml = "";
+      if (populatedOrder.serviceType === ServiceType.DELIVERY) {
+        invoiceHtml = InvoiceService.getInstance().generateDeliveryInvoiceHtml(populatedOrder);
+      } else if (populatedOrder.serviceType === ServiceType.HELPER) {
+        invoiceHtml = InvoiceService.getInstance().generateTaskInvoiceHtml(populatedOrder);
+      } else {
+        invoiceHtml = InvoiceService.getInstance().generateRideInvoiceHtml(populatedOrder);
+      }
+
+      res.setHeader("Content-Type", "text/html");
+      return res.send(invoiceHtml);
     } catch (error) {
       next(error);
     }
