@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Ride Invoice - Flavour Rides</title>
+  <style>
+    body { font-family: Arial, sans-serif; font-size: 11px; color: #333333; margin: 0; padding: 20px; line-height: 1.4; }
+    .page-container { width: 620px; margin: 0 auto 30px auto; background-color: #ffffff; border: 1px solid #dddddd; padding: 30px; box-sizing: border-box; }
+    .header-table { width: 100%; margin-bottom: 20px; }
+    .logo-text { color: #0f172a; font-size: 20px; font-weight: bold; text-align: right; text-transform: uppercase; }
+    .logo-subtext { color: #f59e0b; font-size: 10px; text-align: right; font-weight: bold; }
+    .page-title { font-size: 16px; font-weight: bold; margin: 0; }
+    .ride-id-text { font-size: 10px; color: #666666; margin-top: 5px; }
+    .summary-section { text-align: center; margin: 20px 0; }
+    .total-title { font-size: 12px; color: #666666; margin-bottom: 5px; }
+    .total-amount { font-size: 26px; font-weight: bold; color: #000000; }
+    .map-mock { border: 1px solid #e2e8f0; border-radius: 8px; margin: 20px 0; padding: 10px; background-color: #f8fafc; display: flex; justify-content: space-between; align-items: center; }
+    .map-placeholder { width: 65%; height: 120px; background: linear-gradient(45deg, #e2e8f0 25%, #cbd5e1 25%, #cbd5e1 50%, #e2e8f0 50%, #e2e8f0 75%, #cbd5e1 75%, #cbd5e1 100%); background-size: 40px 40px; border-radius: 4px; display: flex; align-items: center; justify-content: center; color: #475569; font-weight: bold; border: 1px solid #cbd5e1; }
+    .metrics-col { width: 30%; text-align: center; }
+    .metric-value { font-size: 18px; font-weight: bold; color: #0f172a; margin-bottom: 2px; }
+    .metric-label { font-size: 9px; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 12px; }
+    .address-list { margin: 20px 0; padding-left: 15px; border-left: 2px solid #cbd5e1; }
+    .address-item { position: relative; margin-bottom: 15px; padding-left: 10px; }
+    .address-item:last-child { margin-bottom: 0; }
+    .address-item::before { content: ''; position: absolute; left: -15px; top: 3px; width: 8px; height: 8px; border-radius: 50%; }
+    .address-item.pickup::before { background-color: #22c55e; }
+    .address-item.drop::before { background-color: #ef4444; }
+    .section-title { font-size: 12px; font-weight: bold; border-bottom: 1px solid #e2e8f0; padding-bottom: 6px; margin: 25px 0 10px 0; }
+    .bill-row { display: flex; justify-content: space-between; padding: 6px 0; font-size: 11px; }
+    .bill-row.total { font-weight: bold; border-top: 1px solid #e2e8f0; margin-top: 5px; padding-top: 8px; font-size: 12px; }
+    .table-details { width: 100%; border-collapse: collapse; margin: 15px 0; }
+    .table-details td { padding: 6px 0; border-bottom: 1px solid #f1f5f9; vertical-align: top; }
+    .table-details td.label-col { color: #666666; width: 40%; }
+    .table-details td.val-col { font-weight: bold; text-align: right; }
+    .legal-footer { font-size: 9px; color: #94a3b8; text-align: center; line-height: 1.5; margin-top: 30px; border-top: 1px solid #f1f5f9; padding-top: 15px; }
+    .provider-section { display: flex; justify-content: space-between; margin-bottom: 20px; }
+    .provider-info { width: 60%; line-height: 1.4; }
+    .qr-container { width: 80px; height: 80px; background-color: #eeeeee; border: 1px solid #cccccc; display: flex; align-items: center; justify-content: center; font-size: 8px; color: #666666; text-align: center; }
+  </style>
+</head>
+<body>
+
+  <!-- PAGE 1: Payment Summary -->
+  <div class="page-container">
+    <table class="header-table">
+      <tr>
+        <td>
+          <h1 class="page-title">Payment Summary</h1>
+          <div class="ride-id-text">Ride ID: RD17808812185935874</div>
+          <div class="ride-id-text">Time of Ride: Jun 8th 2026, 6:49 AM</div>
+        </td>
+        <td>
+          <div class="logo-text">Flavour Rides</div>
+          <div class="logo-subtext">FLAVOUR GROUP</div>
+        </td>
+      </tr>
+    </table>
+
+    <div class="summary-section">
+      <div class="total-title">Total</div>
+      <div class="total-amount">₹ 20.00</div>
+    </div>
+
+    <div class="map-mock">
+      <div class="map-placeholder">ROUTE MAP PREVIEW</div>
+      <div class="metrics-col">
+        <div class="metric-value">0.39 kms</div>
+        <div class="metric-label">Distance</div>
+        <div class="metric-value">1.98 mins</div>
+        <div class="metric-label">Duration</div>
+      </div>
+    </div>
+
+    <div class="address-list">
+      <div class="address-item pickup">
+        <strong>Pickup:</strong> RK Beach, Beach Road, Visakhapatnam, Andhra Pradesh, India
+      </div>
+      <div class="address-item drop">
+        <strong>Drop:</strong> 15-3-17, Krishna Nagar, Maharani Peta, Visakhapatnam, Andhra Pradesh 530002, India
+      </div>
+    </div>
+
+    <div class="section-title">Bill Details</div>
+    <div class="bill-row">
+      <span>Ride Charge</span>
+      <span>₹ 13.00</span>
+    </div>
+    <div class="bill-row">
+      <span>Booking Fees & Convenience Charges</span>
+      <span>₹ 7.00</span>
+    </div>
+    <div class="bill-row total">
+      <span>Total Amount</span>
+      <span>₹ 20.00</span>
+    </div>
+    <div style="font-size: 9px; color: #94a3b8; text-align: right; margin-top: 2px;">(Inclusive of Taxes)</div>
+
+    <div class="section-title">You Paid Using</div>
+    <div class="bill-row">
+      <span>Cash</span>
+      <span>₹ 20.00</span>
+    </div>
+  </div>
+
+
+  <!-- PAGE 2: Driver Tax Invoice (Ride Charge) -->
+  <div class="page-container">
+    <table class="header-table">
+      <tr>
+        <td>
+          <h1 class="page-title">Tax Invoice</h1>
+          <div class="ride-id-text">Ride ID: RD17808812185935874</div>
+        </td>
+        <td>
+          <div class="logo-text">Flavour Rides</div>
+          <div class="logo-subtext">FLAVOUR GROUP</div>
+        </td>
+      </tr>
+    </table>
+
+    <table class="table-details">
+      <tr>
+        <td class="label-col">Invoice No.</td>
+        <td class="val-col">2627AD0012635874</td>
+      </tr>
+      <tr>
+        <td class="label-col">Invoice Date</td>
+        <td class="val-col">Jun 8th 2026, 6:49 AM</td>
+      </tr>
+      <tr>
+        <td class="label-col">State</td>
+        <td class="val-col">Andhra Pradesh</td>
+      </tr>
+      <tr>
+        <td class="label-col">Tax Category</td>
+        <td class="val-col" style="font-size: 10px;">Other local transportation services of passengers n.e.c. (996419)</td>
+      </tr>
+      <tr>
+        <td class="label-col">Place of Supply</td>
+        <td class="val-col">Andhra Pradesh</td>
+      </tr>
+      <tr>
+        <td class="label-col">GST Number</td>
+        <td class="val-col">37AAHCR1710J1ZF</td>
+      </tr>
+      <tr>
+        <td class="label-col">Vehicle Number</td>
+        <td class="val-col">AP39RN7856</td>
+      </tr>
+      <tr>
+        <td class="label-col">Captain Name</td>
+        <td class="val-col">Dinesh Nidadavolu</td>
+      </tr>
+      <tr>
+        <td class="label-col">Customer Name</td>
+        <td class="val-col">Suman SB</td>
+      </tr>
+      <tr>
+        <td class="label-col">Customer Pick Up Address</td>
+        <td class="val-col" style="font-weight: normal; font-size: 10px;">RK Beach, Beach Road, Visakhapatnam, Andhra Pradesh, India</td>
+      </tr>
+    </table>
+
+    <div class="section-title">Bill Details</div>
+    <div class="bill-row">
+      <span>Captain Fee</span>
+      <span>₹ 12.38</span>
+    </div>
+    <div class="bill-row">
+      <span>CGST (2.5%)</span>
+      <span>₹ 0.31</span>
+    </div>
+    <div class="bill-row">
+      <span>SGST (2.5%)</span>
+      <span>₹ 0.31</span>
+    </div>
+    <div class="bill-row">
+      <span>IGST (0%)</span>
+      <span>₹ 0.00</span>
+    </div>
+    <div class="bill-row total">
+      <span>Ride Charge</span>
+      <span>₹ 13.00</span>
+    </div>
+    <div style="font-size: 9px; color: #94a3b8; text-align: right; margin-top: 2px;">(Inclusive of Taxes)</div>
+
+    <div class="legal-footer">
+      This document is issued by Transport Service Provider and not by Flavour Private Limited (Flavour Rides). Flavour Rides acts only as an Electronic Commerce Operator for the transportation services.
+    </div>
+  </div>
+
+
+  <!-- PAGE 3: Platform Tax Invoice (Booking & Convenience Fee) -->
+  <div class="page-container">
+    <table class="header-table">
+      <tr>
+        <td>
+          <h1 class="page-title">Tax Invoice</h1>
+          <div class="ride-id-text">Ride ID: RD17808812185935874</div>
+        </td>
+        <td>
+          <div class="logo-text">Flavour Rides</div>
+          <div class="logo-subtext">FLAVOUR GROUP</div>
+        </td>
+      </tr>
+    </table>
+
+    <div class="provider-section">
+      <div class="provider-info">
+        <strong>Flavour Private Limited</strong><br/>
+        D No 48-11-2-10 A, Shakamuri Shivayya Street,<br/>
+        Currency Nagar, Vijaywada, Andhra Pradesh, 520008
+      </div>
+      <div class="qr-container">
+        QR CODE
+      </div>
+    </div>
+
+    <div style="margin-bottom: 20px; line-height: 1.4;">
+      <strong>Bill To:</strong><br/>
+      Suman SB<br/>
+      RK Beach, Beach Road, Visakhapatnam, Andhra Pradesh, India
+    </div>
+
+    <table class="table-details">
+      <tr>
+        <td class="label-col">Invoice No.</td>
+        <td class="val-col">2627AD0012635874</td>
+      </tr>
+      <tr>
+        <td class="label-col">Invoice Date</td>
+        <td class="val-col">Jun 8th 2026, 6:49 AM</td>
+      </tr>
+      <tr>
+        <td class="label-col">Tax Category</td>
+        <td class="val-col">Other services n.e.c. (999799)</td>
+      </tr>
+      <tr>
+        <td class="label-col">Place of Supply</td>
+        <td class="val-col">Andhra Pradesh</td>
+      </tr>
+      <tr>
+        <td class="label-col">GST</td>
+        <td class="val-col">37AAHCR1710J1ZF</td>
+      </tr>
+    </table>
+
+    <div class="section-title">Bill Details</div>
+    <div class="bill-row">
+      <span>Booking Fee</span>
+      <span>₹ 1.00</span>
+    </div>
+    <div class="bill-row">
+      <span>Convenience Charges</span>
+      <span>₹ 4.93</span>
+    </div>
+    <div class="bill-row" style="font-weight: bold; border-top: 1px solid #f1f5f9; padding-top: 4px; margin-top: 4px;">
+      <span>Sub Total</span>
+      <span>₹ 5.93</span>
+    </div>
+    <div class="bill-row">
+      <span>CGST (9%)</span>
+      <span>₹ 0.54</span>
+    </div>
+    <div class="bill-row">
+      <span>SGST (9%)</span>
+      <span>₹ 0.54</span>
+    </div>
+    <div class="bill-row">
+      <span>IGST (0%)</span>
+      <span>₹ 0.00</span>
+    </div>
+    <div class="bill-row total">
+      <span>Final Amount</span>
+      <span>₹ 7.00</span>
+    </div>
+    <div style="font-size: 9px; color: #94a3b8; text-align: right; margin-top: 2px;">(Inclusive of Taxes)</div>
+
+    <div class="legal-footer">
+      This is a system generated invoice and hence no signature required.<br/>
+      Thank you Suman SB
+    </div>
+  </div>
+
+</body>
+</html>
