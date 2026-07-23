@@ -205,7 +205,7 @@ const ServiceCategoryNew = ({ icon, label, active, onPress, iconFamily = 'Ionico
           <Ionicons name={icon} size={26} color="#6D28D9" />
         }
       </View>
-      <Text style={{ marginTop: 10, fontSize: 11, fontWeight: '800', color: '#374151', letterSpacing: 0.5 }}>{label}</Text>
+      <Text style={{ marginTop: 10, fontSize: 11, fontWeight: '800', color: active ? '#7C3AED' : '#374151', letterSpacing: 0.5 }}>{label}</Text>
     </TouchableOpacity>
   );
 };
@@ -784,6 +784,10 @@ export default function HomeScreen() {
     setPage(1);
     setHasMore(true);
     setActiveService(service);
+    
+    // Auto scroll the banner carousel to match selected service
+    const index = service === 'Food' ? 0 : 3;
+    carouselRef.current?.scrollTo({ x: index * screenWidth, animated: true });
   };
 
   const applyDistanceFilter = () => {
@@ -900,7 +904,8 @@ export default function HomeScreen() {
   };
 
   const renderHeader = () => {
-    if (!showCategories || (!showHomeSkeleton && visibleItems.length === 0)) return null;
+    const hasRidersButNoVendors = !showHomeSkeleton && !loadingDrivers && nearbyDriversCount > 0 && visibleItems.length === 0;
+    if (!showCategories || ((!showHomeSkeleton && visibleItems.length === 0) && !hasRidersButNoVendors)) return null;
 
     const getParallaxStyle = (index: number) => {
       const inputRange = [(index - 1) * screenWidth, index * screenWidth, (index + 1) * screenWidth];
@@ -1068,8 +1073,8 @@ export default function HomeScreen() {
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 16, marginTop: 35 }}>
           <ServiceCategoryNew icon="bag-outline" label="TASK" active={false} onPress={() => { console.log(">>> [CLICK] TASK button pressed (main header)"); router.push("/helper-task"); }} />
           <ServiceCategoryNew icon="car-outline" label="RIDES" active={false} onPress={() => { console.log(">>> [CLICK] RIDES button pressed (main header)"); router.push("/all-services"); }} />
-          <ServiceCategoryNew icon="fast-food-outline" label="FOOD" active={false} onPress={() => { console.log(">>> [CLICK] FOOD button pressed (main header)"); handleServiceSwitch('Food'); }} />
-          <ServiceCategoryNew icon="food-steak" iconFamily="MaterialCommunityIcons" label="MEAT" active={false} onPress={() => { console.log(">>> [CLICK] MEAT button pressed (main header)"); handleServiceSwitch('Meat'); }} />
+          <ServiceCategoryNew icon="fast-food-outline" label="FOOD" active={activeService === 'Food'} onPress={() => { console.log(">>> [CLICK] FOOD button pressed (main header)"); handleServiceSwitch('Food'); }} />
+          <ServiceCategoryNew icon="food-steak" iconFamily="MaterialCommunityIcons" label="MEAT" active={activeService === 'Meat'} onPress={() => { console.log(">>> [CLICK] MEAT button pressed (main header)"); handleServiceSwitch('Meat'); }} />
         </View>
 
         <View style={{ height: 1, backgroundColor: '#E5E7EB', marginHorizontal: 16, marginTop: 24, marginBottom: 24 }} />
@@ -1093,44 +1098,76 @@ export default function HomeScreen() {
           </Text>
         </View>
 
-        {/* Tag Pills */}
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 16, paddingVertical: 16 }}>
-          <View>
-            <View style={{ flexDirection: 'row', gap: 10, marginBottom: 12 }}>
-              {popularTags.slice(0, 7).map((tag, idx) => <TagPill key={idx} tag={tag} />)}
-            </View>
-            <View style={{ flexDirection: 'row', gap: 10 }}>
-              {popularTags.slice(7, 14).map((tag, idx) => <TagPill key={idx} tag={tag} />)}
-            </View>
+        {/* Conditionally show warning and block all products/categories */}
+        {hasRidersButNoVendors ? (
+          <View style={{ 
+            margin: 16, 
+            marginTop: 24, 
+            alignItems: 'center', 
+            padding: 24, 
+            backgroundColor: '#F9FAFB', 
+            borderRadius: 24, 
+            borderWidth: 1, 
+            borderColor: '#E5E7EB',
+            shadowColor: '#000',
+            shadowOffset: { width: 0, height: 2 },
+            shadowOpacity: 0.05,
+            shadowRadius: 8,
+            elevation: 2
+          }}>
+            <Ionicons name={activeService === 'Meat' ? "basket" : "fast-food"} size={48} color="#7C3AED" style={{ marginBottom: 12 }} />
+            <Text style={{ fontSize: 18, fontWeight: '800', color: '#1F2937', textAlign: 'center' }}>
+              {activeService === 'Meat' ? "No Meat Available" : "No Food Available"}
+            </Text>
+            <Text style={{ fontSize: 13, color: '#4B5563', textAlign: 'center', marginTop: 6, fontWeight: '600', lineHeight: 18 }}>
+              {activeService === 'Meat'
+                ? "Riders are online, but there are no meat shops or outlets serving this zone currently."
+                : "Riders are online, but there are no restaurants or vendors serving this zone currently."
+              }
+            </Text>
           </View>
-        </ScrollView>
-
-        {/* 149 Store */}
-        {store149Items.length > 0 && (
-          <View style={{ margin: 16, backgroundColor: '#F5F3FF', borderRadius: 24, padding: 16 }}>
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+        ) : (
+          <>
+            {/* Tag Pills */}
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 16, paddingVertical: 16 }}>
               <View>
-                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                  <View style={{ backgroundColor: '#7C3AED', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4 }}>
-                    <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 16 }}>149</Text>
-                  </View>
-                  <Text style={{ fontSize: 20, fontWeight: '800', marginLeft: 8, color: '#111827' }}>store</Text>
+                <View style={{ flexDirection: 'row', gap: 10, marginBottom: 12 }}>
+                  {popularTags.slice(0, 7).map((tag, idx) => <TagPill key={idx} tag={tag} />)}
                 </View>
-                <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4 }}>
-                  <Ionicons name="checkmark-circle" size={14} color="#7C3AED" />
-                  <Text style={{ color: '#6D28D9', fontSize: 12, marginLeft: 4, fontWeight: '600' }}>Meals at ₹149 + Free Delivery</Text>
+                <View style={{ flexDirection: 'row', gap: 10 }}>
+                  {popularTags.slice(7, 14).map((tag, idx) => <TagPill key={idx} tag={tag} />)}
                 </View>
               </View>
-              <TouchableOpacity style={{ flexDirection: 'row', alignItems: 'center' }} onPress={() => router.push("/149-store")}>
-                <Text style={{ color: '#7C3AED', fontSize: 14, fontWeight: '700' }}>View All</Text>
-                <Ionicons name="chevron-forward" size={14} color="#7C3AED" />
-              </TouchableOpacity>
-            </View>
-
-            <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-              {store149Items.map(item => <Store149Card key={item._id} item={item} />)}
             </ScrollView>
-          </View>
+
+            {/* 149 Store */}
+            {store149Items.length > 0 && (
+              <View style={{ margin: 16, backgroundColor: '#F5F3FF', borderRadius: 24, padding: 16 }}>
+                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+                  <View>
+                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                      <View style={{ backgroundColor: '#7C3AED', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4 }}>
+                        <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 16 }}>149</Text>
+                      </View>
+                      <Text style={{ fontSize: 20, fontWeight: '800', marginLeft: 8, color: '#111827' }}>store</Text>
+                    </View>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4 }}>
+                      <Ionicons name="checkmark-circle" size={14} color="#7C3AED" />
+                      <Text style={{ color: '#6D28D9', fontSize: 12, marginLeft: 4, fontWeight: '600' }}>Meals at ₹149 + Free Delivery</Text>
+                    </View>
+                  </View>
+                  <TouchableOpacity style={{ flexDirection: 'row', alignItems: 'center' }} onPress={() => router.push("/149-store")}>
+                    <Text style={{ color: '#7C3AED', fontSize: 14, fontWeight: '700' }}>View All</Text>
+                    <Ionicons name="chevron-forward" size={14} color="#7C3AED" />
+                  </TouchableOpacity>
+                </View>
+
+                <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                  {store149Items.map(item => <Store149Card key={item._id} item={item} />)}
+                </ScrollView>
+              </View>
+            )}
+          </>
         )}
       </View>
     );
@@ -1243,8 +1280,8 @@ export default function HomeScreen() {
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 16 }}>
             <ServiceCategoryNew icon="bag-outline" label="TASK" active={false} onPress={() => { console.log(">>> [CLICK] TASK button pressed (sticky header)"); router.push("/helper-task"); }} />
             <ServiceCategoryNew icon="car-outline" label="RIDES" active={false} onPress={() => { console.log(">>> [CLICK] RIDES button pressed (sticky header)"); router.push("/all-services"); }} />
-            <ServiceCategoryNew icon="fast-food-outline" label="FOOD" active={false} onPress={() => { console.log(">>> [CLICK] FOOD button pressed (sticky header)"); handleServiceSwitch('Food'); }} />
-            <ServiceCategoryNew icon="food-steak" iconFamily="MaterialCommunityIcons" label="MEAT" active={false} onPress={() => { console.log(">>> [CLICK] MEAT button pressed (sticky header)"); handleServiceSwitch('Meat'); }} />
+            <ServiceCategoryNew icon="fast-food-outline" label="FOOD" active={activeService === 'Food'} onPress={() => { console.log(">>> [CLICK] FOOD button pressed (sticky header)"); handleServiceSwitch('Food'); }} />
+            <ServiceCategoryNew icon="food-steak" iconFamily="MaterialCommunityIcons" label="MEAT" active={activeService === 'Meat'} onPress={() => { console.log(">>> [CLICK] MEAT button pressed (sticky header)"); handleServiceSwitch('Meat'); }} />
           </View>
         </Animated.View>
       )}
