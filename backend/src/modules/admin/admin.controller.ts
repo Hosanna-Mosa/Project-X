@@ -886,7 +886,7 @@ export class AdminController {
           const { SocketManager } = require("../../sockets/socket.manager");
           const socketManager = SocketManager.getInstance();
           const redisClient = socketManager ? socketManager.redisClient : null;
-          if (redisClient) {
+          if (redisClient && redisClient.isReady) {
             await redisClient.geoAdd("drivers:locations", {
               longitude: lng,
               latitude: lat,
@@ -961,8 +961,8 @@ export class AdminController {
         const { SocketManager } = require("../../sockets/socket.manager");
         const socketManager = SocketManager.getInstance();
         const redisClient = socketManager ? socketManager.redisClient : null;
-        if (redisClient) {
-          if (latitude !== undefined && longitude !== undefined) {
+        if (redisClient && redisClient.isReady) {
+          if (status === "ONLINE" && driver.currentLocation) {
             await redisClient.geoAdd("drivers:locations", {
               longitude: Number(longitude),
               latitude: Number(latitude),
@@ -993,7 +993,7 @@ export class AdminController {
         const { SocketManager } = require("../../sockets/socket.manager");
         const socketManager = SocketManager.getInstance();
         const redisClient = socketManager ? socketManager.redisClient : null;
-        if (redisClient) {
+        if (redisClient && redisClient.isReady) {
           for (const driverId of devDriverIds) {
             await redisClient.geoRemove("drivers:locations", driverId.toString());
             await redisClient.del(`driver_status:${driverId}`);

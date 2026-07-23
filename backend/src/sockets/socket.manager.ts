@@ -262,7 +262,7 @@ export class SocketManager {
           `driverOnline=${this.getUserSocketStatus(data.driverId).online}`
         );
         
-        if (this.redisClient) {
+        if (this.redisClient && this.redisClient.isReady) {
           try {
             await this.redisClient.geoAdd("drivers:locations", {
               longitude: Number(data.lng),
@@ -487,7 +487,7 @@ export class SocketManager {
               await driver.save();
               console.log(`🔌 [SOCKET][DRIVER][OFFLINE] Driver ${driver._id} (${authUser?.name || "Driver"}) marked OFFLINE on socket disconnect.`);
 
-              if (this.redisClient) {
+              if (this.redisClient && this.redisClient.isReady) {
                 try {
                   await this.redisClient.zRem("drivers:locations", driver._id.toString());
                   await this.redisClient.del(`driver_status:${driver._id.toString()}`);
