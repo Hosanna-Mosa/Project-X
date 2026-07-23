@@ -13,6 +13,7 @@ import { ZonesService } from "../zones/zones.service";
 import Zone from "../../database/models/Zone";
 import { ValidationError } from "../../utils/errors";
 import { NotificationService } from "../../services/notification.service";
+import { InvoiceService } from "../../services/invoice.service";
 
 export class OrdersService {
   private routingService = new RoutingService();
@@ -131,17 +132,25 @@ export class OrdersService {
     const deliveryOtp = Math.floor(1000 + Math.random() * 9000).toString();
     const restaurantPickupCode = Math.floor(1000 + Math.random() * 9000).toString();
 
-    const generateIndustrialOrderId = () => {
+    const generateCustomOrderId = (serviceType: ServiceType) => {
       const date = new Date();
-      const year = String(date.getFullYear()).slice(-2);
-      const month = String(date.getMonth() + 1).padStart(2, '0');
       const day = String(date.getDate()).padStart(2, '0');
-      const random4Digits = Math.floor(1000 + Math.random() * 9000).toString();
-      return `FLR-${year}${month}${day}-${random4Digits}`;
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const year = String(date.getFullYear()).slice(-2);
+      const random6Digits = Math.floor(100000 + Math.random() * 900000).toString();
+      
+      let prefix = "F"; // Food Delivery ID
+      if (serviceType === ServiceType.HELPER) {
+        prefix = "T"; // Task ID
+      } else if ([ServiceType.BIKE, ServiceType.AUTO, ServiceType.CAB, ServiceType.CAB_PRIME].includes(serviceType)) {
+        prefix = "R"; // Ride ID
+      }
+      
+      return `${prefix}${day}${month}${year}${random6Digits}`;
     };
 
     const order = new Order({
-      _id: generateIndustrialOrderId(),
+      _id: generateCustomOrderId(effectiveType),
       user: userId,
       vendor: vendorId,
       serviceType: effectiveType,
@@ -798,6 +807,21 @@ export class OrdersService {
               status: status,
               serviceType: populated.serviceType,
             }
+          });
+        }
+
+        // Asynchronously send invoice if the order status is completed/delivered
+        const isCompleted = [
+          OrderStatus.COMPLETED,
+          OrderStatus.DELIVERED,
+          OrderStatus.DELIVERED_LC,
+        ].includes(status) || 
+        status.toLowerCase() === "completed" || 
+        status.toLowerCase() === "delivered";
+
+        if (isCompleted) {
+          InvoiceService.getInstance().sendInvoice(orderId).catch(err => {
+            console.error(`[orders.service] Failed to send invoice for order ${orderId}:`, err);
           });
         }
       } catch (err) {

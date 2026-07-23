@@ -635,7 +635,7 @@ const styles = StyleSheet.create({
   },
   avatarInitial: {
     fontSize: moderateScale(36),
-    fontFamily: 'Inter_700Bold',
+    fontWeight: '700',
     color: '#fff',
   },
   avatarImage: {
@@ -644,7 +644,7 @@ const styles = StyleSheet.create({
   },
   userName: {
     fontSize: moderateScale(22),
-    fontFamily: 'Inter_800ExtraBold',
+    fontWeight: '800',
     color: '#111',
     marginTop: 12,
     textAlign: 'center',
@@ -661,7 +661,7 @@ const styles = StyleSheet.create({
   },
   premiumText: {
     fontSize: moderateScale(10),
-    fontFamily: 'Inter_700Bold',
+    fontWeight: '700',
     color: '#6366F1',
     marginLeft: 4,
     letterSpacing: 0.5,
@@ -696,18 +696,18 @@ const styles = StyleSheet.create({
   },
   statsNumber: {
     fontSize: moderateScale(18),
-    fontFamily: 'Inter_800ExtraBold',
+    fontWeight: '800',
     color: '#111',
   },
   statsLabel: {
     fontSize: moderateScale(12),
-    fontFamily: 'Inter_500Medium',
+    fontWeight: '500',
     color: '#6B7280',
     marginTop: 2,
   },
   sectionTitle: {
     fontSize: moderateScale(15),
-    fontFamily: 'Inter_800ExtraBold',
+    fontWeight: '800',
     color: '#1F2937',
     marginTop: 28,
     marginBottom: 12,
@@ -738,7 +738,7 @@ const styles = StyleSheet.create({
   },
   gridLabel: {
     fontSize: moderateScale(12),
-    fontFamily: 'Inter_600SemiBold',
+    fontWeight: '600',
     color: '#374151',
   },
   bannerContainer: {
@@ -753,12 +753,12 @@ const styles = StyleSheet.create({
   },
   bannerTitle: {
     fontSize: moderateScale(16),
-    fontFamily: 'Inter_800ExtraBold',
+    fontWeight: '800',
     color: '#fff',
   },
   bannerSubtitle: {
     fontSize: moderateScale(11),
-    fontFamily: 'Inter_500Medium',
+    fontWeight: '500',
     color: '#E0E7FF',
     marginTop: 4,
   },
@@ -780,7 +780,7 @@ const styles = StyleSheet.create({
   },
   avatarMiniText: {
     fontSize: 9,
-    fontFamily: 'Inter_700Bold',
+    fontWeight: '700',
     color: '#fff',
   },
   signOutBtn: {
@@ -797,12 +797,12 @@ const styles = StyleSheet.create({
   },
   signOutBtnText: {
     fontSize: moderateScale(14),
-    fontFamily: 'Inter_700Bold',
+    fontWeight: '700',
     color: '#EF4444',
   },
   versionText: {
     fontSize: moderateScale(11),
-    fontFamily: 'Inter_400Regular',
+    fontWeight: '400',
     color: '#9CA3AF',
     textAlign: 'center',
     marginTop: 24,
@@ -831,7 +831,7 @@ const styles = StyleSheet.create({
   },
   modalTitle: { 
     fontSize: moderateScale(22), 
-    fontFamily: 'Inter_700Bold',
+    fontWeight: '700',
   },
   modalScroll: { 
     marginBottom: 20,
@@ -842,7 +842,7 @@ const styles = StyleSheet.create({
   },
   inputLabel: { 
     fontSize: moderateScale(14), 
-    fontFamily: 'Inter_600SemiBold', 
+    fontWeight: '600', 
     marginLeft: 4,
   },
   textInput: {
@@ -850,7 +850,7 @@ const styles = StyleSheet.create({
     borderRadius: moderateScale(12),
     padding: 14,
     fontSize: moderateScale(16),
-    fontFamily: 'Inter_500Medium',
+    fontWeight: '500',
   },
   saveBtn: {
     padding: 16,
@@ -868,7 +868,7 @@ const styles = StyleSheet.create({
   saveBtnText: { 
     color: '#ffffff', 
     fontSize: moderateScale(16), 
-    fontFamily: 'Inter_700Bold',
+    fontWeight: '700',
   },
   settingRow: {
     flexDirection: 'row',
@@ -883,12 +883,12 @@ const styles = StyleSheet.create({
   },
   settingLabel: {
     fontSize: moderateScale(14),
-    fontFamily: 'Inter_600SemiBold',
+    fontWeight: '600',
     marginBottom: 4,
   },
   settingSub: {
     fontSize: moderateScale(11),
-    fontFamily: 'Inter_400Regular',
+    fontWeight: '400',
     lineHeight: moderateScale(14),
   },
 });

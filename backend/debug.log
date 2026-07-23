@@ -980,3 +980,23 @@ Driver 6a5db6a62b4c19e29ec7d8ab has homeMode OFF. Adding unconditionally.
   Dropoff: [81.7760462, 17.0097255]
   Distances: d_h = 46528.7m, d_p = 6412.0m, p_d = 0.0m, drop_h = 45104.9m
   -> Detour overhead: 4988.2m, Max allowed detour: 13958.6m. Result: true
+  Driver: [81.7834784, 16.9524652]
+  Home: [82.1842504, 17.120459]
+  Pickup: [81.7819425, 16.9506962]
+  Dropoff: [81.7809757, 17.0015686]
+  Distances: d_h = 46523.2m, d_p = 255.7m, p_d = 5657.7m, drop_h = 44860.8m
+  -> Detour overhead: 4251.0m, Max allowed detour: 13957.0m. Result: true
+[DETOUR CHECK] Driver: 6a42577448525b572677670d
+  Driver: [81.7835127, 16.9524636]
+  Home: [82.1842504, 17.120459]
+  Pickup: [81.7819425, 16.9506962]
+  Dropoff: [81.7809757, 17.0015686]
+  Distances: d_h = 46519.9m, d_p = 257.9m, p_d = 5657.7m, drop_h = 44860.8m
+  -> Detour overhead: 4256.5m, Max allowed detour: 13956.0m. Result: true
+[DETOUR CHECK] Driver: 6a42577448525b572677670d
+  Driver: [81.7826324, 16.9509021]
+  Home: [82.1842504, 17.120459]
+  Pickup: [81.7819425, 16.9506962]
+  Dropoff: [81.7804732, 17.0050454]
+  Distances: d_h = 46675.7m, d_p = 76.9m, p_d = 6045.4m, drop_h = 44799.2m
+  -> Detour overhead: 4245.8m, Max allowed detour: 14002.7m. Result: true

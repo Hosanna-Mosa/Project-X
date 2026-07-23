@@ -1,4 +1,7 @@
 import nodemailer from "nodemailer";
+import * as dotenv from "dotenv";
+
+dotenv.config();
 
 const transporter = nodemailer.createTransport({
   host: process.env.SMTP_HOST || "smtp.gmail.com",
@@ -15,25 +18,28 @@ interface SendEmailOptions {
   subject: string;
   text?: string;
   html?: string;
+  attachments?: any[];
 }
 
-export async function sendEmail({ to, subject, text, html }: SendEmailOptions) {
+export async function sendEmail({ to, subject, text, html, attachments }: SendEmailOptions) {
   if (!process.env.SMTP_USER || !process.env.SMTP_PASS) {
     console.warn("⚠️  SMTP not configured — printing email to console instead:");
     console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
     console.log(`To: ${to}`);
     console.log(`Subject: ${subject}`);
     console.log(`Body: ${text || "(HTML content)"}`);
+    console.log(`Has Attachments: ${attachments ? attachments.length : 0}`);
     console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
     return;
   }
 
   await transporter.sendMail({
-    from: `"Precision Nav" <${process.env.SMTP_USER}>`,
+    from: `"Flavour" <${process.env.SMTP_USER}>`,
     to,
     subject,
     text,
     html,
+    attachments,
   });
 }
 

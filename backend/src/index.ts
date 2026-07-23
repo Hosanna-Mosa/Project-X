@@ -5,6 +5,7 @@ import cors from "cors";
 import helmet from "helmet";
 import morgan from "morgan";
 import * as dotenv from "dotenv";
+dotenv.config();
 import { connectDB } from "./database/db";
 import { SocketManager } from "./sockets/socket.manager";
 import { globalErrorHandler } from "./middleware/error.middleware";
@@ -28,8 +29,6 @@ import zonesRoutes from "./modules/zones/zones.routes";
 import notificationsRoutes from "./modules/notifications/notifications.routes";
 import supportRoutes from "./modules/support/support.routes";
 import reviewRoutes from "./modules/reviews/reviews.routes";
-
-dotenv.config();
 
 const app = express();
 const server = http.createServer(app);
