@@ -41,7 +41,9 @@ export default function SupportChatScreen() {
   const insets = useSafeAreaInsets();
   const token = useDriverStore((s) => s.token);
 
+  const [viewMode, setViewMode] = useState<"loading" | "list" | "chat" | "create">("loading");
   const [loading, setLoading] = useState(true);
+  const [allTickets, setAllTickets] = useState<SupportTicket[]>([]);
   const [ticket, setTicket] = useState<SupportTicket | null>(null);
   const [inputText, setInputText] = useState("");
   const [submittingReply, setSubmittingReply] = useState(false);
@@ -53,6 +55,11 @@ export default function SupportChatScreen() {
   const [creatingTicket, setCreatingTicket] = useState(false);
 
   const flatListRef = useRef<FlatList>(null);
+  const ticketRef = useRef<SupportTicket | null>(null);
+
+  useEffect(() => {
+    ticketRef.current = ticket;
+  }, [ticket]);
 
   const supportFetch = async (endpoint: string, options: RequestInit = {}) => {
     if (!token || !apiUrl) throw new Error("Authentication or API configuration is missing");
@@ -77,10 +84,33 @@ export default function SupportChatScreen() {
     if (showLoading) setLoading(true);
     try {
       const tickets = await supportFetch("/api/v1/support/tickets");
+      setAllTickets(tickets || []);
       if (tickets && tickets.length > 0) {
-        setTicket(tickets[0]);
+        if (showLoading) {
+          if (tickets.length === 1) {
+            const latest = tickets[0];
+            setTicket(latest);
+            if (latest.status === "RESOLVED") {
+              setViewMode("list");
+            } else {
+              setViewMode("chat");
+            }
+          } else {
+            setViewMode("list");
+          }
+        } else {
+          // Background poll: update active ticket details if we are currently viewing it
+          const currentActive = ticketRef.current;
+          if (currentActive) {
+            const activeT = tickets.find(t => t._id === currentActive._id);
+            if (activeT) setTicket(activeT);
+          }
+        }
       } else {
-        setTicket(null);
+        if (showLoading) {
+          setTicket(null);
+          setViewMode("create");
+        }
       }
     } catch (error) {
       console.error("Failed to fetch support tickets:", error);
@@ -95,8 +125,9 @@ export default function SupportChatScreen() {
 
     socketService.connect();
     const handleTicketUpdate = (updatedTicket: any) => {
-      console.log("[SOCKET] Driver support ticket updated:", updatedTicket);
-      setTicket(updatedTicket);
+      console.log("[SOCKET] Partner support ticket updated:", updatedTicket);
+      setTicket((prev) => (prev && prev._id === updatedTicket._id ? updatedTicket : prev));
+      setAllTickets((prev) => prev.map((t) => (t._id === updatedTicket._id ? updatedTicket : t)));
     };
     socketService.on("ticket_updated", handleTicketUpdate);
 
@@ -136,6 +167,8 @@ export default function SupportChatScreen() {
         }),
       });
       setTicket(created);
+      setAllTickets(prev => [created, ...prev]);
+      setViewMode("chat");
       Alert.alert("Ticket Created", "Partner Support has received your case and will respond shortly.");
     } catch (error: any) {
       Alert.alert("Error", error.message || "Failed to create support ticket");
@@ -159,7 +192,7 @@ export default function SupportChatScreen() {
       setTicket(updatedTicket);
     } catch (error: any) {
       Alert.alert("Failed to send message", error.message || "Please try again.");
-      setInputText(messageText);
+      setInputText(messageText); // restore text
     } finally {
       setSubmittingReply(false);
     }
@@ -169,7 +202,7 @@ export default function SupportChatScreen() {
     if (item.sender === "system") {
       return (
         <View style={styles.systemMessageContainer}>
-          <Text style={styles.systemMessageText}>
+          <Text style={[styles.systemMessageText, { color: Colors.textSecondary }]}>
             {item.time}
           </Text>
         </View>
@@ -185,20 +218,20 @@ export default function SupportChatScreen() {
         ]}
       >
         {!isUser && (
-          <View style={styles.avatar}>
+          <View style={[styles.avatar, { backgroundColor: Colors.primaryLight }]}>
             <Feather name="headphones" size={12} color={Colors.primary} />
           </View>
         )}
         <View
           style={[
             styles.bubble,
-            isUser ? styles.bubbleUser : styles.bubbleAgent,
+            isUser ? [styles.bubbleUser, { backgroundColor: Colors.primary }] : [styles.bubbleAgent, { backgroundColor: Colors.surfaceAlt }],
           ]}
         >
-          <Text style={isUser ? styles.bubbleTextUser : styles.bubbleTextAgent}>
+          <Text style={isUser ? styles.bubbleTextUser : [styles.bubbleTextAgent, { color: Colors.text }]}>
             {item.text}
           </Text>
-          <Text style={isUser ? styles.timeUser : styles.timeAgent}>
+          <Text style={isUser ? styles.timeUser : [styles.timeAgent, { color: Colors.textMuted }]}>
             {item.time}
           </Text>
         </View>
@@ -208,22 +241,124 @@ export default function SupportChatScreen() {
 
   if (loading) {
     return (
-      <View style={styles.center}>
+      <View style={[styles.center, { backgroundColor: Colors.background }]}>
         <ActivityIndicator size="large" color={Colors.primary} />
-        <Text style={{ marginTop: 12, color: Colors.textSecondary }}>Loading partner support...</Text>
+        <Text style={{ marginTop: 12, color: Colors.textSecondary }}>Loading support session...</Text>
       </View>
     );
   }
 
-  // If no ticket, show Creation Form
-  if (!ticket) {
+  // If list screen view
+  if (viewMode === "list") {
     return (
-      <View style={styles.root}>
-        <View style={styles.header}>
+      <View style={[styles.root, { backgroundColor: Colors.background }]}>
+        <View style={[styles.header, { paddingTop: insets.top + 16, borderBottomColor: Colors.border }]}>
           <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
             <Ionicons name="arrow-back" size={24} color={Colors.text} />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>Create Ticket</Text>
+          <Text style={[styles.headerTitle, { color: Colors.text }]}>Support Sessions</Text>
+        </View>
+
+        <FlatList
+          data={allTickets}
+          keyExtractor={(item) => item._id}
+          contentContainerStyle={{ padding: 16, gap: 16 }}
+          renderItem={({ item }) => {
+            const isOpen = item.status === "OPEN" || item.status === "PENDING_RESOLVE";
+            return (
+              <TouchableOpacity
+                onPress={() => {
+                  setTicket(item);
+                  setViewMode("chat");
+                }}
+                style={{
+                  backgroundColor: Colors.surface,
+                  borderColor: Colors.border,
+                  borderWidth: 1,
+                  borderRadius: 16,
+                  padding: 16,
+                }}
+              >
+                <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 8 }}>
+                  <View style={{ flex: 1, marginRight: 8 }}>
+                    <Text style={{ fontSize: 15, fontWeight: "800", color: Colors.text }} numberOfLines={1}>
+                      {item.title}
+                    </Text>
+                    <Text style={{ fontSize: 11, fontWeight: "600", color: Colors.textMuted, marginTop: 2 }}>
+                      ID: {item.ticketId} • {item.category}
+                    </Text>
+                  </View>
+                  <View
+                    style={{
+                      paddingHorizontal: 8,
+                      paddingVertical: 4,
+                      borderRadius: 8,
+                      backgroundColor: isOpen ? "#DCFCE7" : "#F3F4F6",
+                    }}
+                  >
+                    <Text
+                      style={{
+                        fontSize: 10,
+                        fontWeight: "800",
+                        color: isOpen ? "#15803D" : "#4B5563",
+                      }}
+                    >
+                      {item.status}
+                    </Text>
+                  </View>
+                </View>
+                <Text style={{ fontSize: 13, color: Colors.textSecondary, marginBottom: 8 }} numberOfLines={2}>
+                  {item.message}
+                </Text>
+                <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+                  <Text style={{ fontSize: 11, color: Colors.textMuted }}>
+                    {new Date(item.createdAt).toLocaleDateString()}
+                  </Text>
+                  <Text style={{ fontSize: 12, fontWeight: "bold", color: Colors.primary }}>
+                    Continue Chat →
+                  </Text>
+                </View>
+              </TouchableOpacity>
+            );
+          }}
+          ListFooterComponent={() => (
+            <TouchableOpacity
+              style={[
+                styles.submitBtn,
+                { backgroundColor: Colors.primary, marginTop: 8, marginBottom: 24 },
+              ]}
+              onPress={() => {
+                setNewTitle("");
+                setNewMessage("");
+                setViewMode("create");
+              }}
+            >
+              <Text style={styles.submitBtnText}>+ Start New Support Chat</Text>
+            </TouchableOpacity>
+          )}
+        />
+      </View>
+    );
+  }
+
+  // If creation Form view
+  if (viewMode === "create") {
+    return (
+      <View style={[styles.root, { backgroundColor: Colors.background }]}>
+        <View style={[styles.header, { paddingTop: insets.top + 16, borderBottomColor: Colors.border }]}>
+          <TouchableOpacity
+            style={styles.backBtn}
+            onPress={() => {
+              if (allTickets.length > 0) {
+                setViewMode("list");
+              } else {
+                router.back();
+              }
+            }}
+          >
+            <Ionicons name="arrow-back" size={24} color={Colors.text} />
+          </TouchableOpacity>
+          <Text style={[styles.headerTitle, { color: Colors.text }]}>Create Support Ticket</Text>
         </View>
 
         <KeyboardAvoidingView
@@ -234,8 +369,9 @@ export default function SupportChatScreen() {
             data={[{ key: "form" }]}
             renderItem={() => (
               <View style={styles.formContainer}>
-                <Text style={styles.label}>Issue Category</Text>
-                <View style={styles.pickerContainer}>
+                <Text style={[styles.label, { color: Colors.textSecondary }]}>Issue Category</Text>
+                <View style={[styles.pickerContainer, { backgroundColor: Colors.surface, borderColor: Colors.border }]}>
+                  <TextInput style={{ display: "none" }} />
                   <TouchableOpacity
                     style={styles.pickerButton}
                     onPress={() => {
@@ -257,9 +393,9 @@ export default function SupportChatScreen() {
                   </TouchableOpacity>
                 </View>
 
-                <Text style={[styles.label, { marginTop: 20 }]}>Summary / Title</Text>
+                <Text style={[styles.label, { color: Colors.textSecondary, marginTop: 20 }]}>Summary / Title</Text>
                 <TextInput
-                  style={styles.input}
+                  style={[styles.input, { backgroundColor: Colors.surface, borderColor: Colors.border, color: Colors.text }]}
                   placeholder="e.g. Weekly payout delayed"
                   placeholderTextColor={Colors.textMuted}
                   value={newTitle}
@@ -267,9 +403,9 @@ export default function SupportChatScreen() {
                   maxLength={60}
                 />
 
-                <Text style={[styles.label, { marginTop: 20 }]}>Describe your issue</Text>
+                <Text style={[styles.label, { color: Colors.textSecondary, marginTop: 20 }]}>Describe your issue</Text>
                 <TextInput
-                  style={styles.textArea}
+                  style={[styles.textArea, { backgroundColor: Colors.surface, borderColor: Colors.border, color: Colors.text }]}
                   placeholder="Tell us what went wrong. Include order number, item detail, or billing adjustments needed..."
                   placeholderTextColor={Colors.textMuted}
                   multiline
@@ -280,7 +416,7 @@ export default function SupportChatScreen() {
                 />
 
                 <TouchableOpacity
-                  style={[styles.submitBtn, creatingTicket && { opacity: 0.7 }]}
+                  style={[styles.submitBtn, { backgroundColor: Colors.primary }, creatingTicket && { opacity: 0.7 }]}
                   onPress={handleCreateTicket}
                   disabled={creatingTicket}
                 >
@@ -303,68 +439,97 @@ export default function SupportChatScreen() {
   // Active Chat UI
   return (
     <KeyboardAvoidingView
-      style={styles.root}
+      style={[styles.root, { backgroundColor: Colors.background }]}
       behavior={Platform.OS === "ios" ? "padding" : "height"}
       keyboardVerticalOffset={0}
     >
       {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
+      <View style={[styles.header, { paddingTop: insets.top + (Platform.OS === "web" ? 67 : 0) + 12, borderBottomColor: Colors.border }]}>
+        <TouchableOpacity
+          style={styles.backBtn}
+          onPress={() => {
+            if (allTickets.length > 0) {
+              setViewMode("list");
+            } else {
+              router.back();
+            }
+          }}
+        >
           <Feather name="arrow-left" size={22} color={Colors.text} />
         </TouchableOpacity>
         <View style={styles.headerCenter}>
-          <View style={styles.headerAvatar}>
+          <View style={[styles.headerAvatar, { backgroundColor: Colors.primaryLight }]}>
             <Feather name="headphones" size={18} color={Colors.primary} />
-            <View style={styles.onlineDot} />
+            {ticket && ticket.status !== "RESOLVED" && <View style={styles.onlineDot} />}
           </View>
-          <View>
-            <Text style={styles.headerName}>Partner Support</Text>
-            <Text style={styles.headerStatus}>Ticket {ticket.ticketId} • {ticket.status}</Text>
-          </View>
+          {ticket && (
+            <View>
+              <Text style={[styles.headerName, { color: Colors.text }]}>Partner Support</Text>
+              <Text style={styles.headerStatus}>Ticket {ticket.ticketId} • {ticket.status}</Text>
+            </View>
+          )}
         </View>
       </View>
 
       {/* Message List */}
-      <FlatList
-        ref={flatListRef}
-        data={ticket.messages}
-        keyExtractor={(_, index) => index.toString()}
-        renderItem={renderMessageItem}
-        contentContainerStyle={styles.messagesList}
-        showsVerticalScrollIndicator={false}
-        onLayout={() => flatListRef.current?.scrollToEnd({ animated: false })}
-      />
+      {ticket && (
+        <FlatList
+          ref={flatListRef}
+          data={ticket.messages}
+          keyExtractor={(_, index) => index.toString()}
+          renderItem={renderMessageItem}
+          contentContainerStyle={styles.messagesList}
+          showsVerticalScrollIndicator={false}
+          onLayout={() => flatListRef.current?.scrollToEnd({ animated: false })}
+        />
+      )}
 
       {/* Input Bar */}
-      {ticket.status === "RESOLVED" ? (
-        <View style={[styles.resolvedNotice, { paddingBottom: insets.bottom + 16 }]}>
-          <Feather name="check-circle" size={16} color={Colors.primary} />
-          <Text style={styles.resolvedText}>This ticket has been marked as resolved.</Text>
-          <TouchableOpacity
-            style={styles.reopenBtn}
-            onPress={async () => {
-              try {
-                setLoading(true);
-                await supportFetch(`/api/v1/support/tickets/${ticket._id}/messages`, {
-                  method: "POST",
-                  body: JSON.stringify({ text: "Re-opening this case. I still need assistance." }),
-                });
-                await fetchTickets(true);
-              } catch (err: any) {
-                Alert.alert("Error", err.message || "Failed to reopen ticket");
-              } finally {
-                setLoading(false);
-              }
-            }}
-          >
-            <Text style={styles.reopenBtnText}>Reopen Case</Text>
-          </TouchableOpacity>
+      {ticket && ticket.status === "RESOLVED" ? (
+        <View style={[styles.resolvedNotice, { backgroundColor: Colors.surface, paddingBottom: insets.bottom + 16 }]}>
+          <Feather name="check-circle" size={16} color="#0d9488" />
+          <Text style={[styles.resolvedText, { color: Colors.textSecondary }]}>This ticket has been marked as resolved.</Text>
+          <View style={{ flexDirection: "row", gap: 12, marginTop: 4 }}>
+            <TouchableOpacity
+              style={[styles.reopenBtn, { borderColor: Colors.primary }]}
+              onPress={async () => {
+                try {
+                  setLoading(true);
+                  // Submitting a new message reopens the ticket
+                  await supportFetch(`/api/v1/support/tickets/${ticket._id}/messages`, {
+                    method: "POST",
+                    body: JSON.stringify({ text: "Re-opening this case. I still need assistance." }),
+                  });
+                  await fetchTickets(true);
+                  setViewMode("chat");
+                } catch (err: any) {
+                  Alert.alert("Error", err.message || "Failed to reopen ticket");
+                } finally {
+                  setLoading(false);
+                }
+              }}
+            >
+              <Text style={[styles.reopenBtnText, { color: Colors.primary }]}>Reopen Case</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.reopenBtn, { backgroundColor: Colors.primary, borderColor: Colors.primary }]}
+              onPress={() => {
+                setNewTitle("");
+                setNewMessage("");
+                setTicket(null);
+                setViewMode("create");
+              }}
+            >
+              <Text style={[styles.reopenBtnText, { color: "#fff" }]}>Start New Chat</Text>
+            </TouchableOpacity>
+          </View>
         </View>
-      ) : ticket.status === "PENDING_RESOLVE" ? (
-        <View style={[styles.resolveRequestContainer, { paddingBottom: insets.bottom + 16 }]}>
+      ) : ticket && ticket.status === "PENDING_RESOLVE" ? (
+        <View style={[styles.resolveRequestContainer, { backgroundColor: Colors.surface, paddingBottom: insets.bottom + 16, borderTopColor: Colors.border }]}>
           <Ionicons name="help-circle-outline" size={24} color={Colors.primary} />
-          <Text style={styles.resolveRequestTitle}>Resolve this ticket?</Text>
-          <Text style={styles.resolveRequestDesc}>
+          <Text style={[styles.resolveRequestTitle, { color: Colors.text }]}>Resolve this ticket?</Text>
+          <Text style={[styles.resolveRequestDesc, { color: Colors.textSecondary }]}>
             Support has requested to mark this case as resolved. Is your issue fully solved?
           </Text>
           <View style={styles.resolveRequestButtons}>
@@ -409,10 +574,10 @@ export default function SupportChatScreen() {
           </View>
         </View>
       ) : (
-        <View style={[styles.inputBar as any, { paddingBottom: insets.bottom + 8 }]}>
-          <View style={styles.inputContainer as any}>
+        <View style={[styles.inputBar, { paddingBottom: insets.bottom + 8, borderTopColor: Colors.border }]}>
+          <View style={[styles.inputContainer, { backgroundColor: Colors.surface }]}>
             <TextInput
-              style={styles.textInput as any}
+              style={[styles.textInput, { color: Colors.text }]}
               placeholder="Type a message to Support..."
               placeholderTextColor={Colors.textMuted}
               value={inputText}
@@ -422,7 +587,7 @@ export default function SupportChatScreen() {
             />
           </View>
           <TouchableOpacity
-            style={[styles.sendBtn as any, !inputText.trim() && styles.sendBtnDisabled]}
+            style={[styles.sendBtn, { backgroundColor: Colors.primary }, !inputText.trim() && styles.sendBtnDisabled]}
             onPress={handleSendMessage}
             disabled={!inputText.trim() || submittingReply}
           >
@@ -439,22 +604,18 @@ export default function SupportChatScreen() {
 const styles = StyleSheet.create({
   root: {
     flex: 1,
-    backgroundColor: Colors.background,
   },
   center: {
     flex: 1,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: Colors.background,
   },
   header: {
     flexDirection: "row",
     alignItems: "center",
     paddingHorizontal: 16,
-    paddingTop: 48,
     paddingBottom: 14,
     borderBottomWidth: 1,
-    borderBottomColor: Colors.border,
     backgroundColor: Colors.surface,
     gap: 12,
   },
@@ -468,7 +629,6 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 18,
     fontWeight: "800",
-    color: Colors.text,
   },
   headerCenter: {
     flex: 1,
@@ -480,7 +640,6 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 10,
-    backgroundColor: Colors.primaryLight,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -498,7 +657,6 @@ const styles = StyleSheet.create({
   headerName: {
     fontSize: 14,
     fontWeight: "700",
-    color: Colors.text,
   },
   headerStatus: {
     fontSize: 10,
@@ -512,14 +670,11 @@ const styles = StyleSheet.create({
   label: {
     fontSize: 13,
     fontWeight: "700",
-    color: Colors.textSecondary,
     marginBottom: 8,
   },
   pickerContainer: {
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: Colors.border,
-    backgroundColor: Colors.surface,
     overflow: "hidden",
   },
   pickerButton: {
@@ -533,29 +688,22 @@ const styles = StyleSheet.create({
     height: 48,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: Colors.border,
-    backgroundColor: Colors.surface,
     paddingHorizontal: 14,
     fontSize: 14,
     fontWeight: "500",
-    color: Colors.text,
   },
   textArea: {
     height: 120,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: Colors.border,
-    backgroundColor: Colors.surface,
     paddingHorizontal: 14,
     paddingTop: 12,
     fontSize: 14,
     fontWeight: "500",
-    color: Colors.text,
   },
   submitBtn: {
     height: 50,
     borderRadius: 14,
-    backgroundColor: Colors.primary,
     alignItems: "center",
     justifyContent: "center",
     marginTop: 32,
@@ -579,7 +727,6 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: "600",
     textTransform: "uppercase",
-    color: Colors.textSecondary,
     letterSpacing: 1,
   },
   messageRow: {
@@ -597,7 +744,6 @@ const styles = StyleSheet.create({
     width: 24,
     height: 24,
     borderRadius: 8,
-    backgroundColor: Colors.primaryLight,
     alignItems: "center",
     justifyContent: "center",
     marginBottom: 2,
@@ -610,13 +756,9 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   bubbleUser: {
-    backgroundColor: Colors.primary,
     borderBottomRightRadius: 4,
   },
   bubbleAgent: {
-    backgroundColor: Colors.surface,
-    borderWidth: 1,
-    borderColor: Colors.border,
     borderBottomLeftRadius: 4,
   },
   bubbleTextUser: {
@@ -627,7 +769,6 @@ const styles = StyleSheet.create({
   },
   bubbleTextAgent: {
     fontSize: 14,
-    color: Colors.text,
     fontWeight: "500",
     lineHeight: 19,
   },
@@ -638,7 +779,6 @@ const styles = StyleSheet.create({
   },
   timeAgent: {
     fontSize: 9,
-    color: Colors.textMuted,
     alignSelf: "flex-end",
   },
   inputBar: {
@@ -648,13 +788,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingTop: 12,
     borderTopWidth: 1,
-    borderTopColor: Colors.border,
     backgroundColor: Colors.surface,
   },
   inputContainer: {
     flex: 1,
     borderRadius: 22,
-    backgroundColor: Colors.surfaceAlt,
     minHeight: 44,
     maxHeight: 100,
     paddingHorizontal: 14,
@@ -663,14 +801,12 @@ const styles = StyleSheet.create({
   textInput: {
     fontSize: 14,
     fontWeight: "500",
-    color: Colors.text,
     paddingVertical: 8,
   },
   sendBtn: {
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: Colors.primary,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -682,18 +818,15 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     paddingVertical: 20,
     paddingHorizontal: 24,
-    backgroundColor: Colors.surface,
     gap: 10,
   },
   resolvedText: {
     fontSize: 13,
     fontWeight: "600",
-    color: Colors.textSecondary,
     textAlign: "center",
   },
   reopenBtn: {
     borderWidth: 1.5,
-    borderColor: Colors.primary,
     borderRadius: 10,
     paddingHorizontal: 16,
     paddingVertical: 8,
@@ -701,25 +834,20 @@ const styles = StyleSheet.create({
   },
   reopenBtnText: {
     fontSize: 13,
-    color: Colors.primary,
     fontWeight: "700",
   },
   resolveRequestContainer: {
     padding: 16,
     alignItems: "center",
     borderTopWidth: 1,
-    borderTopColor: Colors.border,
-    backgroundColor: Colors.surfaceAlt,
   },
   resolveRequestTitle: {
     fontSize: 16,
     fontWeight: "bold",
-    color: Colors.text,
     marginTop: 8,
   },
   resolveRequestDesc: {
     fontSize: 13,
-    color: Colors.textSecondary,
     textAlign: "center",
     marginTop: 4,
     marginBottom: 16,

@@ -8,8 +8,8 @@ import Colors from '@/constants/colors';
 import { customFetch } from '@/utils/api/custom-fetch';
 
 const DRIVER_MARKER_IMAGE = require('@/assets/images/driver-marker.png');
-const VEHICLE_BIKE_3D = require('@/assets/images/services/scooter_blue_transparent_resized.png');
-const VEHICLE_AUTO_3D = require('@/assets/images/services/auto_resized.png');
+const VEHICLE_BIKE_3D = require('@/assets/images/services/scooter_blue_top_view.png');
+const VEHICLE_AUTO_3D = require('@/assets/images/services/auto_top_view.png');
 const VEHICLE_CAB_3D = require('@/assets/images/services/cab.png');
 
 interface Props {
@@ -356,7 +356,7 @@ export const MapBackground = forwardRef<MapBackgroundRef, Props>(({
 
         {driverMarkers.map((driver) => {
           const vehicleType = (driver.vehicleType || driver.vehicle || "bike").toLowerCase();
-          
+
           // Disable car/cab markers for now
           if (vehicleType.includes("car") || vehicleType.includes("cab") || vehicleType.includes("prime")) {
             return null;
@@ -381,11 +381,11 @@ export const MapBackground = forwardRef<MapBackgroundRef, Props>(({
               coordinate={{ latitude: Number(driver.lat), longitude: Number(driver.lng) }}
               anchor={{ x: 0.5, y: 0.5 }}
               title={driver.name || "Driver"}
-              tracksViewChanges={false}
+              tracksViewChanges={true}
             >
-              <Image 
+              <Image
                 source={markerImage}
-                style={{ width: 48, height: 48 }}
+                style={{ width: 40, height: 40 }}
                 resizeMode="contain"
               />
             </Marker>
@@ -421,11 +421,11 @@ export const MapBackground = forwardRef<MapBackgroundRef, Props>(({
             coordinate={{ latitude: Number(driverLocation.lat), longitude: Number(driverLocation.lng) }}
             title="Driver"
             anchor={{ x: 0.5, y: 0.5 }}
-            tracksViewChanges={false}
+            tracksViewChanges={true}
           >
-            <Image 
+            <Image
               source={VEHICLE_BIKE_3D}
-              style={{ width: 48, height: 48 }}
+              style={{ width: 40, height: 40 }}
               resizeMode="contain"
             />
           </Marker>
