@@ -421,6 +421,8 @@ export const MapBackground = forwardRef<MapBackgroundRef, Props>(({
             coordinate={{ latitude: Number(driverLocation.lat), longitude: Number(driverLocation.lng) }}
             title="Driver"
             anchor={{ x: 0.5, y: 0.5 }}
+            flat={true}
+            rotation={(driverLocation as any).heading || 0}
             tracksViewChanges={true}
           >
             <Image

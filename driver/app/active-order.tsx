@@ -23,7 +23,7 @@ import Colors from "@/constants/colors";
 import { socketService } from "@/utils/socketService";
 import Constants from "expo-constants";
 
-const VEHICLE_BIKE_3D = require('@/assets/images/scooter_marker.png');
+const VEHICLE_BIKE_3D = require('@/assets/images/scooter_blue_top_view.png');
 
 const apiUrl = process.env.EXPO_PUBLIC_API_URL || Constants.expoConfig?.extra?.apiUrl;
 
@@ -96,7 +96,19 @@ export default function ActiveOrderScreen() {
       ]
     );
   };
+  const calculateBearing = (lat1: number, lng1: number, lat2: number, lng2: number): number => {
+    const rad = Math.PI / 180;
+    const phi1 = lat1 * rad;
+    const phi2 = lat2 * rad;
+    const deltaLambda = (lng2 - lng1) * rad;
+    const y = Math.sin(deltaLambda) * Math.cos(phi2);
+    const x = Math.cos(phi1) * Math.sin(phi2) - Math.sin(phi1) * Math.cos(phi2) * Math.cos(deltaLambda);
+    const theta = Math.atan2(y, x);
+    return (theta * (180 / Math.PI) + 360) % 360;
+  };
+
   const [driverLocation, setDriverLocation] = useState<{ lat: number; lng: number } | null>(null);
+  const [driverHeading, setDriverHeading] = useState<number>(0);
 
   // Map Ref
   const mapRef = useRef<MapView | null>(null);
@@ -165,12 +177,57 @@ export default function ActiveOrderScreen() {
       return;
     }
 
+    let locationSub: Location.LocationSubscription | null = null;
+    let headingSub: Location.LocationSubscription | null = null;
+
     (async () => {
       let { status } = await Location.requestForegroundPermissionsAsync();
       if (status === "granted") {
         let loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
         const initialLoc = { lat: loc.coords.latitude, lng: loc.coords.longitude };
         setDriverLocation(initialLoc);
+        if (typeof loc.coords.heading === "number" && loc.coords.heading >= 0) {
+          setDriverHeading(loc.coords.heading);
+        }
+
+        // 1. Real-time GPS location watcher
+        try {
+          locationSub = await Location.watchPositionAsync(
+            {
+              accuracy: Location.Accuracy.High,
+              timeInterval: 2000,
+              distanceInterval: 5,
+            },
+            (newLoc) => {
+              if (newLoc?.coords) {
+                setDriverLocation({
+                  lat: newLoc.coords.latitude,
+                  lng: newLoc.coords.longitude,
+                });
+                if (typeof newLoc.coords.heading === "number" && newLoc.coords.heading >= 0) {
+                  setDriverHeading(newLoc.coords.heading);
+                }
+              }
+            }
+          );
+        } catch (lErr) {
+          console.warn("[Location Watcher] Failed:", lErr);
+        }
+
+        // 2. Real-time device compass heading watcher (rotates marker as mobile turns)
+        try {
+          headingSub = await Location.watchHeadingAsync((headingData) => {
+            const trueH = headingData.trueHeading;
+            const magH = headingData.magHeading;
+            const h = (trueH !== undefined && trueH >= 0) ? trueH : magH;
+            if (typeof h === "number" && !isNaN(h)) {
+              setDriverHeading(h);
+            }
+          });
+        } catch (headingErr) {
+          console.warn("[Heading Watcher] Compass sensor watch failed/unavailable:", headingErr);
+        }
+
         // Focus map to show full route
         const coords: { latitude: number; longitude: number }[] = [];
         coords.push({ latitude: initialLoc.lat, longitude: initialLoc.lng });
@@ -197,6 +254,11 @@ export default function ActiveOrderScreen() {
         setDriverLocation({ lat: 12.9716, lng: 77.5946 });
       }
     })();
+
+    return () => {
+      if (locationSub) locationSub.remove();
+      if (headingSub) headingSub.remove();
+    };
   }, [currentOrder]);
 
   // Clean simulation intervals on unmount
@@ -256,6 +318,9 @@ export default function ActiveOrderScreen() {
     let startLat = driverLocation?.lat || 12.9716;
     let startLng = driverLocation?.lng || 77.5946;
 
+    const calculatedBearing = calculateBearing(startLat, startLng, targetLat, targetLng);
+    setDriverHeading(calculatedBearing);
+
     let step = 0;
     const totalSteps = 10;
 
@@ -278,6 +343,7 @@ export default function ActiveOrderScreen() {
         driverId: driverPhone || "driver-123",
         lat: curLat,
         lng: curLng,
+        heading: calculatedBearing || driverHeading || 0,
         orderId: currentOrder.id,
       });
 
@@ -1441,10 +1507,12 @@ export default function ActiveOrderScreen() {
             <Marker 
               coordinate={{ latitude: Number(driverLocation.lat), longitude: Number(driverLocation.lng) }}
               anchor={{ x: 0.5, y: 0.5 }}
+              flat={true}
+              rotation={driverHeading || 0}
             >
               <Image 
                 source={VEHICLE_BIKE_3D}
-                style={{ width: 48, height: 48 }}
+                style={{ width: 40, height: 40 }}
                 resizeMode="contain"
               />
             </Marker>
