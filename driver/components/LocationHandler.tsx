@@ -52,7 +52,7 @@ export const LocationHandler = () => {
         (location) => {
           if (isMounted) {
             if (isOnline) {
-              updateAndBroadcast(location.coords.latitude, location.coords.longitude);
+              updateAndBroadcast(location.coords.latitude, location.coords.longitude, location.coords.heading || 0);
             } else {
               updateLocalOnly(location.coords.latitude, location.coords.longitude);
             }
@@ -66,7 +66,7 @@ export const LocationHandler = () => {
         updateDriverLocation(lat, lng);
     };
 
-    const updateAndBroadcast = (lat: number, lng: number) => {
+    const updateAndBroadcast = (lat: number, lng: number, heading?: number) => {
       updateLocalOnly(lat, lng);
       
       if (isOnline) {
@@ -74,6 +74,7 @@ export const LocationHandler = () => {
           driverId: driverPhone || "driver-123",
           lat: lat,
           lng: lng,
+          heading: heading || 0,
           orderId: currentOrder?.id
         });
       }

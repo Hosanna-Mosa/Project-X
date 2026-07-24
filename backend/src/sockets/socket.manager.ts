@@ -209,7 +209,7 @@ export class SocketManager {
       });
 
       // DRIVER LOCATION UPDATE: Store in Redis Geospatial & Emit to Order Room
-      socket.on("driver_location_update", async (data: { driverId: string; orderId?: string; lat: number; lng: number }) => {
+      socket.on("driver_location_update", async (data: { driverId: string; orderId?: string; lat: number; lng: number; heading?: number }) => {
         if (!authUser || (authUser.role !== "DRIVER")) {
           console.warn(`[SOCKET SECURITY] Unauthorized driver location update from user ${authUser?.userId}`);
           return;
@@ -283,6 +283,7 @@ export class SocketManager {
             driverId: data.driverId,
             lat: data.lat,
             lng: data.lng,
+            heading: data.heading || 0,
           });
           console.log(
             `[SOCKET][EMIT] source=driver_location_update target=order_room event=driver_location_update ` +

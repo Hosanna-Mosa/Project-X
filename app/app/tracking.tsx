@@ -444,6 +444,10 @@ export default function TrackingScreen() {
             if (order.restaurantPickupCode) {
               setStartOtp(order.restaurantPickupCode);
             }
+            if (order.duration) {
+              const durMinutes = parseInt(order.duration.toString().replace(/[^0-9]/g, "")) || 15;
+              setEta(durMinutes);
+            }
             if (order.polyline) {
               setRoute({
                 totalDistance: order.totalDistance || 0,
@@ -462,6 +466,29 @@ export default function TrackingScreen() {
     return () => clearInterval(interval);
   }, [currentOrderId]);
 
+  const calculateDynamicETA = (
+    driverLoc: { lat: number; lng: number } | null,
+    targetLoc: { lat: number; lng: number } | null,
+    fallbackEta: number = 15
+  ): number => {
+    if (!driverLoc || !targetLoc || !driverLoc.lat || !targetLoc.lat) return fallbackEta;
+    
+    const R = 6371; // Earth radius in km
+    const rad = Math.PI / 180;
+    const dLat = (targetLoc.lat - driverLoc.lat) * rad;
+    const dLng = (targetLoc.lng - driverLoc.lng) * rad;
+    const a =
+      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos(driverLoc.lat * rad) * Math.cos(targetLoc.lat * rad) *
+      Math.sin(dLng / 2) * Math.sin(dLng / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    const distanceKm = R * c;
+
+    // Average city travel speed ~22 km/h
+    const minutes = Math.round((distanceKm / 22) * 60);
+    return Math.max(1, minutes);
+  };
+
   useEffect(() => {
     if (currentOrderId) {
       socketService.connect();
@@ -474,8 +501,22 @@ export default function TrackingScreen() {
       };
 
       const onLocationUpdate = (data: any) => {
-        setDriverLocation({ lat: data.lat, lng: data.lng });
-        setTimeout(() => mapRef.current?.fitToRoute(), 500);
+        if (data.lat != null && data.lng != null) {
+          const newLoc = { lat: data.lat, lng: data.lng, heading: data.heading || 0 };
+          setDriverLocation(newLoc);
+
+          // Calculate real-time dynamic ETA to active stop
+          const activeStop = (status === "searching_driver" || status === "driver_assigned" || status === "en_route_pickup" || status === "arrived_pickup")
+            ? (pickupStop || stops?.[0])
+            : (deliveryStop || stops?.[stops.length - 1]);
+            
+          if (activeStop && activeStop.lat != null && activeStop.lng != null) {
+            const dynamicMins = calculateDynamicETA(newLoc, { lat: Number(activeStop.lat), lng: Number(activeStop.lng) }, eta);
+            setEta(dynamicMins);
+          }
+
+          setTimeout(() => mapRef.current?.fitToRoute(), 500);
+        }
       };
 
       const onStatusUpdate = (data: any) => {
