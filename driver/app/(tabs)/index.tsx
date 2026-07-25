@@ -68,6 +68,25 @@ export default function HomeScreen() {
 
   const [scheduledRides, setScheduledRides] = useState<any[]>([]);
   const [loadingScheduled, setLoadingScheduled] = useState(false);
+  
+  const [driverAds, setDriverAds] = useState<any[]>([]);
+
+  useEffect(() => {
+    if (!apiUrl) return;
+    (async () => {
+      try {
+        const res = await fetch(`${apiUrl}/api/v1/banners`);
+        if (res.ok) {
+          const json = await res.json();
+          const bannersArray = json.data || json;
+          const ads = bannersArray.filter((b: any) => b.itemType === 'ad' && b.position === 'driver_dashboard');
+          setDriverAds(ads);
+        }
+      } catch (err) {
+        console.warn("Failed to fetch driver ads:", err);
+      }
+    })();
+  }, []);
 
   const translateX = React.useRef(new Animated.Value(0)).current;
 

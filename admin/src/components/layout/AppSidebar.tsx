@@ -20,6 +20,7 @@ import {
   Sun,
   ChevronDown,
   MessageSquare,
+  Image,
 } from "lucide-react";
 
 const navItems = [
@@ -39,6 +40,7 @@ const navItems = [
   { title: "Active Chats", url: "/support/chats", icon: MessageSquare },
   { title: "Coupons", url: "/coupons", icon: Ticket },
   { title: "App Updates", url: "/app-updates", icon: RefreshCw },
+  { title: "Banners", url: "/banners", icon: Image },
 ];
 
 export function AppSidebar() {

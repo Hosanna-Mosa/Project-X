@@ -243,6 +243,9 @@ export default function HomeScreen() {
   const [searchText, setSearchText] = useState("");
   const [isSearchActive, setIsSearchActive] = useState(false);
   const [recentSearches, setRecentSearches] = useState<string[]>([]);
+  const [banners, setBanners] = useState<any[]>([]);
+  const [hasShownStartupAd, setHasShownStartupAd] = useState(false);
+  const [activeStartupAd, setActiveStartupAd] = useState<any | null>(null);
 
   const getInitialWord = () => {
     const today = new Date();
@@ -508,6 +511,23 @@ export default function HomeScreen() {
           console.error("Failed to load active address:", e);
         } finally {
           setIsAddressLoaded(true);
+        }
+      })();
+
+      // Load banners
+      (async () => {
+        try {
+          const response = await customFetch<any>('/api/v1/banners');
+          if (response && response.data) {
+            setBanners(response.data);
+            const startupAds = response.data.filter((b: any) => b.itemType === 'ad' && b.position === 'startup');
+            if (startupAds.length > 0 && !hasShownStartupAd) {
+              setActiveStartupAd(startupAds[0]);
+              setHasShownStartupAd(true);
+            }
+          }
+        } catch (e) {
+          console.error("Failed to load banners:", e);
         }
       })();
 
@@ -916,7 +936,7 @@ export default function HomeScreen() {
   };
 
   const renderHeader = () => {
-    const hasRidersButNoVendors = !showHomeSkeleton && !loadingDrivers && nearbyDriversCount > 0 && visibleItems.length === 0;
+    const hasRidersButNoVendors = !showHomeSkeleton && !loadingDrivers && (nearbyDriversCount ?? 0) > 0 && visibleItems.length === 0;
     if (!showCategories || ((!showHomeSkeleton && visibleItems.length === 0) && !hasRidersButNoVendors)) return null;
 
     const getParallaxStyle = (index: number) => {
@@ -938,6 +958,10 @@ export default function HomeScreen() {
       });
       return { opacity, transform: [{ translateX }, { scale }] };
     };
+
+    const heroBanners = banners.filter(b => (!b.itemType || b.itemType === 'banner') && (!b.position || b.position === 'hero' || b.position === 'inline'));
+    const greetingAds = banners.filter(b => b.itemType === 'ad' && b.position === 'below_greetings');
+
     return (
       <View style={{ backgroundColor: '#FAFAFA', paddingBottom: 20 }}>
         {/* NEW HEADER AREA */}
@@ -958,7 +982,31 @@ export default function HomeScreen() {
               bannerIndexRef.current = newIndex;
             }}
           >
-            {/* FOOD BANNER */}
+            {/* DYNAMIC HERO BANNERS */}
+            {heroBanners.length > 0 ? (
+              heroBanners.map((banner, index) => (
+                <LinearGradient
+                  key={banner._id || index}
+                  colors={banner.color1 && banner.color2 ? [banner.color1, banner.color2] : ['#4C1D95', '#2E1065']}
+                  style={{ width: screenWidth, paddingBottom: moderateScale(45), paddingTop: insets.top + moderateScale(50) }}
+                >
+                  <Animated.View style={[{ flexDirection: 'row', paddingHorizontal: 16, minHeight: moderateScale(120), alignItems: 'center' }, getParallaxStyle(index)]}>
+                    <View style={{ flex: 1.4, justifyContent: 'center', paddingRight: 8 }}>
+                      <Text style={{ color: '#fff', fontSize: moderateScale(24), fontWeight: '800', lineHeight: moderateScale(28) }}>{banner.title}</Text>
+                      {banner.description && (
+                        <Text style={{ color: '#C4B5FD', fontSize: moderateScale(13), marginTop: moderateScale(8) }}>{banner.description}</Text>
+                      )}
+                    </View>
+                    <View style={{ flex: 0.9, justifyContent: 'center', alignItems: 'flex-end' }}>
+                      <Image source={{ uri: banner.imageUrl }} style={{ width: moderateScale(120), height: moderateScale(120), borderRadius: moderateScale(60) }} resizeMode="cover" />
+                    </View>
+                  </Animated.View>
+                </LinearGradient>
+              ))
+            ) : (
+              <>
+                {/* FALLBACK HARDCODED BANNERS */}
+                {/* FOOD BANNER */}
             <LinearGradient
               colors={['#4C1D95', '#2E1065']}
               style={{ width: screenWidth, paddingBottom: moderateScale(45), paddingTop: insets.top + moderateScale(50) }}
@@ -1021,11 +1069,13 @@ export default function HomeScreen() {
                 </View>
               </Animated.View>
             </LinearGradient>
+              </>
+            )}
           </Animated.ScrollView>
 
           {/* Dots Indicator */}
           <View style={{ position: 'absolute', bottom: 50, left: 0, right: 0, justifyContent: 'center', alignItems: 'center', flexDirection: 'row', gap: 6, zIndex: 5 }}>
-            {[0, 1, 2, 3].map((i) => {
+            {Array.from({ length: heroBanners.length > 0 ? heroBanners.length : 4 }).map((_, i) => {
               const width = bannerScrollX.interpolate({
                 inputRange: [(i - 1) * screenWidth, i * screenWidth, (i + 1) * screenWidth],
                 outputRange: [6, 20, 6],
@@ -1214,23 +1264,29 @@ export default function HomeScreen() {
               </View>
             </ScrollView>
 
-            {/* Inline Banner Ad */}
-            <View style={{ marginHorizontal: 16, marginVertical: 8, borderRadius: 16, overflow: 'hidden', backgroundColor: '#fff', elevation: 3, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4 }}>
-              <View style={{ position: 'relative' }}>
-                <Image 
-                  source={{ uri: "https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=800" }} 
-                  style={{ width: '100%', height: 160 }}
-                  resizeMode="cover"
-                />
-                <View style={{ position: 'absolute', top: 8, right: 8, backgroundColor: 'rgba(0,0,0,0.5)', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
-                  <Text style={{ color: '#fff', fontSize: 10, fontWeight: 'bold' }}>Ad</Text>
+            {/* Below Greetings Ads */}
+            {greetingAds.length > 0 ? (
+              greetingAds.map((banner, index) => (
+                <View key={banner._id || index} style={{ marginHorizontal: 16, marginVertical: 8, borderRadius: 16, overflow: 'hidden', backgroundColor: '#fff', elevation: 3, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4 }}>
+                  <View style={{ position: 'relative' }}>
+                    <Image 
+                      source={{ uri: banner.imageUrl }} 
+                      style={{ width: '100%', height: 160 }}
+                      resizeMode="cover"
+                    />
+                    <View style={{ position: 'absolute', top: 8, right: 8, backgroundColor: 'rgba(0,0,0,0.5)', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
+                      <Text style={{ color: '#fff', fontSize: 10, fontWeight: 'bold' }}>Ad</Text>
+                    </View>
+                    <View style={{ position: 'absolute', bottom: 0, left: 0, right: 0, backgroundColor: 'rgba(0,0,0,0.6)', paddingHorizontal: 16, paddingVertical: 12 }}>
+                      <Text style={{ color: '#fff', fontSize: 16, fontWeight: '800' }}>{banner.title}</Text>
+                      {banner.description && (
+                        <Text style={{ color: '#E5E7EB', fontSize: 12, marginTop: 2 }}>{banner.description}</Text>
+                      )}
+                    </View>
+                  </View>
                 </View>
-                <View style={{ position: 'absolute', bottom: 0, left: 0, right: 0, backgroundColor: 'rgba(0,0,0,0.6)', paddingHorizontal: 16, paddingVertical: 12 }}>
-                  <Text style={{ color: '#fff', fontSize: 16, fontWeight: '800' }}>Special Shoe Sale!</Text>
-                  <Text style={{ color: '#E5E7EB', fontSize: 12, marginTop: 2 }}>Flat 30% Off on top brands.</Text>
-                </View>
-              </View>
-            </View>
+              ))
+            ) : null}
 
             {/* 149 Store */}
             {store149Items.length > 0 && (
@@ -1766,6 +1822,35 @@ export default function HomeScreen() {
           </View>
         </KeyboardAvoidingView>
       </Modal>
+
+      {/* STARTUP AD MODAL */}
+      {activeStartupAd && (
+        <Modal visible={hasShownStartupAd && !!activeStartupAd} transparent animationType="fade">
+          <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', alignItems: 'center', padding: 24 }}>
+            <View style={{ width: '100%', backgroundColor: '#fff', borderRadius: 24, overflow: 'hidden', position: 'relative' }}>
+              <TouchableOpacity 
+                style={{ position: 'absolute', top: 12, right: 12, zIndex: 10, backgroundColor: 'rgba(255,255,255,0.8)', padding: 6, borderRadius: 16 }}
+                onPress={() => setActiveStartupAd(null)}
+              >
+                <Feather name="x" size={20} color="#000" />
+              </TouchableOpacity>
+              <Image source={{ uri: activeStartupAd.imageUrl }} style={{ width: '100%', height: 300 }} resizeMode="cover" />
+              <View style={{ padding: 20 }}>
+                <Text style={{ fontSize: 20, fontWeight: '800', color: '#111827', marginBottom: 8 }}>{activeStartupAd.title}</Text>
+                {activeStartupAd.description && (
+                  <Text style={{ fontSize: 14, color: '#4B5563', lineHeight: 20 }}>{activeStartupAd.description}</Text>
+                )}
+                <TouchableOpacity 
+                  style={{ backgroundColor: '#7C3AED', paddingVertical: 14, borderRadius: 12, alignItems: 'center', marginTop: 20 }}
+                  onPress={() => setActiveStartupAd(null)}
+                >
+                  <Text style={{ color: '#fff', fontSize: 16, fontWeight: 'bold' }}>Continue to App</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </Modal>
+      )}
 
     </View>
   );

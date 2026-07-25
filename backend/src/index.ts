@@ -29,6 +29,7 @@ import zonesRoutes from "./modules/zones/zones.routes";
 import notificationsRoutes from "./modules/notifications/notifications.routes";
 import supportRoutes from "./modules/support/support.routes";
 import reviewRoutes from "./modules/reviews/reviews.routes";
+import bannersRoutes from "./modules/banners/banners.routes";
 
 const app = express();
 const server = http.createServer(app);
@@ -74,6 +75,7 @@ connectDB().then(async () => {
   app.use("/api/v1/notifications", notificationsRoutes);
   app.use("/api/v1/support", supportRoutes);
   app.use("/api/v1/reviews", reviewRoutes);
+  app.use("/api/v1/banners", bannersRoutes);
 
   // Global Error Handler Middleware
   app.use(globalErrorHandler);

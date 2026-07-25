@@ -226,13 +226,6 @@ export default function ProfileScreen() {
         >
           <Feather name="arrow-left" size={20} color={colors.text} />
         </TouchableOpacity>
-        <TouchableOpacity
-          onPress={() => setNotificationsVisible(true)}
-          style={styles.headerButton}
-          activeOpacity={0.8}
-        >
-          <Feather name="bell" size={20} color={colors.text} />
-        </TouchableOpacity>
       </View>
 
       <ScrollView 
@@ -252,86 +245,98 @@ export default function ProfileScreen() {
               )}
             </View>
           </TouchableOpacity>
-          <Text style={styles.userName}>{user?.name || "Dhanush"}</Text>
-          <View style={styles.premiumBadge}>
-            <MaterialCommunityIcons name="rhombus-medium" size={14} color="#6366F1" />
-            <Text style={styles.premiumText}>PREMIUM MEMBER</Text>
+          <View style={styles.avatarTextContainer}>
+            <Text style={styles.userName}>{user?.name || "Dhanush"}</Text>
+            <View style={styles.premiumBadge}>
+              <MaterialCommunityIcons name="rhombus-medium" size={12} color="#6366F1" />
+              <Text style={styles.premiumText}>PREMIUM MEMBER</Text>
+            </View>
           </View>
         </View>
 
-        {/* Stats Row Cards */}
-        <View style={styles.statsContainer}>
-          <TouchableOpacity 
-            style={styles.statsCard} 
-            activeOpacity={0.8}
-            onPress={() => router.replace("/(tabs)/orders")}
-          >
-            <View style={styles.statsIconBg}>
-              <Feather name="shopping-bag" size={18} color="#8B5CF6" />
-            </View>
-            <Text style={styles.statsNumber}>{ordersCount}</Text>
-            <Text style={styles.statsLabel}>Total Orders</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity 
-            style={styles.statsCard} 
-            activeOpacity={0.8}
-            onPress={() => router.push("/delivery/saved-addresses")}
-          >
-            <View style={styles.statsIconBg}>
-              <Ionicons name="location-outline" size={20} color="#8B5CF6" />
-            </View>
-            <Text style={styles.statsNumber}>{user?.addresses?.length || 0}</Text>
-            <Text style={styles.statsLabel}>Saved Places</Text>
-          </TouchableOpacity>
-        </View>
-
-        {/* Quick Access Section */}
-        <Text style={styles.sectionTitle}>Quick Access</Text>
+        <Text style={styles.sectionTitle}>ACCOUNT</Text>
         
-        <View style={styles.quickAccessGrid}>
-          <TouchableOpacity style={styles.gridItem} activeOpacity={0.8} onPress={() => setEditing(true)}>
-            <View style={[styles.gridIconBg, { backgroundColor: '#EEF2FF' }]}>
-              <Feather name="user" size={18} color="#6366F1" />
+        <View style={styles.menuContainer}>
+          <TouchableOpacity style={styles.menuItem} activeOpacity={0.8} onPress={() => router.push("/(tabs)/orders")}>
+            <View style={[styles.menuIconBg, { backgroundColor: '#F3E8FF' }]}>
+              <Feather name="shopping-bag" size={20} color="#8B5CF6" />
             </View>
-            <Text style={styles.gridLabel}>Info</Text>
+            <View style={styles.menuItemTextContainer}>
+              <Text style={styles.menuTitle}>Orders</Text>
+              <Text style={styles.menuSubtitle}>View your order history</Text>
+            </View>
+            <Feather name="chevron-right" size={20} color="#9CA3AF" />
           </TouchableOpacity>
-
-          <TouchableOpacity style={styles.gridItem} activeOpacity={0.8} onPress={() => router.push("/delivery/saved-addresses")}>
-            <View style={[styles.gridIconBg, { backgroundColor: '#EFF6FF' }]}>
-              <Feather name="map-pin" size={18} color="#3B82F6" />
+          <View style={styles.menuDivider} />
+          <TouchableOpacity style={styles.menuItem} activeOpacity={0.8} onPress={() => setEditing(true)}>
+            <View style={[styles.menuIconBg, { backgroundColor: '#F3E8FF' }]}>
+              <Feather name="user" size={20} color="#8B5CF6" />
             </View>
-            <Text style={styles.gridLabel}>Places</Text>
+            <View style={styles.menuItemTextContainer}>
+              <Text style={styles.menuTitle}>Info</Text>
+              <Text style={styles.menuSubtitle}>Manage your profile information</Text>
+            </View>
+            <Feather name="chevron-right" size={20} color="#9CA3AF" />
           </TouchableOpacity>
+          <View style={styles.menuDivider} />
 
-          <TouchableOpacity style={styles.gridItem} activeOpacity={0.8} onPress={() => router.push("/support")}>
-            <View style={[styles.gridIconBg, { backgroundColor: '#E0F2FE' }]}>
-              <Feather name="headphones" size={18} color="#0284C7" />
+          <TouchableOpacity style={styles.menuItem} activeOpacity={0.8} onPress={() => router.push("/delivery/saved-addresses")}>
+            <View style={[styles.menuIconBg, { backgroundColor: '#F3E8FF' }]}>
+              <Feather name="map-pin" size={20} color="#8B5CF6" />
             </View>
-            <Text style={styles.gridLabel}>Support</Text>
+            <View style={styles.menuItemTextContainer}>
+              <Text style={styles.menuTitle}>Places</Text>
+              <Text style={styles.menuSubtitle}>Your saved addresses</Text>
+            </View>
+            <Feather name="chevron-right" size={20} color="#9CA3AF" />
           </TouchableOpacity>
-        </View>
+          <View style={styles.menuDivider} />
 
-        <View style={[styles.quickAccessGrid, { marginTop: 12 }]}>
-          <TouchableOpacity style={styles.gridItem} activeOpacity={0.8} onPress={() => router.push("/favorites")}>
-            <View style={[styles.gridIconBg, { backgroundColor: '#FEF2F2' }]}>
-              <Feather name="heart" size={18} color="#EF4444" />
+          <TouchableOpacity style={styles.menuItem} activeOpacity={0.8} onPress={() => router.push("/support")}>
+            <View style={[styles.menuIconBg, { backgroundColor: '#EFF6FF' }]}>
+              <Feather name="headphones" size={20} color="#3B82F6" />
             </View>
-            <Text style={styles.gridLabel}>Favorites</Text>
+            <View style={styles.menuItemTextContainer}>
+              <Text style={styles.menuTitle}>Support</Text>
+              <Text style={styles.menuSubtitle}>Help & support centre</Text>
+            </View>
+            <Feather name="chevron-right" size={20} color="#9CA3AF" />
           </TouchableOpacity>
+          <View style={styles.menuDivider} />
 
-          <TouchableOpacity style={styles.gridItem} activeOpacity={0.8} onPress={() => setNotificationsVisible(true)}>
-            <View style={[styles.gridIconBg, { backgroundColor: '#F0FDF4' }]}>
-              <Feather name="bell" size={18} color="#22C55E" />
+          <TouchableOpacity style={styles.menuItem} activeOpacity={0.8} onPress={() => router.push("/favorites")}>
+            <View style={[styles.menuIconBg, { backgroundColor: '#FCE7F3' }]}>
+              <Feather name="heart" size={20} color="#EC4899" />
             </View>
-            <Text style={styles.gridLabel}>Notifications</Text>
+            <View style={styles.menuItemTextContainer}>
+              <Text style={styles.menuTitle}>Favorites</Text>
+              <Text style={styles.menuSubtitle}>Your favorite restaurants & items</Text>
+            </View>
+            <Feather name="chevron-right" size={20} color="#9CA3AF" />
           </TouchableOpacity>
+          <View style={styles.menuDivider} />
 
-          <TouchableOpacity style={styles.gridItem} activeOpacity={0.8} onPress={() => setSecurityVisible(true)}>
-            <View style={[styles.gridIconBg, { backgroundColor: '#FFF7ED' }]}>
-              <Feather name="shield" size={18} color="#F97316" />
+          <TouchableOpacity style={styles.menuItem} activeOpacity={0.8} onPress={() => setNotificationsVisible(true)}>
+            <View style={[styles.menuIconBg, { backgroundColor: '#DCFCE7' }]}>
+              <Feather name="bell" size={20} color="#22C55E" />
             </View>
-            <Text style={styles.gridLabel}>Security</Text>
+            <View style={styles.menuItemTextContainer}>
+              <Text style={styles.menuTitle}>Notifications</Text>
+              <Text style={styles.menuSubtitle}>Manage your notification preferences</Text>
+            </View>
+            <Feather name="chevron-right" size={20} color="#9CA3AF" />
+          </TouchableOpacity>
+          <View style={styles.menuDivider} />
+
+          <TouchableOpacity style={styles.menuItem} activeOpacity={0.8} onPress={() => setSecurityVisible(true)}>
+            <View style={[styles.menuIconBg, { backgroundColor: '#E0F2FE' }]}>
+              <Feather name="shield" size={20} color="#0EA5E9" />
+            </View>
+            <View style={styles.menuItemTextContainer}>
+              <Text style={styles.menuTitle}>Security</Text>
+              <Text style={styles.menuSubtitle}>Privacy & account security</Text>
+            </View>
+            <Feather name="chevron-right" size={20} color="#9CA3AF" />
           </TouchableOpacity>
         </View>
 
@@ -343,16 +348,17 @@ export default function ProfileScreen() {
           disabled={loading}
         >
           {loading ? (
-            <ActivityIndicator size="small" color="#EF4444" />
+            <ActivityIndicator size="small" color="#6366F1" />
           ) : (
             <>
-              <Feather name="log-out" size={16} color="#EF4444" />
-              <Text style={styles.signOutBtnText}>Sign Out</Text>
+              <Feather name="log-out" size={20} color="#6366F1" />
+              <View>
+                <Text style={styles.signOutBtnTitle}>Sign Out</Text>
+                <Text style={styles.signOutBtnSub}>You will be logged out from your account</Text>
+              </View>
             </>
           )}
         </TouchableOpacity>
-
-        <Text style={styles.versionText}>App Version 1.2.0 • Build 240405</Text>
       </ScrollView>
 
       {/* Edit Modal */}
@@ -603,28 +609,24 @@ const styles = StyleSheet.create({
     paddingBottom: 40,
   },
   avatarSection: {
+    flexDirection: 'row',
     alignItems: 'center',
     marginTop: 12,
-    marginBottom: 20,
+    marginBottom: 24,
   },
   avatarOuterRing: {
-    width: moderateScale(110),
-    height: moderateScale(110),
-    borderRadius: moderateScale(55),
+    width: moderateScale(100),
+    height: moderateScale(100),
+    borderRadius: moderateScale(50),
     borderWidth: 8,
     borderColor: '#EEF2FF',
     alignItems: 'center',
     justifyContent: 'center',
-    shadowColor: '#6366F1',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 4,
   },
   avatarContainer: {
-    width: moderateScale(94),
-    height: moderateScale(94),
-    borderRadius: moderateScale(47),
+    width: moderateScale(84),
+    height: moderateScale(84),
+    borderRadius: moderateScale(42),
     overflow: 'hidden',
   },
   avatarPlaceholder: {
@@ -642,22 +644,24 @@ const styles = StyleSheet.create({
     width: '100%',
     height: '100%',
   },
+  avatarTextContainer: {
+    marginLeft: 16,
+    flex: 1,
+  },
   userName: {
     fontSize: moderateScale(22),
     fontWeight: '800',
     color: '#111',
-    marginTop: 12,
-    textAlign: 'center',
   },
   premiumBadge: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#EEF2FF',
     paddingHorizontal: 12,
-    paddingVertical: 4,
+    paddingVertical: 6,
     borderRadius: 12,
-    marginTop: 6,
-    alignSelf: 'center',
+    marginTop: 8,
+    alignSelf: 'flex-start',
   },
   premiumText: {
     fontSize: moderateScale(10),
@@ -668,31 +672,37 @@ const styles = StyleSheet.create({
   },
   statsContainer: {
     flexDirection: 'row',
-    gap: 16,
-    marginTop: 12,
-  },
-  statsCard: {
-    flex: 1,
     backgroundColor: '#fff',
-    borderWidth: 1,
-    borderColor: '#F3F4F6',
     borderRadius: 16,
-    padding: 16,
-    alignItems: 'center',
     elevation: 2,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.03,
     shadowRadius: 6,
+    paddingVertical: 20,
+    marginBottom: 24,
   },
-  statsIconBg: {
-    width: moderateScale(36),
-    height: moderateScale(36),
-    borderRadius: moderateScale(18),
-    backgroundColor: '#EEF2FF',
+  statsItem: {
+    flex: 1,
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 8,
+    gap: 16,
+  },
+  statsDivider: {
+    width: 1,
+    backgroundColor: '#F3F4F6',
+  },
+  statsIconBg: {
+    width: moderateScale(44),
+    height: moderateScale(44),
+    borderRadius: moderateScale(22),
+    backgroundColor: '#F3E8FF',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  statsTextContainer: {
+    alignItems: 'flex-start',
   },
   statsNumber: {
     fontSize: moderateScale(18),
@@ -706,99 +716,70 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
   sectionTitle: {
-    fontSize: moderateScale(15),
-    fontWeight: '800',
-    color: '#1F2937',
-    marginTop: 28,
-    marginBottom: 12,
-  },
-  quickAccessGrid: {
-    flexDirection: 'row',
-    gap: 12,
-  },
-  gridItem: {
-    flex: 1,
-    backgroundColor: '#fff',
-    borderRadius: 16,
-    padding: 12,
-    alignItems: 'center',
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.02,
-    shadowRadius: 6,
-  },
-  gridIconBg: {
-    width: moderateScale(44),
-    height: moderateScale(44),
-    borderRadius: moderateScale(22),
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 8,
-  },
-  gridLabel: {
     fontSize: moderateScale(12),
-    fontWeight: '600',
-    color: '#374151',
-  },
-  bannerContainer: {
-    marginTop: 24,
-    borderRadius: 16,
-    overflow: 'hidden',
-  },
-  bannerGradient: {
-    flexDirection: 'row',
-    padding: 20,
-    alignItems: 'center',
-  },
-  bannerTitle: {
-    fontSize: moderateScale(16),
-    fontWeight: '800',
-    color: '#fff',
-  },
-  bannerSubtitle: {
-    fontSize: moderateScale(11),
-    fontWeight: '500',
-    color: '#E0E7FF',
-    marginTop: 4,
-  },
-  bannerIllustration: {
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  avatarGroup: {
-    flexDirection: 'row',
-  },
-  avatarMini: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    borderWidth: 1.5,
-    borderColor: '#fff',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  avatarMiniText: {
-    fontSize: 9,
     fontWeight: '700',
-    color: '#fff',
+    color: '#6B7280',
+    marginBottom: 12,
+    letterSpacing: 0.5,
+    textTransform: 'uppercase',
+  },
+  menuContainer: {
+    marginBottom: 20,
+  },
+  menuItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+  },
+  menuIconBg: {
+    width: moderateScale(40),
+    height: moderateScale(40),
+    borderRadius: moderateScale(20),
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 16,
+  },
+  menuItemTextContainer: {
+    flex: 1,
+  },
+  menuTitle: {
+    fontSize: moderateScale(15),
+    fontWeight: '700',
+    color: '#111',
+  },
+  menuSubtitle: {
+    fontSize: moderateScale(12),
+    fontWeight: '400',
+    color: '#6B7280',
+    marginTop: 2,
+  },
+  menuDivider: {
+    height: 1,
+    backgroundColor: '#D1D5DB', // Darkened so it's visible on the screen background
+    marginLeft: 72,
+    marginRight: 16,
   },
   signOutBtn: {
-    marginTop: 24,
-    height: moderateScale(50),
-    borderWidth: 1.5,
-    borderColor: '#EF4444',
-    borderRadius: 16,
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    backgroundColor: '#fff',
+    padding: 16,
+    backgroundColor: '#FAFAFF',
+    borderWidth: 1,
+    borderColor: '#C7D2FE',
+    borderRadius: 16,
+    gap: 16,
+    marginBottom: 12,
   },
-  signOutBtnText: {
-    fontSize: moderateScale(14),
+  signOutBtnTitle: {
+    fontSize: moderateScale(15),
     fontWeight: '700',
-    color: '#EF4444',
+    color: '#6366F1',
+  },
+  signOutBtnSub: {
+    fontSize: moderateScale(11),
+    fontWeight: '400',
+    color: '#64748B',
+    marginTop: 2,
   },
   versionText: {
     fontSize: moderateScale(11),

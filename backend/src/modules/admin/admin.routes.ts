@@ -40,7 +40,12 @@ router.post("/dev-drivers/seed", authenticateToken, authorizeRole([UserRole.ADMI
 router.get("/dev-drivers", authenticateToken, authorizeRole([UserRole.ADMIN]), adminController.getDevDrivers.bind(adminController));
 router.put("/dev-drivers/:id", authenticateToken, authorizeRole([UserRole.ADMIN]), adminController.updateDevDriver.bind(adminController));
 router.delete("/dev-drivers", authenticateToken, authorizeRole([UserRole.ADMIN]), adminController.deleteDevDrivers.bind(adminController));
-//jiiiii
+// Banners management routes
+router.get("/banners", authenticateToken, authorizeRole([UserRole.ADMIN]), adminController.getBanners.bind(adminController));
+router.post("/banners", authenticateToken, authorizeRole([UserRole.ADMIN]), adminController.createBanner.bind(adminController));
+router.put("/banners/:id", authenticateToken, authorizeRole([UserRole.ADMIN]), adminController.updateBanner.bind(adminController));
+router.delete("/banners/:id", authenticateToken, authorizeRole([UserRole.ADMIN]), adminController.deleteBanner.bind(adminController));
+
 // User and Driver details routes
 router.get("/users/:id", authenticateToken, authorizeRole([UserRole.ADMIN]), adminController.getUserDetail.bind(adminController));
 router.get("/drivers/:id", authenticateToken, authorizeRole([UserRole.ADMIN]), adminController.getDriverDetail.bind(adminController));
