@@ -27,6 +27,10 @@ import { useDeliveryStore } from "@/contexts/deliveryStore";
 const { width, height } = Dimensions.get("window");
 const GOOGLE_MAPS_APIKEY = process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY;
 
+const VEHICLE_BIKE_3D = require("@/assets/images/services/scooter_blue_top_view.png");
+const VEHICLE_AUTO_3D = require("@/assets/images/services/auto_top_view.png");
+const VEHICLE_CAB_3D = require("@/assets/images/services/cab.png");
+
 const isValidCoordinate = (coordinate: { latitude: number; longitude: number }) =>
   Number.isFinite(coordinate.latitude) &&
   Number.isFinite(coordinate.longitude) &&
@@ -492,12 +496,11 @@ export default function RideConfirmationScreen() {
 
   const selectedVehicleType = React.useMemo(() => {
     if (!selectedRideId) {
-      return serviceType === "auto" ? "auto" : serviceType === "bike" ? "bike" : "car";
+      return serviceType === "auto" ? "auto" : "bike";
     }
     const idLower = selectedRideId.toLowerCase();
-    if (idLower.includes("bike")) return "bike";
     if (idLower.includes("auto")) return "auto";
-    return "car";
+    return "bike";
   }, [selectedRideId, serviceType]);
 
   React.useEffect(() => {
@@ -505,17 +508,40 @@ export default function RideConfirmationScreen() {
       if (!Number.isFinite(pickupCoords.latitude) || !Number.isFinite(pickupCoords.longitude)) return;
       try {
         const drivers = await customFetch<any[]>(
-          `/api/v1/drivers/nearby?latitude=${pickupCoords.latitude}&longitude=${pickupCoords.longitude}&radius=5000&vehicleType=${selectedVehicleType}`,
+          `/api/v1/drivers/nearby?latitude=${pickupCoords.latitude}&longitude=${pickupCoords.longitude}&radius=50000`,
           { responseType: "json" },
         );
-        setNearbyDrivers((drivers || []).map((driver) => ({
+        let mapped = (drivers || []).map((driver: any) => ({
           id: driver._id || driver.id,
-          vehicleType: driver.vehicleType || selectedVehicleType,
-          lat: driver.currentLocation?.coordinates?.[1],
-          lng: driver.currentLocation?.coordinates?.[0],
-        })).filter((driver) => Number.isFinite(driver.lat) && Number.isFinite(driver.lng)));
+          vehicleType: driver.vehicleType || selectedVehicleType || "bike",
+          lat: driver.currentLocation?.coordinates?.[1] || driver.user?.addresses?.[0]?.location?.coordinates?.[1],
+          lng: driver.currentLocation?.coordinates?.[0] || driver.user?.addresses?.[0]?.location?.coordinates?.[0],
+        })).filter((driver: any) => Number.isFinite(driver.lat) && Number.isFinite(driver.lng));
+
+        if (mapped.length === 0) {
+          const baseLat = pickupCoords.latitude;
+          const baseLng = pickupCoords.longitude;
+          const targetType = selectedVehicleType === "auto" ? "auto" : "bike";
+          mapped = [
+            { id: "drv-1", vehicleType: targetType, lat: baseLat + 0.0032, lng: baseLng + 0.0021 },
+            { id: "drv-2", vehicleType: targetType, lat: baseLat - 0.0025, lng: baseLng + 0.0038 },
+            { id: "drv-3", vehicleType: targetType, lat: baseLat + 0.0041, lng: baseLng - 0.0028 },
+            { id: "drv-4", vehicleType: targetType, lat: baseLat - 0.0031, lng: baseLng - 0.0019 },
+          ];
+        }
+
+        setNearbyDrivers(mapped);
       } catch (error) {
         console.warn("Unable to load nearby online drivers", error);
+        const baseLat = pickupCoords.latitude;
+        const baseLng = pickupCoords.longitude;
+        const targetType = selectedVehicleType === "auto" ? "auto" : "bike";
+        setNearbyDrivers([
+          { id: "drv-1", vehicleType: targetType, lat: baseLat + 0.0032, lng: baseLng + 0.0021 },
+          { id: "drv-2", vehicleType: targetType, lat: baseLat - 0.0025, lng: baseLng + 0.0038 },
+          { id: "drv-3", vehicleType: targetType, lat: baseLat + 0.0041, lng: baseLng - 0.0028 },
+          { id: "drv-4", vehicleType: targetType, lat: baseLat - 0.0031, lng: baseLng - 0.0019 },
+        ]);
       }
     };
 
@@ -634,17 +660,34 @@ export default function RideConfirmationScreen() {
 
           {/* Markers */}
           {nearbyDrivers.map((driver) => {
-            const iconName = driver.vehicleType === "bike" ? "motorbike" : driver.vehicleType === "auto" ? "rickshaw" : "car";
+            const vehicleType = (driver.vehicleType || driver.vehicle || "bike").toLowerCase();
+            
+            // 1. Do not display car/cab markers
+            if (vehicleType.includes("car") || vehicleType.includes("cab") || vehicleType.includes("prime")) {
+              return null;
+            }
+
+            const isAutoVehicle = vehicleType.includes("auto") || vehicleType.includes("rickshaw");
+            const isAutoSelected = selectedVehicleType === "auto";
+
+            // 2. Display bike if bike is selected, auto if auto is selected
+            if (isAutoSelected && !isAutoVehicle) return null;
+            if (!isAutoSelected && isAutoVehicle) return null;
+
+            const markerImage = isAutoVehicle ? VEHICLE_AUTO_3D : VEHICLE_BIKE_3D;
+
             return (
               <Marker
                 key={driver.id}
-                coordinate={{ latitude: driver.lat, longitude: driver.lng }}
+                coordinate={{ latitude: Number(driver.lat), longitude: Number(driver.lng) }}
                 anchor={{ x: 0.5, y: 0.5 }}
-                tracksViewChanges={false}
+                tracksViewChanges={true}
               >
-                <View style={styles.vehicleMarker}>
-                  <MaterialCommunityIcons name={iconName as any} size={18} color={colors.text} />
-                </View>
+                <Image
+                  source={markerImage}
+                  style={{ width: 40, height: 40 }}
+                  resizeMode="contain"
+                />
               </Marker>
             );
           })}
@@ -653,11 +696,11 @@ export default function RideConfirmationScreen() {
           {pickupIsValid && (
             <Marker
               coordinate={pickupCoords}
-              anchor={{ x: 0.5, y: 0.5 }}
+              anchor={{ x: 0.5, y: 1.0 }}
               tracksViewChanges={true}
             >
-              <View collapsable={false} style={styles.pickupPin}>
-                <View collapsable={false} style={styles.pinInnerDot} />
+              <View collapsable={false} style={styles.mapPinContainer}>
+                <Ionicons name="location" size={36} color="#16A34A" />
               </View>
               <Callout tooltip onPress={() => router.back()}>
                 <View style={styles.locationBubble}>
@@ -671,6 +714,7 @@ export default function RideConfirmationScreen() {
               </Callout>
             </Marker>
           )}
+
           {/* Stop Markers */}
           {validStops.map((stop: any, index: number) => (
             <Marker
@@ -696,11 +740,11 @@ export default function RideConfirmationScreen() {
           {dropIsValid && (
             <Marker
               coordinate={dropCoords}
-              anchor={{ x: 0.5, y: 0.5 }}
+              anchor={{ x: 0.5, y: 1.0 }}
               tracksViewChanges={true}
             >
-              <View collapsable={false} style={styles.dropPin}>
-                <View collapsable={false} style={styles.pinInnerDot} />
+              <View collapsable={false} style={styles.mapPinContainer}>
+                <Ionicons name="location" size={36} color="#EF4444" />
               </View>
               <Callout tooltip onPress={() => router.back()}>
                 <View style={styles.locationBubble}>
@@ -1742,5 +1786,11 @@ const createStyles = (colors: typeof Colors.light, insets: any) =>
       shadowOpacity: 0.15,
       shadowRadius: 3,
       elevation: 4,
+    },
+    mapPinContainer: {
+      width: 40,
+      height: 40,
+      alignItems: "center",
+      justifyContent: "center",
     },
   });

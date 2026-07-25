@@ -62,7 +62,7 @@ export default function AddAddressScreen() {
   const [addressLine, setAddressLine] = useState("");
   const [completeAddress, setCompleteAddress] = useState("");
   const [instructions, setInstructions] = useState("");
-  
+
   // Internal helper states
   const [phone, setPhone] = useState(String(params.phone || ""));
   const [receiverName, setReceiverName] = useState(String(params.receiverName || ""));
@@ -158,7 +158,7 @@ export default function AddAddressScreen() {
       }
 
       const fullAddr = String(params.addressLine || "");
-      
+
       // 1. Extract Instructions
       const matchInst = fullAddr.match(/\(Instructions: (.*?)\)/);
       if (matchInst) {
@@ -196,12 +196,13 @@ export default function AddAddressScreen() {
           const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
           setUserCoords({ lat: loc.coords.latitude, lng: loc.coords.longitude });
         }
-      } catch (e) {}
+      } catch (e) { }
     })();
   }, []);
 
   const onRegionChangeComplete = async (r: any) => {
     setRegion(r);
+    setIsResolvingAddress(true);
     // Ignore initial mount region change in edit mode so original address text is not overwritten
     if (isEditMode && !isMapReady.current) {
       isMapReady.current = true;
@@ -211,7 +212,9 @@ export default function AddAddressScreen() {
           setShortAddress(place.name || place.street || place.city || "Selected Location");
           setCityOrCountry([place.city, place.region].filter(Boolean).join(", ") || "India");
         }
-      } catch (e) {}
+      } catch (e) { } finally {
+        setIsResolvingAddress(false);
+      }
       return;
     }
     await fetchAddressForCoords(r.latitude, r.longitude);
@@ -362,6 +365,9 @@ export default function AddAddressScreen() {
             provider={Platform.OS === "android" ? PROVIDER_GOOGLE : PROVIDER_DEFAULT}
             style={styles.map}
             initialRegion={region}
+            onRegionChange={() => {
+              if (!isResolvingAddress) setIsResolvingAddress(true);
+            }}
             onRegionChangeComplete={onRegionChangeComplete}
             showsUserLocation={true}
             showsMyLocationButton={false}
@@ -379,6 +385,13 @@ export default function AddAddressScreen() {
                 onChangeText={handleSearch}
               />
               {searching && <ActivityIndicator size="small" color={COLORS.secondary} />}
+            </View>
+
+            <View style={{ marginTop: 8, alignItems: "flex-start" }}>
+              <TouchableOpacity style={styles.useCurrentLocBtn} onPress={handleUseCurrentLocation}>
+                <Feather name="crosshair" size={16} color={COLORS.primary} />
+                <Text style={styles.useCurrentLocText}>Use current location</Text>
+              </TouchableOpacity>
             </View>
 
             {searchResults.length > 0 && (
@@ -402,7 +415,14 @@ export default function AddAddressScreen() {
           {/* Central Map Pin Marker */}
           <View style={styles.centerMarkerContainer} pointerEvents="none">
             <View style={styles.tooltipBubble}>
-              <Text style={styles.tooltipText}>Move the pin to adjust your location</Text>
+              {isResolvingAddress ? (
+                <>
+                  <ActivityIndicator size="small" color={COLORS.onPrimary} style={{ marginRight: 4 }} />
+                  <Text style={styles.tooltipText}>Fetching location...</Text>
+                </>
+              ) : (
+                <Text style={styles.tooltipText}>Move the pin to adjust your location</Text>
+              )}
             </View>
             <View style={styles.tooltipTriangle} />
             <View style={styles.markerIcon}>
@@ -413,31 +433,40 @@ export default function AddAddressScreen() {
           </View>
 
           <View style={styles.bottomOverlay}>
-            <View style={{ alignItems: "center", marginBottom: 16 }}>
-              <TouchableOpacity style={styles.useCurrentLocBtn} onPress={handleUseCurrentLocation}>
-                <Feather name="crosshair" size={16} color={COLORS.primary} />
-                <Text style={styles.useCurrentLocText}>Use current location</Text>
-              </TouchableOpacity>
-            </View>
-
-            <View style={[styles.bottomCard, { paddingBottom: insets.bottom + 16 }]}>
+            <View style={[styles.bottomCard, { paddingBottom: Math.max(insets.bottom, 16) }]}>
               <Text style={styles.cardHeader}>Delivering your order to</Text>
 
               <View style={styles.addressSummaryBox}>
                 <View style={styles.addressIconWrap}>
-                  <Feather name="map-pin" size={20} color={COLORS.primary} />
+                  {isResolvingAddress ? (
+                    <ActivityIndicator size="small" color={COLORS.primary} />
+                  ) : (
+                    <Feather name="map-pin" size={20} color={COLORS.primary} />
+                  )}
                 </View>
                 <View style={styles.addressTextWrap}>
-                  <Text style={styles.shortAddress}>{shortAddress}</Text>
-                  <Text style={styles.cityCountry}>{cityOrCountry}</Text>
+                  <Text style={styles.shortAddress} numberOfLines={1}>
+                    {isResolvingAddress ? "Fetching location..." : shortAddress}
+                  </Text>
+                  <Text style={styles.cityCountry} numberOfLines={1}>
+                    {isResolvingAddress ? "Updating address for pin..." : cityOrCountry}
+                  </Text>
                 </View>
                 <TouchableOpacity style={styles.changeBtn} onPress={() => searchInputRef.current?.focus()}>
                   <Text style={styles.changeBtnText}>Change</Text>
                 </TouchableOpacity>
               </View>
 
-              <TouchableOpacity style={styles.stepOneNextBtn} onPress={() => setStep(2)}>
-                <Text style={styles.stepOneNextBtnText}>Add more address details ▶</Text>
+              <TouchableOpacity
+                style={[styles.stepOneNextBtn, isResolvingAddress && { opacity: 0.7 }]}
+                onPress={() => setStep(2)}
+                disabled={isResolvingAddress}
+              >
+                {isResolvingAddress ? (
+                  <ActivityIndicator size="small" color={COLORS.onPrimary} />
+                ) : (
+                  <Text style={styles.stepOneNextBtnText}>Add more address details ▶</Text>
+                )}
               </TouchableOpacity>
             </View>
           </View>
@@ -447,7 +476,7 @@ export default function AddAddressScreen() {
         <View style={styles.detailsContainer}>
           <ScrollView
             showsVerticalScrollIndicator={false}
-            contentContainerStyle={[styles.detailsScroll, { paddingBottom: insets.bottom + 120 }]}
+            contentContainerStyle={[styles.detailsScroll, { paddingBottom: Math.max(insets.bottom, 16) + 80 }]}
           >
             {/* Map Preview Card (Tapping returns to Step 1 Map Picker) */}
             <TouchableOpacity
@@ -566,7 +595,7 @@ export default function AddAddressScreen() {
           </ScrollView>
 
           {/* Fixed Bottom Save Button */}
-          <View style={[styles.fixedBottomBox, { paddingBottom: insets.bottom + 16 }]}>
+          <View style={[styles.fixedBottomBox, { paddingBottom: Math.max(insets.bottom, 16) }]}>
             <TouchableOpacity
               style={[styles.saveBtn, loading && { opacity: 0.7 }]}
               onPress={handleSave}
@@ -703,6 +732,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 6,
     borderRadius: 6,
+    flexDirection: "row",
+    alignItems: "center",
   },
   tooltipText: {
     color: COLORS.onPrimary,
