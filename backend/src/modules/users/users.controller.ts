@@ -1,5 +1,6 @@
 import { Response } from "express";
 import User from "../../database/models/User";
+import Order from "../../database/models/Order";
 import { AuthRequest } from "../../middleware/auth.middleware";
 import cloudinary from "../../utils/cloudinary";
 
@@ -176,6 +177,61 @@ export class UsersController {
       if (!user) return res.status(404).json({ message: "User not found" });
       return res.json(user.addresses || []);
     } catch (error) {
+      return res.status(500).json({ message: "Internal server error" });
+    }
+  }
+
+  async getRecentLocations(req: AuthRequest, res: Response) {
+    try {
+      const userId = req.user?.userId;
+      if (!userId) return res.status(401).json({ message: "Unauthorized" });
+
+      const orders = await Order.find({ user: userId })
+        .sort({ createdAt: -1 })
+        .limit(20)
+        .lean();
+
+      const locationsMap = new Map<string, any>();
+
+      for (const order of orders) {
+        if (Array.isArray(order.stops)) {
+          for (const stop of order.stops) {
+            if (
+              stop.address &&
+              Array.isArray(stop.location?.coordinates) &&
+              stop.location.coordinates.length === 2
+            ) {
+              const lng = stop.location.coordinates[0];
+              const lat = stop.location.coordinates[1];
+              const fullAddr = stop.address.trim();
+
+              if (!fullAddr || (lat === 0 && lng === 0)) continue;
+
+              const normalized = fullAddr.toLowerCase();
+              if (!locationsMap.has(normalized)) {
+                const parts = fullAddr.split(",");
+                const name = parts[0]?.trim() || fullAddr;
+                const addressDetail = parts.length > 1 ? parts.slice(1).join(",").trim() : fullAddr;
+
+                locationsMap.set(normalized, {
+                  id: String((stop as any)._id || order._id || locationsMap.size + 1),
+                  name: name,
+                  address: addressDetail,
+                  fullAddress: fullAddr,
+                  lat,
+                  lng,
+                  createdAt: order.createdAt,
+                });
+              }
+            }
+          }
+        }
+      }
+
+      const recentLocations = Array.from(locationsMap.values()).slice(0, 10);
+      return res.json(recentLocations);
+    } catch (error) {
+      console.error("Get recent locations error:", error);
       return res.status(500).json({ message: "Internal server error" });
     }
   }

@@ -826,7 +826,19 @@ export default function HomeScreen() {
     ? filteredItems
     : foodFilter === 'all'
       ? filteredItems
-      : filteredItems.filter(r => foodFilter === 'veg' ? r.isPureVeg : !r.isPureVeg);
+      : filteredItems.filter((r) => {
+          if (r.isPureVeg === true || r.isVeg === true) return true;
+          if (Array.isArray(r.categories)) {
+            const hasVegCat = r.categories.some((cat: string) =>
+              cat.toLowerCase().includes("veg") && !cat.toLowerCase().includes("non")
+            );
+            if (hasVegCat) return true;
+          }
+          if (r.name && (r.name.toLowerCase().includes("veg") || r.name.toLowerCase().includes("tiffin") || r.name.toLowerCase().includes("sweets") || r.name.toLowerCase().includes("pure veg"))) {
+            return true;
+          }
+          return false;
+        });
 
   const showCategories = !hasNoLocation && (showHomeSkeleton || loadingDrivers || (nearbyDriversCount ?? 0) > 0);
 
@@ -1054,19 +1066,81 @@ export default function HomeScreen() {
         </View>
 
 
-        {/* Floating Search Bar */}
-        <View style={{ paddingHorizontal: 16, marginTop: -25, zIndex: 10 }}>
+        {/* Floating Search Bar Row with Veg Toggle */}
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 16, marginTop: -22, zIndex: 10 }}>
           <TouchableOpacity
-            style={{ backgroundColor: '#fff', borderRadius: 30, flexDirection: 'row', alignItems: 'center', padding: 8, paddingLeft: 20, shadowColor: '#000', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.1, shadowRadius: 15, elevation: 8 }}
+            style={{
+              flex: 1,
+              height: 44,
+              backgroundColor: '#fff',
+              borderRadius: 22,
+              flexDirection: 'row',
+              alignItems: 'center',
+              paddingLeft: 18,
+              paddingRight: 5,
+              shadowColor: '#000',
+              shadowOffset: { width: 0, height: 4 },
+              shadowOpacity: 0.1,
+              shadowRadius: 10,
+              elevation: 6,
+            }}
             activeOpacity={0.9}
             onPress={() => setIsSearchActive(true)}
           >
-            <Ionicons name="search" size={22} color="#9CA3AF" />
-            <Text style={{ flex: 1, marginLeft: 12, color: '#9CA3AF', fontSize: 14 }}>Search for biryani, pizza, burger...</Text>
-            <View style={{ backgroundColor: '#7C3AED', width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' }}>
-              <Ionicons name="search" size={20} color="#fff" />
+            <Text style={{ flex: 1, color: '#9CA3AF', fontSize: 13 }} numberOfLines={1}>
+              Search for biryani, pizza, burger...
+            </Text>
+            <View style={{ backgroundColor: '#7C3AED', width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center' }}>
+              <Ionicons name="search" size={16} color="#fff" />
             </View>
           </TouchableOpacity>
+
+          {activeService === 'Food' && (
+            <TouchableOpacity 
+              activeOpacity={0.85}
+              onPress={() => setFoodFilter(foodFilter === 'veg' ? 'all' : 'veg')}
+            >
+              <Animated.View style={[
+                styles.vegMorphBadge,
+                {
+                  width: vegAnim.interpolate({ inputRange: [0, 1], outputRange: [44, 85] }),
+                  backgroundColor: vegAnim.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [colors.surface, '#16A34A']
+                  }),
+                  borderColor: vegAnim.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [colors.border, '#15803D']
+                  }),
+                }
+              ]}>
+                <View style={styles.vegMorphIconWrap}>
+                  <Ionicons 
+                    name="leaf" 
+                    size={15} 
+                    color={foodFilter === 'veg' ? '#FFFFFF' : '#16A34A'} 
+                  />
+                </View>
+                <Animated.Text 
+                  numberOfLines={1}
+                  style={[
+                    styles.vegMorphText,
+                    {
+                      opacity: vegAnim,
+                      transform: [{
+                        translateX: vegAnim.interpolate({
+                          inputRange: [0, 1],
+                          outputRange: [-10, 0]
+                        })
+                      }]
+                    }
+                  ]}
+                >
+                  VEG
+                </Animated.Text>
+              </Animated.View>
+            </TouchableOpacity>
+          )}
         </View>
 
         {/* Service Categories */}
@@ -3212,5 +3286,32 @@ const createStyles = (colors: typeof Colors.light) => StyleSheet.create({
     fontSize: moderateScale(13),
     fontWeight: '700',
     color: colors.text,
+  },
+  vegMorphBadge: {
+    height: 44,
+    borderRadius: 22,
+    borderWidth: 1.5,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingLeft: 12,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 10,
+    elevation: 6,
+  },
+  vegMorphIconWrap: {
+    width: 16,
+    height: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  vegMorphText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: '900',
+    marginLeft: 6,
+    letterSpacing: 0.5,
   },
 });
