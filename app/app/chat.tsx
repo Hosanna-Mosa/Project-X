@@ -19,10 +19,10 @@ import { socketService } from "@/utils/socketService";
 import { useDeliveryStore } from "@/contexts/deliveryStore";
 
 const QUICK_REPLIES = [
-  "On my way! 👋",
-  "Running late, sorry",
-  "At the door 🚪",
-  "Thank you!",
+  "Are you coming ❓",
+  "Waiting at pickup 📍",
+  "My location is as per map 🗺️",
+  "Message when reached 💬"
 ];
 
 export default function ChatScreen() {
@@ -142,26 +142,35 @@ export default function ChatScreen() {
       keyboardVerticalOffset={0}
     >
       {/* Header */}
+      {/* Header */}
       <View style={[styles.header, { paddingTop: insets.top + (Platform.OS === "web" ? 67 : 0) + 12 }]}>
         <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
           <Feather name="arrow-left" size={22} color={Colors.light.text} />
         </TouchableOpacity>
         <View style={styles.headerCenter}>
           <View style={styles.headerAvatar}>
-            <Feather name="user" size={20} color={Colors.light.textSecondary} />
+            <Feather name="user" size={24} color={Colors.light.textSecondary} />
             <View style={styles.onlineDot} />
           </View>
           <View>
-            <Text style={styles.headerName}>{driver?.name || "John Doe"}</Text>
-            <Text style={styles.headerStatus}>Your driver · Online</Text>
+            <Text style={styles.headerName}>{driver?.name?.toUpperCase() || "DRIVER"}</Text>
+            <Text style={styles.headerStatus}>{driver?.vehicleNumber || driver?.vehicleModel || "Your Driver"}</Text>
           </View>
         </View>
         <TouchableOpacity 
           style={styles.callBtn}
           onPress={() => Linking.openURL(`tel:${driver?.phone || "1234567890"}`)}
         >
-          <Feather name="phone" size={20} color="#0EA5E9" />
+          <Feather name="phone" size={20} color={Colors.light.textSecondary} />
         </TouchableOpacity>
+      </View>
+
+      {/* Warning Banner */}
+      <View style={styles.warningBanner}>
+        <View style={styles.warningIconContainer}>
+          <Feather name="alert-triangle" size={18} color="#EA580C" />
+        </View>
+        <Text style={styles.warningText}>Do not share your PIN with the captain before the ride starts</Text>
       </View>
 
       {/* Helper Task Assignment Banner */}
@@ -191,23 +200,24 @@ export default function ChatScreen() {
         onLayout={() => flatListRef.current?.scrollToEnd({ animated: false })}
       />
 
-      {/* Quick Replies */}
-      <View style={styles.quickRepliesContainer}>
-        <FlatList
-          data={QUICK_REPLIES}
-          keyExtractor={(item) => item}
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.quickRepliesList}
-          renderItem={({ item }) => (
+      {/* Quick Replies Area */}
+      <View style={styles.quickRepliesCard}>
+        <View style={styles.quickRepliesHeaderRow}>
+          <Text style={styles.quickRepliesTitle}>⚡ Quick Chat</Text>
+          <Feather name="chevron-down" size={16} color={Colors.light.textSecondary} />
+        </View>
+        <View style={styles.quickRepliesList}>
+          {QUICK_REPLIES.map((item, index) => (
             <TouchableOpacity
-              style={styles.quickReplyChip}
+              key={index}
+              style={styles.quickReplyActionBtn}
               onPress={() => sendMessage(item)}
             >
-              <Text style={styles.quickReplyText}>{item}</Text>
+              <Text style={styles.quickReplyActionText}>{item}</Text>
+              <Feather name="send" size={16} color="#0EA5E9" />
             </TouchableOpacity>
-          )}
-        />
+          ))}
+        </View>
       </View>
 
       {/* Input Bar */}
@@ -448,7 +458,71 @@ const styles = StyleSheet.create({
     elevation: 6,
   },
   sendBtnDisabled: {
-    backgroundColor: "#CBD5E1",
     shadowOpacity: 0,
+  },
+  warningBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#FFF7ED",
+    marginHorizontal: 16,
+    marginTop: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    borderRadius: 12,
+    gap: 12,
+    borderWidth: 1,
+    borderColor: "#FFEDD5",
+  },
+  warningIconContainer: {
+    backgroundColor: "#FFEDD5",
+    padding: 6,
+    borderRadius: 8,
+  },
+  warningText: {
+    flex: 1,
+    fontSize: 13,
+    color: "#431407",
+    fontWeight: "500",
+    lineHeight: 18,
+  },
+  quickRepliesCard: {
+    backgroundColor: "#FFFFFF",
+    marginHorizontal: 16,
+    marginBottom: 8,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: "#F1F5F9",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 8,
+    elevation: 2,
+    padding: 16,
+  },
+  quickRepliesHeaderRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 12,
+  },
+  quickRepliesTitle: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: Colors.light.text,
+  },
+  quickReplyActionBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
+    borderRadius: 20,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+  },
+  quickReplyActionText: {
+    fontSize: 14,
+    color: Colors.light.textSecondary,
+    fontWeight: "500",
   },
 });

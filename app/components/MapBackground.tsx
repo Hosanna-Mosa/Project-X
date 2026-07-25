@@ -146,9 +146,12 @@ export const MapBackground = forwardRef<MapBackgroundRef, Props>(({
     }
   }));
 
-  // Auto-center map on userLocation and driverLocation dynamically
+  const hasFocusedRoute = useRef(false);
+
+  // Auto-center map on userLocation and driverLocation dynamically just once
   useEffect(() => {
-    if (internalMapRef.current && userLocation && driverLocation) {
+    if (internalMapRef.current && userLocation && driverLocation && !hasFocusedRoute.current) {
+      hasFocusedRoute.current = true;
       internalMapRef.current.fitToCoordinates([
         { latitude: Number(userLocation.lat), longitude: Number(userLocation.lng) },
         { latitude: Number(driverLocation.lat), longitude: Number(driverLocation.lng) }
@@ -156,7 +159,7 @@ export const MapBackground = forwardRef<MapBackgroundRef, Props>(({
         edgePadding: { top: 120, right: 80, bottom: 430, left: 80 }, // keep bottom high to clear the success BottomSheet
         animated: true,
       });
-    } else if (internalMapRef.current && userLocation) {
+    } else if (internalMapRef.current && userLocation && !hasFocusedRoute.current && !driverLocation) {
       const regionForUser = getRegionForLocation(userLocation.lat, userLocation.lng, 0.015, 0.015);
       internalMapRef.current.animateToRegion(regionForUser, 1000);
     }
@@ -381,7 +384,6 @@ export const MapBackground = forwardRef<MapBackgroundRef, Props>(({
               coordinate={{ latitude: Number(driver.lat), longitude: Number(driver.lng) }}
               anchor={{ x: 0.5, y: 0.5 }}
               title={driver.name || "Driver"}
-              tracksViewChanges={true}
             >
               <Image
                 source={markerImage}
@@ -423,7 +425,6 @@ export const MapBackground = forwardRef<MapBackgroundRef, Props>(({
             anchor={{ x: 0.5, y: 0.5 }}
             flat={true}
             rotation={(driverLocation as any).heading || 0}
-            tracksViewChanges={true}
           >
             <Image
               source={VEHICLE_BIKE_3D}
