@@ -68,6 +68,25 @@ export default function HomeScreen() {
 
   const [scheduledRides, setScheduledRides] = useState<any[]>([]);
   const [loadingScheduled, setLoadingScheduled] = useState(false);
+  
+  const [driverAds, setDriverAds] = useState<any[]>([]);
+
+  useEffect(() => {
+    if (!apiUrl) return;
+    (async () => {
+      try {
+        const res = await fetch(`${apiUrl}/api/v1/banners`);
+        if (res.ok) {
+          const json = await res.json();
+          const bannersArray = json.data || json;
+          const ads = bannersArray.filter((b: any) => b.itemType === 'ad' && b.position === 'driver_dashboard');
+          setDriverAds(ads);
+        }
+      } catch (err) {
+        console.warn("Failed to fetch driver ads:", err);
+      }
+    })();
+  }, []);
 
   const translateX = React.useRef(new Animated.Value(0)).current;
 
@@ -369,6 +388,26 @@ export default function HomeScreen() {
               />
             </View>
           </Pressable>
+        )}
+
+        {/* Dynamic Driver Ads */}
+        {driverAds.length > 0 && (
+          <View style={{ marginHorizontal: 16, marginTop: 4 }}>
+            {driverAds.map((ad, idx) => (
+              <View key={ad._id || idx} style={{ borderRadius: 16, overflow: 'hidden', marginBottom: 12, elevation: 3, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4, backgroundColor: '#fff' }}>
+                <Image source={{ uri: ad.imageUrl }} style={{ width: '100%', height: 140 }} resizeMode="cover" />
+                <View style={{ position: 'absolute', top: 8, right: 8, backgroundColor: 'rgba(0,0,0,0.5)', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
+                  <Text style={{ color: '#fff', fontSize: 10, fontWeight: 'bold' }}>Ad</Text>
+                </View>
+                {(ad.title || ad.description) && (
+                  <View style={{ padding: 12, backgroundColor: '#fff' }}>
+                    {ad.title && <Text style={{ fontSize: 15, fontWeight: '700', color: Colors.text }}>{ad.title}</Text>}
+                    {ad.description && <Text style={{ fontSize: 13, color: Colors.textMuted, marginTop: 2 }}>{ad.description}</Text>}
+                  </View>
+                )}
+              </View>
+            ))}
+          </View>
         )}
 
         {/* Service Toggle */}

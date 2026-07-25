@@ -18,6 +18,7 @@ import MeatCenters from "./pages/MeatCenters";
 import MeatPricing from "./pages/MeatPricing";
 import VendorLogin from "./pages/VendorLogin";
 import Zones from "./pages/Zones";
+import Banners from "./pages/Banners";
 
 import VendorDashboard from "./pages/VendorDashboard";
 import VendorScheduledOrders from "./pages/VendorScheduledOrders";
@@ -68,6 +69,7 @@ const App = () => (
           <Route path="/meat-centers" element={<MeatCenters />} />
           <Route path="/meat-pricing" element={<MeatPricing />} />
           <Route path="/zones" element={<Zones />} />
+          <Route path="/banners" element={<Banners />} />
           <Route path="/vendor-login" element={<VendorLogin />} />
 
           <Route path="/vendor/dashboard" element={<VendorDashboard />} />

@@ -8,6 +8,7 @@ import SystemConfig from "../../database/models/SystemConfig";
 import ChatMessage from "../../database/models/ChatMessage";
 import AppVersion from "../../database/models/AppVersion";
 import Zone from "../../database/models/Zone";
+import Banner from "../../database/models/Banner";
 import { SocketManager } from "../../sockets/socket.manager";
 
 export class AdminController {
@@ -1009,6 +1010,77 @@ export class AdminController {
       return res.json({ message: "All mock dev drivers deleted successfully!" });
     } catch (error) {
       console.error("Error deleting dev drivers:", error);
+      return res.status(500).json({ message: "Internal server error" });
+    }
+  }
+
+  async getBanners(req: Request, res: Response) {
+    try {
+      const banners = await Banner.find().sort({ createdAt: -1 });
+      return res.json(banners);
+    } catch (error) {
+      console.error("Error getting banners:", error);
+      return res.status(500).json({ message: "Internal server error" });
+    }
+  }
+
+  async createBanner(req: Request, res: Response) {
+    try {
+      const { title, description, imageUrl, targetUrl, itemType, position, isActive } = req.body;
+      if (!title || !imageUrl) {
+        return res.status(400).json({ message: "Title and Image URL are required" });
+      }
+
+      const banner = new Banner({
+        title,
+        description,
+        imageUrl,
+        targetUrl,
+        itemType: itemType || 'banner',
+        position: position || 'hero',
+        isActive: isActive !== undefined ? isActive : true
+      });
+
+      await banner.save();
+      return res.status(201).json({ message: "Banner created successfully", banner });
+    } catch (error) {
+      console.error("Error creating banner:", error);
+      return res.status(500).json({ message: "Internal server error" });
+    }
+  }
+
+  async updateBanner(req: Request, res: Response) {
+    try {
+      const { id } = req.params;
+      const { title, description, imageUrl, targetUrl, itemType, position, isActive } = req.body;
+      const banner = await Banner.findById(id);
+      
+      if (!banner) return res.status(404).json({ message: "Banner not found" });
+
+      if (title !== undefined) banner.title = title;
+      if (description !== undefined) banner.description = description;
+      if (imageUrl !== undefined) banner.imageUrl = imageUrl;
+      if (targetUrl !== undefined) banner.targetUrl = targetUrl;
+      if (itemType !== undefined) banner.itemType = itemType;
+      if (position !== undefined) banner.position = position;
+      if (isActive !== undefined) banner.isActive = isActive;
+
+      await banner.save();
+      return res.json({ message: "Banner updated successfully", banner });
+    } catch (error) {
+      console.error("Error updating banner:", error);
+      return res.status(500).json({ message: "Internal server error" });
+    }
+  }
+
+  async deleteBanner(req: Request, res: Response) {
+    try {
+      const { id } = req.params;
+      const banner = await Banner.findByIdAndDelete(id);
+      if (!banner) return res.status(404).json({ message: "Banner not found" });
+      return res.json({ message: "Banner deleted successfully" });
+    } catch (error) {
+      console.error("Error deleting banner:", error);
       return res.status(500).json({ message: "Internal server error" });
     }
   }
