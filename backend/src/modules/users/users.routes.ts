@@ -17,6 +17,8 @@ router.post("/addresses", authenticateToken, usersController.addAddress.bind(use
 router.patch("/addresses/:id", authenticateToken, usersController.updateAddress.bind(usersController));
 router.delete("/addresses/:id", authenticateToken, usersController.deleteAddress.bind(usersController));
 
+router.get("/recent-locations", authenticateToken, usersController.getRecentLocations.bind(usersController));
+
 router.patch("/booking-preference", authenticateToken, usersController.saveBookingPreference.bind(usersController));
 
 router.get("/favorites", authenticateToken, usersController.getFavorites.bind(usersController));

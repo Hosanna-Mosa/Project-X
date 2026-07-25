@@ -48,7 +48,7 @@ const fallbackHotspots: Hotspot[] = [
 export default function HomeScreen() {
   const insets = useSafeAreaInsets();
   const [mode, setMode] = useState<"ride" | "delivery">("ride");
-  const overlapMargin = (SCREEN_HEIGHT >= 700 && SCREEN_HEIGHT <= 850) ? 0 : -46;
+  const overlapMargin = -30;
   const [showOnlineModal, setShowOnlineModal] = useState(false);
   const [hotspots, setHotspots] = useState<Hotspot[]>(fallbackHotspots);
   const [isLoadingHotspots, setIsLoadingHotspots] = useState(false);
@@ -96,7 +96,7 @@ export default function HomeScreen() {
       Animated.sequence([
         // Drive off screen to the right
         Animated.timing(translateX, {
-          toValue: 200, 
+          toValue: 200,
           duration: 500,
           easing: Easing.in(Easing.back(1.5)),
           useNativeDriver: true,
@@ -273,12 +273,12 @@ export default function HomeScreen() {
           colors={['#60a5fa', '#3b82f6']}
           style={[styles.headerGradient, { paddingTop: insets.top + 16 }]}
         >
-          <Image 
-            source={require('../../assets/images/cityscape_bg.png')} 
-            style={styles.headerBgImage} 
-            resizeMode="cover" 
+          <Image
+            source={require('../../assets/images/cityscape_bg.png')}
+            style={styles.headerBgImage}
+            resizeMode="cover"
           />
-          
+
           <View style={styles.headerContent}>
             {/* Top Row: Greeting */}
             <View style={styles.headerTopRow}>
@@ -300,12 +300,12 @@ export default function HomeScreen() {
         </LinearGradient>
 
         <View style={styles.content}>
-            <View style={{ position: 'relative', zIndex: 10, marginTop: overlapMargin, marginBottom: 8 }}>
-              {/* Online Status Banner (Overlapping) */}
-              <Pressable
-                style={styles.statusCard}
-                onPress={handleToggleOnline}
-              >
+          <View style={{ position: 'relative', zIndex: 10, marginTop: overlapMargin, marginBottom: 8 }}>
+            {/* Online Status Banner (Overlapping) */}
+            <Pressable
+              style={styles.statusCard}
+              onPress={handleToggleOnline}
+            >
               <View style={[styles.statusIconBg, { backgroundColor: isOnline ? '#e6faec' : '#f1f5f9' }]}>
                 <Feather
                   name={isOnline ? "wifi" : "wifi-off"}
@@ -322,7 +322,7 @@ export default function HomeScreen() {
                 </Text>
               </View>
               <View style={[
-                styles.powerButton, 
+                styles.powerButton,
                 { backgroundColor: isOnline ? '#22C55E' : '#EF4444', borderWidth: 0 }
               ]}>
                 <Feather
@@ -333,8 +333,8 @@ export default function HomeScreen() {
               </View>
             </Pressable>
             {/* Illustration */}
-            <Animated.Image 
-              source={require('../../assets/images/generated_blue_scooter.png')} 
+            <Animated.Image
+              source={require('../../assets/images/generated_blue_scooter.png')}
               style={[styles.heroIllustration, { transform: [{ translateX }] }]}
               resizeMode="contain"
             />
@@ -346,44 +346,38 @@ export default function HomeScreen() {
             </Animated.View>
           </View>
 
-        {/* Head Home Mode — visible only when online */}
-        {isOnline && (
-          <Pressable
-            style={[
-              styles.homeModeRow,
-              homeMode && styles.homeModeRowActive,
-            ]}
-            onPress={toggleHomeMode}
-          >
-            <View style={styles.homeModeLeft}>
-              <View style={[styles.homeModeIconWrap, homeMode && styles.homeModeIconWrapActive]}>
-                <Feather
-                  name="home"
-                  size={18}
-                  color={homeMode ? Colors.white : "#0ea5e9"}
-                />
-              </View>
-              <View style={styles.homeModeTextWrap}>
-                <Text style={[styles.homeModeLabel, homeMode && styles.homeModeLabelActive]}>
-                  Head Home
-                </Text>
-                <Text style={styles.homeModeDesc}>
-                  {homeMode
-                    ? "Getting orders toward your home"
-                    : "Receive orders heading toward home"}
-                </Text>
-              </View>
-            </View>
-            <View
+          {/* Head Home Mode — visible only when online */}
+          {isOnline && (
+            <Pressable
               style={[
-                styles.homeModeSwitch,
-                homeMode && styles.homeModeSwitchActive,
+                styles.homeModeRow,
+                homeMode && styles.homeModeRowActive,
               ]}
+              onPress={toggleHomeMode}
             >
+              <View style={styles.homeModeLeft}>
+                <View style={[styles.homeModeIconWrap, homeMode && styles.homeModeIconWrapActive]}>
+                  <Feather
+                    name="home"
+                    size={18}
+                    color={homeMode ? Colors.white : "#0ea5e9"}
+                  />
+                </View>
+                <View style={styles.homeModeTextWrap}>
+                  <Text style={[styles.homeModeLabel, homeMode && styles.homeModeLabelActive]}>
+                    Head Home
+                  </Text>
+                  <Text style={styles.homeModeDesc}>
+                    {homeMode
+                      ? "Getting orders toward your home"
+                      : "Receive orders heading toward home"}
+                  </Text>
+                </View>
+              </View>
               <View
                 style={[
-                  styles.homeModeSwitchThumb,
-                  homeMode && styles.homeModeSwitchThumbActive,
+                  styles.homeModeSwitch,
+                  homeMode && styles.homeModeSwitchActive,
                 ]}
               />
             </View>
@@ -452,105 +446,158 @@ export default function HomeScreen() {
                 <Text style={styles.emptyTasksDesc}>
                   {isOnline ? "You are online and ready\nto receive bookings.\nKeep the app open." : "Go online to receive\nand accept bookings."}
                 </Text>
+              >
+                <View
+                  style={[
+                    styles.homeModeSwitchThumb,
+                    homeMode && styles.homeModeSwitchThumbActive,
+                  ]}
+                />
               </View>
-              <TouchableOpacity style={styles.calendarBtn}>
-                <Feather name="calendar" size={18} color={Colors.primary} />
-              </TouchableOpacity>
-            </View>
-          </>
-        )}
+            </Pressable>
+          )}
 
-        {/* Scheduled Rides Section */}
-        {scheduledRides.length > 0 && (
-          <View style={styles.sectionSpacing}>
-            <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>Scheduled Rides ({scheduledRides.length})</Text>
-            </View>
-            <View style={{ gap: 12, marginTop: 8 }}>
-              {scheduledRides.map((ride) => {
-                const pickup = ride.stops?.[0]?.address || "Pickup Location";
-                const drop = ride.stops?.[ride.stops.length - 1]?.address || "Drop Location";
-                const dateStr = ride.reservedAt ? new Date(ride.reservedAt).toLocaleString([], {
-                  weekday: 'short',
-                  month: 'short',
-                  day: 'numeric',
-                  hour: '2-digit',
-                  minute: '2-digit'
-                }) : "N/A";
-                
-                return (
-                  <View key={ride._id} style={styles.scheduledCard}>
-                    <View style={styles.scheduledHeader}>
-                      <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-                        <Feather name="calendar" size={16} color={Colors.primary} />
-                        <Text style={styles.scheduledTime}>{dateStr}</Text>
+          {/* Service Toggle */}
+          <ServiceToggle active={mode} onToggle={setMode} />
+
+          {/* Today's Performance */}
+          <PerformanceCard
+            stats={[
+              { label: "Trips", value: String(earnings.totalDeliveries) },
+              { label: "Balance", value: `₹${earnings.today}`, accent: true },
+              { label: "This Week", value: `₹${earnings.week}` },
+            ]}
+          />
+
+          {/* Active Tasks */}
+          {currentOrder ? (
+            <>
+              <View style={styles.sectionHeader}>
+                <Text style={styles.sectionTitle}>Active Tasks</Text>
+              </View>
+              <ActiveTaskCard
+                mode={currentOrder.serviceType?.toLowerCase() === "helper" ? "delivery" : "ride"}
+                time={currentOrder.timestamp ? new Date(currentOrder.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : "Just Now"}
+                pickup={currentOrder.stops?.[0]?.address || currentOrder.stops?.[0]?.locationName || "Pickup Location"}
+                dropoff={currentOrder.stops?.[currentOrder.stops.length - 1]?.address || currentOrder.stops?.[currentOrder.stops.length - 1]?.locationName || "Drop-off Location"}
+                onGo={() => router.push("/active-order")}
+              />
+            </>
+          ) : (
+            <>
+              <View style={styles.sectionHeader}>
+                <Text style={styles.sectionTitle}>Active Tasks</Text>
+              </View>
+              <View style={styles.emptyTasksCard}>
+                <Image
+                  source={require('../../assets/images/clipboard_empty_state.png')}
+                  style={styles.emptyTasksImg}
+                  resizeMode="contain"
+                />
+                <View style={styles.emptyTasksCopy}>
+                  <Text style={styles.emptyTasksTitle}>No Active Tasks</Text>
+                  <Text style={styles.emptyTasksDesc}>
+                    {isOnline ? "You are online and ready\nto receive bookings.\nKeep the app open." : "Go online to receive\nand accept bookings."}
+                  </Text>
+                </View>
+                <TouchableOpacity style={styles.calendarBtn}>
+                  <Feather name="calendar" size={18} color={Colors.primary} />
+                </TouchableOpacity>
+              </View>
+            </>
+          )}
+
+          {/* Scheduled Rides Section */}
+          {scheduledRides.length > 0 && (
+            <View style={styles.sectionSpacing}>
+              <View style={styles.sectionHeader}>
+                <Text style={styles.sectionTitle}>Scheduled Rides ({scheduledRides.length})</Text>
+              </View>
+              <View style={{ gap: 12, marginTop: 8 }}>
+                {scheduledRides.map((ride) => {
+                  const pickup = ride.stops?.[0]?.address || "Pickup Location";
+                  const drop = ride.stops?.[ride.stops.length - 1]?.address || "Drop Location";
+                  const dateStr = ride.reservedAt ? new Date(ride.reservedAt).toLocaleString([], {
+                    weekday: 'short',
+                    month: 'short',
+                    day: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit'
+                  }) : "N/A";
+
+                  return (
+                    <View key={ride._id} style={styles.scheduledCard}>
+                      <View style={styles.scheduledHeader}>
+                        <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                          <Feather name="calendar" size={16} color={Colors.primary} />
+                          <Text style={styles.scheduledTime}>{dateStr}</Text>
+                        </View>
+                        <Text style={styles.scheduledPrice}>₹{Math.round(ride.totalPrice * 0.8)}</Text>
                       </View>
-                      <Text style={styles.scheduledPrice}>₹{Math.round(ride.totalPrice * 0.8)}</Text>
-                    </View>
-                    
-                    <View style={styles.scheduledBody}>
-                      <View style={styles.addressLine}>
-                        <View style={[styles.dot, { backgroundColor: Colors.success }]} />
-                        <Text style={styles.addressText} numberOfLines={1}>{pickup}</Text>
-                      </View>
-                      <View style={styles.connectorLine} />
-                      <View style={styles.addressLine}>
-                        <View style={[styles.dot, { backgroundColor: Colors.error }]} />
-                        <Text style={styles.addressText} numberOfLines={1}>{drop}</Text>
-                      </View>
-                    </View>
-                    
-                    <View style={styles.scheduledFooter}>
-                      <View>
-                        <Text style={styles.customerName}>Rider: {ride.user?.name || "Customer"}</Text>
-                        <View style={styles.badge}>
-                          <Text style={styles.badgeText}>{ride.serviceType?.toUpperCase()}</Text>
+
+                      <View style={styles.scheduledBody}>
+                        <View style={styles.addressLine}>
+                          <View style={[styles.dot, { backgroundColor: Colors.success }]} />
+                          <Text style={styles.addressText} numberOfLines={1}>{pickup}</Text>
+                        </View>
+                        <View style={styles.connectorLine} />
+                        <View style={styles.addressLine}>
+                          <View style={[styles.dot, { backgroundColor: Colors.error }]} />
+                          <Text style={styles.addressText} numberOfLines={1}>{drop}</Text>
                         </View>
                       </View>
-                      
-                      <TouchableOpacity 
-                        style={[styles.startRideBtn, currentOrder && { opacity: 0.5 }]}
-                        disabled={!!currentOrder}
-                        onPress={() => {
-                          const { startReservedRide } = useDriverStore.getState();
-                          startReservedRide(ride._id);
-                        }}
-                      >
-                        <Text style={styles.startRideBtnText}>Start Ride</Text>
-                      </TouchableOpacity>
+
+                      <View style={styles.scheduledFooter}>
+                        <View>
+                          <Text style={styles.customerName}>Rider: {ride.user?.name || "Customer"}</Text>
+                          <View style={styles.badge}>
+                            <Text style={styles.badgeText}>{ride.serviceType?.toUpperCase()}</Text>
+                          </View>
+                        </View>
+
+                        <TouchableOpacity
+                          style={[styles.startRideBtn, currentOrder && { opacity: 0.5 }]}
+                          disabled={!!currentOrder}
+                          onPress={() => {
+                            const { startReservedRide } = useDriverStore.getState();
+                            startReservedRide(ride._id);
+                          }}
+                        >
+                          <Text style={styles.startRideBtnText}>Start Ride</Text>
+                        </TouchableOpacity>
+                      </View>
                     </View>
-                  </View>
-                );
-              })}
+                  );
+                })}
+              </View>
             </View>
-          </View>
-        )}
+          )}
 
-        {/* High Demand Areas */}
-        <View style={styles.sectionSpacing}>
-          <HighDemandAreas
-            hotspots={hotspots}
-            isLoading={isLoadingHotspots}
-            onAreaPress={openDemandAreaInMaps}
-          />
-        </View>
-
-        {/* Safety Alerts */}
-        <View style={styles.safetyAlert}>
-          <Feather name="alert-triangle" size={moderateScale(24)} color="#f59e0b" style={{ marginTop: 2 }} />
-          <View style={styles.safetyContent}>
-            <Text style={styles.safetyTitle}>Safety Alert</Text>
-            <Text style={styles.safetyText}>
-              Road closure reported on Main St due to construction. Use alternate route.
-            </Text>
+          {/* High Demand Areas */}
+          <View style={styles.sectionSpacing}>
+            <HighDemandAreas
+              hotspots={hotspots}
+              isLoading={isLoadingHotspots}
+              onAreaPress={openDemandAreaInMaps}
+            />
           </View>
-          <Image 
-            source={require('../../assets/images/safety_cones.png')} 
-            style={styles.safetyImg}
-            resizeMode="contain"
-          />
+
+          {/* Safety Alerts */}
+          <View style={styles.safetyAlert}>
+            <Feather name="alert-triangle" size={moderateScale(24)} color="#f59e0b" style={{ marginTop: 2 }} />
+            <View style={styles.safetyContent}>
+              <Text style={styles.safetyTitle}>Safety Alert</Text>
+              <Text style={styles.safetyText}>
+                Road closure reported on Main St due to construction. Use alternate route.
+              </Text>
+            </View>
+            <Image
+              source={require('../../assets/images/safety_cones.png')}
+              style={styles.safetyImg}
+              resizeMode="contain"
+            />
+          </View>
         </View>
-      </View>
       </ScrollView>
 
       <GoOnlineModal
@@ -558,7 +605,7 @@ export default function HomeScreen() {
         onClose={() => setShowOnlineModal(false)}
         onGoOnline={handleGoOnline}
       />
-      
+
       <IncomingOrderModal />
     </View>
   );
@@ -592,6 +639,7 @@ const styles = StyleSheet.create({
     borderBottomRightRadius: moderateScale(24),
     overflow: 'hidden',
     position: 'relative',
+    paddingBottom: 40,
   },
   headerBgImage: {
     position: 'absolute',
@@ -602,7 +650,7 @@ const styles = StyleSheet.create({
   },
   headerContent: {
     paddingHorizontal: 20,
-    paddingBottom: 40,
+    paddingBottom: 57.5,
   },
   headerTopRow: {
     flexDirection: 'row',

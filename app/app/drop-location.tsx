@@ -13,7 +13,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
-import { router, useLocalSearchParams } from "expo-router";
+import { router, useLocalSearchParams, useFocusEffect } from "expo-router";
 import { moderateScale } from "react-native-size-matters";
 import { GooglePlacesAutocomplete } from "react-native-google-places-autocomplete";
 import * as Location from "expo-location";
@@ -80,6 +80,13 @@ export default function LocationSelectionScreen() {
   const [someoneContact, setSomeoneContact] = useState("");
   const [recentPlaces, setRecentPlaces] = useState<RecentPlace[]>([]);
   const [savingPreference, setSavingPreference] = useState(false);
+  const [isNavigating, setIsNavigating] = useState(false);
+
+  useFocusEffect(
+    React.useCallback(() => {
+      setIsNavigating(false);
+    }, [])
+  );
 
   useEffect(() => {
     if (!user?.id) return;
@@ -322,6 +329,7 @@ export default function LocationSelectionScreen() {
     const currentDrop = type === 'drop' ? { name: addrName, lat, lng } : drop;
 
     if (currentPickup && currentDrop && currentPickup.lat && currentDrop.lat) {
+        setIsNavigating(true);
         router.push({ 
             pathname: "/ride-confirmation", 
             params: { 
@@ -452,17 +460,23 @@ export default function LocationSelectionScreen() {
 
       <View style={styles.locationContainer}>
         <View style={styles.dotsContainer}>
-          <View style={[styles.dot, { backgroundColor: "#16A34A" }]} />
+          <View style={styles.markerSlot}>
+            <Ionicons name="location" size={20} color="#16A34A" />
+          </View>
           <View style={styles.dashLine} />
           {stops.map((stop, index) => (
              <React.Fragment key={stop.id}>
-                <View style={styles.stopDiamond}>
-                   <Text style={styles.stopDiamondText}>{index + 1}</Text>
+                <View style={styles.markerSlot}>
+                   <View style={styles.stopDiamond}>
+                      <Text style={styles.stopDiamondText}>{index + 1}</Text>
+                   </View>
                 </View>
                 <View style={styles.dashLine} />
              </React.Fragment>
           ))}
-          <View style={[styles.dot, { backgroundColor: "#EA580C" }]} />
+          <View style={styles.markerSlot}>
+            <Ionicons name="location" size={20} color="#EF4444" />
+          </View>
         </View>
         
         <View style={styles.inputsContainer}>
@@ -566,6 +580,8 @@ export default function LocationSelectionScreen() {
         </View>
       </View>
 
+      <View style={styles.bottomSeparatorLine} />
+
       <View style={styles.actionRow}>
         <TouchableOpacity 
           style={styles.actionBtn}
@@ -642,6 +658,15 @@ export default function LocationSelectionScreen() {
           </TouchableOpacity>
         ))}
       </ScrollView>
+
+      {isNavigating && (
+        <View style={styles.loadingOverlay}>
+          <View style={styles.loadingCard}>
+            <ActivityIndicator size="large" color={colors.primary} />
+            <Text style={styles.loadingText}>Fetching route & calculating fare...</Text>
+          </View>
+        </View>
+      )}
     </KeyboardAvoidingView>
 
     <Modal
@@ -788,31 +813,25 @@ const createStyles = (colors: typeof Colors.light) =>
       color: colors.text,
     },
     locationContainer: {
-      marginHorizontal: 20,
-      backgroundColor: colors.surface,
-      borderRadius: moderateScale(20),
-      padding: 16,
+      paddingHorizontal: 20,
+      paddingVertical: 4,
       flexDirection: "row",
-      shadowColor: "#000",
-      shadowOffset: { width: 0, height: 4 },
-      shadowOpacity: 0.05,
-      shadowRadius: 10,
-      elevation: 10,
       zIndex: 100,
     },
     dotsContainer: {
       alignItems: "center",
-      width: 20,
-      paddingTop: 10,
+      width: 24,
+      justifyContent: "space-between",
     },
-    dot: {
-      width: 8,
-      height: 8,
-      borderRadius: 4,
+    markerSlot: {
+      height: moderateScale(40),
+      alignItems: "center",
+      justifyContent: "center",
     },
     dashLine: {
       width: 1,
-      height: 25,
+      flex: 1,
+      minHeight: 12,
       backgroundColor: colors.border,
       marginVertical: 2,
       borderStyle: 'dashed',
@@ -842,6 +861,12 @@ const createStyles = (colors: typeof Colors.light) =>
       height: 1,
       backgroundColor: colors.borderLight,
       marginVertical: 2,
+    },
+    bottomSeparatorLine: {
+      height: 1,
+      backgroundColor: colors.borderLight,
+      marginHorizontal: 20,
+      marginTop: 8,
     },
     locationInput: {
       flex: 1,
@@ -1102,6 +1127,31 @@ const createStyles = (colors: typeof Colors.light) =>
       fontSize: moderateScale(16),
       fontWeight: "700",
       color: "#FFFFFF",
+    },
+    loadingOverlay: {
+      ...StyleSheet.absoluteFillObject,
+      backgroundColor: "rgba(0, 0, 0, 0.45)",
+      justifyContent: "center",
+      alignItems: "center",
+      zIndex: 99999,
+    },
+    loadingCard: {
+      backgroundColor: colors.surface,
+      paddingHorizontal: 28,
+      paddingVertical: 22,
+      borderRadius: moderateScale(16),
+      alignItems: "center",
+      gap: 12,
+      shadowColor: "#000",
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.2,
+      shadowRadius: 10,
+      elevation: 10,
+    },
+    loadingText: {
+      fontSize: moderateScale(15),
+      fontWeight: "700",
+      color: colors.text,
     },
   });
 
