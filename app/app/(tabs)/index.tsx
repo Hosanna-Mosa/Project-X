@@ -975,7 +975,7 @@ export default function HomeScreen() {
               heroBanners.map((banner, index) => (
                 <LinearGradient
                   key={banner._id || index}
-                  colors={['#4C1D95', '#2E1065']}
+                  colors={banner.color1 && banner.color2 ? [banner.color1, banner.color2] : ['#4C1D95', '#2E1065']}
                   style={{ width: screenWidth, paddingBottom: moderateScale(45), paddingTop: insets.top + moderateScale(50) }}
                 >
                   <Animated.View style={[{ flexDirection: 'row', paddingHorizontal: 16, minHeight: moderateScale(120), alignItems: 'center' }, getParallaxStyle(index)]}>

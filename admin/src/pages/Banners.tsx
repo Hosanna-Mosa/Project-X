@@ -25,6 +25,9 @@ interface Banner {
   itemType: string;
   isActive: boolean;
   position: string;
+  displayOrder: number;
+  color1?: string;
+  color2?: string;
 }
 
 export default function Banners() {
@@ -39,7 +42,10 @@ export default function Banners() {
     targetUrl: "",
     itemType: "banner",
     position: "hero",
+    displayOrder: 0,
     isActive: true,
+    color1: "",
+    color2: "",
   });
 
   const { data: banners, isLoading } = useQuery({
@@ -108,7 +114,10 @@ export default function Banners() {
       targetUrl: "",
       itemType: "banner",
       position: "hero",
+      displayOrder: 0,
       isActive: true,
+      color1: "",
+      color2: "",
     });
   };
 
@@ -150,7 +159,10 @@ export default function Banners() {
       targetUrl: banner.targetUrl || "",
       itemType: banner.itemType || "banner",
       position: banner.position || "hero",
+      displayOrder: banner.displayOrder || 0,
       isActive: banner.isActive,
+      color1: banner.color1 || "",
+      color2: banner.color2 || "",
     });
     setIsDialogOpen(true);
   };
@@ -244,6 +256,46 @@ export default function Banners() {
                 />
               </div>
               <div className="space-y-2">
+                <Label htmlFor="displayOrder">Display Order</Label>
+                <Input
+                  id="displayOrder"
+                  type="number"
+                  value={formData.displayOrder}
+                  onChange={(e) => setFormData({ ...formData, displayOrder: parseInt(e.target.value) || 0 })}
+                  placeholder="e.g. 1"
+                />
+              </div>
+              
+              {formData.itemType === "banner" && (
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="color1">Gradient Color 1 (Optional)</Label>
+                    <div className="flex gap-2">
+                      <Input
+                        id="color1"
+                        value={formData.color1}
+                        onChange={(e) => setFormData({ ...formData, color1: e.target.value })}
+                        placeholder="#4C1D95"
+                      />
+                      {formData.color1 && <div className="w-10 h-10 rounded border" style={{ backgroundColor: formData.color1 }} />}
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="color2">Gradient Color 2 (Optional)</Label>
+                    <div className="flex gap-2">
+                      <Input
+                        id="color2"
+                        value={formData.color2}
+                        onChange={(e) => setFormData({ ...formData, color2: e.target.value })}
+                        placeholder="#2E1065"
+                      />
+                      {formData.color2 && <div className="w-10 h-10 rounded border" style={{ backgroundColor: formData.color2 }} />}
+                    </div>
+                  </div>
+                </div>
+              )}
+              
+              <div className="space-y-2">
                 <Label htmlFor="imageUrl">Image</Label>
                 <div className="flex gap-2">
                   <Input
@@ -309,9 +361,14 @@ export default function Banners() {
                     <span className="capitalize">{banner.itemType || "banner"}</span>
                   </div>
                 </div>
-                <p className="text-gray-500 text-xs mb-2 capitalize font-medium text-purple-600">
-                  {banner.position?.replace(/_/g, " ") || "hero"}
-                </p>
+                <div className="flex justify-between items-center mb-2">
+                  <p className="text-gray-500 text-xs capitalize font-medium text-purple-600">
+                    {banner.position?.replace(/_/g, " ") || "hero"}
+                  </p>
+                  <div className="flex items-center gap-1 bg-gray-50 px-2 py-0.5 rounded border border-gray-100 text-xs text-gray-500 font-medium">
+                    <span>Order: {banner.displayOrder || 0}</span>
+                  </div>
+                </div>
                 <p className="text-gray-500 text-sm mt-1 flex-1">{banner.description}</p>
                 
                 <div className="flex items-center justify-between mt-4 pt-4 border-t border-gray-100">

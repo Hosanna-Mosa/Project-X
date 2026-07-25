@@ -1016,7 +1016,7 @@ export class AdminController {
 
   async getBanners(req: Request, res: Response) {
     try {
-      const banners = await Banner.find().sort({ createdAt: -1 });
+      const banners = await Banner.find().sort({ displayOrder: 1, createdAt: -1 });
       return res.json(banners);
     } catch (error) {
       console.error("Error getting banners:", error);
@@ -1026,7 +1026,7 @@ export class AdminController {
 
   async createBanner(req: Request, res: Response) {
     try {
-      const { title, description, imageUrl, targetUrl, itemType, position, isActive } = req.body;
+      const { title, description, imageUrl, targetUrl, itemType, position, isActive, displayOrder, color1, color2 } = req.body;
       if (!title || !imageUrl) {
         return res.status(400).json({ message: "Title and Image URL are required" });
       }
@@ -1038,7 +1038,10 @@ export class AdminController {
         targetUrl,
         itemType: itemType || 'banner',
         position: position || 'hero',
-        isActive: isActive !== undefined ? isActive : true
+        isActive: isActive !== undefined ? isActive : true,
+        displayOrder: displayOrder !== undefined ? displayOrder : 0,
+        color1,
+        color2
       });
 
       await banner.save();
@@ -1052,7 +1055,7 @@ export class AdminController {
   async updateBanner(req: Request, res: Response) {
     try {
       const { id } = req.params;
-      const { title, description, imageUrl, targetUrl, itemType, position, isActive } = req.body;
+      const { title, description, imageUrl, targetUrl, itemType, position, isActive, displayOrder, color1, color2 } = req.body;
       const banner = await Banner.findById(id);
       
       if (!banner) return res.status(404).json({ message: "Banner not found" });
@@ -1064,6 +1067,9 @@ export class AdminController {
       if (itemType !== undefined) banner.itemType = itemType;
       if (position !== undefined) banner.position = position;
       if (isActive !== undefined) banner.isActive = isActive;
+      if (displayOrder !== undefined) banner.displayOrder = displayOrder;
+      if (color1 !== undefined) banner.color1 = color1;
+      if (color2 !== undefined) banner.color2 = color2;
 
       await banner.save();
       return res.json({ message: "Banner updated successfully", banner });

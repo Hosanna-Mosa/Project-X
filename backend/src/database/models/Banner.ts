@@ -8,6 +8,9 @@ export interface IBanner extends Document {
   itemType: string;
   position: string;
   isActive: boolean;
+  displayOrder: number;
+  color1?: string;
+  color2?: string;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -43,6 +46,16 @@ const bannerSchema = new Schema<IBanner>(
     isActive: {
       type: Boolean,
       default: true,
+    },
+    displayOrder: {
+      type: Number,
+      default: 0,
+    },
+    color1: {
+      type: String,
+    },
+    color2: {
+      type: String,
     },
   },
   {
