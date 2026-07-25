@@ -58,10 +58,8 @@ export default function SavedAddressesScreen() {
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
   // Recent Locations
-  const [recentLocations, setRecentLocations] = useState<any[]>([
-    { id: "mock-1", name: "Coffee Collective", address: "42 Market Street, San Francisco", lat: 37.7939, lng: -122.3965 },
-    { id: "mock-2", name: "Equinox Gym", address: "747 Howard St, San Francisco", lat: 37.7849, lng: -122.4019 },
-  ]);
+  const [recentLocations, setRecentLocations] = useState<any[]>([]);
+  const [recentLoading, setRecentLoading] = useState(true);
 
   useFocusEffect(
     useCallback(() => {
@@ -85,15 +83,29 @@ export default function SavedAddressesScreen() {
 
   const loadRecentLocations = async () => {
     try {
+      setRecentLoading(true);
+      const data = await customFetch<any[]>("/api/v1/users/recent-locations");
+      if (Array.isArray(data) && data.length > 0) {
+        setRecentLocations(data);
+        await AsyncStorage.setItem(RECENT_LOCATIONS_KEY, JSON.stringify(data));
+        return;
+      }
+    } catch (err) {
+      console.warn("Failed to fetch recent locations from server, trying cache:", err);
+    }
+
+    try {
       const stored = await AsyncStorage.getItem(RECENT_LOCATIONS_KEY);
       if (stored) {
         const parsed = JSON.parse(stored);
-        if (parsed && parsed.length > 0) {
+        if (Array.isArray(parsed)) {
           setRecentLocations(parsed);
         }
       }
     } catch (err) {
-      console.error("Failed to load recent locations:", err);
+      console.error("Failed to load recent locations from storage:", err);
+    } finally {
+      setRecentLoading(false);
     }
   };
 
@@ -138,11 +150,12 @@ export default function SavedAddressesScreen() {
 
   const handleSelectRecentLocation = (item: any) => {
     if (selectingId || deletingId) return;
+    const fullAddress = item.fullAddress || (item.name && item.address ? `${item.name}, ${item.address}` : item.address || item.name);
     router.push({
       pathname: "/delivery/add-address",
       params: {
         step: "2",
-        addressLine: item.address,
+        addressLine: fullAddress,
         lat: String(item.lat),
         lng: String(item.lng),
       },
@@ -236,7 +249,7 @@ export default function SavedAddressesScreen() {
 
       <ScrollView
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={[styles.container, { paddingBottom: insets.bottom + 100 }]}
+        contentContainerStyle={[styles.container, { paddingBottom: Math.max(insets.bottom, 16) + 80 }]}
       >
           {/* Current Location GPS Button */}
           <TouchableOpacity style={styles.currentLocRow} onPress={handleUseCurrentLocation} disabled={selectingId !== null}>
@@ -319,30 +332,38 @@ export default function SavedAddressesScreen() {
 
           {/* Recent Locations Section */}
           <Text style={styles.sectionTitle}>Recent Locations</Text>
-          <View style={styles.recentList}>
-            {recentLocations.map((item) => (
-              <TouchableOpacity
-                key={item.id}
-                style={styles.recentRow}
-                onPress={() => handleSelectRecentLocation(item)}
-                disabled={selectingId !== null}
-              >
-                <View style={styles.recentIconBox}>
-                  <Feather name="clock" size={18} color={COLORS.onSurfaceVariant} />
-                </View>
-                <View style={styles.recentTextCol}>
-                  <Text style={styles.recentName}>{item.name}</Text>
-                  <Text style={styles.recentAddress} numberOfLines={1}>
-                    {item.address}
-                  </Text>
-                </View>
-              </TouchableOpacity>
-            ))}
-          </View>
+          {recentLoading && recentLocations.length === 0 ? (
+            <ActivityIndicator color={COLORS.secondary} style={{ paddingVertical: 16 }} />
+          ) : recentLocations.length === 0 ? (
+            <View style={styles.emptySectionCard}>
+              <Text style={styles.emptyText}>No recent locations found</Text>
+            </View>
+          ) : (
+            <View style={styles.recentList}>
+              {recentLocations.map((item) => (
+                <TouchableOpacity
+                  key={item.id}
+                  style={styles.recentRow}
+                  onPress={() => handleSelectRecentLocation(item)}
+                  disabled={selectingId !== null}
+                >
+                  <View style={styles.recentIconBox}>
+                    <Feather name="clock" size={18} color={COLORS.onSurfaceVariant} />
+                  </View>
+                  <View style={styles.recentTextCol}>
+                    <Text style={styles.recentName}>{item.name}</Text>
+                    <Text style={styles.recentAddress} numberOfLines={1}>
+                      {item.address}
+                    </Text>
+                  </View>
+                </TouchableOpacity>
+              ))}
+            </View>
+          )}
       </ScrollView>
 
       {/* Sticky Bottom Add Address Button */}
-      <View style={[styles.footer, { paddingBottom: insets.bottom + (Platform.OS === "ios" ? 10 : 16) }]}>
+      <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, 16) }]}>
         <TouchableOpacity
           style={styles.primaryBtn}
           onPress={() => router.push("/delivery/add-address")}
