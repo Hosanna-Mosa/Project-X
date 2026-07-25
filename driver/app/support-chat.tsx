@@ -83,7 +83,7 @@ export default function SupportChatScreen() {
   const fetchTickets = async (showLoading = false) => {
     if (showLoading) setLoading(true);
     try {
-      const tickets = await supportFetch("/api/v1/support/tickets");
+      const tickets: SupportTicket[] = await supportFetch("/api/v1/support/tickets");
       setAllTickets(tickets || []);
       if (tickets && tickets.length > 0) {
         if (showLoading) {
@@ -102,7 +102,7 @@ export default function SupportChatScreen() {
           // Background poll: update active ticket details if we are currently viewing it
           const currentActive = ticketRef.current;
           if (currentActive) {
-            const activeT = tickets.find(t => t._id === currentActive._id);
+            const activeT = tickets.find((t: SupportTicket) => t._id === currentActive._id);
             if (activeT) setTicket(activeT);
           }
         }
