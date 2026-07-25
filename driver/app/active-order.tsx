@@ -261,6 +261,26 @@ export default function ActiveOrderScreen() {
     };
   }, [currentOrder]);
 
+  // Throttle broadcasting compass heading changes
+  const lastHeadingSent = useRef<number>(0);
+  const lastHeadingTime = useRef<number>(Date.now());
+  useEffect(() => {
+    if (!currentOrder || !driverLocation) return;
+    const now = Date.now();
+    // Emit if heading changed by > 10 degrees and > 1000ms has passed since last emit
+    if (Math.abs(driverHeading - lastHeadingSent.current) > 10 && now - lastHeadingTime.current > 1000) {
+       lastHeadingSent.current = driverHeading;
+       lastHeadingTime.current = now;
+       socketService.emit("driver_location_update", {
+         driverId: driverPhone || "driver-123",
+         lat: driverLocation.lat,
+         lng: driverLocation.lng,
+         heading: driverHeading,
+         orderId: currentOrder.id,
+       });
+    }
+  }, [driverHeading, driverLocation, currentOrder, driverPhone]);
+
   // Clean simulation intervals on unmount
   useEffect(() => {
     return () => {

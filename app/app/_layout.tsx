@@ -13,7 +13,8 @@ import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { KeyboardProvider } from "react-native-keyboard-controller";
 import { SafeAreaProvider, useSafeAreaInsets } from "react-native-safe-area-context";
 import Constants from "expo-constants";
-import { Platform, View } from "react-native";
+import { Platform, View, Modal, TouchableOpacity, Image, Text } from "react-native";
+import { Feather } from "@expo/vector-icons";
 import * as NavigationBar from "expo-navigation-bar";
 import * as Notifications from "expo-notifications";
 
@@ -86,6 +87,7 @@ function RootLayoutNav() {
 }
 
 export default function RootLayout() {
+  const [showLaunchAd, setShowLaunchAd] = useState(true);
   const [showUpdate, setShowUpdate] = useState(false);
   const [forceUpdate, setForceUpdate] = useState(false);
   const [storeUrl, setStoreUrl] = useState("");
@@ -245,6 +247,35 @@ export default function RootLayout() {
                 storeUrl={storeUrl} 
                 onDismiss={handleDismissUpdate} 
               />
+              
+              <Modal visible={showLaunchAd} transparent animationType="fade">
+                <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', alignItems: 'center', padding: 24 }}>
+                  <View style={{ width: '100%', backgroundColor: '#fff', borderRadius: 24, overflow: 'hidden' }}>
+                    <TouchableOpacity 
+                      onPress={() => setShowLaunchAd(false)}
+                      style={{ position: 'absolute', top: 12, right: 12, zIndex: 10, backgroundColor: 'rgba(0,0,0,0.4)', borderRadius: 20, padding: 6 }}
+                    >
+                      <Feather name="x" size={20} color="#fff" />
+                    </TouchableOpacity>
+                    <Image 
+                      source={{ uri: "https://images.unsplash.com/photo-1542838132-92c53300491e?w=800" }} 
+                      style={{ width: '100%', height: 300 }}
+                      resizeMode="cover"
+                    />
+                    <View style={{ padding: 20, alignItems: 'center' }}>
+                      <Text style={{ fontSize: 12, fontWeight: '700', color: '#6D28D9', textTransform: 'uppercase', letterSpacing: 1 }}>Sponsored</Text>
+                      <Text style={{ fontSize: 22, fontWeight: '900', color: '#111827', marginTop: 8, textAlign: 'center' }}>Super Saver Sale</Text>
+                      <Text style={{ fontSize: 14, color: '#4B5563', marginTop: 8, textAlign: 'center' }}>Get up to 50% off on all fresh groceries this weekend!</Text>
+                      <TouchableOpacity 
+                        onPress={() => setShowLaunchAd(false)}
+                        style={{ marginTop: 20, backgroundColor: '#6D28D9', paddingVertical: 14, paddingHorizontal: 32, borderRadius: 30, width: '100%', alignItems: 'center' }}
+                      >
+                        <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 16 }}>Explore Now</Text>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                </View>
+              </Modal>
             </KeyboardProvider>
           </GestureHandlerRootView>
         </QueryClientProvider>

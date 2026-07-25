@@ -1140,6 +1140,24 @@ export default function HomeScreen() {
               </View>
             </ScrollView>
 
+            {/* Inline Banner Ad */}
+            <View style={{ marginHorizontal: 16, marginVertical: 8, borderRadius: 16, overflow: 'hidden', backgroundColor: '#fff', elevation: 3, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4 }}>
+              <View style={{ position: 'relative' }}>
+                <Image 
+                  source={{ uri: "https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=800" }} 
+                  style={{ width: '100%', height: 160 }}
+                  resizeMode="cover"
+                />
+                <View style={{ position: 'absolute', top: 8, right: 8, backgroundColor: 'rgba(0,0,0,0.5)', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
+                  <Text style={{ color: '#fff', fontSize: 10, fontWeight: 'bold' }}>Ad</Text>
+                </View>
+                <View style={{ position: 'absolute', bottom: 0, left: 0, right: 0, backgroundColor: 'rgba(0,0,0,0.6)', paddingHorizontal: 16, paddingVertical: 12 }}>
+                  <Text style={{ color: '#fff', fontSize: 16, fontWeight: '800' }}>Special Shoe Sale!</Text>
+                  <Text style={{ color: '#E5E7EB', fontSize: 12, marginTop: 2 }}>Flat 30% Off on top brands.</Text>
+                </View>
+              </View>
+            </View>
+
             {/* 149 Store */}
             {store149Items.length > 0 && (
               <View style={{ margin: 16, backgroundColor: '#F5F3FF', borderRadius: 24, padding: 16 }}>

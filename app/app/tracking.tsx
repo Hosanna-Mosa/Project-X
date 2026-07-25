@@ -9,6 +9,9 @@ import {
   Linking,
   Alert,
   TextInput,
+  Modal,
+  ImageBackground,
+  Image,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
@@ -289,6 +292,8 @@ export default function TrackingScreen() {
     }, 500);
   };
   const [eta, setEta] = useState(15);
+  const [driverModalVisible, setDriverModalVisible] = useState(false);
+  const [tripModalVisible, setTripModalVisible] = useState(false);
 
   const [helperStatus, setHelperStatus] = useState<string>("");
   const [deliveryOtp, setDeliveryOtp] = useState<string | null>(null);
@@ -419,7 +424,29 @@ export default function TrackingScreen() {
                 name: order.driver.name || order.driver.user?.name || order.driver.firstName || "Driver",
                 phone: order.driver.phone || order.driver.user?.phone || "",
                 vehicle: order.driver.vehicleType || "unknown",
+                vehicleNumber: order.driver.vehicleNumber || order.driver.licensePlate || "",
+                vehicleModel: order.driver.vehicleModel || order.driver.vehicleMake || order.driver.vehicleType || "Vehicle",
+                rating: order.driver.rating || "4.8",
+                trips: order.driver.totalTrips || order.driver.trips || "0",
+                duration: order.driver.duration || order.driver.experience || "New",
               });
+
+              if (order.driver.currentLocation && order.driver.currentLocation.coordinates) {
+                const coords = order.driver.currentLocation.coordinates;
+                if (coords[0] != null && coords[1] != null) {
+                  setDriverLocation((prev) => {
+                    const lat = coords[1];
+                    const lng = coords[0];
+                    if (!prev || Math.abs(prev.lat - lat) > 0.00001 || Math.abs(prev.lng - lng) > 0.00001) {
+                      const computedHeading = (prev && (prev.lat !== lat || prev.lng !== lng))
+                        ? calculateBearing(prev.lat, prev.lng, lat, lng)
+                        : prev?.heading || 0;
+                      return { lat, lng, heading: computedHeading };
+                    }
+                    return prev;
+                  });
+                }
+              }
             }
             if (order.stops && order.stops.length > 0) {
               const mappedStops = order.stops.map((s: any) => ({
@@ -466,6 +493,17 @@ export default function TrackingScreen() {
     return () => clearInterval(interval);
   }, [currentOrderId]);
 
+  const calculateBearing = (lat1: number, lng1: number, lat2: number, lng2: number): number => {
+    const rad = Math.PI / 180;
+    const phi1 = lat1 * rad;
+    const phi2 = lat2 * rad;
+    const deltaLambda = (lng2 - lng1) * rad;
+    const y = Math.sin(deltaLambda) * Math.cos(phi2);
+    const x = Math.cos(phi1) * Math.sin(phi2) - Math.sin(phi1) * Math.cos(phi2) * Math.cos(deltaLambda);
+    const theta = Math.atan2(y, x);
+    return (theta * (180 / Math.PI) + 360) % 360;
+  };
+
   const calculateDynamicETA = (
     driverLoc: { lat: number; lng: number } | null,
     targetLoc: { lat: number; lng: number } | null,
@@ -489,6 +527,9 @@ export default function TrackingScreen() {
     return Math.max(1, minutes);
   };
 
+  const deliveryStop = stops?.find(s => s.type?.toLowerCase() === "delivery" || s.type?.toLowerCase() === "drop");
+  const pickupStop = stops?.find(s => s.type?.toLowerCase() === "pickup" || s.type?.toLowerCase() === "store");
+
   useEffect(() => {
     if (currentOrderId) {
       socketService.connect();
@@ -502,20 +543,33 @@ export default function TrackingScreen() {
 
       const onLocationUpdate = (data: any) => {
         if (data.lat != null && data.lng != null) {
-          const newLoc = { lat: data.lat, lng: data.lng, heading: data.heading || 0 };
-          setDriverLocation(newLoc);
+          setDriverLocation((prev) => {
+            let heading = data.heading;
+            
+            // If heading isn't provided or is exactly 0, try to calculate it based on movement vector
+            if (!heading && prev) {
+              const dLat = Math.abs(prev.lat - data.lat);
+              const dLng = Math.abs(prev.lng - data.lng);
+              // Only calculate if moved significantly (> ~1 meter) to avoid jitter spinning
+              if (dLat > 0.00001 || dLng > 0.00001) {
+                heading = calculateBearing(prev.lat, prev.lng, data.lat, data.lng);
+              } else {
+                heading = prev.heading;
+              }
+            }
+            
+            return { lat: data.lat, lng: data.lng, heading: heading || 0 };
+          });
 
           // Calculate real-time dynamic ETA to active stop
-          const activeStop = (status === "searching_driver" || status === "driver_assigned" || status === "en_route_pickup" || status === "arrived_pickup")
+          const activeStop = (status === "pending" || status === "confirmed" || status === "driver_assigned" || status === "en_route_pickup" || status === "arrived_pickup")
             ? (pickupStop || stops?.[0])
             : (deliveryStop || stops?.[stops.length - 1]);
             
           if (activeStop && activeStop.lat != null && activeStop.lng != null) {
-            const dynamicMins = calculateDynamicETA(newLoc, { lat: Number(activeStop.lat), lng: Number(activeStop.lng) }, eta);
+            const dynamicMins = calculateDynamicETA({ lat: data.lat, lng: data.lng }, { lat: Number(activeStop.lat), lng: Number(activeStop.lng) }, eta);
             setEta(dynamicMins);
           }
-
-          setTimeout(() => mapRef.current?.fitToRoute(), 500);
         }
       };
 
@@ -566,7 +620,6 @@ export default function TrackingScreen() {
     router.replace("/(tabs)/orders");
   };
 
-  const deliveryStop = stops?.find(s => s.type?.toLowerCase() === "delivery" || s.type?.toLowerCase() === "drop");
   const userLocCoords = deliveryStop ? { lat: Number(deliveryStop.lat), lng: Number(deliveryStop.lng) } : null;
 
   if (status === "delivered") {
@@ -669,6 +722,32 @@ export default function TrackingScreen() {
     );
   }
 
+  let bannerText = "Walk to your pickup-point";
+  let bannerColor = "#0EA5E9";
+  let etaHeader = "Pickup in ";
+  let etaValue = `${eta} mins`;
+  let etaSubtext = "Captain on the way";
+
+  if (status === "arrived_pickup") {
+    bannerText = "Captain has arrived!";
+    bannerColor = "#16A34A";
+    etaHeader = "Meet at pickup point";
+    etaValue = "";
+    etaSubtext = "Your ride is waiting for you";
+  } else if (status === "en_route_delivery") {
+    bannerText = "Trip Started";
+    bannerColor = "#16A34A";
+    etaHeader = "Drop-off in ";
+    etaValue = `${eta} mins`;
+    etaSubtext = "Heading to your destination";
+  } else if (status === "arrived_delivery") {
+    bannerText = "Arrived at Destination";
+    bannerColor = "#16A34A";
+    etaHeader = "You have arrived!";
+    etaValue = "";
+    etaSubtext = "Please share the end ride OTP";
+  }
+
   return (
     <View style={styles.root}>
       <MapBackground
@@ -706,13 +785,8 @@ export default function TrackingScreen() {
         <View style={{ width: 44 }} />
       </View>
 
-      <BottomSheet style={styles.bottomSheet} defaultHeight={bottomSheetHeight} disableExpand={true}>
-        <ScrollView
-          showsVerticalScrollIndicator={false}
-          onContentSizeChange={(width, height) => {
-            setBottomSheetHeight(height + 100);
-          }}
-        >
+      <BottomSheet style={styles.bottomSheet} defaultHeight={Dimensions.get('window').height * 0.45} disableExpand={false}>
+        <ScrollView showsVerticalScrollIndicator={false}>
           {!driver ? (
             <View style={styles.findingDriverContainer}>
               <View style={styles.radarContainer}>
@@ -777,99 +851,257 @@ export default function TrackingScreen() {
             </View>
           ) : (
             <>
-              <View style={styles.driverCard}>
-                <View style={styles.driverAvatar}>
-                  <Feather name="user" size={28} color={colors.text} />
-                </View>
-                <View style={styles.driverInfo}>
-                  <Text style={styles.driverName}>{driver.name || "Assigned Driver"}</Text>
-                  <View style={styles.ratingRow}>
-                    <Feather name="star" size={12} color="#F59E0B" />
-                    <Text style={styles.ratingText}>{driver.rating || "4.9"}</Text>
+              {isRide ? (
+                <View style={[styles.rideDriverCardContainer, { backgroundColor: colors.surface }]}>
+                  {/* Blue Banner */}
+                  <View style={[styles.blueBanner, { backgroundColor: bannerColor }]}>
+                    <Text style={styles.blueBannerText}>{bannerText}</Text>
                   </View>
-                  <Text style={styles.driverMotto}>
-                    {isRide ? "Loves driving safely" : (isHelper ? "Here to help you with tasks" : "Loves delivering on time")}
-                  </Text>
-                </View>
-                <View style={styles.driverActions}>
-                  <TouchableOpacity 
-                    style={[styles.actionBtn, { backgroundColor: "#EF4444" }]} 
-                    onPress={handleSOS}
-                  >
-                    <Feather name="alert-triangle" size={18} color="#FFFFFF" />
-                  </TouchableOpacity>
-                  <TouchableOpacity 
-                    style={styles.actionBtn}
-                    onPress={() => Linking.openURL(`tel:${driver.phone || "1234567890"}`)}
-                  >
-                    <Feather name="phone" size={18} color={colors.textSecondary} />
-                  </TouchableOpacity>
-                  <TouchableOpacity style={styles.actionBtn} onPress={() => router.push("/chat")}>
-                    <Feather name="message-square" size={18} color={colors.primary} />
-                    {unreadCount > 0 && (
-                      <View style={styles.badge}>
-                        <Text style={styles.badgeText}>{unreadCount}</Text>
+                  
+                  {/* ETA Section */}
+                  <View style={styles.rideEtaSection}>
+                    <Text style={[styles.pickupTimeText, { color: colors.text }]}>
+                      {etaHeader}<Text style={{ color: '#16A34A' }}>{etaValue}</Text>
+                    </Text>
+                    <Text style={styles.captainOnWayText}>{etaSubtext}</Text>
+                  </View>
+
+                  {/* PIN Section */}
+                  {startOtp && ["confirmed", "driver_assigned", "en_route_pickup", "arrived_pickup"].includes(status) && (
+                    <View style={styles.pinRow}>
+                      <Text style={[styles.pinLabel, { color: colors.textSecondary }]}>Start your order with PIN</Text>
+                      <View style={styles.pinBoxes}>
+                        {String(startOtp).split('').map((digit, i) => (
+                          <View key={i} style={[styles.pinBox, { borderColor: colors.border, backgroundColor: colors.surface }]}>
+                            <Text style={[styles.pinDigit, { color: colors.text }]}>{digit}</Text>
+                          </View>
+                        ))}
                       </View>
-                    )}
+                    </View>
+                  )}
+
+                  {/* End Ride OTP Section */}
+                  {deliveryOtp && status === "arrived_delivery" && (
+                    <View style={styles.pinRow}>
+                      <Text style={[styles.pinLabel, { color: colors.textSecondary }]}>End Ride OTP</Text>
+                      <View style={styles.pinBoxes}>
+                        {String(deliveryOtp).split('').map((digit, i) => (
+                          <View key={i} style={[styles.pinBox, { borderColor: colors.border, backgroundColor: colors.surface }]}>
+                            <Text style={[styles.pinDigit, { color: colors.text }]}>{digit}</Text>
+                          </View>
+                        ))}
+                      </View>
+                    </View>
+                  )}
+
+                  {/* Driver Info */}
+                  <View style={[styles.rideDriverDetailsRow, { backgroundColor: colors.surfaceSecondary + "40" }]}>
+                    <View style={styles.rideDriverTextInfo}>
+                      <Text style={[styles.vehicleNumber, { color: colors.text }]}>{driver?.vehicleNumber || "Waiting for plate..."}</Text>
+                      <Text style={styles.vehicleModel}>{driver?.vehicleModel?.toUpperCase() || driver?.vehicle?.toUpperCase() || "UNKNOWN VEHICLE"}</Text>
+                      <Text style={styles.rideDriverName}>{driver?.name?.toUpperCase() || "DRIVER"}</Text>
+                    </View>
+                    <TouchableOpacity onPress={() => setDriverModalVisible(true)}>
+                      <View style={styles.rideDriverAvatarContainer}>
+                        <View style={[styles.rideDriverAvatar, { backgroundColor: colors.surfaceSecondary, borderColor: colors.border }]}>
+                          <Feather name="user" size={32} color={colors.textSecondary} />
+                        </View>
+                      </View>
+                    </TouchableOpacity>
+                  </View>
+
+                  {/* Message Button */}
+                  <TouchableOpacity style={[styles.messageButton, { borderColor: colors.border, backgroundColor: colors.surface }]} onPress={() => router.push("/chat")}>
+                    <View style={styles.messageButtonInner}>
+                      <Feather name="phone-call" size={18} color={colors.textSecondary} style={{ marginRight: 8 }} />
+                      <Text style={[styles.messageButtonText, { color: colors.textSecondary }]}>Message {driver.name?.split(' ')[0]?.toUpperCase() || "DRIVER"}</Text>
+                    </View>
                   </TouchableOpacity>
-                </View>
-              </View>
 
-              <View style={styles.divider} />
-
-              {isRide && startOtp && ["confirmed", "driver_assigned", "en_route_pickup", "arrived_pickup"].includes(status) && (
-                <View style={styles.otpCard}>
-                  <Feather name="shield" size={20} color={colors.primary} />
-                  <View style={styles.otpTextContainer}>
-                    <Text style={styles.otpTitle}>Start Ride OTP</Text>
-                    <Text style={styles.otpSubtitle}>Share this OTP with your captain to start the ride</Text>
-                  </View>
-                  <View style={styles.otpBadge}>
-                    <Text style={styles.otpCode}>{startOtp}</Text>
+                  {/* Pickup Location & Trip Details */}
+                  <View style={styles.pickupLocationRow}>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.pickupFromLabel}>Pickup From</Text>
+                      <Text style={[styles.pickupFromText, { color: colors.text }]} numberOfLines={1}>
+                        {stops?.[0]?.address || "Location"}
+                      </Text>
+                    </View>
+                    <TouchableOpacity style={[styles.tripDetailsBtn, { borderColor: colors.border, backgroundColor: colors.surface }]} onPress={() => setTripModalVisible(true)}>
+                      <Text style={[styles.tripDetailsText, { color: colors.text }]}>Trip Details</Text>
+                    </TouchableOpacity>
                   </View>
                 </View>
+              ) : (
+                <>
+                  <View style={styles.driverCard}>
+                    <TouchableOpacity onPress={() => setDriverModalVisible(true)}>
+                      <View style={styles.driverAvatar}>
+                        <Feather name="user" size={28} color={colors.text} />
+                      </View>
+                    </TouchableOpacity>
+                    <View style={styles.driverInfo}>
+                      <Text style={styles.driverName}>{driver.name || "Assigned Driver"}</Text>
+                      <View style={styles.ratingRow}>
+                        <Feather name="star" size={12} color="#F59E0B" />
+                        <Text style={styles.ratingText}>{driver.rating || "4.9"}</Text>
+                      </View>
+                      <Text style={styles.driverMotto}>
+                        {isHelper ? "Here to help you with tasks" : "Loves delivering on time"}
+                      </Text>
+                    </View>
+                    <View style={styles.driverActions}>
+                      <TouchableOpacity 
+                        style={[styles.actionBtn, { backgroundColor: "#EF4444" }]} 
+                        onPress={handleSOS}
+                      >
+                        <Feather name="alert-triangle" size={18} color="#FFFFFF" />
+                      </TouchableOpacity>
+                      <TouchableOpacity 
+                        style={styles.actionBtn}
+                        onPress={() => Linking.openURL(`tel:${driver.phone || "1234567890"}`)}
+                      >
+                        <Feather name="phone" size={18} color={colors.textSecondary} />
+                      </TouchableOpacity>
+                      <TouchableOpacity style={styles.actionBtn} onPress={() => router.push("/chat")}>
+                        <Feather name="message-square" size={18} color={colors.primary} />
+                        {unreadCount > 0 && (
+                          <View style={styles.badge}>
+                            <Text style={styles.badgeText}>{unreadCount}</Text>
+                          </View>
+                        )}
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+
+                  <View style={styles.divider} />
+
+                  {!isRide && deliveryOtp && (
+                    <View style={styles.otpCard}>
+                      <Feather name="shield" size={20} color={colors.primary} />
+                      <View style={styles.otpTextContainer}>
+                        <Text style={styles.otpTitle}>Share OTP to receive order</Text>
+                        <Text style={styles.otpSubtitle}>Only give this code when your items are safely received</Text>
+                      </View>
+                      <View style={styles.otpBadge}>
+                        <Text style={styles.otpCode}>{deliveryOtp}</Text>
+                      </View>
+                    </View>
+                  )}
+
+                  {isHelper && helperStatus ? (
+                    <View style={{ backgroundColor: '#E0E7FF', padding: 12, borderRadius: 12, marginVertical: 10, borderWidth: 1, borderColor: '#C7D2FE' }}>
+                      <Text style={{ fontSize: 12, color: '#4F46E5', fontWeight: '700', marginBottom: 4 }}>HELPER UPDATE</Text>
+                      <Text style={{ fontSize: 15, color: '#312E81', fontWeight: '500' }}>{helperStatus}</Text>
+                    </View>
+                  ) : null}
+
+                  <OrderStatusTimeline currentStatus={status} serviceType={serviceType || undefined} />
+                </>
               )}
-
-              {isRide && deliveryOtp && ["en_route_delivery", "arrived_delivery"].includes(status) && (
-                <View style={styles.otpCard}>
-                  <Feather name="shield" size={20} color={colors.primary} />
-                  <View style={styles.otpTextContainer}>
-                    <Text style={styles.otpTitle}>End Ride OTP</Text>
-
-                  </View>
-                  <View style={styles.otpBadge}>
-                    <Text style={styles.otpCode}>{deliveryOtp}</Text>
-                  </View>
-                </View>
-              )}
-
-              {!isRide && deliveryOtp && (
-                <View style={styles.otpCard}>
-                  <Feather name="shield" size={20} color={colors.primary} />
-                  <View style={styles.otpTextContainer}>
-                    <Text style={styles.otpTitle}>Share OTP to receive order</Text>
-                    <Text style={styles.otpSubtitle}>Only give this code when your items are safely received</Text>
-                  </View>
-                  <View style={styles.otpBadge}>
-                    <Text style={styles.otpCode}>{deliveryOtp}</Text>
-                  </View>
-                </View>
-              )}
-
-              {isHelper && helperStatus ? (
-                <View style={{ backgroundColor: '#E0E7FF', padding: 12, borderRadius: 12, marginVertical: 10, borderWidth: 1, borderColor: '#C7D2FE' }}>
-                  <Text style={{ fontSize: 12, color: '#4F46E5', fontWeight: '700', marginBottom: 4 }}>HELPER UPDATE</Text>
-                  <Text style={{ fontSize: 15, color: '#312E81', fontWeight: '500' }}>{helperStatus}</Text>
-                </View>
-              ) : null}
-
-              <OrderStatusTimeline currentStatus={status} serviceType={serviceType || undefined} />
             </>
           )}
 
-          <View style={{ height: 20 }} />
+          {/* Tracking Ad Banner */}
+          <View style={{ width: '100%', height: 120, position: 'relative', marginTop: 16, borderRadius: 12, overflow: 'hidden' }}>
+            <Image 
+              source={{ uri: "https://images.unsplash.com/photo-1549488344-c628e5db369e?w=800" }} 
+              style={{ width: '100%', height: '100%' }}
+              resizeMode="cover"
+            />
+            <View style={{ position: 'absolute', top: 8, right: 8, backgroundColor: 'rgba(0,0,0,0.5)', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
+              <Text style={{ color: '#fff', fontSize: 10, fontWeight: 'bold' }}>Ad</Text>
+            </View>
+            <View style={{ position: 'absolute', bottom: 0, left: 0, right: 0, backgroundColor: 'rgba(0,0,0,0.7)', paddingHorizontal: 12, paddingVertical: 8 }}>
+              <Text style={{ color: '#fff', fontSize: 14, fontWeight: '800' }}>Stay Hydrated on the go!</Text>
+              <Text style={{ color: '#E5E7EB', fontSize: 11, marginTop: 2 }}>Get 20% off on all soft drinks.</Text>
+            </View>
+          </View>
         </ScrollView>
       </BottomSheet>
+      <Modal visible={driverModalVisible} animationType="slide" transparent>
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { backgroundColor: colors.surface }]}>
+            <TouchableOpacity style={styles.closeModalBtn} onPress={() => setDriverModalVisible(false)}>
+              <Feather name="x" size={20} color={colors.text} />
+            </TouchableOpacity>
+
+            <View style={styles.modalHero}>
+              <View style={[StyleSheet.absoluteFill, { borderTopLeftRadius: 24, borderTopRightRadius: 24, overflow: 'hidden' }]}>
+                {/* Modern Vibrant Gradient/Image Banner */}
+                <Image 
+                  source={{ uri: "https://images.unsplash.com/photo-1579546929518-9e396f3cc809?w=800" }} // Vibrant colorful abstract or cityscape
+                  style={{ width: '100%', height: '100%' }} 
+                  resizeMode="cover" 
+                />
+                <View style={{ position: 'absolute', top: 0, bottom: 0, left: 0, right: 0, backgroundColor: 'rgba(0,0,0,0.2)' }} />
+              </View>
+            </View>
+            
+            <View style={styles.modalDriverProfileContainer}>
+              <View style={styles.modalDriverAvatar}>
+                <Feather name="user" size={40} color={colors.textSecondary} />
+              </View>
+              <Text style={[styles.modalDriverName, { color: colors.text }]}>{driver?.name?.toUpperCase() || "DRIVER"}</Text>
+            </View>
+
+            <View style={styles.modalStatsRow}>
+              <View style={styles.modalStatItem}>
+                <Text style={styles.modalStatLabel}>Rating</Text>
+                <Text style={[styles.modalStatValue, { color: colors.text }]}>{driver?.rating || "4.8"} ★</Text>
+              </View>
+              <View style={styles.modalStatDivider} />
+              <View style={styles.modalStatItem}>
+                <Text style={styles.modalStatLabel}>Trips</Text>
+                <Text style={[styles.modalStatValue, { color: colors.text }]}>{driver?.trips || "0"}</Text>
+              </View>
+              <View style={styles.modalStatDivider} />
+              <View style={styles.modalStatItem}>
+                <Text style={styles.modalStatLabel}>Duration</Text>
+                <Text style={[styles.modalStatValue, { color: colors.text }]}>{driver?.duration || "New"}</Text>
+              </View>
+            </View>
+            
+            <View style={{ height: 40 }} />
+          </View>
+        </View>
+      </Modal>
+
+      <Modal visible={tripModalVisible} animationType="slide" transparent>
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { backgroundColor: colors.surface }]}>
+            <TouchableOpacity style={styles.closeModalBtn} onPress={() => setTripModalVisible(false)}>
+              <Feather name="x" size={20} color={colors.text} />
+            </TouchableOpacity>
+
+            <View style={{ padding: 24, paddingTop: 40 }}>
+              <Text style={{ fontSize: 20, fontWeight: '800', color: colors.text, marginBottom: 20 }}>Trip Details</Text>
+              
+              <View style={{ flexDirection: 'row', gap: 12, marginBottom: 24 }}>
+                <View style={{ width: 12, alignItems: 'center' }}>
+                  <View style={{ width: 12, height: 12, borderRadius: 6, backgroundColor: colors.success, marginTop: 4 }} />
+                  <View style={{ width: 2, flex: 1, backgroundColor: colors.border, marginVertical: 4 }} />
+                  <View style={{ width: 12, height: 12, borderRadius: 6, backgroundColor: colors.error, marginBottom: 4 }} />
+                </View>
+                <View style={{ flex: 1, gap: 24 }}>
+                  <View>
+                    <Text style={{ fontSize: 12, color: colors.textSecondary, fontWeight: '700', marginBottom: 2 }}>PICKUP</Text>
+                    <Text style={{ fontSize: 15, color: colors.text, fontWeight: '600' }}>{stops?.[0]?.address || "Pickup Location"}</Text>
+                  </View>
+                  <View>
+                    <Text style={{ fontSize: 12, color: colors.textSecondary, fontWeight: '700', marginBottom: 2 }}>DROP-OFF</Text>
+                    <Text style={{ fontSize: 15, color: colors.text, fontWeight: '600' }}>{stops?.[stops.length - 1]?.address || "Drop-off Location"}</Text>
+                  </View>
+                </View>
+              </View>
+
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', borderTopWidth: 1, borderColor: colors.border, paddingTop: 16 }}>
+                <Text style={{ fontSize: 14, color: colors.textSecondary, fontWeight: '600' }}>Order ID</Text>
+                <Text style={{ fontSize: 14, color: colors.text, fontWeight: '800' }}>{currentOrderId?.substring(0, 8).toUpperCase()}</Text>
+              </View>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -1268,8 +1500,250 @@ const createStyles = (colors: typeof Colors.light) => StyleSheet.create({
     marginTop: 12,
   },
   submitReviewBtnText: {
-    color: "#FFFFFF",
+    fontWeight: "700",
+  },
+  rideDriverCardContainer: {
+    width: "100%",
+    borderRadius: 16,
+    overflow: "hidden",
+    marginTop: 0,
+    elevation: 4,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 10,
+  },
+  blueBanner: {
+    backgroundColor: "#0EA5E9",
+    paddingVertical: 12,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  blueBannerText: {
+    color: "#fff",
     fontSize: 14,
     fontWeight: "700",
+  },
+  rideEtaSection: {
+    paddingHorizontal: 16,
+    paddingVertical: 16,
+  },
+  pickupTimeText: {
+    fontSize: 22,
+    fontWeight: "800",
+  },
+  captainOnWayText: {
+    fontSize: 14,
+    color: "#64748B",
+    marginTop: 4,
+    fontWeight: "500",
+  },
+  pinRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 16,
+    paddingBottom: 16,
+  },
+  pinLabel: {
+    fontSize: 13,
+    fontWeight: "600",
+    flex: 1,
+    marginRight: 8,
+  },
+  pinBoxes: {
+    flexDirection: "row",
+    gap: 8,
+  },
+  pinBox: {
+    width: 32,
+    height: 36,
+    borderWidth: 1,
+    borderRadius: 6,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  pinDigit: {
+    fontSize: 16,
+    fontWeight: "700",
+  },
+  rideDriverDetailsRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderRadius: 12,
+    marginHorizontal: 16,
+  },
+  rideDriverTextInfo: {
+    flex: 1,
+  },
+  vehicleNumber: {
+    fontSize: 18,
+    fontWeight: "800",
+    letterSpacing: 0.5,
+  },
+  vehicleModel: {
+    fontSize: 13,
+    color: "#64748B",
+    marginTop: 2,
+    fontWeight: "500",
+  },
+  rideDriverName: {
+    fontSize: 11,
+    color: "#64748B",
+    marginTop: 4,
+    fontWeight: "600",
+  },
+  rideDriverAvatarContainer: {
+    alignItems: "center",
+    position: "relative",
+  },
+  rideDriverAvatar: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    borderWidth: 1.5,
+    alignItems: "center",
+    justifyContent: "center",
+    overflow: "hidden",
+  },
+  topCaptainBadge: {
+    position: "absolute",
+    bottom: -8,
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: "#fff",
+  },
+  topCaptainText: {
+    fontSize: 9,
+    fontWeight: "800",
+    color: "#fff",
+  },
+  messageButton: {
+    marginHorizontal: 16,
+    marginTop: 16,
+    borderWidth: 1,
+    borderRadius: 20,
+    paddingVertical: 12,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  messageButtonInner: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  messageButtonText: {
+    fontSize: 14,
+    fontWeight: "600",
+  },
+  pickupLocationRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 16,
+    paddingVertical: 16,
+    borderTopWidth: 1,
+    borderTopColor: "#F1F5F9",
+    marginTop: 16,
+  },
+  pickupFromLabel: {
+    fontSize: 11,
+    color: "#64748B",
+    fontWeight: "500",
+  },
+  pickupFromText: {
+    fontSize: 13,
+    fontWeight: "700",
+    marginTop: 2,
+    paddingRight: 16,
+  },
+  tripDetailsBtn: {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderWidth: 1,
+    borderRadius: 16,
+  },
+  tripDetailsText: {
+    fontSize: 12,
+    fontWeight: "600",
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.5)",
+    justifyContent: "flex-end",
+  },
+  modalContent: {
+    width: "100%",
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    position: "relative",
+  },
+  closeModalBtn: {
+    position: "absolute",
+    top: 16,
+    right: 16,
+    zIndex: 10,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: "#fff",
+    alignItems: "center",
+    justifyContent: "center",
+    elevation: 4,
+  },
+  modalHero: {
+    height: 180,
+    width: "100%",
+  },
+  modalDriverProfileContainer: {
+    alignItems: "center",
+    marginTop: -40,
+  },
+  modalDriverAvatar: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: "#fff",
+    borderWidth: 4,
+    borderColor: "#fff",
+    alignItems: "center",
+    justifyContent: "center",
+    elevation: 4,
+  },
+  modalDriverName: {
+    fontSize: 18,
+    fontWeight: "800",
+    marginTop: 12,
+  },
+  modalStatsRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: 24,
+  },
+  modalStatItem: {
+    alignItems: "center",
+    paddingHorizontal: 16,
+  },
+  modalStatLabel: {
+    fontSize: 12,
+    color: "#64748B",
+    fontWeight: "500",
+  },
+  modalStatValue: {
+    fontSize: 15,
+    fontWeight: "700",
+    marginTop: 4,
+  },
+  modalStatDivider: {
+    width: 1,
+    height: 30,
+    backgroundColor: "#E2E8F0",
   },
 });
