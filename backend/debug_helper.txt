@@ -1474,3 +1474,15 @@
  -> emitting new_order to driverUser._id: 6a4bc52da685d9f0c3950bb0
  -> emitting new_order to driverUser._id: 6a646ae5f2d1a33f03d48461
  -> emitting new_order to driverUser._id: 6a42576a48525b57267766c9
+
+[2026-07-26T16:22:10.586Z] Created order R260726273473 type: bike, driversToNotify: 4, isReserved: false
+ -> emitting new_order to driverUser._id: 6a453f1cecb0e2672c8b06aa
+ -> emitting new_order to driverUser._id: 6a5f4c0e5f35a1dd09c40735
+ -> emitting new_order to driverUser._id: 6a60d44b94d2586547a3d42f
+ -> emitting new_order to driverUser._id: 6a49342d1c45737b5916e335
+
+[2026-07-26T16:31:35.734Z] Created order R260726805584 type: bike, driversToNotify: 1, isReserved: false
+ -> emitting new_order to driverUser._id: 6a42576a48525b57267766c9
+
+[2026-07-26T16:43:06.028Z] Created order R260726229246 type: bike, driversToNotify: 1, isReserved: false
+ -> emitting new_order to driverUser._id: 6a42576a48525b57267766c9

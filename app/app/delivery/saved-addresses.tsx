@@ -109,9 +109,12 @@ export default function SavedAddressesScreen() {
     }
   };
 
+  const [currentLocLoading, setCurrentLocLoading] = useState(false);
+
   const handleUseCurrentLocation = async () => {
+    if (currentLocLoading || selectingId) return;
     try {
-      setLoading(true);
+      setCurrentLocLoading(true);
       let { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== "granted") {
         Alert.alert("Permission Denied", "Please enable location services to use current location.");
@@ -144,7 +147,7 @@ export default function SavedAddressesScreen() {
     } catch (err: any) {
       Alert.alert("Error", err.message || "Failed to determine current location.");
     } finally {
-      setLoading(false);
+      setCurrentLocLoading(false);
     }
   };
 
@@ -252,15 +255,31 @@ export default function SavedAddressesScreen() {
         contentContainerStyle={[styles.container, { paddingBottom: Math.max(insets.bottom, 16) + 80 }]}
       >
           {/* Current Location GPS Button */}
-          <TouchableOpacity style={styles.currentLocRow} onPress={handleUseCurrentLocation} disabled={selectingId !== null}>
+          <TouchableOpacity
+            style={[styles.currentLocRow, currentLocLoading && { opacity: 0.8 }]}
+            onPress={handleUseCurrentLocation}
+            disabled={selectingId !== null || currentLocLoading}
+          >
             <View style={styles.currentLocIconBox}>
-              <Feather name="navigation" size={20} color={COLORS.onPrimary} />
+              {currentLocLoading ? (
+                <ActivityIndicator size="small" color={COLORS.onPrimary} />
+              ) : (
+                <Feather name="navigation" size={20} color={COLORS.onPrimary} />
+              )}
             </View>
             <View style={styles.currentLocTextCol}>
-              <Text style={styles.currentLocTitle}>Current Location</Text>
-              <Text style={styles.currentLocSubtitle}>Using GPS to find your location</Text>
+              <Text style={styles.currentLocTitle}>
+                {currentLocLoading ? "Fetching Location..." : "Current Location"}
+              </Text>
+              <Text style={styles.currentLocSubtitle}>
+                {currentLocLoading ? "Finding your GPS coordinates..." : "Using GPS to find your location"}
+              </Text>
             </View>
-            <Feather name="chevron-right" size={20} color={COLORS.outline} />
+            {currentLocLoading ? (
+              <ActivityIndicator size="small" color={COLORS.primary} />
+            ) : (
+              <Feather name="chevron-right" size={20} color={COLORS.outline} />
+            )}
           </TouchableOpacity>
 
           {/* Saved Addresses Section */}
@@ -363,7 +382,7 @@ export default function SavedAddressesScreen() {
       </ScrollView>
 
       {/* Sticky Bottom Add Address Button */}
-      <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, 16) }]}>
+      <View style={[styles.footer, { paddingBottom: 12 }]}>
         <TouchableOpacity
           style={styles.primaryBtn}
           onPress={() => router.push("/delivery/add-address")}

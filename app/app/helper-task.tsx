@@ -84,6 +84,8 @@ export default function HelperTaskScreen() {
   const [characterIndex, setCharacterIndex] = React.useState(0);
   const [assignedDriver, setAssignedDriver] = useState<any>(null);
   const [isDescriptionFocused, setIsDescriptionFocused] = useState(false);
+  const [scrollY, setScrollY] = useState(0);
+  const isScrolled = scrollY > (SCREEN_HEIGHT < 850 ? 100 : 120);
 
   React.useEffect(() => {
     const hideSubscription = Keyboard.addListener(
@@ -713,13 +715,46 @@ export default function HelperTaskScreen() {
   return (
     <View style={[styles.root, { backgroundColor: colors.background }]}>
       <Stack.Screen options={{ headerShown: false }} />
-      <StatusBar barStyle={theme === "dark" ? "light-content" : "dark-content"} />
+      <StatusBar barStyle={isScrolled ? (theme === "dark" ? "light-content" : "dark-content") : "light-content"} />
 
       <KeyboardAvoidingView 
         style={{ flex: 1, backgroundColor: colors.background }}
         behavior={Platform.OS === "ios" ? "padding" : "height"}
         keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 20}
       >
+        {/* Fixed Top Header Bar */}
+        <View
+          style={{
+            position: "absolute",
+            top: 0,
+            left: 0,
+            right: 0,
+            zIndex: 100,
+            paddingTop: insets.top + (Platform.OS === "ios" ? 4 : 8),
+            paddingBottom: 12,
+            paddingHorizontal: 20 * scale,
+            flexDirection: "row",
+            alignItems: "center",
+            justifyContent: "space-between",
+            backgroundColor: isScrolled ? (colors.surfaceContainerLowest || "#ffffff") : "#5c52eb",
+            borderBottomWidth: isScrolled ? 1 : 0,
+            borderBottomColor: colors.borderLight || "#E2E8F0",
+            elevation: isScrolled ? 4 : 0,
+            shadowColor: "#000",
+            shadowOffset: { width: 0, height: 2 },
+            shadowOpacity: isScrolled ? 0.08 : 0,
+            shadowRadius: 4,
+          }}
+        >
+          <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
+            <Feather name="arrow-left" size={24 * scale} color={isScrolled ? (colors.onSurface || "#191C1E") : "#FFFFFF"} />
+          </TouchableOpacity>
+          <Text style={[styles.headerTitle, { color: isScrolled ? (colors.onSurface || "#191C1E") : "#FFFFFF", fontSize: 18 * scale, fontWeight: "700" }]}>
+            Helper Task
+          </Text>
+          <View style={{ width: 40 * scale }} />
+        </View>
+
         <ScrollView 
           ref={scrollViewRef} 
           style={{ flex: 1, backgroundColor: colors.background }}
@@ -727,10 +762,14 @@ export default function HelperTaskScreen() {
           showsVerticalScrollIndicator={false} 
           keyboardShouldPersistTaps="handled"
           scrollEnabled={true}
+          onScroll={(e) => {
+            setScrollY(e.nativeEvent.contentOffset.y);
+          }}
+          scrollEventThrottle={16}
         >
           
           {/* Dynamic Purple Header */}
-      <Animated.View style={{ backgroundColor: '#5c52eb', paddingTop: insets.top, paddingBottom: 120 * scale, height: animatedHeaderHeight, overflow: 'hidden' }}>
+          <Animated.View style={{ backgroundColor: '#5c52eb', paddingTop: insets.top + 48 * scale, paddingBottom: 120 * scale, height: animatedHeaderHeight, overflow: 'hidden' }}>
         
         {/* Animated Crowded Road Parallax Background */}
         <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 0 }}>
@@ -758,8 +797,6 @@ export default function HelperTaskScreen() {
 
            {/* The Road Surface */}
            <View style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 110 * scale, backgroundColor: 'rgba(0,0,0,0.15)', borderTopWidth: 2, borderColor: 'rgba(255,255,255,0.05)' }} />
-
-
 
            {/* Scrolling Dashed Road Lines */}
            <Animated.View style={{ flexDirection: 'row', position: 'absolute', bottom: 70 * scale, width: 1000, transform: [{ translateX: roadScroll }] }}>
@@ -792,14 +829,6 @@ export default function HelperTaskScreen() {
              </>
            )}
 
-        </View>
-
-        <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 20 * scale, zIndex: 10 }}>
-          <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
-            <Feather name="arrow-left" size={24 * scale} color="#fff" />
-          </TouchableOpacity>
-          <Text style={[styles.headerTitle, { color: '#fff', fontSize: 18 * scale }]}>Helper Task</Text>
-          <View style={{ width: 40 * scale }} />
         </View>
 
         {/* Main Header Graphic Container */}
