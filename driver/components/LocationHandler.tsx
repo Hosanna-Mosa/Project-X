@@ -2,6 +2,7 @@ import React, { useEffect, useRef } from "react";
 import { AppState, AppStateStatus } from "react-native";
 import * as Location from "expo-location";
 import * as TaskManager from "expo-task-manager";
+import * as Notifications from "expo-notifications";
 import Constants from "expo-constants";
 import { useDriverStore } from "@/store/driverStore";
 import { socketService } from "@/utils/socketService";
@@ -67,31 +68,35 @@ export const LocationHandler = () => {
   // AppState Listener to reconnect socket & refresh when app returns to foreground
   useEffect(() => {
     const subscription = AppState.addEventListener("change", async (nextAppState: AppStateStatus) => {
+      // If returning to active, just log it. (We don't auto-reconnect because they are set offline below)
       if (
         appState.current.match(/inactive|background/) &&
         nextAppState === "active"
       ) {
         console.log("[LocationHandler] App resumed from background to foreground.");
+      }
+
+      // If going to background, force offline to sync state
+      if (
+        appState.current === "active" &&
+        nextAppState.match(/inactive|background/)
+      ) {
+        console.log("[LocationHandler] App went to background. Forcing offline.");
         const store = useDriverStore.getState();
         if (store.isOnline) {
-          socketService.connect();
-          socketService.join(store.driverUserId || store.driverPhone || "driver-123", "DRIVER");
-
-          try {
-            const pos = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
-            if (pos) {
-              store.updateDriverLocation(pos.coords.latitude, pos.coords.longitude);
-              socketService.emit("driver_location_update", {
-                driverId: store.driverPhone || store.driverUserId || "driver-123",
-                lat: pos.coords.latitude,
-                lng: pos.coords.longitude,
-                heading: pos.coords.heading || 0,
-                orderId: store.currentOrder?.id,
-              });
-            }
-          } catch (e) {}
+          store.goOffline();
+          
+          Notifications.scheduleNotificationAsync({
+            content: {
+              title: "Status: Offline",
+              body: "Your app is minimized, so you are now offline and won't receive new orders.",
+              sound: true,
+            },
+            trigger: { seconds: 1 },
+          });
         }
       }
+
       appState.current = nextAppState;
     });
 
@@ -104,6 +109,9 @@ export const LocationHandler = () => {
     let isMounted = true;
 
     const setupTracking = async () => {
+      // Request notification permissions to ensure local notifications work
+      await Notifications.requestPermissionsAsync();
+
       // Permission Check
       const { status: fgStatus } = await Location.requestForegroundPermissionsAsync();
       if (fgStatus !== "granted") return;
