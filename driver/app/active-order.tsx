@@ -23,7 +23,7 @@ import Colors from "@/constants/colors";
 import { socketService } from "@/utils/socketService";
 import Constants from "expo-constants";
 
-const VEHICLE_BIKE_3D = require('@/assets/images/scooter_blue_top_view.png');
+const VEHICLE_BIKE_3D = require('@/assets/images/scooter_blue_top_view_2.png');
 
 const apiUrl = process.env.EXPO_PUBLIC_API_URL || Constants.expoConfig?.extra?.apiUrl;
 

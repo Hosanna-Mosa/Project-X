@@ -1,19 +1,112 @@
 import React, { useEffect, useRef } from "react";
+import { AppState, AppStateStatus } from "react-native";
 import * as Location from "expo-location";
+import * as TaskManager from "expo-task-manager";
+import Constants from "expo-constants";
 import { useDriverStore } from "@/store/driverStore";
 import { socketService } from "@/utils/socketService";
 
+const BACKGROUND_LOCATION_TASK = "BACKGROUND_DRIVER_LOCATION_TASK";
+
+// Top-level Task Definition for Expo Background Location Updates
+TaskManager.defineTask(BACKGROUND_LOCATION_TASK, async ({ data, error }: any) => {
+  if (error) {
+    console.warn("[BackgroundLocation] Task error:", error);
+    return;
+  }
+  if (data) {
+    const { locations } = data as { locations: Location.LocationObject[] };
+    if (locations && locations.length > 0) {
+      const loc = locations[locations.length - 1];
+      const { latitude, longitude, heading } = loc.coords;
+
+      const store = useDriverStore.getState();
+      store.updateDriverLocation(latitude, longitude);
+
+      if (store.isOnline) {
+        // 1. Socket location broadcast if connected
+        try {
+          socketService.emit("driver_location_update", {
+            driverId: store.driverPhone || store.driverUserId || "driver-123",
+            lat: latitude,
+            lng: longitude,
+            heading: heading || 0,
+            orderId: store.currentOrder?.id,
+          });
+        } catch (e) {}
+
+        // 2. HTTP REST update to ensure backend MongoDB & Redis remain updated even if OS pauses WebSocket
+        if (store.token) {
+          try {
+            const apiUrl = process.env.EXPO_PUBLIC_API_URL || Constants.expoConfig?.extra?.apiUrl || "http://localhost:8000";
+            await fetch(`${apiUrl}/api/v1/drivers/location`, {
+              method: "PATCH",
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${store.token}`,
+              },
+              body: JSON.stringify({
+                latitude: latitude,
+                longitude: longitude,
+              }),
+            });
+          } catch (fetchErr) {
+            console.warn("[BackgroundLocation] REST location update failed:", fetchErr);
+          }
+        }
+      }
+    }
+  }
+});
+
 export const LocationHandler = () => {
-  const { isOnline, driverPhone, currentOrder } = useDriverStore();
+  const { isOnline, driverPhone, driverUserId, currentOrder } = useDriverStore();
   const watcher = useRef<Location.LocationSubscription | null>(null);
+  const appState = useRef(AppState.currentState);
+
+  // AppState Listener to reconnect socket & refresh when app returns to foreground
+  useEffect(() => {
+    const subscription = AppState.addEventListener("change", async (nextAppState: AppStateStatus) => {
+      if (
+        appState.current.match(/inactive|background/) &&
+        nextAppState === "active"
+      ) {
+        console.log("[LocationHandler] App resumed from background to foreground.");
+        const store = useDriverStore.getState();
+        if (store.isOnline) {
+          socketService.connect();
+          socketService.join(store.driverUserId || store.driverPhone || "driver-123", "DRIVER");
+
+          try {
+            const pos = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+            if (pos) {
+              store.updateDriverLocation(pos.coords.latitude, pos.coords.longitude);
+              socketService.emit("driver_location_update", {
+                driverId: store.driverPhone || store.driverUserId || "driver-123",
+                lat: pos.coords.latitude,
+                lng: pos.coords.longitude,
+                heading: pos.coords.heading || 0,
+                orderId: store.currentOrder?.id,
+              });
+            }
+          } catch (e) {}
+        }
+      }
+      appState.current = nextAppState;
+    });
+
+    return () => {
+      subscription.remove();
+    };
+  }, []);
 
   useEffect(() => {
     let isMounted = true;
 
     const setupTracking = async () => {
       // Permission Check
-      const { status } = await Location.requestForegroundPermissionsAsync();
-      if (status !== 'granted') return;
+      const { status: fgStatus } = await Location.requestForegroundPermissionsAsync();
+      if (fgStatus !== "granted") return;
 
       // 1. Get Initial Location Fast (LastKnown)
       const lastKnown = await Location.getLastKnownPositionAsync();
@@ -37,7 +130,7 @@ export const LocationHandler = () => {
         }
       } catch (e) {}
 
-      // 3. Start High-Accuracy Watch
+      // 3. Start High-Accuracy Foreground Watch
       if (watcher.current) {
         watcher.current.remove();
         watcher.current = null;
@@ -59,23 +152,57 @@ export const LocationHandler = () => {
           }
         }
       );
+
+      // 4. Background Location Service Management
+      try {
+        const isTaskRegistered = await TaskManager.isTaskRegisteredAsync(BACKGROUND_LOCATION_TASK);
+
+        if (isOnline) {
+          const { status: bgStatus } = await Location.requestBackgroundPermissionsAsync();
+          if (bgStatus === "granted") {
+            if (!isTaskRegistered) {
+              await Location.startLocationUpdatesAsync(BACKGROUND_LOCATION_TASK, {
+                accuracy: Location.Accuracy.Balanced,
+                timeInterval: 10000, // 10 seconds in background
+                distanceInterval: 10, // 10 meters
+                showsBackgroundLocationIndicator: true,
+                foregroundService: {
+                  notificationTitle: "Flavour Driver Active",
+                  notificationBody: "Tracking location for order dispatches in background...",
+                  notificationColor: "#22C55E",
+                },
+              });
+              console.log("[LocationHandler] Background location tracking started.");
+            }
+          } else {
+            console.warn("[LocationHandler] Background location permission not granted.");
+          }
+        } else {
+          if (isTaskRegistered) {
+            await Location.stopLocationUpdatesAsync(BACKGROUND_LOCATION_TASK);
+            console.log("[LocationHandler] Background location tracking stopped.");
+          }
+        }
+      } catch (bgErr) {
+        console.warn("[LocationHandler] Error handling background location updates:", bgErr);
+      }
     };
 
     const updateLocalOnly = (lat: number, lng: number) => {
-        const { updateDriverLocation } = useDriverStore.getState();
-        updateDriverLocation(lat, lng);
+      const { updateDriverLocation } = useDriverStore.getState();
+      updateDriverLocation(lat, lng);
     };
 
     const updateAndBroadcast = (lat: number, lng: number, heading?: number) => {
       updateLocalOnly(lat, lng);
-      
+
       if (isOnline) {
         socketService.emit("driver_location_update", {
-          driverId: driverPhone || "driver-123",
+          driverId: driverPhone || driverUserId || "driver-123",
           lat: lat,
           lng: lng,
           heading: heading || 0,
-          orderId: currentOrder?.id
+          orderId: currentOrder?.id,
         });
       }
     };
@@ -89,7 +216,7 @@ export const LocationHandler = () => {
         watcher.current = null;
       }
     };
-  }, [isOnline, currentOrder?.id, driverPhone]);
+  }, [isOnline, currentOrder?.id, driverPhone, driverUserId]);
 
   return null;
 };
