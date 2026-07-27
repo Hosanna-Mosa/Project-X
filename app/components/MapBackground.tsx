@@ -382,10 +382,15 @@ export const MapBackground = forwardRef<MapBackgroundRef, Props>(({
             <Marker
               key={driver.id || driver._id}
               coordinate={{ latitude: Number(driver.lat), longitude: Number(driver.lng) }}
-              image={markerImage}
               anchor={{ x: 0.5, y: 0.5 }}
               title={driver.name || "Driver"}
-            />
+            >
+              <Image
+                source={markerImage}
+                style={{ width: 40, height: 40 }}
+                resizeMode="contain"
+              />
+            </Marker>
           );
         })}
 
@@ -416,12 +421,17 @@ export const MapBackground = forwardRef<MapBackgroundRef, Props>(({
           <Marker
             key="driver-location-pin"
             coordinate={{ latitude: Number(driverLocation.lat), longitude: Number(driverLocation.lng) }}
-            image={VEHICLE_BIKE_3D}
             title="Driver"
             anchor={{ x: 0.5, y: 0.5 }}
             flat={true}
             rotation={(driverLocation as any).heading || 0}
-          />
+          >
+            <Image
+              source={VEHICLE_BIKE_3D}
+              style={{ width: 40, height: 40 }}
+              resizeMode="contain"
+            />
+          </Marker>
         )}
 
         {(polyline || autoRoutePolyline) ? (

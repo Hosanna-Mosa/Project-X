@@ -8,6 +8,7 @@ import {
   TouchableOpacity,
   View,
   Animated,
+  Image,
 } from "react-native";
 import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
@@ -19,6 +20,10 @@ import { useDeliveryStore } from "@/contexts/deliveryStore";
 import { useThemeStore } from "@/contexts/themeStore";
 import { customFetch } from "@/utils/api/custom-fetch";
 import { socketService } from "@/utils/socketService";
+
+const VEHICLE_BIKE_3D = require("@/assets/images/services/scooter_blue_top_view_2.png");
+const VEHICLE_AUTO_3D = require("@/assets/images/services/auto_top_view.png");
+const VEHICLE_CAB_3D = require("@/assets/images/services/cab.png");
 
 const { height } = Dimensions.get("window");
 
@@ -130,6 +135,21 @@ export default function RideSearchingScreen() {
 
   const [onlineDrivers, setOnlineDrivers] = React.useState<OnlineDriver[]>([]);
 
+  const pickupCoords = React.useMemo(
+    () => ({
+      latitude: parseFloat(params.pickupLat || "0"),
+      longitude: parseFloat(params.pickupLng || "0"),
+    }),
+    [params.pickupLat, params.pickupLng],
+  );
+  const dropCoords = React.useMemo(
+    () => ({
+      latitude: parseFloat(params.dropLat || "0"),
+      longitude: parseFloat(params.dropLng || "0"),
+    }),
+    [params.dropLat, params.dropLng],
+  );
+
   React.useEffect(() => {
     let active = true;
     const fetchOnlineDrivers = async () => {
@@ -160,21 +180,6 @@ export default function RideSearchingScreen() {
       clearInterval(interval);
     };
   }, [pickupCoords.latitude, pickupCoords.longitude, params.serviceId]);
-
-  const pickupCoords = React.useMemo(
-    () => ({
-      latitude: parseFloat(params.pickupLat || "0"),
-      longitude: parseFloat(params.pickupLng || "0"),
-    }),
-    [params.pickupLat, params.pickupLng],
-  );
-  const dropCoords = React.useMemo(
-    () => ({
-      latitude: parseFloat(params.dropLat || "0"),
-      longitude: parseFloat(params.dropLng || "0"),
-    }),
-    [params.dropLat, params.dropLng],
-  );
 
   const fare = parseFare(params.fareTotal, params.ridePrice);
   const pickupTitle = String(params.pickupName || "Pickup").split(",")[0];
@@ -380,13 +385,17 @@ export default function RideSearchingScreen() {
                 }}
                 anchor={{ x: 0.5, y: 0.5 }}
               >
-                <View style={styles.driverMarker}>
-                  <MaterialCommunityIcons
-                    name={drv.vehicleType === "auto" ? "taxi" : drv.vehicleType === "car" ? "car" : "motorbike"}
-                    size={18}
-                    color="#FFFFFF"
-                  />
-                </View>
+                <Image
+                  source={
+                    drv.vehicleType === "auto"
+                      ? VEHICLE_AUTO_3D
+                      : drv.vehicleType === "car"
+                      ? VEHICLE_CAB_3D
+                      : VEHICLE_BIKE_3D
+                  }
+                  style={{ width: 40, height: 40 }}
+                  resizeMode="contain"
+                />
               </Marker>
             );
           })}

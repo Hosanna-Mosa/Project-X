@@ -790,9 +790,14 @@ export default function RideConfirmationScreen() {
               <Marker
                 key={driver.id}
                 coordinate={{ latitude: Number(driver.lat), longitude: Number(driver.lng) }}
-                image={markerImage}
                 anchor={{ x: 0.5, y: 0.5 }}
-              />
+              >
+                <Image
+                  source={markerImage}
+                  style={{ width: 40, height: 40 }}
+                  resizeMode="contain"
+                />
+              </Marker>
             );
           })}
 
