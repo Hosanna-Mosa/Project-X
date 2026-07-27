@@ -1522,20 +1522,15 @@ export default function ActiveOrderScreen() {
             </Marker>
           ) : null}
 
-          {/* Driver Location Marker (Scooty) */}
+          {/* Driver Location Marker */}
           {(driverLocation != null && driverLocation.lat != null && driverLocation.lng != null) ? (
             <Marker 
               coordinate={{ latitude: Number(driverLocation.lat), longitude: Number(driverLocation.lng) }}
+              image={VEHICLE_BIKE_3D}
               anchor={{ x: 0.5, y: 0.5 }}
               flat={true}
               rotation={driverHeading || 0}
-            >
-              <Image 
-                source={VEHICLE_BIKE_3D}
-                style={{ width: 40, height: 40 }}
-                resizeMode="contain"
-              />
-            </Marker>
+            />
           ) : null}
 
           {/* Dashed line along the road from driver to customer */}

@@ -12,7 +12,13 @@ import {
   Alert,
   Modal,
   ActivityIndicator,
+  LayoutAnimation,
+  UIManager,
 } from "react-native";
+
+if (Platform.OS === "android" && UIManager.setLayoutAnimationEnabledExperimental) {
+  UIManager.setLayoutAnimationEnabledExperimental(true);
+}
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons, Feather, MaterialCommunityIcons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
@@ -130,14 +136,21 @@ export default function RideConfirmationScreen() {
 
   const serviceType = normalizeServiceType(params.serviceId);
 
-  const pickupCoords = {
-    latitude: parseFloat(params.pickupLat || "0"),
-    longitude: parseFloat(params.pickupLng || "0"),
-  };
-  const dropCoords = {
-    latitude: parseFloat(params.dropLat || "0"),
-    longitude: parseFloat(params.dropLng || "0"),
-  };
+  const pickupCoords = React.useMemo(
+    () => ({
+      latitude: parseFloat(params.pickupLat || "0"),
+      longitude: parseFloat(params.pickupLng || "0"),
+    }),
+    [params.pickupLat, params.pickupLng]
+  );
+
+  const dropCoords = React.useMemo(
+    () => ({
+      latitude: parseFloat(params.dropLat || "0"),
+      longitude: parseFloat(params.dropLng || "0"),
+    }),
+    [params.dropLat, params.dropLng]
+  );
 
   React.useEffect(() => {
     if (params.serviceId) {
@@ -404,28 +417,91 @@ export default function RideConfirmationScreen() {
   }, [
     pickupIsValid,
     dropIsValid,
-    pickupCoords.latitude,
-    pickupCoords.longitude,
-    dropCoords.latitude,
-    dropCoords.longitude,
+    pickupCoords,
+    dropCoords,
     validStops,
   ]);
 
-  const fitTripToMap = React.useCallback(() => {
-    if (tripCoordinates.length < 2) return;
+  const fitTripToMap = React.useCallback((animated = true) => {
+    if (!mapRef.current) return;
+    if (!pickupIsValid || !dropIsValid) return;
 
-    mapRef.current?.fitToCoordinates(tripCoordinates, {
-      edgePadding: { right: 80, bottom: 420, left: 80, top: 160 },
-      animated: true,
+    const pointsToFit = [
+      pickupCoords,
+      ...validStops.map((stop: any) => ({ latitude: stop.latitude, longitude: stop.longitude })),
+      dropCoords,
+    ];
+
+    if (pointsToFit.length < 2) return;
+
+    mapRef.current.fitToCoordinates(pointsToFit, {
+      edgePadding: {
+        top: Platform.OS === "ios" ? 110 : 90,
+        right: 60,
+        bottom: 330,
+        left: 60,
+      },
+      animated,
     });
-  }, [tripCoordinates]);
+  }, [pickupCoords, dropCoords, validStops, pickupIsValid, dropIsValid]);
+
+  const initialRegion = React.useMemo(() => {
+    if (!pickupIsValid && !dropIsValid) {
+      return {
+        latitude: 17.0005,
+        longitude: 81.7800,
+        latitudeDelta: 0.05,
+        longitudeDelta: 0.05,
+      };
+    }
+    if (!dropIsValid) {
+      return {
+        ...pickupCoords,
+        latitudeDelta: 0.04,
+        longitudeDelta: 0.04,
+      };
+    }
+    if (!pickupIsValid) {
+      return {
+        ...dropCoords,
+        latitudeDelta: 0.04,
+        longitudeDelta: 0.04,
+      };
+    }
+
+    const minLat = Math.min(pickupCoords.latitude, dropCoords.latitude);
+    const maxLat = Math.max(pickupCoords.latitude, dropCoords.latitude);
+    const minLng = Math.min(pickupCoords.longitude, dropCoords.longitude);
+    const maxLng = Math.max(pickupCoords.longitude, dropCoords.longitude);
+
+    const centerLat = (minLat + maxLat) / 2;
+    const centerLng = (minLng + maxLng) / 2;
+
+    const latDelta = Math.max((maxLat - minLat) * 1.8, 0.025);
+    const lngDelta = Math.max((maxLng - minLng) * 1.8, 0.025);
+
+    return {
+      latitude: centerLat - (latDelta * 0.18),
+      longitude: centerLng,
+      latitudeDelta: latDelta,
+      longitudeDelta: lngDelta,
+    };
+  }, [pickupCoords, dropCoords, pickupIsValid, dropIsValid]);
 
   React.useEffect(() => {
-    if (!mapReady) return;
+    if (!mapReady || !pickupIsValid || !dropIsValid) return;
 
-    const timer = setTimeout(fitTripToMap, 250);
-    return () => clearTimeout(timer);
-  }, [fitTripToMap, mapReady]);
+    fitTripToMap(false);
+    const timer1 = setTimeout(() => fitTripToMap(true), 250);
+    const timer2 = setTimeout(() => fitTripToMap(true), 750);
+    const timer3 = setTimeout(() => fitTripToMap(true), 1500);
+
+    return () => {
+      clearTimeout(timer1);
+      clearTimeout(timer2);
+      clearTimeout(timer3);
+    };
+  }, [fitTripToMap, mapReady, pickupIsValid, dropIsValid]);
 
   React.useEffect(() => {
     if (!pickupIsValid || !dropIsValid) {
@@ -585,25 +661,65 @@ export default function RideConfirmationScreen() {
     });
   };
 
-  const handleRecenter = async () => {
-    try {
-      const { status } = await Location.requestForegroundPermissionsAsync();
-      if (status !== "granted") {
-        Alert.alert("Permission Denied", "Location permission is required.");
-        return;
+  const [isAddStopExpanded, setIsAddStopExpanded] = useState(false);
+  const addStopTimerRef = useRef<any>(null);
+
+  const handleAddStopPress = () => {
+    if (!isAddStopExpanded) {
+      if (Platform.OS === "ios" || Platform.OS === "android") {
+        LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
       }
-      const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
-      const coords = {
-        latitude: loc.coords.latitude,
-        longitude: loc.coords.longitude,
-      };
-      setUserLocation(coords);
-      mapRef.current?.animateToRegion(
-        { ...coords, latitudeDelta: 0.01, longitudeDelta: 0.01 },
-        1000
-      );
-    } catch {
-      Alert.alert("Error", "Could not fetch current location.");
+      setIsAddStopExpanded(true);
+
+      if (addStopTimerRef.current) {
+        clearTimeout(addStopTimerRef.current);
+      }
+
+      addStopTimerRef.current = setTimeout(() => {
+        if (Platform.OS === "ios" || Platform.OS === "android") {
+          LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+        }
+        setIsAddStopExpanded(false);
+        addStopTimerRef.current = null;
+      }, 5000);
+    } else {
+      if (addStopTimerRef.current) {
+        clearTimeout(addStopTimerRef.current);
+        addStopTimerRef.current = null;
+      }
+      handleAddStopFromMap();
+    }
+  };
+
+  React.useEffect(() => {
+    return () => {
+      if (addStopTimerRef.current) {
+        clearTimeout(addStopTimerRef.current);
+      }
+    };
+  }, []);
+
+  const handleRecenter = async () => {
+    if (pickupIsValid && dropIsValid) {
+      fitTripToMap(true);
+    } else {
+      try {
+        const { status } = await Location.requestForegroundPermissionsAsync();
+        if (status === "granted") {
+          const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
+          const coords = {
+            latitude: loc.coords.latitude,
+            longitude: loc.coords.longitude,
+          };
+          setUserLocation(coords);
+          mapRef.current?.animateToRegion(
+            { ...coords, latitudeDelta: 0.01, longitudeDelta: 0.01 },
+            1000
+          );
+        }
+      } catch {
+        // fallback
+      }
     }
   };
 
@@ -615,11 +731,7 @@ export default function RideConfirmationScreen() {
           ref={mapRef}
           provider={PROVIDER_GOOGLE}
           style={StyleSheet.absoluteFill}
-          initialRegion={{
-            ...pickupCoords,
-            latitudeDelta: 0.05,
-            longitudeDelta: 0.05,
-          }}
+          initialRegion={initialRegion}
           zoomEnabled
           scrollEnabled
           showsUserLocation={false}
@@ -646,14 +758,12 @@ export default function RideConfirmationScreen() {
               optimizeWaypoints
               onReady={(result) => {
                 setDirectionsFailed(false);
-                mapRef.current?.fitToCoordinates(result.coordinates, {
-                  edgePadding: { right: 80, bottom: 420, left: 80, top: 160 },
-                });
+                fitTripToMap(true);
               }}
               onError={(errorMessage) => {
                 console.warn("Map directions failed:", errorMessage);
                 setDirectionsFailed(true);
-                fitTripToMap();
+                fitTripToMap(true);
               }}
             />
           )}
@@ -680,15 +790,9 @@ export default function RideConfirmationScreen() {
               <Marker
                 key={driver.id}
                 coordinate={{ latitude: Number(driver.lat), longitude: Number(driver.lng) }}
+                image={markerImage}
                 anchor={{ x: 0.5, y: 0.5 }}
-                tracksViewChanges={true}
-              >
-                <Image
-                  source={markerImage}
-                  style={{ width: 40, height: 40 }}
-                  resizeMode="contain"
-                />
-              </Marker>
+              />
             );
           })}
 
@@ -801,14 +905,17 @@ export default function RideConfirmationScreen() {
               >
                 <Ionicons name="locate" size={18} color="#000" />
               </TouchableOpacity>
+              <TouchableOpacity
+                style={isAddStopExpanded ? styles.addStopBubble : styles.toolCircleBtn}
+                onPress={handleAddStopPress}
+                activeOpacity={0.8}
+              >
+                <Ionicons name="add" size={isAddStopExpanded ? 16 : 20} color="#000" />
+                {isAddStopExpanded && (
+                  <Text style={styles.addStopBubbleText}>Add stop</Text>
+                )}
+              </TouchableOpacity>
             </View>
-            <TouchableOpacity
-              style={styles.addStopBubble}
-              onPress={handleAddStopFromMap}
-            >
-              <Ionicons name="add" size={16} color="#000" />
-              <Text style={styles.addStopBubbleText}>Add stop</Text>
-            </TouchableOpacity>
           </View>
         </View>
       </View>
@@ -1227,7 +1334,7 @@ const createStyles = (colors: typeof Colors.light, insets: any) =>
       elevation: 5,
     },
     rightFloatingBtns: { alignItems: "flex-end", gap: 12 },
-    toolGroup: { gap: 8 },
+    toolGroup: { alignItems: "flex-end", gap: 8 },
     toolCircleBtn: {
       width: 40,
       height: 40,
@@ -1242,12 +1349,13 @@ const createStyles = (colors: typeof Colors.light, insets: any) =>
       elevation: 5,
     },
     addStopBubble: {
+      height: 40,
       backgroundColor: "#fff",
       borderRadius: 20,
       flexDirection: "row",
       alignItems: "center",
       paddingVertical: 8,
-      paddingHorizontal: 16,
+      paddingHorizontal: 14,
       shadowColor: "#000",
       shadowOffset: { width: 0, height: 4 },
       shadowOpacity: 0.1,
@@ -1338,7 +1446,7 @@ const createStyles = (colors: typeof Colors.light, insets: any) =>
     footer: {
       paddingHorizontal: 16,
       paddingTop: 8,
-      paddingBottom: insets.bottom > 0 ? insets.bottom + 8 : 16,
+      paddingBottom: 10,
       backgroundColor: colors.surface,
       borderTopWidth: 1,
       borderTopColor: colors.borderLight,
