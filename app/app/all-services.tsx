@@ -55,8 +55,8 @@ export default function AllServicesScreen() {
       <ScrollView contentContainerStyle={styles.scrollContent}>
         <View style={styles.grid}>
           {SERVICES.map((service) => (
-            <TouchableOpacity 
-              key={service.id} 
+            <TouchableOpacity
+              key={service.id}
               style={styles.serviceItem}
               onPress={() => {
                 setServiceType(service.id);
