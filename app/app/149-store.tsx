@@ -87,7 +87,7 @@ export default function Store149Screen() {
     <View style={styles.container}>
       <StatusBar barStyle="light-content" />
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 24 }}>
-        
+
         {/* Dynamic Purple Header */}
         <LinearGradient
           colors={['#7E3AF2', '#6025C0', '#4C1D95']}
@@ -108,48 +108,48 @@ export default function Store149Screen() {
               </View>
               <Text style={styles.brandText}>Store</Text>
             </View>
-            
+
             <Text style={styles.headerTitle}>Meals at ₹149</Text>
             <Text style={styles.headerSubtitle}>from top restaurants near you</Text>
-            
+
             {/* Highly Animated Custom Banner Design */}
             <View style={styles.bannerDesignContainer}>
-               
-               {/* Multiple Pulsing Rings */}
-               <Animated.View style={[styles.glowRing, pulsingStyle, { width: 220, height: 220, borderRadius: 110, backgroundColor: 'rgba(253, 224, 71, 0.4)' }]} />
-               <Animated.View style={[styles.glowRing, pulsingStyle, { width: 160, height: 160, borderRadius: 80, backgroundColor: 'rgba(245, 158, 11, 0.6)' }]} />
 
-               {/* Particle System (Food Icons and Stars) */}
-               <Animated.View style={[styles.floatingElement, { top: -10, left: 30 }, getFloatStyle(floatAnim2, 20), getRotateStyle(rotateAnimFast)]}>
-                 <Ionicons name="fast-food" size={moderateScale(32)} color="#FDE047" />
-               </Animated.View>
-               <Animated.View style={[styles.floatingElement, { bottom: 15, left: 15 }, getFloatStyle(floatAnim3, 15), getRotateStyle(rotateAnim)]}>
-                 <Ionicons name="pizza" size={moderateScale(38)} color="#F59E0B" />
-               </Animated.View>
-               <Animated.View style={[styles.floatingElement, { top: 15, right: 30 }, getFloatStyle(floatAnim2, 25), getRotateStyle(rotateAnim, true)]}>
-                 <Ionicons name="restaurant" size={moderateScale(28)} color="#FDE047" />
-               </Animated.View>
-               <Animated.View style={[styles.floatingElement, { bottom: 25, right: 15 }, getFloatStyle(floatAnim3, 20), getRotateStyle(rotateAnimFast, true)]}>
-                 <Ionicons name="ice-cream" size={moderateScale(36)} color="#F59E0B" />
-               </Animated.View>
+              {/* Multiple Pulsing Rings */}
+              <Animated.View style={[styles.glowRing, pulsingStyle, { width: 220, height: 220, borderRadius: 110, backgroundColor: 'rgba(253, 224, 71, 0.4)' }]} />
+              <Animated.View style={[styles.glowRing, pulsingStyle, { width: 160, height: 160, borderRadius: 80, backgroundColor: 'rgba(245, 158, 11, 0.6)' }]} />
 
-               <Animated.View style={[styles.floatingElement, { top: 50, left: -5 }, getFloatStyle(floatAnim, 10)]}>
-                 <Ionicons name="star" size={moderateScale(20)} color="#FEF08A" />
-               </Animated.View>
-               <Animated.View style={[styles.floatingElement, { top: 65, right: -5 }, getFloatStyle(floatAnim, 15)]}>
-                 <Ionicons name="sparkles" size={moderateScale(24)} color="#FEF08A" />
-               </Animated.View>
+              {/* Particle System (Food Icons and Stars) */}
+              <Animated.View style={[styles.floatingElement, { top: -10, left: 30 }, getFloatStyle(floatAnim2, 20), getRotateStyle(rotateAnimFast)]}>
+                <Ionicons name="fast-food" size={moderateScale(32)} color="#FDE047" />
+              </Animated.View>
+              <Animated.View style={[styles.floatingElement, { bottom: 15, left: 15 }, getFloatStyle(floatAnim3, 15), getRotateStyle(rotateAnim)]}>
+                <Ionicons name="pizza" size={moderateScale(38)} color="#F59E0B" />
+              </Animated.View>
+              <Animated.View style={[styles.floatingElement, { top: 15, right: 30 }, getFloatStyle(floatAnim2, 25), getRotateStyle(rotateAnim, true)]}>
+                <Ionicons name="restaurant" size={moderateScale(28)} color="#FDE047" />
+              </Animated.View>
+              <Animated.View style={[styles.floatingElement, { bottom: 25, right: 15 }, getFloatStyle(floatAnim3, 20), getRotateStyle(rotateAnimFast, true)]}>
+                <Ionicons name="ice-cream" size={moderateScale(36)} color="#F59E0B" />
+              </Animated.View>
 
-               {/* Center 3D-like Badge */}
-               <Animated.View style={[styles.centerBadgeContainer, getFloatStyle(floatAnim, 12)]}>
-                  <LinearGradient colors={['#FEF08A', '#F59E0B', '#D97706']} style={styles.centerBadge} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}>
-                     <View style={styles.centerBadgeInner}>
-                       <Text style={styles.badgeTextTop}>CRAVING?</Text>
-                       <Text style={styles.badgeTextMain}>₹149</Text>
-                       <Text style={styles.badgeTextBottom}>ANY DISH</Text>
-                     </View>
-                  </LinearGradient>
-               </Animated.View>
+              <Animated.View style={[styles.floatingElement, { top: 50, left: -5 }, getFloatStyle(floatAnim, 10)]}>
+                <Ionicons name="star" size={moderateScale(20)} color="#FEF08A" />
+              </Animated.View>
+              <Animated.View style={[styles.floatingElement, { top: 65, right: -5 }, getFloatStyle(floatAnim, 15)]}>
+                <Ionicons name="sparkles" size={moderateScale(24)} color="#FEF08A" />
+              </Animated.View>
+
+              {/* Center 3D-like Badge */}
+              <Animated.View style={[styles.centerBadgeContainer, getFloatStyle(floatAnim, 12)]}>
+                <LinearGradient colors={['#FEF08A', '#F59E0B', '#D97706']} style={styles.centerBadge} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}>
+                  <View style={styles.centerBadgeInner}>
+                    <Text style={styles.badgeTextTop}>CRAVING?</Text>
+                    <Text style={styles.badgeTextMain}>₹149</Text>
+                    <Text style={styles.badgeTextBottom}>ANY DISH</Text>
+                  </View>
+                </LinearGradient>
+              </Animated.View>
             </View>
           </SafeAreaView>
         </LinearGradient>
@@ -187,11 +187,11 @@ export default function Store149Screen() {
                     setIsSheetVisible(true);
                   }}
                 >
-                  
+
                   {/* Product Image & Select Button */}
                   <View style={styles.imageContainer}>
                     <Image source={{ uri: item.images && item.images.length > 0 ? item.images[0] : "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=400" }} style={styles.productImage} />
-                    
+
                     {/* Diet overlay (top-left) */}
                     <View style={styles.dietOverlay}>
                       <View style={[styles.dietIcon, { borderColor: item.isVeg ? "#16A34A" : "#E11D48" }]}>
@@ -248,7 +248,7 @@ export default function Store149Screen() {
                       <Text style={styles.originalPrice}>₹{item.originalPrice}</Text>
                     )}
                   </View>
-                  
+
                 </TouchableOpacity>
               );
             })}
@@ -265,16 +265,16 @@ export default function Store149Screen() {
         onRequestClose={() => setIsSheetVisible(false)}
       >
         <View style={styles.modalOverlay}>
-          <TouchableOpacity 
-            style={styles.modalCloseBackdrop} 
-            activeOpacity={1} 
-            onPress={() => setIsSheetVisible(false)} 
+          <TouchableOpacity
+            style={styles.modalCloseBackdrop}
+            activeOpacity={1}
+            onPress={() => setIsSheetVisible(false)}
           />
-          
+
           <View style={styles.sheetContainer}>
             {/* Close Button overlapping the top center */}
-            <TouchableOpacity 
-              style={styles.sheetCloseButton} 
+            <TouchableOpacity
+              style={styles.sheetCloseButton}
               onPress={() => setIsSheetVisible(false)}
             >
               <Ionicons name="close" size={24} color="#FFF" />
@@ -283,8 +283,8 @@ export default function Store149Screen() {
             {selectedItem && (
               <View style={styles.sheetContent}>
                 {/* Image */}
-                <Image 
-                  source={{ uri: selectedItem.images && selectedItem.images.length > 0 ? selectedItem.images[0] : "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=400" }} 
+                <Image
+                  source={{ uri: selectedItem.images && selectedItem.images.length > 0 ? selectedItem.images[0] : "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=400" }}
                   style={styles.sheetImage}
                   resizeMode="cover"
                 />
@@ -331,8 +331,8 @@ export default function Store149Screen() {
                           </TouchableOpacity>
                         </View>
                       ) : (
-                        <TouchableOpacity 
-                          style={styles.sheetAddButton} 
+                        <TouchableOpacity
+                          style={styles.sheetAddButton}
                           onPress={() => {
                             const foodItem = {
                               _id: selectedItem._id,
@@ -354,7 +354,7 @@ export default function Store149Screen() {
 
                   {/* Title */}
                   <Text style={styles.sheetTitle}>{selectedItem.name}</Text>
-                  
+
                   {/* Price */}
                   <Text style={styles.sheetPrice}>₹{selectedItem.price}</Text>
 
