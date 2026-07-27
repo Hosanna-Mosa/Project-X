@@ -285,6 +285,14 @@ export const useDriverStore = create<DriverState>()(
               Alert.alert("FILTERED OUT", `matchesActiveServices is false`);
             }
           });
+          socketService.on("order_offer_expired", (data: any) => {
+            console.log("Order offer expired for current driver:", data);
+            const orderId = data.orderId || data.id;
+            const incoming = get().incomingOrder;
+            if (incoming && (!orderId || incoming.id === orderId || incoming.id.toString() === orderId?.toString())) {
+              set({ incomingOrder: null });
+            }
+          });
           socketService.on("order_cancelled", (data: any) => {
             console.log("Order cancelled received:", data);
             const orderId = data.orderId || data.id;
@@ -343,6 +351,7 @@ export const useDriverStore = create<DriverState>()(
         
         import("../utils/socketService").then(({ socketService }) => {
           socketService.off("new_order", () => {}); // Remove listener
+          socketService.off("order_offer_expired", () => {}); // Remove listener
           socketService.off("order_cancelled", () => {}); // Remove listener
           socketService.off("upcoming_reserved_ride", () => {}); // Remove listener
           socketService.disconnect();

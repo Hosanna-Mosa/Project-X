@@ -1474,3 +1474,7 @@
  -> emitting new_order to driverUser._id: 6a4bc52da685d9f0c3950bb0
  -> emitting new_order to driverUser._id: 6a646ae5f2d1a33f03d48461
  -> emitting new_order to driverUser._id: 6a42576a48525b57267766c9
+
+[2026-07-27T06:47:31.862Z] Created order R270726639942 type: bike, driversToNotify: 2, isReserved: false
+ -> emitting new_order to driverUser._id: 6a453f1cecb0e2672c8b06aa
+ -> emitting new_order to driverUser._id: 6a42576a48525b57267766c9

@@ -478,28 +478,11 @@ export class SocketManager {
           `driversRoomSize=${this.getDriverRoomStatus().onlineDrivers}`
         );
 
-        // If driver's last active socket disconnects (app force-closed/killed), mark driver OFFLINE in MongoDB & Redis
-        if (isDriver && userId && (!userStatus || !userStatus.online)) {
-          try {
-            const driver = await Driver.findOne({ user: userId });
-            if (driver) {
-              driver.status = DriverStatus.OFFLINE;
-              driver.isAvailable = false;
-              await driver.save();
-              console.log(`🔌 [SOCKET][DRIVER][OFFLINE] Driver ${driver._id} (${authUser?.name || "Driver"}) marked OFFLINE on socket disconnect.`);
-
-              if (this.redisClient && this.redisClient.isReady) {
-                try {
-                  await this.redisClient.zRem("drivers:locations", driver._id.toString());
-                  await this.redisClient.del(`driver_status:${driver._id.toString()}`);
-                } catch (rErr: any) {
-                  console.warn("[REDIS DISCONNECT CLEANUP] Failed to remove driver from Redis:", rErr.message);
-                }
-              }
-            }
-          } catch (dErr: any) {
-            console.error("[SOCKET DISCONNECT OFFLINE] Error setting driver offline:", dErr.message);
-          }
+        // Note: Mobile socket disconnects when app is backgrounded or minimized.
+        // Driver status is explicitly toggled by driver via API (goOffline) or admin control.
+        // We log disconnects for tracking without forcibly changing driver.status in DB/Redis.
+        if (isDriver && userId) {
+          console.log(`🔌 [SOCKET][DRIVER][DISCONNECT] Driver user ${userId} socket disconnected. Keeping online status in DB/Redis.`);
         }
       });
     });

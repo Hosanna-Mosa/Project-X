@@ -8,7 +8,7 @@ import Colors from '@/constants/colors';
 import { customFetch } from '@/utils/api/custom-fetch';
 
 const DRIVER_MARKER_IMAGE = require('@/assets/images/driver-marker.png');
-const VEHICLE_BIKE_3D = require('@/assets/images/services/scooter_blue_top_view.png');
+const VEHICLE_BIKE_3D = require('@/assets/images/services/scooter_blue_top_view_2.png');
 const VEHICLE_AUTO_3D = require('@/assets/images/services/auto_top_view.png');
 const VEHICLE_CAB_3D = require('@/assets/images/services/cab.png');
 

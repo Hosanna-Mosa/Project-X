@@ -320,50 +320,51 @@ export class OrdersService {
         }))
       };
 
-      socketManager.logConnectionStatus("before_new_order_selective_emit", userId, undefined, savedOrder._id.toString());
-      
-      const debugHelperPath = require('path').join(__dirname, "../../../debug_helper.txt");
-      require('fs').appendFileSync(debugHelperPath, `\n[${new Date().toISOString()}] Created order ${savedOrder._id} type: ${effectiveType}, driversToNotify: ${driversToNotify.length}, isReserved: ${savedOrder.isReserved}\n`);
+      // Calculate exact distance to pickup and sort drivers nearest-first
+      const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => {
+        const R = 6371000;
+        const dLat = ((lat2 - lat1) * Math.PI) / 180;
+        const dLon = ((lon2 - lon1) * Math.PI) / 180;
+        const a =
+          Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+          Math.cos((lat1 * Math.PI) / 180) *
+            Math.cos((lat2 * Math.PI) / 180) *
+            Math.sin(dLon / 2) *
+            Math.sin(dLon / 2);
+        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+        return R * c;
+      };
 
-      for (const d of driversToNotify) {
-        const driverUser = d.user as any;
-        if (driverUser && driverUser._id) {
-          require('fs').appendFileSync(debugHelperPath, ` -> emitting new_order to driverUser._id: ${driverUser._id.toString()}\n`);
-          socketManager.emitToDriver(driverUser._id.toString(), "new_order", orderPayload, "orders.createOrder");
+      const candidatesWithDistance = driversToNotify.map((d: any) => {
+        let dist = 0;
+        const coords = d.currentLocation?.coordinates;
+        if (coords && coords.length >= 2) {
+          dist = calculateDistance(startPos.latitude, startPos.longitude, coords[1], coords[0]);
         }
-      }
-      
-      socketManager.logConnectionStatus("after_new_order_selective_emit", userId, undefined, savedOrder._id.toString());
+        return { driver: d, distanceMeters: dist };
+      });
 
-      // 4. Send push & in-app notifications to matched/filtered drivers
-      if (!savedOrder.isReserved) {
-        (async () => {
-          try {
-            const earnings = Math.round(savedOrder.totalPrice * 0.8);
-            const serviceLabel = effectiveType === ServiceType.DELIVERY ? "delivery" : "ride";
+      // Sort nearest first (ascending distance)
+      candidatesWithDistance.sort((a, b) => a.distanceMeters - b.distanceMeters);
 
-            for (const d of driversToNotify) {
-              const driverUser = d.user as any;
-              if (driverUser && driverUser._id) {
-                await NotificationService.getInstance().sendNotification({
-                  userId: driverUser._id.toString(),
-                  title: "New Delivery Request Nearby! 🚖",
-                  body: `Earn ₹${earnings} for a ${effectiveType} ${serviceLabel} from ${savedOrder.stops[0]?.address?.split(',')[0] || "nearby"}.`,
-                  type: "transactional",
-                  category: "order_status",
-                  data: {
-                    orderId: savedOrder._id,
-                    serviceType: effectiveType,
-                    type: "new_request",
-                  }
-                });
-              }
-            }
-          } catch (err) {
-            console.error("[orders.service] Error sending driver match notifications:", err);
-          }
-        })();
-      }
+      const sortedCandidateInfos = candidatesWithDistance
+        .filter((item) => item.driver?.user?._id)
+        .map((item) => ({
+          driverId: item.driver._id.toString(),
+          driverUserId: item.driver.user._id.toString(),
+          distanceMeters: item.distanceMeters,
+          driverName: (item.driver.user as any)?.name,
+          driverPhone: (item.driver.user as any)?.phone,
+        }));
+
+      console.log(`[SEQUENTIAL DISPATCH] Sorted ${sortedCandidateInfos.length} candidate drivers by distance for order ${savedOrder._id}`);
+
+      // Start Sequential Dispatch Cascade (1 driver at a time, nearest first)
+      const { dispatchManager } = require("../../services/dispatch.manager");
+      await dispatchManager.startDispatch(savedOrder._id.toString(), sortedCandidateInfos, {
+        ...orderPayload,
+        customerUserId: userId,
+      });
 
       // NOTIFY vendor/restaurant
       if (vendorId && !isReserved) {
@@ -890,6 +891,10 @@ export class OrdersService {
       }
     }
 
+    // Trigger dispatch manager to pass order to next nearest driver in sequence
+    const { dispatchManager } = require("../../services/dispatch.manager");
+    await dispatchManager.handleDriverDecline(orderId, driverUserId);
+
     return order;
   }
 
@@ -907,6 +912,10 @@ export class OrdersService {
     if (order.status !== OrderStatus.SEARCHING_DRIVER && !(order.isReserved && order.status === OrderStatus.CREATED)) {
       throw new Error("Order is no longer available");
     }
+
+    // Notify dispatch manager that order was accepted to stop cascade timers
+    const { dispatchManager } = require("../../services/dispatch.manager");
+    dispatchManager.handleDriverAccept(orderId, driverUserId);
 
     const session = await mongoose.startSession();
     session.startTransaction();

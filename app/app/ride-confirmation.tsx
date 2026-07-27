@@ -27,7 +27,7 @@ import { useDeliveryStore } from "@/contexts/deliveryStore";
 const { width, height } = Dimensions.get("window");
 const GOOGLE_MAPS_APIKEY = process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY;
 
-const VEHICLE_BIKE_3D = require("@/assets/images/services/scooter_blue_top_view.png");
+const VEHICLE_BIKE_3D = require("@/assets/images/services/scooter_blue_top_view_2.png");
 const VEHICLE_AUTO_3D = require("@/assets/images/services/auto_top_view.png");
 const VEHICLE_CAB_3D = require("@/assets/images/services/cab.png");
 

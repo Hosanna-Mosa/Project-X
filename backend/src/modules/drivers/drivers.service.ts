@@ -229,6 +229,10 @@ export class DriverService {
       coordinates: [lng, lat],
     };
 
+    if (driver.status === DriverStatus.ONLINE) {
+      driver.isAvailable = true;
+    }
+
     try {
       const { ZonesService } = require("../zones/zones.service");
       const zonesService = new ZonesService();
@@ -240,7 +244,25 @@ export class DriverService {
       console.warn("[HTTP LOCATION UPDATE] Error resolving zone for driver:", zoneErr);
     }
 
-    return driver.save();
+    const savedDriver = await driver.save();
+
+    // Sync Redis if online
+    try {
+      const { socketManager } = require("../../sockets/socket.manager");
+      const redisClient = socketManager ? socketManager.redisClient : null;
+      if (redisClient && redisClient.isReady && driver.status === DriverStatus.ONLINE) {
+        await redisClient.geoAdd("drivers:locations", {
+          longitude: Number(lng),
+          latitude: Number(lat),
+          member: driver._id.toString()
+        });
+        await redisClient.set(`driver_status:${driver._id.toString()}`, "online", { EX: 60 });
+      }
+    } catch (redisErr: any) {
+      console.warn("[HTTP LOCATION UPDATE] Failed to sync Redis:", redisErr.message);
+    }
+
+    return savedDriver;
   }
 
   async updateStatus(driverId: string, status: DriverStatus) {
