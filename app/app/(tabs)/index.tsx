@@ -242,7 +242,31 @@ export default function HomeScreen() {
 
   const [searchText, setSearchText] = useState("");
   const [isSearchActive, setIsSearchActive] = useState(false);
+  const [isSearchVisible, setIsSearchVisible] = useState(false);
+  const searchTranslateY = useRef(new Animated.Value(-Dimensions.get('window').height)).current;
+  const searchBackdropOpacity = useRef(new Animated.Value(0)).current;
   const [recentSearches, setRecentSearches] = useState<string[]>([]);
+
+  useEffect(() => {
+    if (isSearchActive) {
+      setIsSearchVisible(true);
+      // Entry animation is handled by onShow in Modal
+    } else if (isSearchVisible) {
+      Animated.parallel([
+        Animated.timing(searchTranslateY, {
+          toValue: -Dimensions.get('window').height,
+          duration: 300,
+          easing: Easing.in(Easing.poly(3)),
+          useNativeDriver: true,
+        }),
+        Animated.timing(searchBackdropOpacity, {
+          toValue: 0,
+          duration: 300,
+          useNativeDriver: true,
+        })
+      ]).start(() => setIsSearchVisible(false));
+    }
+  }, [isSearchActive]);
   const [banners, setBanners] = useState<any[]>([]);
   const [hasShownStartupAd, setHasShownStartupAd] = useState(false);
   const [activeStartupAd, setActiveStartupAd] = useState<any | null>(null);
@@ -1592,120 +1616,119 @@ export default function HomeScreen() {
 
       {/* DOORDASH STYLE SEARCH SCREEN OVERLAY */}
       <Modal
-        visible={isSearchActive}
-        animationType="slide"
-        transparent={false}
+        visible={isSearchVisible}
+        animationType="none"
+        transparent={true}
         onRequestClose={() => setIsSearchActive(false)}
+        onShow={() => {
+          Animated.parallel([
+            Animated.timing(searchTranslateY, {
+              toValue: 0,
+              duration: 350,
+              easing: Easing.out(Easing.poly(3)),
+              useNativeDriver: true,
+            }),
+            Animated.timing(searchBackdropOpacity, {
+              toValue: 1,
+              duration: 350,
+              useNativeDriver: true,
+            })
+          ]).start();
+        }}
       >
-        <View style={[styles.ddSearchRoot, { paddingTop: insets.top }]}>
-          {/* Header Row */}
-          <View style={styles.ddSearchHeader}>
-            <TouchableOpacity
-              onPress={() => {
-                setIsSearchActive(false);
-                setSearchText("");
-              }}
-              style={styles.ddSearchCloseBtn}
-            >
-              <Ionicons name="close" size={26} color={colors.text} />
-            </TouchableOpacity>
-
-            <View style={styles.ddSearchInputWrapper}>
-              <Ionicons name="search" size={20} color={colors.textSecondary} style={{ marginRight: 8 }} />
-              <TextInput
-                style={styles.ddSearchInput}
-                placeholder="Search food, dishes, restaurants"
-                placeholderTextColor={colors.textMuted}
-                value={searchText}
-                onChangeText={setSearchText}
-                autoFocus
-                returnKeyType="search"
-                onSubmitEditing={() => addRecentSearch(searchText)}
-              />
-              {searchText ? (
-                <TouchableOpacity onPress={() => setSearchText("")}>
-                  <Ionicons name="close-circle" size={18} color={colors.textMuted} />
-                </TouchableOpacity>
-              ) : null}
+        <View style={{ flex: 1 }}>
+          <Animated.View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0,0,0,0.6)', opacity: searchBackdropOpacity }]}>
+            <TouchableOpacity 
+              style={StyleSheet.absoluteFill} 
+              activeOpacity={1} 
+              onPress={() => setIsSearchActive(false)} 
+            />
+          </Animated.View>
+          <Animated.View style={[
+            { 
+              backgroundColor: colors.background, 
+              paddingTop: Platform.OS === 'ios' ? Math.max(insets.top, 16) : 16,
+              borderBottomLeftRadius: 24,
+              borderBottomRightRadius: 24,
+              overflow: 'hidden',
+              maxHeight: Dimensions.get('window').height * 0.85
+            }, 
+            { transform: [{ translateY: searchTranslateY }] }
+          ]}>
+            {/* Header Row */}
+            <View style={{ flexDirection: "row", alignItems: "center", paddingHorizontal: 16, paddingVertical: 12, gap: 16 }}>
+              <TouchableOpacity onPress={() => setIsSearchActive(false)}>
+                <Ionicons name="arrow-back" size={24} color={colors.textSecondary} />
+              </TouchableOpacity>
+              <Text style={{ fontSize: 16, fontWeight: "500", color: colors.textSecondary }}>Search for dishes & restaurants</Text>
             </View>
-          </View>
 
-          {/* Body Content */}
-          {!searchText ? (
-            <ScrollView
-              showsVerticalScrollIndicator={false}
-              contentContainerStyle={styles.ddSearchBody}
-              keyboardShouldPersistTaps="handled"
-            >
-              {/* Recent Searches */}
-              {recentSearches.length > 0 && (
-                <View style={styles.ddRecentSection}>
-                  <View style={styles.ddSectionHeader}>
-                    <Text style={styles.ddSectionTitle}>Recent Searches</Text>
-                    <TouchableOpacity onPress={clearRecentSearches}>
-                      <Text style={styles.ddClearLink}>Clear</Text>
-                    </TouchableOpacity>
+            {/* Search Input Row */}
+            <View style={{ paddingHorizontal: 16, paddingBottom: 16 }}>
+              <View style={{ flexDirection: "row", alignItems: "center", backgroundColor: colors.surfaceSecondary || "#F3F4F6", borderRadius: 16, paddingHorizontal: 16, paddingVertical: Platform.OS === "ios" ? 14 : 10 }}>
+                <Ionicons name="search" size={20} color={colors.textMuted} style={{ marginRight: 10 }} />
+                <TextInput
+                  style={{ flex: 1, fontSize: 16, fontWeight: "500", color: colors.text }}
+                  placeholder="Try 'EatRight'"
+                  placeholderTextColor={colors.textMuted}
+                  value={searchText}
+                  onChangeText={setSearchText}
+                  autoFocus
+                  returnKeyType="search"
+                  onSubmitEditing={() => addRecentSearch(searchText)}
+                />
+                {searchText ? (
+                  <TouchableOpacity onPress={() => setSearchText("")} style={{ padding: 4 }}>
+                    <Ionicons name="close-circle" size={20} color={colors.textMuted} />
+                  </TouchableOpacity>
+                ) : null}
+              </View>
+            </View>
+
+            {/* Body Content */}
+            {!searchText ? (
+              <ScrollView
+                showsVerticalScrollIndicator={false}
+                keyboardShouldPersistTaps="handled"
+                contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 24 }}
+              >
+                {/* Recent Searches */}
+                {recentSearches.length > 0 && (
+                  <View style={{ marginBottom: 24 }}>
+                    <Text style={{ fontSize: 12, fontWeight: "700", letterSpacing: 1, color: colors.text, marginBottom: 16, marginTop: 8 }}>RECENTLY SEARCHED RESTAURANTS</Text>
+                    <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
+                      {recentSearches.map((query, index) => (
+                        <TouchableOpacity
+                          key={index}
+                          style={{ flexDirection: "row", alignItems: "center", borderWidth: 1, borderColor: colors.borderLight, borderRadius: 20, paddingHorizontal: 12, paddingVertical: 8 }}
+                          onPress={() => setSearchText(query)}
+                        >
+                          <Ionicons name="time-outline" size={16} color={colors.textSecondary} style={{ marginRight: 6 }} />
+                          <Text style={{ fontSize: 13, color: colors.textSecondary, fontWeight: "500" }}>{query}</Text>
+                        </TouchableOpacity>
+                      ))}
+                    </View>
                   </View>
-                  <View style={styles.ddRecentList}>
-                    {recentSearches.map((query, index) => (
+                )}
+                
+                {/* Recommended (Optional fallback if no recent searches) */}
+                <View style={{ marginBottom: 24 }}>
+                   <Text style={{ fontSize: 12, fontWeight: "700", letterSpacing: 1, color: colors.text, marginBottom: 16 }}>RECOMMENDED FOR YOU</Text>
+                   <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
+                    {["Biryani", "Pizza", "Burger", "Chinese", "Desserts"].map((rec, i) => (
                       <TouchableOpacity
-                        key={index}
-                        style={styles.ddRecentItem}
-                        onPress={() => setSearchText(query)}
+                        key={i}
+                        style={{ flexDirection: "row", alignItems: "center", borderWidth: 1, borderColor: colors.borderLight, borderRadius: 20, paddingHorizontal: 12, paddingVertical: 8 }}
+                        onPress={() => setSearchText(rec)}
                       >
-                        <Ionicons name="time-outline" size={20} color={colors.textMuted} style={{ marginRight: 12 }} />
-                        <Text style={styles.ddRecentText}>{query}</Text>
+                        <Text style={{ fontSize: 13, color: colors.textSecondary, fontWeight: "500" }}>{rec}</Text>
                       </TouchableOpacity>
                     ))}
-                  </View>
+                   </View>
                 </View>
-              )}
-
-              {/* Recommended Chips */}
-              <View style={styles.ddRecommendedSection}>
-                <Text style={styles.ddSectionTitle}>Recommended</Text>
-                <View style={styles.ddRecommendedGrid}>
-                  {["Ice cream", "Grocery", "Cat food", "Cookie", "Soda", "Tacos", "Burger", "Pizza"].map((rec, i) => (
-                    <TouchableOpacity
-                      key={i}
-                      style={styles.ddRecChip}
-                      onPress={() => setSearchText(rec)}
-                    >
-                      <Text style={styles.ddRecChipText}>{rec}</Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-              </View>
-
-              {/* Cuisines Grid */}
-              <View style={styles.ddCuisinesSection}>
-                <Text style={styles.ddSectionTitle}>Cuisines</Text>
-                <View style={styles.ddCuisinesGrid}>
-                  {[
-                    { name: "Fast Food", emoji: "🍟", query: "Burger" },
-                    { name: "Breakfast", emoji: "🍳", query: "Breakfast" },
-                    { name: "Pizza", emoji: "🍕", query: "Pizza" },
-                    { name: "Indian", emoji: "🍛", query: "Biryani" },
-                    { name: "Desserts", emoji: "🍰", query: "Waffles" },
-                    { name: "Chinese", emoji: "🍜", query: "Noodles" }
-                  ].map((item, i) => (
-                    <TouchableOpacity
-                      key={i}
-                      style={styles.ddCuisineCard}
-                      onPress={() => setSearchText(item.query)}
-                    >
-                      <View style={styles.ddCuisineIconBg}>
-                        <Text style={{ fontSize: 32 }}>{item.emoji}</Text>
-                      </View>
-                      <Text style={styles.ddCuisineText}>{item.name}</Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-              </View>
-            </ScrollView>
-          ) : (
-            /* Search Results */
-            <View style={{ flex: 1, backgroundColor: colors.background }}>
+              </ScrollView>
+            ) : (
+              /* Search Results */
               <FlatList
                 data={listData.filter((item: any) => item.isHeader || item.isRestaurant || item.isDish)}
                 keyExtractor={(item) => item._id}
@@ -1734,8 +1757,8 @@ export default function HomeScreen() {
                   </View>
                 )}
               />
-            </View>
-          )}
+            )}
+          </Animated.View>
         </View>
       </Modal>
 
