@@ -1,87 +1,87 @@
 export default {
-  "expo": {
-    "name": "Flavour",
-    "slug": "flavour",
-    "version": "1.0.0",
-    "orientation": "portrait",
-    "icon": "./assets/images/icon.png",
-    "scheme": "flavour",
-    "userInterfaceStyle": "automatic",
-    "newArchEnabled": true,
-    "splash": {
-      "image": "./assets/images/splash-icon.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#ffffff"
+  expo: {
+    name: 'Flavour',
+    slug: 'flavour',
+    version: '1.0.0',
+    orientation: 'portrait',
+    icon: './assets/images/icon.png',
+    scheme: 'flavour',
+    userInterfaceStyle: 'automatic',
+    newArchEnabled: true,
+    splash: {
+      image: './assets/images/splash-icon.png',
+      resizeMode: 'contain',
+      backgroundColor: '#ffffff',
     },
-    "ios": {
-      "supportsTablet": false,
-      "bundleIdentifier": "com.flavour.customer",
-      "config": {
-        "googleMapsApiKey": process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY
+    ios: {
+      supportsTablet: false,
+      bundleIdentifier: 'com.flavour.customer',
+      config: {
+        googleMapsApiKey: process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY,
       },
-      "infoPlist": {
-        "NSLocationWhenInUseUsageDescription": "This app uses your location to show nearby services and track your deliveries."
-      }
-    },
-    "android": {
-      "package": "com.flavour.customer",
-      "googleServicesFile": "./google-services.json",
-      "adaptiveIcon": {
-        "foregroundImage": "./assets/images/icon.png",
-        "backgroundColor": "#ffffff"
+      infoPlist: {
+        NSLocationWhenInUseUsageDescription:
+          'This app uses your location to show nearby services and track your deliveries.',
       },
-      "usesCleartextTraffic": true,
-      "navigationBar": {
-        "backgroundColor": "#FFFFFF",
-        "buttonStyle": "dark"
+    },
+    android: {
+      package: 'com.flavour.customer',
+      googleServicesFile: './google-services.json',
+      adaptiveIcon: {
+        foregroundImage: './assets/images/icon.png',
+        backgroundColor: '#ffffff',
       },
-      "config": {
-        "googleMaps": {
-          "apiKey": process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY
-        }
+      usesCleartextTraffic: true,
+      navigationBar: {
+        backgroundColor: '#FFFFFF',
+        buttonStyle: 'dark',
       },
-      "permissions": [
-        "ACCESS_COARSE_LOCATION",
-        "ACCESS_FINE_LOCATION",
-        "android.permission.POST_NOTIFICATIONS",
-        "android.permission.RECEIVE_BOOT_COMPLETED"
-      ]
-    },
-    "notification": {
-      "icon": "./assets/images/icon.png",
-      "color": "#ffffff"
-    },
-    "web": {
-      "favicon": "./assets/images/icon.png"
-    },
-    "plugins": [
-      [
-        "expo-router",
-        {
-          "origin": "https://replit.com/"
-        }
+      config: {
+        googleMaps: {
+          apiKey: process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY,
+        },
+      },
+      permissions: [
+        'ACCESS_COARSE_LOCATION',
+        'ACCESS_FINE_LOCATION',
+        'android.permission.POST_NOTIFICATIONS',
+        'android.permission.RECEIVE_BOOT_COMPLETED',
       ],
-      "expo-font",
-      "expo-web-browser",
-      "@react-native-community/datetimepicker",
+    },
+    notification: {
+      icon: './assets/images/icon.png',
+      color: '#ffffff',
+    },
+    web: {
+      favicon: './assets/images/icon.png',
+    },
+    plugins: [
       [
-        "expo-notifications",
+        'expo-router',
         {
-          "icon": "./assets/images/icon.png",
-          "color": "#ffffff"
-        }
-      ]
+          origin: 'https://replit.com/',
+        },
+      ],
+      'expo-font',
+      'expo-web-browser',
+      '@react-native-community/datetimepicker',
+      [
+        'expo-notifications',
+        {
+          icon: './assets/images/icon.png',
+          color: '#ffffff',
+        },
+      ],
     ],
-    "experiments": {
-      "typedRoutes": true,
-      "reactCompiler": true
+    experiments: {
+      typedRoutes: true,
+      reactCompiler: true,
     },
-    "extra": {
-      "apiUrl": process.env.EXPO_PUBLIC_API_URL,
-      "eas": {
-        "projectId": "e3e714ab-ffe7-4ea4-bf62-b317be38497c"
-      }
+    extra: {
+      apiUrl: process.env.EXPO_PUBLIC_API_URL,
+      eas: {
+        projectId: 'b53cf032-dea6-4aff-835e-b3cd717e54a3',
+      },
     },
-    "owner": "hosanna4190"
-  }
-}
+  },
+};
