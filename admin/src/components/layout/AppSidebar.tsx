@@ -30,6 +30,7 @@ const navItems = [
   { title: "Dev Drivers", url: "/dev-drivers", icon: SlidersHorizontal },
   { title: "Users", url: "/users", icon: Users },
   { title: "Vendors", url: "/vendors", icon: Store },
+  { title: "Restaurant Menu", url: "/restaurant-menu", icon: Store },
   { title: "Meal Centers", url: "/meat-centers", icon: Drumstick },
   { title: "Meal Pricing", url: "/meat-pricing", icon: IndianRupee },
   { title: "Zones", url: "/zones", icon: Map },

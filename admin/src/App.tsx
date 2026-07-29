@@ -14,6 +14,7 @@ import SupportChat from "./pages/SupportChat";
 import OrderDetail from "./pages/OrderDetail";
 import Users from "./pages/Users";
 import Vendors from "./pages/Vendors";
+import RestaurantMenu from "./pages/RestaurantMenu";
 import MeatCenters from "./pages/MeatCenters";
 import MeatPricing from "./pages/MeatPricing";
 import VendorLogin from "./pages/VendorLogin";
@@ -66,6 +67,7 @@ const App = () => (
           <Route path="/support/chats/:id" element={<SupportChat />} />
           <Route path="/users" element={<Users />} />
           <Route path="/vendors" element={<Vendors />} />
+          <Route path="/restaurant-menu" element={<RestaurantMenu />} />
           <Route path="/meat-centers" element={<MeatCenters />} />
           <Route path="/meat-pricing" element={<MeatPricing />} />
           <Route path="/zones" element={<Zones />} />
