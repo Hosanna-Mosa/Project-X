@@ -4,6 +4,7 @@ import Layout from "./routes/__root";
 import Home from "./routes/index";
 import PartnerPage from "./routes/partner";
 import PartnerOnboarding from "./routes/partner-onboarding";
+import RestaurantMenuFront from "./routes/restaurant-menu";
 
 function NotFound() {
   return (
@@ -95,6 +96,7 @@ export default function App() {
           <Route index element={<Home />} />
           <Route path="partner" element={<PartnerPage />} />
           <Route path="partner/onboarding" element={<PartnerOnboarding />} />
+          <Route path="restaurant-menu/:id" element={<RestaurantMenuFront />} />
           <Route path="*" element={<NotFound />} />
         </Route>
       </Routes>
