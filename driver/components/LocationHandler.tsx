@@ -64,6 +64,7 @@ export const LocationHandler = () => {
   const { isOnline, driverPhone, driverUserId, currentOrder } = useDriverStore();
   const watcher = useRef<Location.LocationSubscription | null>(null);
   const appState = useRef(AppState.currentState);
+  const isCheckingPermissions = useRef(false);
 
   // AppState Listener to reconnect socket & refresh when app returns to foreground
   useEffect(() => {
@@ -81,6 +82,13 @@ export const LocationHandler = () => {
         appState.current === "active" &&
         nextAppState.match(/inactive|background/)
       ) {
+        // Skip if going to background due to a permission check popup
+        if (isCheckingPermissions.current) {
+          console.log("[LocationHandler] App went to background/inactive due to permission check. Skipping auto-offline.");
+          appState.current = nextAppState;
+          return;
+        }
+
         console.log("[LocationHandler] App went to background. Forcing offline.");
         const store = useDriverStore.getState();
         if (store.isOnline) {
@@ -109,90 +117,111 @@ export const LocationHandler = () => {
     let isMounted = true;
 
     const setupTracking = async () => {
-      // Request notification permissions to ensure local notifications work
-      await Notifications.requestPermissionsAsync();
-
-      // Permission Check
-      const { status: fgStatus } = await Location.requestForegroundPermissionsAsync();
-      if (fgStatus !== "granted") return;
-
-      // 1. Get Initial Location Fast (LastKnown)
-      const lastKnown = await Location.getLastKnownPositionAsync();
-      if (lastKnown && isMounted) {
-        if (isOnline) {
-          updateAndBroadcast(lastKnown.coords.latitude, lastKnown.coords.longitude);
-        } else {
-          updateLocalOnly(lastKnown.coords.latitude, lastKnown.coords.longitude);
-        }
-      }
-
-      // 2. Get Current Location (Balanced)
+      isCheckingPermissions.current = true;
       try {
-        const current = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
-        if (current && isMounted) {
+        // Check notification permissions first
+        const { status: notifCheck } = await Notifications.getPermissionsAsync();
+        let notifStatus = notifCheck;
+        if (notifStatus !== "granted") {
+          const requested = await Notifications.requestPermissionsAsync();
+          notifStatus = requested.status;
+        }
+
+        // Check foreground location permissions first
+        const { status: fgCheck } = await Location.getForegroundPermissionsAsync();
+        let fgStatus = fgCheck;
+        if (fgStatus !== "granted") {
+          const requested = await Location.requestForegroundPermissionsAsync();
+          fgStatus = requested.status;
+        }
+        if (fgStatus !== "granted") return;
+
+        // 1. Get Initial Location Fast (LastKnown)
+        const lastKnown = await Location.getLastKnownPositionAsync();
+        if (lastKnown && isMounted) {
           if (isOnline) {
-            updateAndBroadcast(current.coords.latitude, current.coords.longitude);
+            updateAndBroadcast(lastKnown.coords.latitude, lastKnown.coords.longitude);
           } else {
-            updateLocalOnly(current.coords.latitude, current.coords.longitude);
+            updateLocalOnly(lastKnown.coords.latitude, lastKnown.coords.longitude);
           }
         }
-      } catch (e) {}
 
-      // 3. Start High-Accuracy Foreground Watch
-      if (watcher.current) {
-        watcher.current.remove();
-        watcher.current = null;
-      }
-
-      watcher.current = await Location.watchPositionAsync(
-        {
-          accuracy: Location.Accuracy.High,
-          timeInterval: 5000, // 5 seconds
-          distanceInterval: 10, // 10 meters
-        },
-        (location) => {
-          if (isMounted) {
+        // 2. Get Current Location (Balanced)
+        try {
+          const current = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+          if (current && isMounted) {
             if (isOnline) {
-              updateAndBroadcast(location.coords.latitude, location.coords.longitude, location.coords.heading || 0);
+              updateAndBroadcast(current.coords.latitude, current.coords.longitude);
             } else {
-              updateLocalOnly(location.coords.latitude, location.coords.longitude);
+              updateLocalOnly(current.coords.latitude, current.coords.longitude);
             }
           }
+        } catch (e) {}
+
+        // 3. Start High-Accuracy Foreground Watch
+        if (watcher.current) {
+          watcher.current.remove();
+          watcher.current = null;
         }
-      );
 
-      // 4. Background Location Service Management
-      try {
-        const isTaskRegistered = await TaskManager.isTaskRegisteredAsync(BACKGROUND_LOCATION_TASK);
+        watcher.current = await Location.watchPositionAsync(
+          {
+            accuracy: Location.Accuracy.High,
+            timeInterval: 5000, // 5 seconds
+            distanceInterval: 10, // 10 meters
+          },
+          (location) => {
+            if (isMounted) {
+              if (isOnline) {
+                updateAndBroadcast(location.coords.latitude, location.coords.longitude, location.coords.heading || 0);
+              } else {
+                updateLocalOnly(location.coords.latitude, location.coords.longitude);
+              }
+            }
+          }
+        );
 
-        if (isOnline) {
-          const { status: bgStatus } = await Location.requestBackgroundPermissionsAsync();
-          if (bgStatus === "granted") {
-            if (!isTaskRegistered) {
-              await Location.startLocationUpdatesAsync(BACKGROUND_LOCATION_TASK, {
-                accuracy: Location.Accuracy.Balanced,
-                timeInterval: 10000, // 10 seconds in background
-                distanceInterval: 10, // 10 meters
-                showsBackgroundLocationIndicator: true,
-                foregroundService: {
-                  notificationTitle: "Flavour Driver Active",
-                  notificationBody: "Tracking location for order dispatches in background...",
-                  notificationColor: "#22C55E",
-                },
-              });
-              console.log("[LocationHandler] Background location tracking started.");
+        // 4. Background Location Service Management
+        try {
+          const isTaskRegistered = await TaskManager.isTaskRegisteredAsync(BACKGROUND_LOCATION_TASK);
+
+          if (isOnline) {
+            // Check background location permissions first
+            const { status: bgCheck } = await Location.getBackgroundPermissionsAsync();
+            let bgStatus = bgCheck;
+            if (bgStatus !== "granted") {
+              const requested = await Location.requestBackgroundPermissionsAsync();
+              bgStatus = requested.status;
+            }
+            if (bgStatus === "granted") {
+              if (!isTaskRegistered) {
+                await Location.startLocationUpdatesAsync(BACKGROUND_LOCATION_TASK, {
+                  accuracy: Location.Accuracy.Balanced,
+                  timeInterval: 10000, // 10 seconds in background
+                  distanceInterval: 10, // 10 meters
+                  showsBackgroundLocationIndicator: true,
+                  foregroundService: {
+                    notificationTitle: "Flavour Driver Active",
+                    notificationBody: "Tracking location for order dispatches in background...",
+                    notificationColor: "#22C55E",
+                  },
+                });
+                console.log("[LocationHandler] Background location tracking started.");
+              }
+            } else {
+              console.warn("[LocationHandler] Background location permission not granted.");
             }
           } else {
-            console.warn("[LocationHandler] Background location permission not granted.");
+            if (isTaskRegistered) {
+              await Location.stopLocationUpdatesAsync(BACKGROUND_LOCATION_TASK);
+              console.log("[LocationHandler] Background location tracking stopped.");
+            }
           }
-        } else {
-          if (isTaskRegistered) {
-            await Location.stopLocationUpdatesAsync(BACKGROUND_LOCATION_TASK);
-            console.log("[LocationHandler] Background location tracking stopped.");
-          }
+        } catch (bgErr) {
+          console.warn("[LocationHandler] Error handling background location updates:", bgErr);
         }
-      } catch (bgErr) {
-        console.warn("[LocationHandler] Error handling background location updates:", bgErr);
+      } finally {
+        isCheckingPermissions.current = false;
       }
     };
 
