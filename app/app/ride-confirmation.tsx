@@ -438,7 +438,7 @@ export default function RideConfirmationScreen() {
       edgePadding: {
         top: Platform.OS === "ios" ? 110 : 90,
         right: 60,
-        bottom: 330,
+        bottom: 60,
         left: 60,
       },
       animated,
@@ -732,8 +732,11 @@ export default function RideConfirmationScreen() {
           provider={PROVIDER_GOOGLE}
           style={StyleSheet.absoluteFill}
           initialRegion={initialRegion}
-          zoomEnabled
-          scrollEnabled
+          zoomEnabled={true}
+          scrollEnabled={true}
+          pitchEnabled={true}
+          rotateEnabled={true}
+          zoomTapEnabled={true}
           showsUserLocation={false}
           showsMyLocationButton={false}
           onMapReady={() => setMapReady(true)}

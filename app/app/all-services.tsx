@@ -101,8 +101,8 @@ const createStyles = (colors: typeof Colors.light) =>
       marginRight: 16,
     },
     headerTitle: {
-      fontSize: moderateScale(22),
-      fontWeight: "900",
+      fontSize: moderateScale(18),
+      fontWeight: "800",
       color: colors.text,
     },
     scrollContent: {

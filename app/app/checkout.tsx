@@ -480,8 +480,8 @@ const createStyles = () => StyleSheet.create({
     fontWeight: "600",
   },
   headerTitle: {
-    fontSize: moderateScale(20),
-    fontWeight: "bold",
+    fontSize: moderateScale(18),
+    fontWeight: "800",
     color: "#000",
   },
   content: {

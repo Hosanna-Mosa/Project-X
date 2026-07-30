@@ -262,7 +262,7 @@ const createStyles = (colors: typeof Colors.light) => StyleSheet.create({
     justifyContent: "center",
   },
   headerTitleRow: { marginTop: 5 },
-  headerTitle: { fontSize: 24, fontWeight: "900", color: colors.text, letterSpacing: -0.5 },
+  headerTitle: { fontSize: 18, fontWeight: "800", color: colors.text, letterSpacing: -0.5 },
   headerSubtitle: { fontSize: 13, color: colors.textSecondary, fontWeight: "500" },
   meatCategoriesContainer: { paddingHorizontal: 16, paddingVertical: 20, gap: 16 },
   categoryCircleWrapper: { alignItems: "center", gap: 8, width: 65 },

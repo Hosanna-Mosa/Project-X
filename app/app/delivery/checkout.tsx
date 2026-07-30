@@ -298,10 +298,9 @@ const createStyles = (colors: typeof Colors.light) => StyleSheet.create({
     gap: 4,
   },
   title: {
-    fontSize: 22,
+    fontSize: 18,
     fontWeight: "800",
     color: colors.text,
-    letterSpacing: -0.3,
   },
   subtitle: {
     fontSize: 12,

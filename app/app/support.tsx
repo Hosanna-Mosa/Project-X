@@ -11,6 +11,7 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons, Feather } from "@expo/vector-icons";
 import { router } from "expo-router";
+import { moderateScale } from "react-native-size-matters";
 import Colors from "@/constants/colors";
 import { useThemeStore } from "@/contexts/themeStore";
 
@@ -177,8 +178,8 @@ const createStyles = (colors: typeof Colors.light) =>
       marginRight: 16,
     },
     headerTitle: {
-      fontSize: 22,
-      fontWeight: "900",
+      fontSize: moderateScale(18),
+      fontWeight: "800",
       color: colors.text,
     },
     scrollContent: {

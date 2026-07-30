@@ -1247,34 +1247,7 @@ export default function HomeScreen() {
         </View>
 
         {/* Conditionally show warning and block all products/categories */}
-        {hasRidersButNoVendors ? (
-          <View style={{ 
-            margin: 16, 
-            marginTop: 24, 
-            alignItems: 'center', 
-            padding: 24, 
-            backgroundColor: '#F9FAFB', 
-            borderRadius: 24, 
-            borderWidth: 1, 
-            borderColor: '#E5E7EB',
-            shadowColor: '#000',
-            shadowOffset: { width: 0, height: 2 },
-            shadowOpacity: 0.05,
-            shadowRadius: 8,
-            elevation: 2
-          }}>
-            <Ionicons name={activeService === 'Meat' ? "basket" : "fast-food"} size={48} color="#7C3AED" style={{ marginBottom: 12 }} />
-            <Text style={{ fontSize: 18, fontWeight: '800', color: '#1F2937', textAlign: 'center' }}>
-              {activeService === 'Meat' ? "No Meat Available" : "No Food Available"}
-            </Text>
-            <Text style={{ fontSize: 13, color: '#4B5563', textAlign: 'center', marginTop: 6, fontWeight: '600', lineHeight: 18 }}>
-              {activeService === 'Meat'
-                ? "Riders are online, but there are no meat shops or outlets serving this zone currently."
-                : "Riders are online, but there are no restaurants or vendors serving this zone currently."
-              }
-            </Text>
-          </View>
-        ) : (
+        {hasRidersButNoVendors ? null : (
           <>
             {/* Tag Pills */}
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 16, paddingVertical: 16 }}>
