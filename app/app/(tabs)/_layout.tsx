@@ -7,6 +7,7 @@ export default function TabLayout() {
       tabBar={() => null}
       screenOptions={{
         headerShown: false,
+        tabBarStyle: { display: "none" },
       }}
     >
       <Tabs.Screen name="index" options={{ title: "Home" }} />

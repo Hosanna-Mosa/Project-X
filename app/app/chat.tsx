@@ -31,6 +31,7 @@ export default function ChatScreen() {
   const [inputText, setInputText] = useState("");
   const flatListRef = useRef<FlatList>(null);
   const [taskAssigned, setTaskAssigned] = useState(false);
+  const [isQuickRepliesExpanded, setIsQuickRepliesExpanded] = useState(false);
 
   const handleAssignTask = () => {
     socketService.emit("assign_task_confirmed", { orderId: currentOrderId });
@@ -202,26 +203,32 @@ export default function ChatScreen() {
 
       {/* Quick Replies Area */}
       <View style={styles.quickRepliesCard}>
-        <View style={styles.quickRepliesHeaderRow}>
+        <TouchableOpacity 
+          style={[styles.quickRepliesHeaderRow, !isQuickRepliesExpanded && { marginBottom: 0 }]}
+          onPress={() => setIsQuickRepliesExpanded(!isQuickRepliesExpanded)}
+          activeOpacity={0.7}
+        >
           <Text style={styles.quickRepliesTitle}>⚡ Quick Chat</Text>
-          <Feather name="chevron-down" size={16} color={Colors.light.textSecondary} />
-        </View>
-        <View style={styles.quickRepliesList}>
-          {QUICK_REPLIES.map((item, index) => (
-            <TouchableOpacity
-              key={index}
-              style={styles.quickReplyActionBtn}
-              onPress={() => sendMessage(item)}
-            >
-              <Text style={styles.quickReplyActionText}>{item}</Text>
-              <Feather name="send" size={16} color="#0EA5E9" />
-            </TouchableOpacity>
-          ))}
-        </View>
+          <Feather name={isQuickRepliesExpanded ? "chevron-up" : "chevron-down"} size={16} color={Colors.light.textSecondary} />
+        </TouchableOpacity>
+        {isQuickRepliesExpanded && (
+          <View style={styles.quickRepliesList}>
+            {QUICK_REPLIES.map((item, index) => (
+              <TouchableOpacity
+                key={index}
+                style={styles.quickReplyActionBtn}
+                onPress={() => sendMessage(item)}
+              >
+                <Text style={styles.quickReplyActionText}>{item}</Text>
+                <Feather name="send" size={16} color="#0EA5E9" />
+              </TouchableOpacity>
+            ))}
+          </View>
+        )}
       </View>
 
       {/* Input Bar */}
-      <View style={[styles.inputBar, { paddingBottom: insets.bottom + 8 }]}>
+      <View style={[styles.inputBar, { paddingBottom: Platform.OS === "ios" ? insets.bottom + 8 : 12 }]}>
         <View style={styles.inputContainer}>
           <TextInput
             style={styles.textInput}

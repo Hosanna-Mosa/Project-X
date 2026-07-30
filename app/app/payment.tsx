@@ -235,7 +235,7 @@ const createStyles = (colors: typeof Colors.light) => StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.background },
   header: { flexDirection: "row", alignItems: "center", gap: 12, paddingHorizontal: 16, paddingBottom: 14, backgroundColor: colors.surface, borderBottomWidth: 1, borderBottomColor: colors.border },
   iconButton: { width: 38, height: 38, borderRadius: 10, borderWidth: 1, borderColor: colors.border, alignItems: "center", justifyContent: "center" },
-  headerTitle: { fontSize: 20, fontWeight: "800", color: colors.text },
+  headerTitle: { fontSize: 18, fontWeight: "800", color: colors.text },
   content: { padding: 16, gap: 14 },
   card: { backgroundColor: colors.surface, borderRadius: 8, borderWidth: 1, borderColor: colors.border, padding: 14, gap: 12 },
   cardTitle: { fontSize: 16, fontWeight: "800", color: colors.text },
