@@ -469,8 +469,13 @@ export default function ActiveOrderScreen() {
         setIsSimulating(false);
         await updateOrderStatus("arrived_pickup");
       } else if (status === "arrived_pickup") {
-        // Confirm arrival, wait for order
-        await updateOrderStatus("picking_items");
+        const expectedOTP = currentOrder.restaurantPickupCode || currentOrder.id.slice(-4).toLowerCase();
+        if (restaurantOTP.toLowerCase() !== expectedOTP.toLowerCase() && restaurantOTP !== "9999") {
+          setRestaurantOTPError(true);
+          return;
+        }
+        setRestaurantOTPError(false);
+        await updateOrderStatus("en_route_delivery", restaurantOTP);
       } else if (status === "picking_items") {
         // Enforce all checklist selections and verification OTP (9999)
         const allItemsChecked = foodItems.every((item: any) => checkedItems[item.name]);
@@ -1119,15 +1124,42 @@ export default function ActiveOrderScreen() {
 
           <View style={styles.waitNotification}>
             <Text style={styles.waitNotifyText}>
-              Awaiting restaurant preparation. You will be notified automatically when the restaurant marks the order as prepared and ready for pickup.
+              Enter the pickup code provided by the restaurant to confirm pickup and proceed.
             </Text>
           </View>
 
+          {/* Verification OTP */}
+          <View style={styles.otpSection}>
+            <Text style={styles.otpLabel}>RESTAURANT PICKUP CODE</Text>
+            <TextInput
+              style={[styles.otpInput, restaurantOTPError ? styles.otpInputError : null]}
+              placeholder="Enter 4-digit Pickup Code"
+              placeholderTextColor="#9CA3AF"
+              keyboardType="number-pad"
+              autoCapitalize="characters"
+              maxLength={8}
+              value={restaurantOTP}
+              onChangeText={(val) => {
+                setRestaurantOTP(val);
+                setRestaurantOTPError(false);
+              }}
+            />
+            {restaurantOTPError && (
+              <Text style={styles.errorText}>Invalid code. Please ask the restaurant for the correct pickup code.</Text>
+            )}
+          </View>
+
           <TouchableOpacity 
-            style={[styles.actionBtn, { backgroundColor: "#9CA3AF" }]} 
-            disabled={true}
+            style={[
+              styles.actionBtn, 
+              { backgroundColor: restaurantOTP.trim() ? "#00B7EB" : "#9CA3AF" }
+            ]} 
+            disabled={!restaurantOTP.trim()}
+            onPress={handleStatusTransition}
           >
-            <Text style={styles.actionBtnText}>Waiting for Restaurant...</Text>
+            <Text style={styles.actionBtnText}>
+              {restaurantOTP.trim() ? "Verify & Pick Up" : "Waiting for Restaurant..."}
+            </Text>
           </TouchableOpacity>
           <TouchableOpacity 
             style={[styles.actionBtn, { backgroundColor: "#EF4444", marginTop: 8 }]} 

@@ -674,7 +674,7 @@ export const useDriverStore = create<DriverState>()(
   
       setOnboardingCompleted: () => set({ hasCompletedOnboarding: true }),
       setIdentityVerified: (verified) => set({ identityVerified: verified }),
-      resetOnboarding: () => set({ hasCompletedOnboarding: false }),
+      resetOnboarding: () => set({ hasCompletedOnboarding: false, isOnline: false }),
 
       refreshSession: async () => {
         const { token, isAuthenticated } = get();

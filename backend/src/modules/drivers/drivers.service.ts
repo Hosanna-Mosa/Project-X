@@ -237,7 +237,7 @@ export class DriverService {
       const { ZonesService } = require("../zones/zones.service");
       const zonesService = new ZonesService();
       const activeZone = await zonesService.getZoneForCoordinates(lat, lng);
-      if (activeZone) {
+      if (activeZone && !driver.preferredZone) {
         driver.preferredZone = activeZone._id;
       }
     } catch (zoneErr) {
