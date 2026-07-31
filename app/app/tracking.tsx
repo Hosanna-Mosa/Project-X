@@ -713,7 +713,7 @@ export default function TrackingScreen() {
           />
         </ScrollView>
 
-        <View style={[styles.successFooter, { paddingBottom: insets.bottom + 16 }]}>
+        <View style={[styles.successFooter, { paddingBottom: insets.bottom || 12 }]}>
           <TouchableOpacity style={[styles.successHomeBtn, { backgroundColor: colors.primary }]} onPress={handleBack}>
             <Text style={styles.successHomeBtnText}>Go Back to Home</Text>
           </TouchableOpacity>
@@ -1395,14 +1395,14 @@ const createStyles = (colors: typeof Colors.light) => StyleSheet.create({
     marginBottom: 8,
   },
   successTitle: {
-    fontSize: 26,
+    fontSize: 21,
     fontWeight: "900",
     textAlign: "center",
   },
   successSubtitle: {
-    fontSize: 14,
+    fontSize: 13,
     textAlign: "center",
-    lineHeight: 20,
+    lineHeight: 18,
     paddingHorizontal: 16,
   },
   successDetailsScroll: {
@@ -1418,7 +1418,7 @@ const createStyles = (colors: typeof Colors.light) => StyleSheet.create({
     width: "100%",
   },
   successCardHeader: {
-    fontSize: 13,
+    fontSize: 11,
     fontWeight: "800",
     textTransform: "uppercase",
     letterSpacing: 0.5,
@@ -1468,7 +1468,7 @@ const createStyles = (colors: typeof Colors.light) => StyleSheet.create({
     width: "100%",
   },
   reviewHeaderTitle: {
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: "700",
   },
   tagChip: {
@@ -1501,6 +1501,7 @@ const createStyles = (colors: typeof Colors.light) => StyleSheet.create({
   },
   submitReviewBtnText: {
     fontWeight: "700",
+    color: "#FFFFFF",
   },
   rideDriverCardContainer: {
     width: "100%",

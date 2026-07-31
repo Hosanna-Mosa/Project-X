@@ -27,8 +27,8 @@ export class OnboardingService {
   async saveOnboardingData(userId: string, data: Partial<IDriver>) {
     const driver = await this.getOrCreateDriver(userId);
 
-    // If this is a fresh create, mark as in_progress
-    if (driver.onboardingStatus === OnboardingStatus.NOT_STARTED) {
+    // If onboarding is not in progress, set it to in_progress
+    if (driver.onboardingStatus !== OnboardingStatus.IN_PROGRESS) {
       driver.onboardingStatus = OnboardingStatus.IN_PROGRESS;
     }
 

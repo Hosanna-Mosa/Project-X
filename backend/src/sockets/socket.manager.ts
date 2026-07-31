@@ -243,7 +243,7 @@ export class SocketManager {
               const { ZonesService } = require("../modules/zones/zones.service");
               const zonesService = new ZonesService();
               const activeZone = await zonesService.getZoneForCoordinates(Number(data.lat), Number(data.lng));
-              if (activeZone) {
+              if (activeZone && !resolvedDriver.preferredZone) {
                 resolvedDriver.preferredZone = activeZone._id;
               }
             } catch (zoneErr) {
