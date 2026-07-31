@@ -236,10 +236,25 @@ export default function ActiveOrderScreen() {
         
         setTimeout(() => {
           if (coords.length > 1) {
-            mapRef.current?.fitToCoordinates(coords, {
-              edgePadding: { top: 80, right: 50, bottom: 400, left: 50 },
-              animated: true,
-            });
+            const lats = coords.map(c => c.latitude);
+            const lngs = coords.map(c => c.longitude);
+            const minLat = Math.min(...lats);
+            const maxLat = Math.max(...lats);
+            const minLng = Math.min(...lngs);
+            const maxLng = Math.max(...lngs);
+            const centerLat = (minLat + maxLat) / 2;
+            const centerLng = (minLng + maxLng) / 2;
+            // Shift the center slightly up to account for the bottom sheet padding
+            const shiftedCenterLat = centerLat - (maxLat - minLat) * 0.15;
+            const latDelta = Math.max(0.04, (maxLat - minLat) * 2.0);
+            const lngDelta = Math.max(0.04, (maxLng - minLng) * 2.0);
+
+            mapRef.current?.animateToRegion({
+              latitude: shiftedCenterLat,
+              longitude: centerLng,
+              latitudeDelta: latDelta,
+              longitudeDelta: lngDelta,
+            }, 1000);
           } else {
             mapRef.current?.animateToRegion({
               latitude: initialLoc.lat,
@@ -374,10 +389,25 @@ export default function ActiveOrderScreen() {
       if (deliveryStop) coords.push({ latitude: Number(deliveryStop.lat), longitude: Number(deliveryStop.lng) });
       
       if (coords.length > 1) {
-        mapRef.current?.fitToCoordinates(coords, {
-          edgePadding: { top: 80, right: 50, bottom: 400, left: 50 },
-          animated: true,
-        });
+        const lats = coords.map(c => c.latitude);
+        const lngs = coords.map(c => c.longitude);
+        const minLat = Math.min(...lats);
+        const maxLat = Math.max(...lats);
+        const minLng = Math.min(...lngs);
+        const maxLng = Math.max(...lngs);
+        const centerLat = (minLat + maxLat) / 2;
+        const centerLng = (minLng + maxLng) / 2;
+        // Shift the center slightly up to account for the bottom sheet padding
+        const shiftedCenterLat = centerLat - (maxLat - minLat) * 0.15;
+        const latDelta = Math.max(0.04, (maxLat - minLat) * 2.0);
+        const lngDelta = Math.max(0.04, (maxLng - minLng) * 2.0);
+
+        mapRef.current?.animateToRegion({
+          latitude: shiftedCenterLat,
+          longitude: centerLng,
+          latitudeDelta: latDelta,
+          longitudeDelta: lngDelta,
+        }, 1000);
       } else {
         mapRef.current?.animateToRegion({
           latitude: curLat,

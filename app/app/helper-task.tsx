@@ -11,6 +11,7 @@ import { useThemeStore } from "@/contexts/themeStore";
 import { useDeliveryStore } from "@/contexts/deliveryStore";
 import { DeliverySlider } from "@/components/DeliverySlider";
 import DateTimePicker from "@react-native-community/datetimepicker";
+import * as Location from "expo-location";
 
 const { height: SCREEN_HEIGHT } = Dimensions.get("window");
 const scale = SCREEN_HEIGHT < 850 ? 0.85 : 1.0;
@@ -28,10 +29,55 @@ const getDistanceFromLatLonInKm = (lat1: number, lon1: number, lat2: number, lon
 
 export default function HelperTaskScreen() {
   const insets = useSafeAreaInsets();
+  const safeTop = insets.top || StatusBar.currentHeight || 24;
   const { theme } = useThemeStore();
   const { radius } = useLocalSearchParams<{ radius?: string }>();
   const colors = Colors[theme];
-  const { driver, currentCoords, setOrderId, setDriver, setServiceType } = useDeliveryStore();
+  const { driver, currentCoords, currentLocation, setOrderId, setDriver, setServiceType } = useDeliveryStore();
+
+  const handleUseCurrentLocation = async () => {
+    try {
+      const storeLocation = useDeliveryStore.getState().currentLocation;
+      const storeCoords = useDeliveryStore.getState().currentCoords;
+      if (storeLocation && storeCoords && storeCoords.lat && storeCoords.lng) {
+        setPickupLocation(storeLocation);
+        setPickupCoords(storeCoords);
+        setIsPickupValid(true);
+        return;
+      }
+
+      let { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert("Permission Denied", "Please enable location services to find your current location.");
+        return;
+      }
+
+      const location = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
+      const coords = { lat: location.coords.latitude, lng: location.coords.longitude };
+      setPickupCoords(coords);
+
+      const [address] = await Location.reverseGeocodeAsync({
+        latitude: coords.lat,
+        longitude: coords.lng
+      });
+
+      if (address) {
+        const formatted = [
+          address.name,
+          address.street,
+          address.district || address.subregion,
+          address.city,
+          address.region,
+          address.postalCode
+        ].filter(Boolean).join(", ");
+        setPickupLocation(formatted);
+        setIsPickupValid(true);
+      }
+    } catch (error) {
+      console.warn("Helper Task: GPS fetch failed:", error);
+      Alert.alert("Error", "Could not fetch your current location. Please type it manually.");
+    }
+  };
 
   const [pickupLocation, setPickupLocation] = useState("");
   const [dropoffLocation, setDropoffLocation] = useState("");
@@ -126,22 +172,57 @@ export default function HelperTaskScreen() {
 
   React.useEffect(() => {
     let interval: any;
-    if (taskState === "searching") {
-      setRejectedCount(0);
-      setTotalContacted(3);
-      interval = setInterval(() => {
-        setTotalContacted(prev => {
-          const next = prev + Math.floor(Math.random() * 2) + 1;
-          return next > 25 ? 25 : next;
-        });
-        setRejectedCount(prev => {
-          const next = prev + Math.floor(Math.random() * 2);
-          return next > 20 ? 20 : next;
-        });
-      }, 3000);
+    if (taskState === "searching" && localOrderId) {
+      const fetchStatus = async () => {
+        try {
+          const orderData = await customFetch<any>(`/api/v1/orders/${localOrderId}`);
+          if (orderData) {
+            setRejectedCount(orderData.declineReasons ? orderData.declineReasons.length : 0);
+            setTotalContacted(orderData.totalCandidatesCount || 0);
+            if (orderData.customerPrice) {
+              setCurrentTaskPrice(orderData.customerPrice);
+            } else if (orderData.totalPrice) {
+              setCurrentTaskPrice(orderData.totalPrice);
+            }
+            if ((orderData.status === "DRIVER_ASSIGNED" || orderData.status === "accepted" || orderData.driver) && orderData.driver) {
+              setDriver(orderData.driver);
+              setServiceType("helper");
+              setOrderId(orderData._id);
+              
+              setIsTransitioningToAssigned(true);
+              blackoutOpacityAnim.setValue(0);
+              stampScaleAnim.setValue(3);
+              stampOpacityAnim.setValue(0);
+              stampGlowAnim.setValue(0);
+              
+              Animated.sequence([
+                Animated.timing(blackoutOpacityAnim, { toValue: 0.8, duration: 200, useNativeDriver: true }),
+                Animated.parallel([
+                  Animated.timing(stampOpacityAnim, { toValue: 1, duration: 150, useNativeDriver: true }),
+                  Animated.spring(stampScaleAnim, { toValue: 1, friction: 4, tension: 80, useNativeDriver: true })
+                ]),
+                Animated.timing(stampGlowAnim, { toValue: 1, duration: 800, useNativeDriver: true }),
+                Animated.parallel([
+                  Animated.timing(blackoutOpacityAnim, { toValue: 0, duration: 400, useNativeDriver: true }),
+                  Animated.timing(stampOpacityAnim, { toValue: 0, duration: 400, useNativeDriver: true }),
+                  Animated.timing(stampScaleAnim, { toValue: 5, duration: 400, useNativeDriver: true })
+                ])
+              ]).start(() => {
+                setIsTransitioningToAssigned(false);
+                setTaskState("assigned");
+              });
+            }
+          }
+        } catch (err) {
+          console.warn("Error polling order status:", err);
+        }
+      };
+      
+      fetchStatus();
+      interval = setInterval(fetchStatus, 3000);
     }
     return () => clearInterval(interval);
-  }, [taskState]);
+  }, [taskState, localOrderId]);
 
   React.useEffect(() => {
     // Start continuous loops for the Home innovation elements
@@ -730,7 +811,7 @@ export default function HelperTaskScreen() {
             left: 0,
             right: 0,
             zIndex: 100,
-            paddingTop: insets.top + (Platform.OS === "ios" ? 4 : 8),
+            paddingTop: safeTop + (Platform.OS === "ios" ? 4 : 8),
             paddingBottom: 12,
             paddingHorizontal: 20 * scale,
             flexDirection: "row",
@@ -769,7 +850,7 @@ export default function HelperTaskScreen() {
         >
           
           {/* Dynamic Purple Header */}
-          <Animated.View style={{ backgroundColor: '#5c52eb', paddingTop: insets.top + 48 * scale, paddingBottom: 120 * scale, height: animatedHeaderHeight, overflow: 'hidden' }}>
+          <Animated.View style={{ backgroundColor: '#5c52eb', paddingTop: safeTop + 48 * scale, paddingBottom: 120 * scale, height: animatedHeaderHeight, overflow: 'hidden' }}>
         
         {/* Animated Crowded Road Parallax Background */}
         <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 0 }}>
@@ -918,19 +999,19 @@ export default function HelperTaskScreen() {
               </View>
             )}
            </View>
-             
+           
            {/* The AI Matching Deck (Visible during search/assigned) */}
-           <Animated.View style={[{ position: 'absolute', top: taskState === "searching" ? (SCREEN_HEIGHT < 850 ? 100 : 130 * scale) : 180 * scale, height: SCREEN_HEIGHT < 850 ? 240 : 320 * scale, left: 0, right: 0 }, { zIndex: 100, opacity: deckOpacityAnim, justifyContent: 'center', alignItems: 'center' }]} pointerEvents="none">
+           <Animated.View style={[{ position: 'absolute', top: taskState === "searching" ? (SCREEN_HEIGHT < 850 ? 140 : 160 * scale) : 200 * scale, height: SCREEN_HEIGHT < 850 ? 240 : 320 * scale, left: 0, right: 0 }, { zIndex: 100, opacity: deckOpacityAnim, justifyContent: 'center', alignItems: 'center' }]} pointerEvents="none">
                 
                 {/* Telemetry HUD */}
-                <View style={{ position: 'absolute', top: SCREEN_HEIGHT < 850 ? -22 : -20 * scale, width: '100%', alignItems: 'center' }}>
+                <View style={{ position: 'absolute', top: SCREEN_HEIGHT < 850 ? -25 : -30 * scale, width: '100%', alignItems: 'center' }}>
                    {taskState === "searching" && (
                      <>
                        <Text style={{ color: '#fff', fontSize: 16 * scale, fontWeight: '800', letterSpacing: 2, opacity: 0.8 }}>
                          FILTERING NEARBY HELPERS...
                        </Text>
                        <Text style={{ color: '#00FFCC', fontSize: 12 * scale, fontWeight: '700', marginTop: 8 * scale, fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace' }}>
-                         {142 - dummyIndex * 7} ONLINE IN {radius}KM RADIUS
+                         {totalContacted} ONLINE IN {radius || 5}KM RADIUS
                        </Text>
 
                        {delayedReason && (
@@ -1017,39 +1098,39 @@ export default function HelperTaskScreen() {
             <View style={{ alignSelf: 'center', width: 40 * scale, height: 5 * scale, borderRadius: 3 * scale, backgroundColor: colors.border, marginBottom: 20 * scale }} />
             
             {taskState === "searching" ? (
-              <View style={{ flex: 1, width: '100%' }}>
-                <View style={{ flex: 1, gap: 16 * scale, paddingBottom: 12 }}>
+               <View style={{ width: '100%' }}>
+                 <View style={{ gap: 16 * scale, paddingBottom: 12 }}>
                   
                   {/* CURRENT OFFER */}
                   {currentTaskPrice !== null && (
-                    <View style={{ paddingVertical: 16 * scale, paddingHorizontal: 20 * scale, backgroundColor: '#fff', borderRadius: 20 * scale, borderWidth: 1, borderColor: '#F1F5F9', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', width: '100%', shadowColor: '#000', shadowOffset: { width: 0, height: 4 * scale }, shadowOpacity: 0.05, shadowRadius: 12 * scale, elevation: 2 }}>
+                    <View style={{ paddingVertical: 8 * scale, paddingHorizontal: 0, backgroundColor: 'transparent', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
                       <View>
-                         <Text style={{ color: '#475569', fontSize: 12 * scale, fontWeight: '800', letterSpacing: 1, marginBottom: 4 * scale }}>CURRENT OFFER</Text>
-                         <Text style={{ color: '#5c52eb', fontSize: 38 * scale, fontWeight: '900', letterSpacing: -1 }}>₹{currentTaskPrice}</Text>
+                         <Text style={{ color: '#475569', fontSize: 10 * scale, fontWeight: '800', letterSpacing: 1, marginBottom: 2 * scale }}>CURRENT OFFER</Text>
+                         <Text style={{ color: '#5c52eb', fontSize: 28 * scale, fontWeight: '800', letterSpacing: -0.5 }}>₹{currentTaskPrice}</Text>
                       </View>
-                      <View style={{ width: 50 * scale, height: 50 * scale, borderRadius: 25 * scale, backgroundColor: '#F3F0FF', alignItems: 'center', justifyContent: 'center' }}>
-                         <Ionicons name="pricetag" size={24 * scale} color="#5c52eb" style={{ transform: [{ rotate: '-45deg' }] }} />
+                      <View style={{ width: 38 * scale, height: 38 * scale, borderRadius: 19 * scale, backgroundColor: '#F3F0FF', alignItems: 'center', justifyContent: 'center' }}>
+                         <Ionicons name="pricetag" size={18 * scale} color="#5c52eb" style={{ transform: [{ rotate: '-45deg' }] }} />
                       </View>
                     </View>
                   )}
 
                   {/* MARKET RESPONSE */}
                   {totalContacted > 0 && (
-                    <View style={{ width: '100%', backgroundColor: '#FFF5F5', padding: 16 * scale, borderRadius: 20 * scale, shadowColor: '#EF4444', shadowOffset: { width: 0, height: 4 * scale }, shadowOpacity: 0.05, shadowRadius: 8 * scale, elevation: 2 }}>
-                       <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 * scale }}>
-                          <View style={{ width: 44 * scale, height: 44 * scale, borderRadius: 22 * scale, backgroundColor: '#FEE2E2', alignItems: 'center', justifyContent: 'center', marginRight: 12 * scale }}>
-                            <Ionicons name="people-outline" size={22 * scale} color="#DC2626" />
+                    <View style={{ width: '100%', backgroundColor: 'transparent', paddingVertical: 8 * scale, paddingHorizontal: 0 }}>
+                       <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 * scale }}>
+                          <View style={{ width: 36 * scale, height: 36 * scale, borderRadius: 18 * scale, backgroundColor: '#FEE2E2', alignItems: 'center', justifyContent: 'center', marginRight: 10 * scale }}>
+                            <Ionicons name="people-outline" size={18 * scale} color="#DC2626" />
                           </View>
                           <View style={{ flex: 1 }}>
-                            <Text style={{ fontSize: 11 * scale, fontWeight: '800', color: '#B91C1C', marginBottom: 2 * scale, letterSpacing: 1 }}>MARKET RESPONSE</Text>
+                            <Text style={{ fontSize: 10 * scale, fontWeight: '800', color: '#B91C1C', marginBottom: 2 * scale, letterSpacing: 1 }}>MARKET RESPONSE</Text>
                             <View style={{ flexDirection: 'row', alignItems: 'baseline' }}>
-                              <Text style={{ fontSize: 24 * scale, fontWeight: '900', color: '#DC2626' }}>{rejectedCount}</Text>
-                              <Text style={{ fontSize: 14 * scale, fontWeight: '700', color: '#DC2626', marginLeft: 6 * scale }}>declined out of {totalContacted}</Text>
+                              <Text style={{ fontSize: 20 * scale, fontWeight: '800', color: '#DC2626' }}>{rejectedCount}</Text>
+                              <Text style={{ fontSize: 12 * scale, fontWeight: '700', color: '#DC2626', marginLeft: 4 * scale }}>declined out of {totalContacted}</Text>
                             </View>
                           </View>
-                          <Ionicons name="bar-chart-outline" size={22 * scale} color="#FCA5A5" />
+                          <Ionicons name="bar-chart-outline" size={18 * scale} color="#FCA5A5" />
                        </View>
-                       <Text style={{ fontSize: 13 * scale, color: '#475569', fontWeight: '500' }}>We're finding the best match for you.</Text>
+                       <Text style={{ fontSize: 11 * scale, color: '#475569', fontWeight: '500' }}>We're finding the best match for you.</Text>
                     </View>
                   )}
                   
@@ -1150,14 +1231,7 @@ export default function HelperTaskScreen() {
                   </Animated.View>
                </View>
             ) : (
-              <>
-                <View style={[styles.driverBadge, { backgroundColor: `${colors.primary}15` }]}>
-                  <Feather name="user-check" size={18} color={colors.primary} />
-                  <Text style={[styles.driverBadgeText, { color: colors.primary }]}>
-                    {driver?.name ? `${driver.name} is ready` : "Helper is ready"}
-                  </Text>
-                </View>
-                
+                <>
                 <Text style={[styles.introTitle, { color: colors.text }]}>What do you need?</Text>
                 <Text style={[styles.introSubtitle, { color: colors.textSecondary }]}>
                   Fill in the details below and slide to assign the task.
@@ -1184,10 +1258,13 @@ export default function HelperTaskScreen() {
                     }}
                   />
                   {pickupLocation.length > 0 && (
-                    <TouchableOpacity onPress={() => { setPickupLocation(""); setIsPickupValid(false); }}>
+                    <TouchableOpacity onPress={() => { setPickupLocation(""); setIsPickupValid(false); }} style={{ marginRight: 8 }}>
                       <Ionicons name="close-circle" size={18} color={colors.textSecondary} />
                     </TouchableOpacity>
                   )}
+                  <TouchableOpacity onPress={handleUseCurrentLocation} style={{ padding: 4 }}>
+                    <Ionicons name="locate" size={20} color={colors.primary} />
+                  </TouchableOpacity>
                 </View>
 
                 {activeField === "pickup" && searchResults.length > 0 && (

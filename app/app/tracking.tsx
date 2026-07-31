@@ -87,7 +87,10 @@ function OrderReviewCard({
   };
 
   const handleSubmit = async () => {
-    if (!orderId) return;
+    if (!orderId) {
+      Alert.alert("Error", "Order ID is missing. Cannot submit feedback.");
+      return;
+    }
     try {
       setIsSubmitting(true);
       const res = await customFetch<any>("/api/v1/reviews", {
@@ -99,9 +102,9 @@ function OrderReviewCard({
           tags: selectedTags,
         }),
       });
-      if (res && res.review) {
+      if (res) {
         setIsSubmitted(true);
-        setExistingReview(res.review);
+        setExistingReview(res.review || { rating, comment, tags: selectedTags });
         Alert.alert("Thank You!", "Your review has been submitted successfully.");
       }
     } catch (err: any) {
@@ -156,7 +159,7 @@ function OrderReviewCard({
   return (
     <View style={[styles.reviewContainerCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
       <Text style={[styles.reviewHeaderTitle, { color: colors.text, alignSelf: "flex-start" }]}>Rate your Experience</Text>
-      
+
       {/* Interactive Star Picker */}
       <View style={{ flexDirection: "row", gap: 8, marginVertical: 8 }}>
         {[1, 2, 3, 4, 5].map((star) => (
@@ -239,7 +242,7 @@ export default function TrackingScreen() {
 
   const handleSOS = () => {
     if (!currentOrderId) return;
-    
+
     Alert.alert(
       "Emergency SOS",
       "Are you sure you want to trigger SOS? This will instantly alert our support team and emergency contacts.",
@@ -284,7 +287,7 @@ export default function TrackingScreen() {
         [
           {
             text: "OK",
-            onPress: () => {}
+            onPress: () => { }
           }
         ],
         { cancelable: true }
@@ -510,7 +513,7 @@ export default function TrackingScreen() {
     fallbackEta: number = 15
   ): number => {
     if (!driverLoc || !targetLoc || !driverLoc.lat || !targetLoc.lat) return fallbackEta;
-    
+
     const R = 6371; // Earth radius in km
     const rad = Math.PI / 180;
     const dLat = (targetLoc.lat - driverLoc.lat) * rad;
@@ -545,7 +548,7 @@ export default function TrackingScreen() {
         if (data.lat != null && data.lng != null) {
           setDriverLocation((prev) => {
             let heading = data.heading;
-            
+
             // If heading isn't provided or is exactly 0, try to calculate it based on movement vector
             if (!heading && prev) {
               const dLat = Math.abs(prev.lat - data.lat);
@@ -557,7 +560,7 @@ export default function TrackingScreen() {
                 heading = prev.heading;
               }
             }
-            
+
             return { lat: data.lat, lng: data.lng, heading: heading || 0 };
           });
 
@@ -565,7 +568,7 @@ export default function TrackingScreen() {
           const activeStop = (status === "pending" || status === "confirmed" || status === "driver_assigned" || status === "en_route_pickup" || status === "arrived_pickup")
             ? (pickupStop || stops?.[0])
             : (deliveryStop || stops?.[stops.length - 1]);
-            
+
           if (activeStop && activeStop.lat != null && activeStop.lng != null) {
             const dynamicMins = calculateDynamicETA({ lat: data.lat, lng: data.lng }, { lat: Number(activeStop.lat), lng: Number(activeStop.lng) }, eta);
             setEta(dynamicMins);
@@ -857,7 +860,7 @@ export default function TrackingScreen() {
                   <View style={[styles.blueBanner, { backgroundColor: bannerColor }]}>
                     <Text style={styles.blueBannerText}>{bannerText}</Text>
                   </View>
-                  
+
                   {/* ETA Section */}
                   <View style={styles.rideEtaSection}>
                     <Text style={[styles.pickupTimeText, { color: colors.text }]}>
@@ -910,13 +913,30 @@ export default function TrackingScreen() {
                     </TouchableOpacity>
                   </View>
 
-                  {/* Message Button */}
-                  <TouchableOpacity style={[styles.messageButton, { borderColor: colors.border, backgroundColor: colors.surface }]} onPress={() => router.push("/chat")}>
-                    <View style={styles.messageButtonInner}>
-                      <Feather name="phone-call" size={18} color={colors.textSecondary} style={{ marginRight: 8 }} />
-                      <Text style={[styles.messageButtonText, { color: colors.textSecondary }]}>Message {driver.name?.split(' ')[0]?.toUpperCase() || "DRIVER"}</Text>
-                    </View>
-                  </TouchableOpacity>
+                  {/* Action Buttons Row */}
+                  <View style={{ flexDirection: 'row', gap: 12, marginHorizontal: 16, marginTop: 16 }}>
+                    {/* Call Button */}
+                    <TouchableOpacity
+                      style={{ flex: 1, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface, borderRadius: 20, paddingVertical: 12, alignItems: 'center', justifyContent: 'center' }}
+                      onPress={() => Linking.openURL(`tel:${driver?.phone || "1234567890"}`)}
+                    >
+                      <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                        <Feather name="phone" size={18} color={colors.textSecondary} style={{ marginRight: 8 }} />
+                        <Text style={{ fontSize: 14, fontWeight: '600', color: colors.textSecondary }}>Call</Text>
+                      </View>
+                    </TouchableOpacity>
+
+                    {/* Chat/Message Button */}
+                    <TouchableOpacity
+                      style={{ flex: 1, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface, borderRadius: 20, paddingVertical: 12, alignItems: 'center', justifyContent: 'center' }}
+                      onPress={() => router.push("/chat")}
+                    >
+                      <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                        <Feather name="message-square" size={18} color={colors.primary} style={{ marginRight: 8 }} />
+                        <Text style={{ fontSize: 14, fontWeight: '600', color: colors.primary }}>Chat</Text>
+                      </View>
+                    </TouchableOpacity>
+                  </View>
 
                   {/* Pickup Location & Trip Details */}
                   <View style={styles.pickupLocationRow}>
@@ -950,13 +970,13 @@ export default function TrackingScreen() {
                       </Text>
                     </View>
                     <View style={styles.driverActions}>
-                      <TouchableOpacity 
-                        style={[styles.actionBtn, { backgroundColor: "#EF4444" }]} 
+                      <TouchableOpacity
+                        style={[styles.actionBtn, { backgroundColor: "#EF4444" }]}
                         onPress={handleSOS}
                       >
                         <Feather name="alert-triangle" size={18} color="#FFFFFF" />
                       </TouchableOpacity>
-                      <TouchableOpacity 
+                      <TouchableOpacity
                         style={styles.actionBtn}
                         onPress={() => Linking.openURL(`tel:${driver.phone || "1234567890"}`)}
                       >
@@ -1003,8 +1023,8 @@ export default function TrackingScreen() {
 
           {/* Tracking Ad Banner */}
           <View style={{ width: '100%', height: 120, position: 'relative', marginTop: 16, borderRadius: 12, overflow: 'hidden' }}>
-            <Image 
-              source={{ uri: "https://images.unsplash.com/photo-1549488344-c628e5db369e?w=800" }} 
+            <Image
+              source={{ uri: "https://images.unsplash.com/photo-1549488344-c628e5db369e?w=800" }}
               style={{ width: '100%', height: '100%' }}
               resizeMode="cover"
             />
@@ -1028,15 +1048,15 @@ export default function TrackingScreen() {
             <View style={styles.modalHero}>
               <View style={[StyleSheet.absoluteFill, { borderTopLeftRadius: 24, borderTopRightRadius: 24, overflow: 'hidden' }]}>
                 {/* Modern Vibrant Gradient/Image Banner */}
-                <Image 
+                <Image
                   source={{ uri: "https://images.unsplash.com/photo-1579546929518-9e396f3cc809?w=800" }} // Vibrant colorful abstract or cityscape
-                  style={{ width: '100%', height: '100%' }} 
-                  resizeMode="cover" 
+                  style={{ width: '100%', height: '100%' }}
+                  resizeMode="cover"
                 />
                 <View style={{ position: 'absolute', top: 0, bottom: 0, left: 0, right: 0, backgroundColor: 'rgba(0,0,0,0.2)' }} />
               </View>
             </View>
-            
+
             <View style={styles.modalDriverProfileContainer}>
               <View style={styles.modalDriverAvatar}>
                 <Feather name="user" size={40} color={colors.textSecondary} />
@@ -1060,7 +1080,7 @@ export default function TrackingScreen() {
                 <Text style={[styles.modalStatValue, { color: colors.text }]}>{driver?.duration || "New"}</Text>
               </View>
             </View>
-            
+
             <View style={{ height: 40 }} />
           </View>
         </View>
@@ -1075,7 +1095,7 @@ export default function TrackingScreen() {
 
             <View style={{ padding: 24, paddingTop: 40 }}>
               <Text style={{ fontSize: 20, fontWeight: '800', color: colors.text, marginBottom: 20 }}>Trip Details</Text>
-              
+
               <View style={{ flexDirection: 'row', gap: 12, marginBottom: 24 }}>
                 <View style={{ width: 12, alignItems: 'center' }}>
                   <View style={{ width: 12, height: 12, borderRadius: 6, backgroundColor: colors.success, marginTop: 4 }} />

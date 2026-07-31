@@ -48,6 +48,7 @@ export default function FoodCheckoutScreen() {
   const [tipAmount, setTipAmount] = React.useState<number>(100);
   const [isOtherTip, setIsOtherTip] = React.useState(false);
   const [otherTipText, setOtherTipText] = React.useState("");
+  const [cartSummaryExpanded, setCartSummaryExpanded] = React.useState(true);
 
   const userId = React.useMemo(() => String(user?.id || user?._id || ""), [user?.id, user?._id]);
 
@@ -246,7 +247,7 @@ export default function FoodCheckoutScreen() {
         </TouchableOpacity>
         <View style={styles.headerTitles}>
           <Text style={styles.headerSubtitle}>Checkout</Text>
-          <Text style={styles.headerTitle}>{vendorName}</Text>
+          <Text style={styles.headerTitle} numberOfLines={1} ellipsizeMode="tail">{vendorName}</Text>
         </View>
       </View>
 
@@ -271,16 +272,21 @@ export default function FoodCheckoutScreen() {
         {/* Cart Summary Section */}
         <View style={styles.divider} />
         <View style={styles.section}>
-          <View style={styles.sectionHeaderRow}>
+          <TouchableOpacity 
+            style={styles.sectionHeaderRow}
+            onPress={() => setCartSummaryExpanded(!cartSummaryExpanded)}
+            activeOpacity={0.7}
+          >
             <Feather name="shopping-cart" size={moderateScale(20)} color="#000" />
             <Text style={styles.sectionTitle}>Cart Summary</Text>
             <View style={{ flex: 1 }} />
-            <Feather name="chevron-up" size={moderateScale(20)} color="#000" />
-          </View>
+            <Feather name={cartSummaryExpanded ? "chevron-up" : "chevron-down"} size={moderateScale(20)} color="#000" />
+          </TouchableOpacity>
           <Text style={styles.cartSub}>{vendorName} • {getItemCount()} items</Text>
           
-          <View style={styles.itemsList}>
-            {items.map(item => (
+          {cartSummaryExpanded && (
+            <View style={styles.itemsList}>
+              {items.map(item => (
               <View key={item._id} style={styles.itemRow}>
                 <View style={styles.itemLeft}>
                   <Text style={styles.itemQuantity}>{item.quantity} x</Text>
@@ -293,6 +299,7 @@ export default function FoodCheckoutScreen() {
               </View>
             ))}
           </View>
+          )} 
         </View>
 
         {/* Summary Section */}
@@ -435,7 +442,7 @@ export default function FoodCheckoutScreen() {
       </ScrollView>
 
       {/* Sticky Footer */}
-      <View style={[styles.footer, { paddingBottom: insets.bottom + 10 }]}>
+      <View style={[styles.footer, { paddingBottom: 12 }]}>
         {discountAmount > 0 && (
           <View style={styles.savingsRow}>
             <Feather name="tag" size={16} color="#000" />
@@ -475,12 +482,12 @@ const createStyles = () => StyleSheet.create({
     flex: 1,
   },
   headerSubtitle: {
-    fontSize: moderateScale(12),
+    fontSize: moderateScale(10),
     color: "#666",
     fontWeight: "600",
   },
   headerTitle: {
-    fontSize: moderateScale(18),
+    fontSize: moderateScale(13),
     fontWeight: "800",
     color: "#000",
   },

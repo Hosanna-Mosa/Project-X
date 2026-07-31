@@ -91,6 +91,7 @@ export interface IOrder extends Omit<Document, "_id"> {
   isReviewed?: boolean;
   review?: mongoose.Types.ObjectId;
   declineReasons?: { driverId: string; reason: string }[];
+  totalCandidatesCount?: number;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -152,6 +153,7 @@ const OrderSchema: Schema = new Schema(
     radius: { type: Number },
     duration: { type: Number },
     customerPrice: { type: Number },
+    totalCandidatesCount: { type: Number, default: 0 },
     bookingFor: {
       type: {
         type: String,

@@ -73,6 +73,15 @@ export class OrdersService {
         surgeMultiplier: 1,
         total: totalPrice,
       };
+    } else if (effectiveType === ServiceType.HELPER && totals?.total && Number(totals.total) > 0) {
+      totalPrice = Math.round(Number(totals.total));
+      priceBreakdown = {
+        baseFare: totalPrice,
+        distanceFare: 0,
+        timeFare: 0,
+        surgeMultiplier: 1,
+        total: totalPrice,
+      };
     } else if (isRide) {
       priceBreakdown = await this.pricingService.calculateFareBreakdown(
         effectiveType,
@@ -359,6 +368,10 @@ export class OrdersService {
 
       console.log(`[SEQUENTIAL DISPATCH] Sorted ${sortedCandidateInfos.length} candidate drivers by distance for order ${savedOrder._id}`);
 
+      // Save total candidates count to DB
+      savedOrder.totalCandidatesCount = sortedCandidateInfos.length;
+      await savedOrder.save();
+
       // Start Sequential Dispatch Cascade (1 driver at a time, nearest first)
       const { dispatchManager } = require("../../services/dispatch.manager");
       await dispatchManager.startDispatch(savedOrder._id.toString(), sortedCandidateInfos, {
@@ -574,13 +587,34 @@ export class OrdersService {
     if (!orderId) {
       return null;
     }
-    return Order.findOne(this.getOrderQuery(orderId))
+    const order = await Order.findOne(this.getOrderQuery(orderId))
       .populate("user")
       .populate({
         path: "driver",
         populate: { path: "user" }
       })
       .populate("vendor");
+
+    // Dynamically adjust totalCandidatesCount based on active online status of the candidates
+    if (order && order.status === OrderStatus.SEARCHING_DRIVER) {
+      try {
+        const { dispatchManager } = require("../../services/dispatch.manager");
+        const session = dispatchManager.activeDispatches.get(order._id.toString());
+        if (session && session.candidates) {
+          const candidateUserIds = session.candidates.map((c: any) => c.driverUserId);
+          const onlineCount = await Driver.countDocuments({
+            user: { $in: candidateUserIds },
+            status: "online",
+            isAvailable: true
+          });
+          order.totalCandidatesCount = onlineCount;
+        }
+      } catch (err: any) {
+        console.error("[DYNAMIC CANDIDATE COUNT ERROR]:", err.message);
+      }
+    }
+
+    return order;
   }
 
   async increaseOrderPrice(orderId: string, amount: number, userId: string) {

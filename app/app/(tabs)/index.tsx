@@ -471,6 +471,18 @@ export default function HomeScreen() {
 
   const [loading149, setLoading149] = useState(false);
 
+  // Swiggy-like Filter states
+  const [selectedSort, setSelectedSort] = useState<string>("relevance"); // "relevance" | "time" | "rating" | "costLowHigh" | "costHighLow"
+  const [filter99Store, setFilter99Store] = useState<boolean>(false);
+  const [filterFastDelivery, setFilterFastDelivery] = useState<boolean>(false);
+  const [filterOffers, setFilterOffers] = useState<boolean>(false);
+  const [filterRating4Plus, setFilterRating4Plus] = useState<boolean>(false);
+  const [filterCostRange, setFilterCostRange] = useState<string>("all"); // "all" | "under300" | "300to600" | "over600"
+  const [filterVegNonVeg, setFilterVegNonVeg] = useState<string>("all"); // "all" | "veg" | "nonveg"
+  const [selectedCuisines, setSelectedCuisines] = useState<string[]>([]);
+  const [activeFilterTab, setActiveFilterTab] = useState<string>("Sort");
+  const [isFilterModalVisible, setIsFilterModalVisible] = useState<boolean>(false);
+
   const cartStore = useCartStore();
   const cartItems = cartStore.items;
   const addCartItem = cartStore.addItem;
@@ -884,6 +896,100 @@ export default function HomeScreen() {
           return false;
         });
 
+  const filteredAndSortedItems = React.useMemo(() => {
+    let items = [...visibleItems];
+
+    // 1. Filter: 99 Store
+    if (filter99Store) {
+      items = items.filter(vendor => {
+        return store149Items.some(item => 
+          item.vendorId === vendor._id || 
+          (item.vendorId && typeof item.vendorId === 'object' && item.vendorId._id === vendor._id)
+        );
+      });
+    }
+
+    // 2. Filter: Fast Delivery (<= 30 mins)
+    if (filterFastDelivery) {
+      items = items.filter(vendor => {
+        if (!vendor.time) return false;
+        const match = vendor.time.match(/\d+/);
+        if (match) {
+          const t = parseInt(match[0]);
+          return t <= 30;
+        }
+        return false;
+      });
+    }
+
+    // 3. Filter: Offers (Free delivery or has deliveryFee === 0)
+    if (filterOffers) {
+      items = items.filter(vendor => vendor.deliveryFee === 0 || (vendor.offer && vendor.offer.toLowerCase().includes("free")));
+    }
+
+    // 4. Filter: Rating 4.0+
+    if (filterRating4Plus) {
+      items = items.filter(vendor => vendor.rating >= 4.0);
+    }
+
+    // 5. Filter: Cost Range
+    if (filterCostRange !== "all") {
+      items = items.filter(vendor => {
+        const cost = vendor.minOrderValue || 0;
+        if (filterCostRange === "under300") return cost < 300;
+        if (filterCostRange === "300to600") return cost >= 300 && cost <= 600;
+        if (filterCostRange === "over600") return cost > 600;
+        return true;
+      });
+    }
+
+    // 6. Filter: Veg/Non-Veg
+    if (filterVegNonVeg !== "all") {
+      items = items.filter(vendor => {
+        const isVeg = vendor.isPureVeg === true || vendor.isVeg === true;
+        if (filterVegNonVeg === "veg") return isVeg;
+        if (filterVegNonVeg === "nonveg") return !isVeg;
+        return true;
+      });
+    }
+
+    // 7. Filter: Cuisines
+    if (selectedCuisines.length > 0) {
+      items = items.filter(vendor => {
+        if (!Array.isArray(vendor.categories)) return false;
+        return vendor.categories.some(cat => selectedCuisines.includes(cat));
+      });
+    }
+
+    // 8. Sorting
+    if (selectedSort === "time") {
+      items.sort((a, b) => {
+        const tA = a.time ? parseInt(a.time.match(/\d+/)?.[0] || "999") : 999;
+        const tB = b.time ? parseInt(b.time.match(/\d+/)?.[0] || "999") : 999;
+        return tA - tB;
+      });
+    } else if (selectedSort === "rating") {
+      items.sort((a, b) => (b.rating || 0) - (a.rating || 0));
+    } else if (selectedSort === "costLowHigh") {
+      items.sort((a, b) => (a.minOrderValue || 0) - (b.minOrderValue || 0));
+    } else if (selectedSort === "costHighLow") {
+      items.sort((a, b) => (b.minOrderValue || 0) - (a.minOrderValue || 0));
+    }
+
+    return items;
+  }, [visibleItems, selectedSort, filter99Store, filterFastDelivery, filterOffers, filterRating4Plus, filterCostRange, filterVegNonVeg, selectedCuisines, store149Items]);
+
+  const availableCuisines = React.useMemo(() => {
+    const cuisinesSet = new Set<string>();
+    const items = activeService === 'Meat' ? meatCenters : restaurants;
+    items.forEach(item => {
+      if (Array.isArray(item.categories)) {
+        item.categories.forEach(cat => cuisinesSet.add(cat));
+      }
+    });
+    return Array.from(cuisinesSet).slice(0, 20);
+  }, [restaurants, meatCenters, activeService]);
+
   const showCategories = !hasNoLocation && (showHomeSkeleton || loadingDrivers || (nearbyDriversCount ?? 0) > 0);
 
 
@@ -907,11 +1013,11 @@ export default function HomeScreen() {
     };
 
     return (
-      <View style={{ width: 160, backgroundColor: '#fff', borderRadius: 16, padding: 8, marginRight: 12, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, elevation: 2 }}>
+      <View style={{ width: 130, backgroundColor: 'transparent', padding: 4, marginRight: 12 }}>
         <View style={{ position: 'relative' }}>
           <Image
             source={{ uri: item.images && item.images.length > 0 ? item.images[0] : "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=400" }}
-            style={{ width: '100%', height: 120, borderRadius: 12 }}
+            style={{ width: '100%', height: 100, borderRadius: 12 }}
           />
           {/* Veg icon */}
           <View style={{ position: 'absolute', top: 8, left: 8, backgroundColor: '#fff', padding: 2, borderRadius: 4 }}>
@@ -937,9 +1043,8 @@ export default function HomeScreen() {
                 </TouchableOpacity>
               </View>
             ) : (
-              <TouchableOpacity onPress={handleAdd} style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#fff', borderRadius: 20, paddingHorizontal: 16, paddingVertical: 6, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, elevation: 3 }}>
-                <Text style={{ color: '#16A34A', fontWeight: '800', fontSize: 12 }}>ADD</Text>
-                <Feather name="plus" size={12} color="#16A34A" style={{ marginLeft: 2 }} />
+              <TouchableOpacity onPress={handleAdd} style={{ width: 28, height: 28, borderRadius: 14, backgroundColor: '#fff', alignItems: 'center', justifyContent: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, elevation: 3, borderWidth: 1, borderColor: '#16A34A' }}>
+                <Feather name="plus" size={14} color="#16A34A" />
               </TouchableOpacity>
             )}
           </View>
@@ -1122,10 +1227,10 @@ export default function HomeScreen() {
           {/* Fixed Top Bar */}
           <View style={{ position: 'absolute', top: insets.top + 15, left: 16, right: 16, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }} pointerEvents="box-none">
             <TouchableOpacity onPress={() => router.push("/delivery/saved-addresses")} style={{ flexDirection: 'row', alignItems: 'center' }}>
+              <Ionicons name="location" size={18} color="#fff" style={{ marginRight: 6, textShadowColor: 'rgba(0,0,0,0.3)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2 }} />
               <Text style={{ color: '#fff', fontSize: 16, fontWeight: '700', textShadowColor: 'rgba(0,0,0,0.3)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2 }}>
                 {selectedAddress ? (selectedAddress.label && selectedAddress.label !== "Other" ? selectedAddress.label.toUpperCase() : "ADDRESS") : "ADDRESS"}
               </Text>
-              <Ionicons name="chevron-down" size={16} color="#fff" style={{ marginLeft: 4 }} />
             </TouchableOpacity>
 
             <View style={{ flexDirection: 'row', gap: 20, alignItems: 'center' }}>
@@ -1229,19 +1334,19 @@ export default function HomeScreen() {
 
         {/* Greeting and See All */}
         <View style={{ paddingHorizontal: 16 }}>
-          <Text numberOfLines={1} adjustsFontSizeToFit style={{ fontSize: 22, fontWeight: 'bold', color: '#111827' }}>
+          <Text numberOfLines={1} adjustsFontSizeToFit style={{ fontSize: 22, fontWeight: '600', fontFamily: 'Inter_600SemiBold', color: '#111827' }}>
             Happy{" "}
             <Text
               style={{
                 color: "#111827",
                 fontStyle: isFestival ? "italic" : "normal",
-                fontFamily: isFestival ? (Platform.OS === "ios" ? "Georgia" : "serif") : undefined,
-                fontWeight: isFestival ? "900" : "bold",
+                fontFamily: isFestival ? (Platform.OS === "ios" ? "Georgia" : "serif") : 'Inter_600SemiBold',
+                fontWeight: isFestival ? "700" : "600",
               }}
             >
               {displayText}
             </Text>
-            <Text style={{ color: "#7C3AED", fontWeight: "bold", opacity: cursorVisible ? 1 : 0 }}>|</Text>
+            <Text style={{ color: "#7C3AED", fontWeight: "600", fontFamily: 'Inter_600SemiBold', opacity: cursorVisible ? 1 : 0 }}>|</Text>
             , {userName}! 👋
           </Text>
         </View>
@@ -1291,25 +1396,156 @@ export default function HomeScreen() {
                 <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
                   <View>
                     <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                      <View style={{ backgroundColor: '#7C3AED', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4 }}>
-                        <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 16 }}>149</Text>
+                      <View style={{ backgroundColor: '#000000', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4 }}>
+                        <Text style={{ color: '#D4AF37', fontWeight: '600', fontFamily: 'Inter_600SemiBold', fontSize: 16 }}>149</Text>
                       </View>
-                      <Text style={{ fontSize: 20, fontWeight: '800', marginLeft: 8, color: '#111827' }}>store</Text>
+                      <Text style={{ fontSize: 20, fontWeight: '600', fontFamily: 'Inter_600SemiBold', marginLeft: 8, color: '#D4AF37' }}>store</Text>
                     </View>
                     <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4 }}>
-                      <Ionicons name="checkmark-circle" size={14} color="#7C3AED" />
-                      <Text style={{ color: '#6D28D9', fontSize: 12, marginLeft: 4, fontWeight: '600' }}>Meals at ₹149 + Free Delivery</Text>
+                      <Ionicons name="checkmark-circle" size={14} color="#D4AF37" />
+                      <Text style={{ fontSize: 12, marginLeft: 4, fontWeight: '600' }}>
+                        <Text style={{ color: '#111827' }}>Meals at </Text>
+                        <Text style={{ color: '#D4AF37' }}>₹149 </Text>
+                        <Text style={{ color: '#D4AF37' }}>+ Free Delivery</Text>
+                      </Text>
                     </View>
                   </View>
                   <TouchableOpacity style={{ flexDirection: 'row', alignItems: 'center' }} onPress={() => router.push("/149-store")}>
-                    <Text style={{ color: '#7C3AED', fontSize: 14, fontWeight: '700' }}>View All</Text>
-                    <Ionicons name="chevron-forward" size={14} color="#7C3AED" />
+                    <Text style={{ color: '#D4AF37', fontSize: 14, fontWeight: '700' }}>View All</Text>
+                    <Ionicons name="chevron-forward" size={14} color="#D4AF37" />
                   </TouchableOpacity>
                 </View>
 
                 <ScrollView horizontal showsHorizontalScrollIndicator={false}>
                   {store149Items.map(item => <Store149Card key={item._id} item={item} />)}
                 </ScrollView>
+              </View>
+            )}
+
+            {/* Swiggy-like Filter Bar */}
+            <View style={{ paddingVertical: 8, backgroundColor: 'transparent', marginTop: 8 }}>p: 16 }}>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 16, gap: 8 }}>
+                {/* 1. Filter pill */}
+                <TouchableOpacity 
+                  style={[
+                    styles.filterPill, 
+                    (filter99Store || filterFastDelivery || filterOffers || filterRating4Plus || filterCostRange !== "all" || filterVegNonVeg !== "all" || selectedCuisines.length > 0) && styles.filterPillActive
+                  ]}
+                  onPress={() => { setActiveFilterTab("Sort"); setIsFilterModalVisible(true); }}
+                >
+                  <Text style={[styles.filterPillText, (filter99Store || filterFastDelivery || filterOffers || filterRating4Plus || filterCostRange !== "all" || filterVegNonVeg !== "all" || selectedCuisines.length > 0) && styles.filterPillTextActive]}>Filter</Text>
+                  <Ionicons 
+                    name="options-outline" 
+                    size={14} 
+                    color={(filter99Store || filterFastDelivery || filterOffers || filterRating4Plus || filterCostRange !== "all" || filterVegNonVeg !== "all" || selectedCuisines.length > 0) ? '#E11D48' : '#374151'} 
+                    style={{ marginLeft: 4 }} 
+                  />
+                  {(filter99Store || filterFastDelivery || filterOffers || filterRating4Plus || filterCostRange !== "all" || filterVegNonVeg !== "all" || selectedCuisines.length > 0) && (
+                    <View style={styles.filterBadge}>
+                      <Text style={styles.filterBadgeText}>
+                        {[
+                          filter99Store,
+                          filterFastDelivery,
+                          filterOffers,
+                          filterRating4Plus,
+                          filterCostRange !== "all",
+                          filterVegNonVeg !== "all",
+                          selectedCuisines.length > 0
+                        ].filter(Boolean).length}
+                      </Text>
+                    </View>
+                  )}
+                </TouchableOpacity>
+
+                {/* 2. Sort by pill */}
+                <TouchableOpacity 
+                  style={[styles.filterPill, selectedSort !== "relevance" && styles.filterPillActive]}
+                  onPress={() => { setActiveFilterTab("Sort"); setIsFilterModalVisible(true); }}
+                >
+                  <Text style={[styles.filterPillText, selectedSort !== "relevance" && styles.filterPillTextActive]}>
+                    Sort by
+                  </Text>
+                  <Ionicons name="chevron-down" size={12} color={selectedSort !== "relevance" ? '#E11D48' : '#374151'} style={{ marginLeft: 4 }} />
+                </TouchableOpacity>
+
+                {/* 3. 99 Store / 149 Store quick filter */}
+                <TouchableOpacity 
+                  style={[styles.filterPill, filter99Store && styles.filterPillActive]}
+                  onPress={() => setFilter99Store(!filter99Store)}
+                >
+                  <Text style={[styles.filterPillText, filter99Store && styles.filterPillTextActive]}>149 Store</Text>
+                </TouchableOpacity>
+
+                {/* 4. 15 mins quick filter */}
+                <TouchableOpacity 
+                  style={[styles.filterPill, filterFastDelivery && styles.filterPillActive]}
+                  onPress={() => setFilterFastDelivery(!filterFastDelivery)}
+                >
+                  <Ionicons name="flash" size={13} color={filterFastDelivery ? '#E11D48' : '#374151'} style={{ marginRight: 3 }} />
+                  <Text style={[styles.filterPillText, filterFastDelivery && styles.filterPillTextActive]}>15 mins</Text>
+                </TouchableOpacity>
+
+                {/* 5. Offers quick filter */}
+                <TouchableOpacity 
+                  style={[styles.filterPill, filterOffers && styles.filterPillActive]}
+                  onPress={() => setFilterOffers(!filterOffers)}
+                >
+                  <Text style={[styles.filterPillText, filterOffers && styles.filterPillTextActive]}>Offers</Text>
+                </TouchableOpacity>
+
+                {/* 6. Ratings 4.0+ quick filter */}
+                <TouchableOpacity 
+                  style={[styles.filterPill, filterRating4Plus && styles.filterPillActive]}
+                  onPress={() => setFilterRating4Plus(!filterRating4Plus)}
+                >
+                  <Text style={[styles.filterPillText, filterRating4Plus && styles.filterPillTextActive]}>Ratings 4.0+</Text>
+                </TouchableOpacity>
+
+                {/* 7. Rs 300 - Rs 600 */}
+                <TouchableOpacity 
+                  style={[styles.filterPill, filterCostRange === "300to600" && styles.filterPillActive]}
+                  onPress={() => setFilterCostRange(filterCostRange === "300to600" ? "all" : "300to600")}
+                >
+                  <Text style={[styles.filterPillText, filterCostRange === "300to600" && styles.filterPillTextActive]}>Rs. 300-Rs. 600</Text>
+                </TouchableOpacity>
+
+                {/* 8. Less than Rs 300 */}
+                <TouchableOpacity 
+                  style={[styles.filterPill, filterCostRange === "under300" && styles.filterPillActive]}
+                  onPress={() => setFilterCostRange(filterCostRange === "under300" ? "all" : "under300")}
+                >
+                  <Text style={[styles.filterPillText, filterCostRange === "under300" && styles.filterPillTextActive]}>Less than Rs. 300</Text>
+                </TouchableOpacity>
+
+                {/* 9. Pure Veg */}
+                <TouchableOpacity 
+                  style={[styles.filterPill, filterVegNonVeg === "veg" && styles.filterPillActive]}
+                  onPress={() => setFilterVegNonVeg(filterVegNonVeg === "veg" ? "all" : "veg")}
+                >
+                  <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: '#16A34A', marginRight: 5 }} />
+                  <Text style={[styles.filterPillText, filterVegNonVeg === "veg" && styles.filterPillTextActive]}>Pure Veg</Text>
+                </TouchableOpacity>
+
+                {/* 10. Non Veg */}
+                <TouchableOpacity 
+                  style={[styles.filterPill, filterVegNonVeg === "nonveg" && styles.filterPillActive]}
+                  onPress={() => setFilterVegNonVeg(filterVegNonVeg === "nonveg" ? "all" : "nonveg")}
+                >
+                  <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: '#E11D48', marginRight: 5 }} />
+                  <Text style={[styles.filterPillText, filterVegNonVeg === "nonveg" && styles.filterPillTextActive]}>Non Veg</Text>
+                </TouchableOpacity>
+              </ScrollView>
+            </View>
+
+            {/* Restaurant List Section Heading */}
+            {filteredAndSortedItems.length > 0 && (
+              <View style={{ paddingHorizontal: 16, paddingTop: 16, pb: 4 }}>
+                <Text style={{ fontSize: 18, fontWeight: '600', fontFamily: 'Inter_600SemiBold', color: '#111827', letterSpacing: -0.3 }}>
+                  {activeService === 'Meat' 
+                    ? `Top ${filteredAndSortedItems.length} meat shops to explore`
+                    : `Top ${filteredAndSortedItems.length} restaurants to explore`
+                  }
+                </Text>
               </View>
             )}
           </>
@@ -1380,14 +1616,14 @@ export default function HomeScreen() {
       return [];
     }
     if (!searchText) {
-      return visibleItems.map((item) => ({ ...item, isRestaurant: true }));
+      return filteredAndSortedItems.map((item) => ({ ...item, isRestaurant: true }));
     }
 
     const items: any[] = [];
     // Restaurants Section
-    if (visibleItems.length > 0) {
+    if (filteredAndSortedItems.length > 0) {
       items.push({ _id: "header-restaurants", isHeader: true, title: "RESTAURANTS" });
-      visibleItems.forEach((r) => items.push({ ...r, isRestaurant: true }));
+      filteredAndSortedItems.forEach((r) => items.push({ ...r, isRestaurant: true }));
     }
     // Dishes Section
     if (searchedDishes.length > 0) {
@@ -1395,7 +1631,7 @@ export default function HomeScreen() {
       searchedDishes.forEach((d) => items.push({ ...d, isDish: true }));
     }
     return items;
-  }, [showHomeSkeleton, searchText, visibleItems, searchedDishes, loadingDrivers, nearbyDriversCount]);
+  }, [showHomeSkeleton, searchText, filteredAndSortedItems, searchedDishes, loadingDrivers, nearbyDriversCount]);
 
   return (
     <View style={styles.root}>
@@ -1847,6 +2083,293 @@ export default function HomeScreen() {
           </View>
         </Modal>
       )}
+      {/* Premium Swiggy-like Filter Modal */}
+      <Modal
+        visible={isFilterModalVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setIsFilterModalVisible(false)}
+      >
+        <View style={styles.filterModalOverlay}>
+          <TouchableOpacity style={styles.filterModalScrim} activeOpacity={1} onPress={() => setIsFilterModalVisible(false)} />
+          <View style={styles.filterModalContent}>
+            {/* Header */}
+            <View style={styles.filterModalHeader}>
+              <Text style={styles.filterModalTitle}>Filter</Text>
+              <TouchableOpacity onPress={() => setIsFilterModalVisible(false)} style={styles.filterModalCloseBtn}>
+                <Ionicons name="close" size={24} color="#111827" />
+              </TouchableOpacity>
+            </View>
+
+            {/* Split screen body */}
+            <View style={styles.filterModalBody}>
+              {/* Left Pane (Tabs) */}
+              <View style={styles.filterModalLeftPane}>
+                {[
+                  { id: "Sort", label: "Sort" },
+                  { id: "99store", label: "149 Store" },
+                  { id: "15mins", label: "15 mins" },
+                  { id: "Offers", label: "Offers" },
+                  { id: "Ratings", label: "Ratings" },
+                  { id: "CostForTwo", label: "Cost for two" },
+                  { id: "VegNonVeg", label: "Veg/Non-Veg" },
+                  { id: "Cuisines", label: "Cuisines" }
+                ].map((tab) => {
+                  const isActive = activeFilterTab === tab.id;
+                  
+                  // Check if this category has active filters applied
+                  let hasApplied = false;
+                  if (tab.id === "Sort" && selectedSort !== "relevance") hasApplied = true;
+                  if (tab.id === "99store" && filter99Store) hasApplied = true;
+                  if (tab.id === "15mins" && filterFastDelivery) hasApplied = true;
+                  if (tab.id === "Offers" && filterOffers) hasApplied = true;
+                  if (tab.id === "Ratings" && filterRating4Plus) hasApplied = true;
+                  if (tab.id === "CostForTwo" && filterCostRange !== "all") hasApplied = true;
+                  if (tab.id === "VegNonVeg" && filterVegNonVeg !== "all") hasApplied = true;
+                  if (tab.id === "Cuisines" && selectedCuisines.length > 0) hasApplied = true;
+
+                  return (
+                    <TouchableOpacity 
+                      key={tab.id} 
+                      style={[styles.filterTabButton, isActive && styles.filterTabButtonActive]}
+                      onPress={() => setActiveFilterTab(tab.id)}
+                    >
+                      {hasApplied && (
+                        <View style={styles.filterTabIndicator} />
+                      )}
+                      <Text style={[styles.filterTabText, isActive && styles.filterTabTextActive]}>
+                        {tab.label}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+
+              {/* Right Pane (Options) */}
+              <ScrollView style={styles.filterModalRightPane} contentContainerStyle={{ padding: 16 }}>
+                {activeFilterTab === "Sort" && (
+                  <View>
+                    <Text style={styles.filterSectionTitle}>SORT BY</Text>
+                    {[
+                      { id: "relevance", label: "Relevance (Default)" },
+                      { id: "time", label: "Delivery Time" },
+                      { id: "rating", label: "Rating" },
+                      { id: "costLowHigh", label: "Cost: Low to High" },
+                      { id: "costHighLow", label: "Cost: High to Low" }
+                    ].map((opt) => (
+                      <TouchableOpacity 
+                        key={opt.id} 
+                        style={styles.filterOptionRow}
+                        onPress={() => setSelectedSort(opt.id)}
+                      >
+                        <Ionicons 
+                          name={selectedSort === opt.id ? "radio-button-on" : "radio-button-off"} 
+                          size={20} 
+                          color={selectedSort === opt.id ? "#5c52eb" : "#9CA3AF"} 
+                        />
+                        <Text style={[styles.filterOptionLabel, selectedSort === opt.id && styles.filterOptionLabelActive]}>
+                          {opt.label}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                )}
+
+                {activeFilterTab === "99store" && (
+                  <View>
+                    <Text style={styles.filterSectionTitle}>149 STORE PARTNERS</Text>
+                    <TouchableOpacity 
+                      style={styles.filterOptionRow}
+                      onPress={() => setFilter99Store(!filter99Store)}
+                    >
+                      <Ionicons 
+                        name={filter99Store ? "checkbox" : "square-outline"} 
+                        size={20} 
+                        color={filter99Store ? "#5c52eb" : "#9CA3AF"} 
+                      />
+                      <Text style={[styles.filterOptionLabel, filter99Store && styles.filterOptionLabelActive]}>
+                        Show 149 Store partners
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
+
+                {activeFilterTab === "15mins" && (
+                  <View>
+                    <Text style={styles.filterSectionTitle}>DELIVERY TIME</Text>
+                    <TouchableOpacity 
+                      style={styles.filterOptionRow}
+                      onPress={() => setFilterFastDelivery(!filterFastDelivery)}
+                    >
+                      <Ionicons 
+                        name={filterFastDelivery ? "checkbox" : "square-outline"} 
+                        size={20} 
+                        color={filterFastDelivery ? "#5c52eb" : "#9CA3AF"} 
+                      />
+                      <Text style={[styles.filterOptionLabel, filterFastDelivery && styles.filterOptionLabelActive]}>
+                        Fast Delivery (under 30 mins)
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
+
+                {activeFilterTab === "Offers" && (
+                  <View>
+                    <Text style={styles.filterSectionTitle}>OFFERS</Text>
+                    <TouchableOpacity 
+                      style={styles.filterOptionRow}
+                      onPress={() => setFilterOffers(!filterOffers)}
+                    >
+                      <Ionicons 
+                        name={filterOffers ? "checkbox" : "square-outline"} 
+                        size={20} 
+                        color={filterOffers ? "#5c52eb" : "#9CA3AF"} 
+                      />
+                      <Text style={[styles.filterOptionLabel, filterOffers && styles.filterOptionLabelActive]}>
+                        Free Delivery / Special Offers
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
+
+                {activeFilterTab === "Ratings" && (
+                  <View>
+                    <Text style={styles.filterSectionTitle}>RATINGS</Text>
+                    <TouchableOpacity 
+                      style={styles.filterOptionRow}
+                      onPress={() => setFilterRating4Plus(!filterRating4Plus)}
+                    >
+                      <Ionicons 
+                        name={filterRating4Plus ? "checkbox" : "square-outline"} 
+                        size={20} 
+                        color={filterRating4Plus ? "#5c52eb" : "#9CA3AF"} 
+                      />
+                      <Text style={[styles.filterOptionLabel, filterRating4Plus && styles.filterOptionLabelActive]}>
+                        Ratings 4.0+
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
+
+                {activeFilterTab === "CostForTwo" && (
+                  <View>
+                    <Text style={styles.filterSectionTitle}>COST FOR TWO</Text>
+                    {[
+                      { id: "all", label: "Show All" },
+                      { id: "under300", label: "Less than Rs. 300" },
+                      { id: "300to600", label: "Rs. 300-Rs. 600" },
+                      { id: "over600", label: "More than Rs. 600" }
+                    ].map((opt) => (
+                      <TouchableOpacity 
+                        key={opt.id} 
+                        style={styles.filterOptionRow}
+                        onPress={() => setFilterCostRange(opt.id)}
+                      >
+                        <Ionicons 
+                          name={filterCostRange === opt.id ? "radio-button-on" : "radio-button-off"} 
+                          size={20} 
+                          color={filterCostRange === opt.id ? "#5c52eb" : "#9CA3AF"} 
+                        />
+                        <Text style={[styles.filterOptionLabel, filterCostRange === opt.id && styles.filterOptionLabelActive]}>
+                          {opt.label}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                )}
+
+                {activeFilterTab === "VegNonVeg" && (
+                  <View>
+                    <Text style={styles.filterSectionTitle}>DIETARY PREFERENCE</Text>
+                    {[
+                      { id: "all", label: "Show All" },
+                      { id: "veg", label: "Pure Veg" },
+                      { id: "nonveg", label: "Non-Veg" }
+                    ].map((opt) => (
+                      <TouchableOpacity 
+                        key={opt.id} 
+                        style={styles.filterOptionRow}
+                        onPress={() => setFilterVegNonVeg(opt.id)}
+                      >
+                        <Ionicons 
+                          name={filterVegNonVeg === opt.id ? "radio-button-on" : "radio-button-off"} 
+                          size={20} 
+                          color={filterVegNonVeg === opt.id ? "#5c52eb" : "#9CA3AF"} 
+                        />
+                        <Text style={[styles.filterOptionLabel, filterVegNonVeg === opt.id && styles.filterOptionLabelActive]}>
+                          {opt.label}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                )}
+
+                {activeFilterTab === "Cuisines" && (
+                  <View>
+                    <Text style={styles.filterSectionTitle}>CUISINES</Text>
+                    {availableCuisines.length === 0 ? (
+                      <Text style={{ fontSize: 13, color: '#9CA3AF', fontStyle: 'italic', marginTop: 10 }}>
+                        No cuisines available in current location.
+                      </Text>
+                    ) : (
+                      availableCuisines.map((cuisine) => {
+                        const isSelected = selectedCuisines.includes(cuisine);
+                        return (
+                          <TouchableOpacity 
+                            key={cuisine} 
+                            style={styles.filterOptionRow}
+                            onPress={() => {
+                              if (isSelected) {
+                                setSelectedCuisines(selectedCuisines.filter(c => c !== cuisine));
+                              } else {
+                                setSelectedCuisines([...selectedCuisines, cuisine]);
+                              }
+                            }}
+                          >
+                            <Ionicons 
+                              name={isSelected ? "checkbox" : "square-outline"} 
+                              size={20} 
+                              color={isSelected ? "#5c52eb" : "#9CA3AF"} 
+                            />
+                            <Text style={[styles.filterOptionLabel, isSelected && styles.filterOptionLabelActive]}>
+                              {cuisine}
+                            </Text>
+                          </TouchableOpacity>
+                        );
+                      })
+                    )}
+                  </View>
+                )}
+              </ScrollView>
+            </View>
+
+            {/* Footer buttons */}
+            <View style={styles.filterModalFooter}>
+              <TouchableOpacity 
+                style={styles.filterModalClearBtn} 
+                onPress={() => {
+                  setSelectedSort("relevance");
+                  setFilter99Store(false);
+                  setFilterFastDelivery(false);
+                  setFilterOffers(false);
+                  setFilterRating4Plus(false);
+                  setFilterCostRange("all");
+                  setFilterVegNonVeg("all");
+                  setSelectedCuisines([]);
+                }}
+              >
+                <Text style={styles.filterModalClearText}>Clear Filters</Text>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={styles.filterModalApplyBtn} 
+                onPress={() => setIsFilterModalVisible(false)}
+              >
+                <Text style={styles.filterModalApplyText}>Apply</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
 
     </View>
   );
@@ -2334,7 +2857,8 @@ const createStyles = (colors: typeof Colors.light) => StyleSheet.create({
   },
   greetingTitle: {
     fontSize: moderateScale(22),
-    fontWeight: "900",
+    fontWeight: "600",
+    fontFamily: "Inter_600SemiBold",
     color: colors.text,
     letterSpacing: -0.5,
     marginBottom: 16,
@@ -2788,7 +3312,8 @@ const createStyles = (colors: typeof Colors.light) => StyleSheet.create({
   },
   meatBannerTitle: {
     fontSize: moderateScale(20),
-    fontWeight: '900',
+    fontWeight: '600',
+    fontFamily: 'Inter_600SemiBold',
     color: colors.text,
     letterSpacing: -0.3,
   },
@@ -2806,7 +3331,8 @@ const createStyles = (colors: typeof Colors.light) => StyleSheet.create({
   },
   emptySearchTitle: {
     fontSize: moderateScale(16),
-    fontWeight: "800",
+    fontWeight: "600",
+    fontFamily: "Inter_600SemiBold",
     marginTop: 12,
   },
   emptySearchSubtitle: {
@@ -2824,7 +3350,8 @@ const createStyles = (colors: typeof Colors.light) => StyleSheet.create({
   },
   noServiceTitle: {
     fontSize: moderateScale(18),
-    fontWeight: "800",
+    fontWeight: "600",
+    fontFamily: "Inter_600SemiBold",
     marginTop: 16,
     textAlign: "center",
   },
@@ -2853,7 +3380,7 @@ const createStyles = (colors: typeof Colors.light) => StyleSheet.create({
   },
   listSectionHeader: {
     fontSize: moderateScale(12),
-    fontFamily: "Inter_700Bold",
+    fontFamily: "Inter_600SemiBold",
     color: colors.textSecondary,
     letterSpacing: 1.2,
     paddingHorizontal: 16,
@@ -3165,7 +3692,8 @@ const createStyles = (colors: typeof Colors.light) => StyleSheet.create({
   },
   ddSectionTitle: {
     fontSize: moderateScale(18),
-    fontWeight: "900",
+    fontWeight: "600",
+    fontFamily: "Inter_600SemiBold",
     color: colors.text,
     marginTop: 12,
     marginBottom: 16,
@@ -3317,7 +3845,8 @@ const createStyles = (colors: typeof Colors.light) => StyleSheet.create({
   },
   recentSearchesTitle: {
     fontSize: moderateScale(16),
-    fontWeight: '900',
+    fontWeight: '600',
+    fontFamily: 'Inter_600SemiBold',
     color: colors.text,
   },
   clearRecentText: {
@@ -3343,7 +3872,8 @@ const createStyles = (colors: typeof Colors.light) => StyleSheet.create({
   },
   suggestionsTitle: {
     fontSize: moderateScale(16),
-    fontWeight: '900',
+    fontWeight: '600',
+    fontFamily: 'Inter_600SemiBold',
     color: colors.text,
     marginBottom: 16,
   },
@@ -3394,5 +3924,179 @@ const createStyles = (colors: typeof Colors.light) => StyleSheet.create({
     fontWeight: '900',
     marginLeft: 6,
     letterSpacing: 0.5,
+  },
+  filterPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#fff',
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 18,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.03,
+    shadowRadius: 2,
+    elevation: 1,
+  },
+  filterPillActive: {
+    borderColor: '#5c52eb',
+    backgroundColor: '#EEF2FF',
+  },
+  filterPillText: {
+    fontSize: 12,
+    fontWeight: '400',
+    fontFamily: 'Inter_500Medium',
+    color: '#374151',
+  },
+  filterPillTextActive: {
+    color: '#5c52eb',
+    fontWeight: '600',
+    fontFamily: 'Inter_600SemiBold',
+  },
+  filterBadge: {
+    backgroundColor: '#5c52eb',
+    width: 15,
+    height: 15,
+    borderRadius: 7.5,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginLeft: 5,
+  },
+  filterBadgeText: {
+    color: '#fff',
+    fontSize: 9,
+    fontWeight: 'bold',
+  },
+  filterModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'flex-end',
+  },
+  filterModalScrim: {
+    ...StyleSheet.absoluteFillObject,
+  },
+  filterModalContent: {
+    backgroundColor: colors.surface,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    height: '75%',
+    overflow: 'hidden',
+  },
+  filterModalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  filterModalTitle: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: colors.text,
+  },
+  filterModalCloseBtn: {
+    padding: 4,
+  },
+  filterModalBody: {
+    flex: 1,
+    flexDirection: 'row',
+  },
+  filterModalLeftPane: {
+    width: '35%',
+    backgroundColor: colors.surfaceSecondary || '#F3F4F6',
+    borderRightWidth: 1,
+    borderRightColor: colors.border,
+  },
+  filterModalRightPane: {
+    width: '65%',
+    backgroundColor: colors.surface,
+  },
+  filterTabButton: {
+    paddingVertical: 16,
+    paddingHorizontal: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(0,0,0,0.03)',
+    position: 'relative',
+  },
+  filterTabButtonActive: {
+    backgroundColor: colors.surface,
+  },
+  filterTabText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: colors.textSecondary,
+  },
+  filterTabTextActive: {
+    color: '#5c52eb',
+    fontWeight: '800',
+  },
+  filterTabIndicator: {
+    position: 'absolute',
+    left: 0,
+    top: 12,
+    bottom: 12,
+    width: 4,
+    backgroundColor: '#5c52eb',
+    borderTopRightRadius: 2,
+    borderBottomRightRadius: 2,
+  },
+  filterSectionTitle: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: colors.textMuted,
+    letterSpacing: 0.8,
+    marginBottom: 16,
+  },
+  filterOptionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    gap: 12,
+  },
+  filterOptionLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: colors.textSecondary,
+  },
+  filterOptionLabelActive: {
+    color: '#5c52eb',
+    fontWeight: '800',
+  },
+  filterModalFooter: {
+    flexDirection: 'row',
+    padding: 16,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: colors.surface,
+  },
+  filterModalClearBtn: {
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+  },
+  filterModalClearText: {
+    color: colors.textSecondary,
+    fontWeight: '700',
+    fontSize: 14,
+  },
+  filterModalApplyBtn: {
+    backgroundColor: '#5c52eb',
+    paddingVertical: 12,
+    paddingHorizontal: 36,
+    borderRadius: 24,
+    shadowColor: '#5c52eb',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 6,
+    elevation: 4,
+  },
+  filterModalApplyText: {
+    color: '#fff',
+    fontWeight: '800',
+    fontSize: 14,
   },
 });
