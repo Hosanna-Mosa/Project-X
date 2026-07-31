@@ -99,6 +99,13 @@ export const getNearbyVendors = async (req: Request, res: Response) => {
     const userLat = parseFloat(lat as string);
     const userLng = parseFloat(lng as string);
 
+    // Admin Panel bypass: lat=0 & lng=0 fetches all vendors
+    if (userLat === 0 && userLng === 0) {
+      console.log(`[API] Fetching ALL vendors for Admin Panel`);
+      const allVendors = await Vendor.find({ partnerType: { $ne: "meat" } }).sort({ createdAt: -1 });
+      return res.json(allVendors);
+    }
+
     // Zone Serviceability Check
     const zonesService = new ZonesService();
     const activeZone = await zonesService.getZoneForCoordinates(userLat, userLng);

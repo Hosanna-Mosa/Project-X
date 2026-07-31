@@ -112,6 +112,11 @@ export default function Vendors() {
   const autocompleteInputRef = useRef<HTMLInputElement>(null);
   const [selectedPlace, setSelectedPlace] = useState<any>(null);
   
+  // List Filters
+  const [filterSearch, setFilterSearch] = useState("");
+  const [filterStatus, setFilterStatus] = useState("all");
+  const [filterVeg, setFilterVeg] = useState("all");
+
   const [newVendor, setNewVendor] = useState({
     name: "",
     email: "",
@@ -373,6 +378,38 @@ export default function Vendors() {
           </Dialog>
         </div>
 
+        <div className="flex flex-col md:flex-row gap-4 items-center bg-card p-4 rounded-xl border border-border">
+          <div className="relative flex-1 w-full">
+            <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Search by restaurant name or location..."
+              value={filterSearch}
+              onChange={(e) => setFilterSearch(e.target.value)}
+              className="pl-9 w-full"
+            />
+          </div>
+          <select 
+            value={filterStatus}
+            onChange={(e) => setFilterStatus(e.target.value)}
+            className="h-9 rounded-md border border-input bg-background px-3 py-1 text-sm outline-none focus:ring-2 focus:ring-primary w-full md:w-auto"
+          >
+            <option value="all">All Statuses</option>
+            <option value="approved">Approved</option>
+            <option value="submitted">Submitted</option>
+            <option value="draft">Draft</option>
+            <option value="rejected">Rejected</option>
+          </select>
+          <select 
+            value={filterVeg}
+            onChange={(e) => setFilterVeg(e.target.value)}
+            className="h-9 rounded-md border border-input bg-background px-3 py-1 text-sm outline-none focus:ring-2 focus:ring-primary w-full md:w-auto"
+          >
+            <option value="all">All Dietary</option>
+            <option value="veg">Pure Veg</option>
+            <option value="nonveg">Multi-Cuisine</option>
+          </select>
+        </div>
+
         <div className="section-card overflow-hidden">
           <table className="w-full">
             <thead>
@@ -390,65 +427,80 @@ export default function Vendors() {
               ) : vendors?.length === 0 ? (
                 <tr><td colSpan={5} className="px-6 py-10 text-center text-muted-foreground">No vendors found. Add your first restaurant!</td></tr>
               ) : (
-                vendors?.map((vendor) => (
-                  <tr key={vendor._id} className="border-t border-border hover:bg-muted/30 transition-colors">
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-3">
-                        <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
-                          <Store className="h-5 w-5 text-primary" />
-                        </div>
-                        <div>
-                          <div className="flex items-center gap-2">
-                            <p className="text-sm font-medium text-foreground">{vendor.name}</p>
-                            <span className={`text-[9px] px-1.5 py-0.5 rounded font-bold uppercase ${
-                              (vendor as any).onboardingStatus === "approved" ? "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400" :
-                              (vendor as any).onboardingStatus === "rejected" ? "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400" :
-                              (vendor as any).onboardingStatus === "submitted" ? "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400" :
-                              "bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-400"
-                            }`}>
-                              {(vendor as any).onboardingStatus || "draft"}
-                            </span>
+                (() => {
+                  const filtered = vendors?.filter(vendor => {
+                    const searchLower = filterSearch.toLowerCase();
+                    const matchesSearch = vendor.name.toLowerCase().includes(searchLower) || vendor.address.toLowerCase().includes(searchLower);
+                    const status = (vendor as any).onboardingStatus || "draft";
+                    const matchesStatus = filterStatus === "all" || status === filterStatus;
+                    const matchesVeg = filterVeg === "all" || (filterVeg === "veg" && vendor.isPureVeg) || (filterVeg === "nonveg" && !vendor.isPureVeg);
+                    return matchesSearch && matchesStatus && matchesVeg;
+                  });
+
+                  if (!filtered || filtered.length === 0) {
+                    return <tr><td colSpan={5} className="px-6 py-10 text-center text-muted-foreground">No vendors match your filters.</td></tr>;
+                  }
+
+                  return filtered.map((vendor) => (
+                    <tr key={vendor._id} className="border-t border-border hover:bg-muted/30 transition-colors">
+                      <td className="px-6 py-4">
+                        <div className="flex items-center gap-3">
+                          <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
+                            <Store className="h-5 w-5 text-primary" />
                           </div>
-                          <p className="text-[10px] text-muted-foreground uppercase">{vendor.isPureVeg ? "Pure Veg" : "Multi-Cuisine"}</p>
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <p className="text-sm font-medium text-foreground">{vendor.name}</p>
+                              <span className={`text-[9px] px-1.5 py-0.5 rounded font-bold uppercase ${
+                                (vendor as any).onboardingStatus === "approved" ? "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400" :
+                                (vendor as any).onboardingStatus === "rejected" ? "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400" :
+                                (vendor as any).onboardingStatus === "submitted" ? "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400" :
+                                "bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-400"
+                              }`}>
+                                {(vendor as any).onboardingStatus || "draft"}
+                              </span>
+                            </div>
+                            <p className="text-[10px] text-muted-foreground uppercase">{vendor.isPureVeg ? "Pure Veg" : "Multi-Cuisine"}</p>
+                          </div>
                         </div>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <p className="text-sm text-foreground max-w-[200px] truncate">{vendor.address}</p>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-1.5">
-                        <Star className="h-3.5 w-3.5 text-warning fill-warning" />
-                        <span className="text-sm font-medium text-foreground">{vendor.rating}</span>
-                        <span className="text-xs text-muted-foreground">({vendor.reviews})</span>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <p className="text-sm text-foreground">{vendor.phone}</p>
-                      <p className="text-xs text-muted-foreground">{vendor.email}</p>
-                    </td>
-                    <td className="px-6 py-4">
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <button className="p-1 hover:bg-muted rounded transition-colors">
-                            <MoreVertical className="h-4 w-4 text-muted-foreground" />
-                          </button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={() => handleViewClick(vendor)} className="gap-2 cursor-pointer">
-                            <Eye className="h-4 w-4 text-muted-foreground" /> View Details
-                          </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => handleEditClick(vendor)} className="gap-2 cursor-pointer">
-                            <Edit2 className="h-4 w-4 text-muted-foreground" /> Edit Restaurant
-                          </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => handleDeleteClick(vendor)} className="gap-2 text-destructive focus:text-destructive cursor-pointer">
-                            <Trash2 className="h-4 w-4" /> Delete Restaurant
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </td>
-                  </tr>
-                ))
+                      </td>
+                      <td className="px-6 py-4">
+                        <p className="text-sm text-foreground max-w-[200px] truncate">{vendor.address}</p>
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="flex items-center gap-1.5">
+                          <Star className="h-3.5 w-3.5 text-warning fill-warning" />
+                          <span className="text-sm font-medium text-foreground">{vendor.rating}</span>
+                          <span className="text-xs text-muted-foreground">({vendor.reviews})</span>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4">
+                        <p className="text-sm text-foreground">{vendor.phone}</p>
+                        <p className="text-xs text-muted-foreground">{vendor.email}</p>
+                      </td>
+                      <td className="px-6 py-4">
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <button className="p-1 hover:bg-muted rounded transition-colors">
+                              <MoreVertical className="h-4 w-4 text-muted-foreground" />
+                            </button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem onClick={() => handleViewClick(vendor)} className="gap-2 cursor-pointer">
+                              <Eye className="h-4 w-4 text-muted-foreground" /> View Details
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => handleEditClick(vendor)} className="gap-2 cursor-pointer">
+                              <Edit2 className="h-4 w-4 text-muted-foreground" /> Edit Restaurant
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => handleDeleteClick(vendor)} className="gap-2 text-destructive focus:text-destructive cursor-pointer">
+                              <Trash2 className="h-4 w-4" /> Delete Restaurant
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </td>
+                    </tr>
+                  ));
+                })()
               )}
             </tbody>
           </table>

@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
-import { Store, Plus, Search, Edit, Trash2, Eye, Upload, Loader2, PlusCircle, Check, X, FileText, ShoppingBag, ArrowLeft } from "lucide-react";
+import { Store, Plus, Search, Edit, Trash2, Eye, Upload, Loader2, PlusCircle, Check, X, FileText, ShoppingBag, ArrowLeft, QrCode, Download } from "lucide-react";
+import QRCode from "react-qr-code";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { BASE_URL } from "@/lib/api-client";
 import { toast } from "sonner";
@@ -34,6 +35,7 @@ interface MenuItem {
   description: string;
   category: string;
   isVeg: boolean;
+  images?: string[];
 }
 
 export default function RestaurantMenu() {
@@ -48,8 +50,10 @@ export default function RestaurantMenu() {
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [isViewOpen, setIsViewOpen] = useState(false);
+  const [isQrOpen, setIsQrOpen] = useState(false);
   
   const [selectedRestaurant, setSelectedRestaurant] = useState<Restaurant | null>(null);
+  const [selectedQrRestaurant, setSelectedQrRestaurant] = useState<Restaurant | null>(null);
   const [viewMenu, setViewMenu] = useState<MenuItem[]>([]);
   const [isLoadingMenu, setIsLoadingMenu] = useState(false);
 
@@ -142,6 +146,36 @@ export default function RestaurantMenu() {
     setSelectedRestaurant(restaurant);
     fetchMenu(restaurant._id);
     setIsViewOpen(true);
+  };
+
+  // QR Code Click
+  const handleQrClick = (restaurant: Restaurant) => {
+    setSelectedQrRestaurant(restaurant);
+    setIsQrOpen(true);
+  };
+
+  const handleDownloadQr = () => {
+    const svg = document.getElementById("restaurant-qr-code");
+    if (!svg) return;
+    const svgData = new XMLSerializer().serializeToString(svg);
+    const canvas = document.createElement("canvas");
+    const ctx = canvas.getContext("2d");
+    const img = new Image();
+    img.onload = () => {
+      canvas.width = img.width + 40; // Add padding
+      canvas.height = img.height + 40;
+      if (ctx) {
+        ctx.fillStyle = "white";
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.drawImage(img, 20, 20);
+        const pngFile = canvas.toDataURL("image/png");
+        const downloadLink = document.createElement("a");
+        downloadLink.download = `${selectedQrRestaurant?.name.replace(/\s+/g, "_")}_QR_Menu.png`;
+        downloadLink.href = `${pngFile}`;
+        downloadLink.click();
+      }
+    };
+    img.src = "data:image/svg+xml;base64," + btoa(unescape(encodeURIComponent(svgData)));
   };
 
   // Edit Click
@@ -246,6 +280,39 @@ export default function RestaurantMenu() {
       toast.error(err.message || "OCR Extraction failed");
     } finally {
       setIsExtracting(false);
+    }
+  };
+
+  const handleItemImageUpload = async (file: File, index: number, isEditFlow: boolean) => {
+    const formData = new FormData();
+    formData.append("images", file);
+
+    try {
+      const response = await fetch(`${BASE_URL}/food/upload`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("admin_token") || localStorage.getItem("vendor_token")}`,
+        },
+        body: formData,
+      });
+
+      if (!response.ok) throw new Error("Failed to upload image");
+      
+      const data = await response.json();
+      if (data.imageUrls && data.imageUrls.length > 0) {
+        if (isEditFlow) {
+          const updated = [...editMenu];
+          updated[index].images = [data.imageUrls[0]];
+          setEditMenu(updated);
+        } else {
+          const updated = [...extractedMenu];
+          updated[index].images = [data.imageUrls[0]];
+          setExtractedMenu(updated);
+        }
+        toast.success("Photo uploaded successfully");
+      }
+    } catch (err: any) {
+      toast.error(err.message || "Upload failed");
     }
   };
 
@@ -467,6 +534,7 @@ export default function RestaurantMenu() {
                     <table className="w-full text-sm text-left">
                       <thead className="bg-[#f8fafc] border-b text-xs font-bold text-muted-foreground uppercase">
                         <tr>
+                          <th className="px-4 py-3 w-16">Photo</th>
                           <th className="px-4 py-3">Item Name</th>
                           <th className="px-4 py-3 w-28">Price</th>
                           <th className="px-4 py-3">Category</th>
@@ -478,6 +546,30 @@ export default function RestaurantMenu() {
                       <tbody className="divide-y">
                         {extractedMenu.map((item, idx) => (
                           <tr key={idx} className="hover:bg-muted/30">
+                            <td className="px-4 py-2 text-center">
+                              <div className="relative group w-10 h-10 rounded-lg overflow-hidden border border-slate-200 bg-slate-50 flex items-center justify-center shrink-0">
+                                {item.images && item.images.length > 0 ? (
+                                  <img src={item.images[0]} alt="item" className="w-full h-full object-cover" />
+                                ) : (
+                                  <Upload className="h-4 w-4 text-slate-400" />
+                                )}
+                                <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
+                                  <label className="cursor-pointer">
+                                    <input 
+                                      type="file" 
+                                      className="hidden" 
+                                      accept="image/*"
+                                      onChange={(e) => {
+                                        if (e.target.files && e.target.files[0]) {
+                                          handleItemImageUpload(e.target.files[0], idx, false);
+                                        }
+                                      }}
+                                    />
+                                    <Edit className="h-4 w-4 text-white" />
+                                  </label>
+                                </div>
+                              </div>
+                            </td>
                             <td className="px-4 py-2">
                               <Input
                                 value={item.name}
@@ -687,6 +779,15 @@ export default function RestaurantMenu() {
                           <Button
                             variant="ghost"
                             size="icon"
+                            onClick={() => handleQrClick(res)}
+                            className="h-8 w-8 text-indigo-600 hover:bg-white rounded-xl shadow-none hover:shadow-sm transition-all"
+                            title="Generate QR Menu"
+                          >
+                            <QrCode className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
                             onClick={() => handleEditClick(res)}
                             className="h-8 w-8 text-teal-600 hover:bg-white rounded-xl shadow-none hover:shadow-sm transition-all"
                             title="Edit Restaurant & Menu"
@@ -889,6 +990,7 @@ export default function RestaurantMenu() {
                     <table className="w-full text-sm text-left">
                       <thead className="bg-[#f8fafc] border-b text-xs font-bold text-muted-foreground uppercase">
                         <tr>
+                          <th className="px-4 py-3 w-16">Photo</th>
                           <th className="px-4 py-3">Item Name</th>
                           <th className="px-4 py-3 w-28">Price</th>
                           <th className="px-4 py-3">Category</th>
@@ -900,6 +1002,30 @@ export default function RestaurantMenu() {
                       <tbody className="divide-y">
                         {editMenu.map((item, idx) => (
                           <tr key={idx} className="hover:bg-muted/30">
+                            <td className="px-4 py-2 text-center">
+                              <div className="relative group w-10 h-10 rounded-lg overflow-hidden border border-slate-200 bg-slate-50 flex items-center justify-center shrink-0">
+                                {item.images && item.images.length > 0 ? (
+                                  <img src={item.images[0]} alt="item" className="w-full h-full object-cover" />
+                                ) : (
+                                  <Upload className="h-4 w-4 text-slate-400" />
+                                )}
+                                <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
+                                  <label className="cursor-pointer">
+                                    <input 
+                                      type="file" 
+                                      className="hidden" 
+                                      accept="image/*"
+                                      onChange={(e) => {
+                                        if (e.target.files && e.target.files[0]) {
+                                          handleItemImageUpload(e.target.files[0], idx, true);
+                                        }
+                                      }}
+                                    />
+                                    <Edit className="h-4 w-4 text-white" />
+                                  </label>
+                                </div>
+                              </div>
+                            </td>
                             <td className="px-4 py-2">
                               <Input
                                 value={item.name}
@@ -989,6 +1115,46 @@ export default function RestaurantMenu() {
                 </Button>
               </DialogFooter>
             </form>
+          </DialogContent>
+        </Dialog>
+
+        {/* QR Code Dialog */}
+        <Dialog open={isQrOpen} onOpenChange={setIsQrOpen}>
+          <DialogContent className="max-w-sm rounded-3xl p-6 text-center flex flex-col items-center">
+            <DialogHeader className="mb-4">
+              <DialogTitle className="text-xl font-bold text-[#00665c] text-center w-full">
+                Digital Menu QR Code
+              </DialogTitle>
+              <p className="text-muted-foreground text-sm text-center">
+                {selectedQrRestaurant?.name}
+              </p>
+            </DialogHeader>
+            
+            <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 flex items-center justify-center relative mb-6">
+              {selectedQrRestaurant && (
+                <QRCode
+                  id="restaurant-qr-code"
+                  value={`${import.meta.env.VITE_FRONTEND_URL || "http://localhost:5173"}/restaurant-menu/${selectedQrRestaurant._id}`}
+                  size={200}
+                  level="H"
+                  className="bg-white"
+                />
+              )}
+            </div>
+
+            <p className="text-xs text-slate-500 mb-6 px-4">
+              Customers can scan this QR code to view your digital menu instantly. Print this to place on your tables!
+            </p>
+
+            <DialogFooter className="w-full flex justify-center">
+              <Button 
+                onClick={handleDownloadQr}
+                className="bg-[#00665c] hover:bg-[#005249] rounded-xl px-8 w-full flex items-center gap-2"
+              >
+                <Download className="h-4 w-4" />
+                Download PNG
+              </Button>
+            </DialogFooter>
           </DialogContent>
         </Dialog>
 
