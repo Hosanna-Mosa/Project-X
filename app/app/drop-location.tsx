@@ -728,7 +728,7 @@ export default function LocationSelectionScreen() {
 
           <View style={styles.infoBox}>
             <Ionicons name="information-circle" size={18} color="#64748B" />
-            <Text style={styles.infoText}>Contact name won't be shared with captain</Text>
+            <Text style={styles.infoText}>Contact name won't be shared with driver</Text>
           </View>
 
           <TouchableOpacity

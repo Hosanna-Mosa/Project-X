@@ -131,7 +131,7 @@ export default function CartScreen() {
         
         <View style={styles.headerTitleContainer}>
           <Text style={styles.headerSubtitle}>Your cart from</Text>
-          <Text style={styles.headerTitle}>{displayVendorName}</Text>
+          <Text style={styles.headerTitle} numberOfLines={1} ellipsizeMode="tail">{displayVendorName}</Text>
         </View>
         <View style={{ width: 40 }} />
       </View>
@@ -280,7 +280,7 @@ export default function CartScreen() {
       </ScrollView>
 
       {/* Sticky Footer */}
-      <View style={[styles.stickyFooter, { paddingBottom: insets.bottom > 0 ? insets.bottom : 20 }]}>
+      <View style={[styles.stickyFooter, { paddingBottom: 12 }]}>
         {items.length > 0 ? (
           <TouchableOpacity 
             style={styles.continueBtn} 
@@ -330,12 +330,12 @@ const styles = StyleSheet.create({
     paddingLeft: 4,
   },
   headerSubtitle: {
-    fontSize: moderateScale(13),
+    fontSize: moderateScale(10),
     color: "#191c1e",
     fontWeight: "600",
   },
   headerTitle: {
-    fontSize: moderateScale(18),
+    fontSize: moderateScale(13),
     fontWeight: "800",
     color: "#000000",
     marginTop: 2,
@@ -589,8 +589,7 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     backgroundColor: "#ffffff",
-    borderTopWidth: 4,
-    borderColor: "#000000",
+    
     paddingTop: 16,
     paddingHorizontal: 20,
     shadowColor: "#000",

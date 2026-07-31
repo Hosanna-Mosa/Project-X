@@ -175,6 +175,7 @@ export class DispatchManagerService {
       socketManager.emitToDriver(currentCandidate.driverUserId, "order_offer_expired", { orderId }, "DispatchManager.timeout");
 
       // Mark driver as declined for this order session
+      await this.recordDeclineInDb(orderId, currentCandidate.driverUserId, "Offer timeout (No response)");
       session.declinedDriverUserIds.add(currentCandidate.driverUserId);
       session.currentIndex++;
 
@@ -223,6 +224,7 @@ export class DispatchManagerService {
     const socketManager = SocketManager.getInstance();
     socketManager.emitToDriver(driverUserId, "order_offer_expired", { orderId }, "DispatchManager.decline");
 
+    await this.recordDeclineInDb(orderId, driverUserId, "Explicitly declined by helper/driver");
     session.declinedDriverUserIds.add(driverUserId);
     session.currentIndex++;
 
@@ -286,6 +288,28 @@ export class DispatchManagerService {
     if (session) {
       if (session.timer) clearTimeout(session.timer);
       this.activeDispatches.delete(orderId);
+    }
+  }
+
+  private async recordDeclineInDb(orderId: string, driverUserId: string, reason: string) {
+    try {
+      const driver = await Driver.findOne({ user: driverUserId });
+      if (driver) {
+        const order = await Order.findById(orderId);
+        if (order) {
+          if (!order.declineReasons) {
+            order.declineReasons = [];
+          }
+          const alreadyDeclined = order.declineReasons.some(r => r.driverId === driver._id.toString());
+          if (!alreadyDeclined) {
+            order.declineReasons.push({ driverId: driver._id.toString(), reason });
+            await order.save();
+            console.log(`[DISPATCH MANAGER] Decline recorded in DB for order ${orderId} by driver ${driverUserId}`);
+          }
+        }
+      }
+    } catch (err: any) {
+      console.error(`[DISPATCH MANAGER] Failed to record decline in DB:`, err.message);
     }
   }
 }
