@@ -1,7 +1,7 @@
 import { Request, Response, NextFunction } from "express";
 import { GoogleGenerativeAI } from "@google/generative-ai";
-import Vendor from "../../database/models/Vendor";
-import FoodItem from "../../database/models/FoodItem";
+import DigitalMenuRestaurant from "../../database/models/DigitalMenuRestaurant";
+import DigitalMenuItem from "../../database/models/DigitalMenuItem";
 import mongoose from "mongoose";
 
 // Initialize Gemini API
@@ -33,7 +33,7 @@ export const extractMenuFromImage = async (req: Request, res: Response, next: Ne
     }
 
     const genAI = getGeminiAI();
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+    const model = genAI.getGenerativeModel({ model: "gemini-3.5-flash" });
 
     // Prepare image data for Gemini API
     const imageParts = files.map((file) => ({
@@ -108,24 +108,13 @@ export const saveRestaurantAndMenu = async (req: Request, res: Response, next: N
     // Create unique email if not provided
     const cleanEmail = email || `${name.toLowerCase().replace(/[^a-z0-9]/g, "")}_${Date.now()}@example.com`;
 
-    // Create the restaurant vendor
-    const newRestaurant = new Vendor({
+    // Create the digital menu restaurant
+    const newRestaurant = new DigitalMenuRestaurant({
       name,
       email: cleanEmail,
       phone,
       address,
       isPureVeg: !!isPureVeg,
-      partnerType: "food",
-      onboardingStatus: "approved", // auto approve for admin panel creation
-      location: {
-        type: "Point",
-        coordinates: [81.78, 17.00], // Default coordinates (Rajahmundry area)
-      },
-      rating: 4.0,
-      reviews: "1",
-      isOpen: true,
-      deliveryFee: 30,
-      minOrderValue: 100,
     });
 
     await newRestaurant.save({ session });
@@ -133,16 +122,17 @@ export const saveRestaurantAndMenu = async (req: Request, res: Response, next: N
     // Save menu items
     if (items && Array.isArray(items) && items.length > 0) {
       const foodItemsToCreate = items.map((item: any) => ({
-        vendorId: newRestaurant._id,
+        restaurantId: newRestaurant._id,
         name: item.name,
         description: item.description || "",
         price: Number(item.price) || 0,
         category: item.category || "General",
+        images: item.images || [],
         isVeg: !!item.isVeg,
         isAvailable: true,
       }));
 
-      await FoodItem.insertMany(foodItemsToCreate, { session });
+      await DigitalMenuItem.insertMany(foodItemsToCreate, { session });
     }
 
     await session.commitTransaction();
@@ -165,7 +155,7 @@ export const saveRestaurantAndMenu = async (req: Request, res: Response, next: N
  */
 export const getRestaurants = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
-    const restaurants = await Vendor.find({ partnerType: "food" }).sort({ createdAt: -1 });
+    const restaurants = await DigitalMenuRestaurant.find().sort({ createdAt: -1 });
     res.status(200).json(restaurants);
   } catch (error: any) {
     res.status(500).json({ message: error.message || "Error fetching restaurants" });
@@ -178,13 +168,13 @@ export const getRestaurants = async (req: Request, res: Response, next: NextFunc
 export const getRestaurantAndMenu = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
     const { id } = req.params;
-    const restaurant = await Vendor.findById(id);
+    const restaurant = await DigitalMenuRestaurant.findById(id);
     if (!restaurant) {
       res.status(404).json({ message: "Restaurant not found" });
       return;
     }
 
-    const menuItems = await FoodItem.find({ vendorId: id });
+    const menuItems = await DigitalMenuItem.find({ restaurantId: id });
     res.status(200).json({ restaurant, menu: menuItems });
   } catch (error: any) {
     res.status(500).json({ message: error.message || "Error fetching restaurant and menu" });
@@ -201,7 +191,7 @@ export const updateRestaurantAndMenu = async (req: Request, res: Response, next:
     const { id } = req.params;
     const { name, email, phone, address, isPureVeg, items } = req.body;
 
-    const restaurant = await Vendor.findById(id);
+    const restaurant = await DigitalMenuRestaurant.findById(id);
     if (!restaurant) {
       res.status(404).json({ message: "Restaurant not found" });
       return;
@@ -218,19 +208,20 @@ export const updateRestaurantAndMenu = async (req: Request, res: Response, next:
 
     if (items && Array.isArray(items)) {
       // Delete existing menu items first, then insert the new list
-      await FoodItem.deleteMany({ vendorId: id }, { session });
+      await DigitalMenuItem.deleteMany({ restaurantId: id }, { session });
 
       const foodItemsToCreate = items.map((item: any) => ({
-        vendorId: id,
+        restaurantId: id,
         name: item.name,
         description: item.description || "",
         price: Number(item.price) || 0,
         category: item.category || "General",
+        images: item.images || [],
         isVeg: !!item.isVeg,
         isAvailable: true,
       }));
 
-      await FoodItem.insertMany(foodItemsToCreate, { session });
+      await DigitalMenuItem.insertMany(foodItemsToCreate, { session });
     }
 
     await session.commitTransaction();
@@ -253,14 +244,14 @@ export const deleteRestaurant = async (req: Request, res: Response, next: NextFu
   session.startTransaction();
   try {
     const { id } = req.params;
-    const restaurant = await Vendor.findByIdAndDelete(id, { session });
+    const restaurant = await DigitalMenuRestaurant.findByIdAndDelete(id, { session });
     if (!restaurant) {
       res.status(404).json({ message: "Restaurant not found" });
       return;
     }
 
     // Delete associated food items
-    await FoodItem.deleteMany({ vendorId: id }, { session });
+    await DigitalMenuItem.deleteMany({ restaurantId: id }, { session });
 
     await session.commitTransaction();
     session.endSession();
