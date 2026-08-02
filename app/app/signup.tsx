@@ -16,6 +16,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
 import { moderateScale } from "react-native-size-matters";
 import Colors from "@/constants/colors";
+import { typography } from "@/constants/typography";
 import { useAuthStore } from "@/contexts/authStore";
 import { useThemeStore } from "@/contexts/themeStore";
 
@@ -248,8 +249,8 @@ const createStyles = (colors: typeof Colors.light) => StyleSheet.create({
     justifyContent: "center",
   },
   headerTitle: {
-    fontSize: moderateScale(18),
-    fontWeight: "700",
+    fontSize: typography.heading2.fontSize,
+    fontWeight: typography.heading2.fontWeight,
     color: "#191c1e",
   },
   scrollContainer: {
@@ -273,14 +274,14 @@ const createStyles = (colors: typeof Colors.light) => StyleSheet.create({
     width: "100%",
   },
   cardTitle: {
-    fontSize: moderateScale(26),
-    fontWeight: "700",
+    fontSize: typography.heading1.fontSize,
+    fontWeight: typography.weights.bold,
     color: "#191c1e",
     textAlign: "center",
     marginBottom: 8,
   },
   cardSubtitle: {
-    fontSize: moderateScale(14),
+    fontSize: typography.body.fontSize,
     color: "#43474e",
     textAlign: "center",
     lineHeight: moderateScale(20),
@@ -293,8 +294,8 @@ const createStyles = (colors: typeof Colors.light) => StyleSheet.create({
     gap: 8,
   },
   fieldLabel: {
-    fontSize: moderateScale(12),
-    fontWeight: "600",
+    fontSize: typography.bodySecondary.fontSize,
+    fontWeight: typography.weights.semibold,
     color: "#191c1e",
   },
   inputContainer: {
@@ -313,7 +314,7 @@ const createStyles = (colors: typeof Colors.light) => StyleSheet.create({
   },
   input: {
     flex: 1,
-    fontSize: moderateScale(14),
+    fontSize: typography.body.fontSize,
     color: "#191c1e",
     height: "100%",
   },
@@ -337,19 +338,19 @@ const createStyles = (colors: typeof Colors.light) => StyleSheet.create({
   },
   signUpBtnText: {
     color: "#ffffff",
-    fontSize: moderateScale(16),
-    fontWeight: "700",
+    fontSize: typography.buttonText.fontSize,
+    fontWeight: typography.buttonText.fontWeight,
   },
   loginLinkRow: {
     marginTop: 24,
     alignItems: "center",
   },
   loginLinkText: {
-    fontSize: moderateScale(14),
+    fontSize: typography.body.fontSize,
     color: "#43474e",
   },
   loginLinkHighlight: {
     color: "#0061a5",
-    fontWeight: "700",
+    fontWeight: typography.weights.bold,
   },
 });

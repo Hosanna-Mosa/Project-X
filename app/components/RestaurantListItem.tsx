@@ -126,14 +126,14 @@ export function RestaurantListItem({
 
   const CARD_WIDTH = Dimensions.get('window').width - 32;
   const [activeIndex, setActiveIndex] = React.useState(0);
-  
+
   const carouselImages = React.useMemo(() => {
-     return [
-       image,
-       "https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=800&q=80", 
-       "https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?w=800&q=80", 
-       "https://images.unsplash.com/photo-1499028344343-cd173ffc68a9?w=800&q=80"
-     ];
+    return [
+      image,
+      "https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=800&q=80",
+      "https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?w=800&q=80",
+      "https://images.unsplash.com/photo-1499028344343-cd173ffc68a9?w=800&q=80"
+    ];
   }, [image]);
 
   const handleScroll = (event: any) => {
@@ -179,14 +179,14 @@ export function RestaurantListItem({
             <Text style={styles.name} numberOfLines={1}>{name}</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity 
+          <TouchableOpacity
             hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
             onPress={() => toggleFavorite(_id)}
           >
-            <Ionicons 
-              name={isFavorite ? "heart" : "heart-outline"} 
-              size={20} 
-              color={isFavorite ? "#EF4444" : colors.textMuted} 
+            <Ionicons
+              name={isFavorite ? "heart" : "heart-outline"}
+              size={20}
+              color={isFavorite ? "#EF4444" : colors.textMuted}
             />
           </TouchableOpacity>
         </View>
@@ -226,17 +226,17 @@ export function RestaurantListItem({
       >
         <Animated.View style={[styles.modalOverlay, { opacity: fadeAnim }]}>
           <Pressable style={{ width: "100%", height: "100%", justifyContent: "center", alignItems: "center" }} onPress={() => closeModal()}>
-            <Animated.View 
+            <Animated.View
               style={[
-                styles.modalCard, 
-                { 
+                styles.modalCard,
+                {
                   transform: [
                     { translateY: translateYAnim },
                     { scale: scaleAnim }
                   ],
-                  opacity: fadeAnim 
+                  opacity: fadeAnim
                 }
-              ]} 
+              ]}
               onStartShouldSetResponder={() => true}
             >
               {/* Header with image, name & price rating */}
@@ -358,7 +358,7 @@ const createStyles = (colors: typeof Colors.light, theme: "light" | "dark") => S
     marginBottom: 4,
   },
   name: {
-    fontSize: 20,
+    fontSize: 14,
     fontWeight: "700",
     color: colors.text,
     flex: 1,

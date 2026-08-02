@@ -1,6 +1,8 @@
 import { Response } from "express";
 import User from "../../database/models/User";
 import Order from "../../database/models/Order";
+import Vendor from "../../database/models/Vendor";
+import MeatCenter from "../../database/models/MeatCenter";
 import { AuthRequest } from "../../middleware/auth.middleware";
 import cloudinary from "../../utils/cloudinary";
 
@@ -273,9 +275,25 @@ export class UsersController {
 
   async getFavorites(req: AuthRequest, res: Response) {
     try {
-      const user = await User.findById(req.user?.userId).populate("favorites");
+      const user = await User.findById(req.user?.userId);
       if (!user) return res.status(404).json({ message: "User not found" });
-      return res.json(user.favorites || []);
+
+      const favoriteIds = user.favorites || [];
+      const [vendors, meatCenters] = await Promise.all([
+        Vendor.find({ _id: { $in: favoriteIds } }).lean(),
+        MeatCenter.find({ _id: { $in: favoriteIds } }).lean(),
+      ]);
+
+      const combined = [
+        ...vendors,
+        ...meatCenters.map((mc: any) => ({ ...mc, partnerType: "meat", role: "meat_vendor" }))
+      ];
+
+      const ordered = favoriteIds
+        .map(id => combined.find(item => item._id.toString() === id.toString()))
+        .filter(Boolean);
+
+      return res.json(ordered);
     } catch (error) {
       console.error("Get favorites error:", error);
       return res.status(500).json({ message: "Internal server error" });

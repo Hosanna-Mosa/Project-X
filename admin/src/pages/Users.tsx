@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { StatCard } from "@/components/shared/StatCard";
-import { Users as UsersIcon, UserCheck, UserX, Shield, SlidersHorizontal, UserPlus, Eye, Ban, ChevronLeft, ChevronRight, Mail, Trash2, Phone } from "lucide-react";
+import { Users as UsersIcon, UserCheck, UserX, Shield, SlidersHorizontal, UserPlus, Eye, Ban, ChevronLeft, ChevronRight, Mail, Trash2, Phone, Search } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { adminFetch } from "@/lib/api-client";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
@@ -20,6 +20,7 @@ export default function Users() {
   const queryClient = useQueryClient();
   const [currentPage, setCurrentPage] = useState(1);
   const [roleFilter, setRoleFilter] = useState("ALL");
+  const [searchQuery, setSearchQuery] = useState("");
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [isViewOpen, setIsViewOpen] = useState(false);
   const [viewingUser, setViewingUser] = useState<any | null>(null);
@@ -107,7 +108,16 @@ export default function Users() {
   const driverCount = users.filter((u: any) => u.role === "DRIVER").length;
   const adminCount = users.filter((u: any) => u.role === "ADMIN").length;
 
-  const filteredUsers = users.filter((u: any) => {
+  const searchedUsers = users.filter((u: any) => {
+    const query = searchQuery.toLowerCase().trim();
+    if (!query) return true;
+    const name = u.name?.toLowerCase() || "";
+    const email = u.email?.toLowerCase() || "";
+    const phone = u.phone?.toLowerCase() || "";
+    return name.includes(query) || email.includes(query) || phone.includes(query);
+  });
+
+  const filteredUsers = searchedUsers.filter((u: any) => {
     if (roleFilter === "ALL") return true;
     if (roleFilter === "USER") return u.role === "USER";
     if (roleFilter === "DRIVER") return u.role === "DRIVER";
@@ -138,6 +148,19 @@ export default function Users() {
               <p className="text-sm text-muted-foreground mt-0.5">View and manage all registered platform users.</p>
             </div>
             <div className="flex gap-3">
+              <div className="relative w-64">
+                <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+                <Input
+                  type="text"
+                  placeholder="Search users..."
+                  value={searchQuery}
+                  onChange={(e) => {
+                    setSearchQuery(e.target.value);
+                    setCurrentPage(1);
+                  }}
+                  className="pl-9 h-10 rounded-xl bg-muted/30 border-border"
+                />
+              </div>
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <button className="flex items-center gap-2 px-4 py-2.5 border border-border rounded-lg text-sm font-medium text-foreground hover:bg-muted/50">

@@ -13,6 +13,7 @@ import { Feather } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
 import { moderateScale } from "react-native-size-matters";
 import Colors from "@/constants/colors";
+import { typography } from "@/constants/typography";
 import { useAuthStore } from "@/contexts/authStore";
 import { useThemeStore } from "@/contexts/themeStore";
 import { Alert } from "react-native";
@@ -143,13 +144,14 @@ const createStyles = (colors: typeof Colors.light) => StyleSheet.create({
     gap: 8,
   },
   title: {
-    fontSize: moderateScale(22),
-    fontWeight: "800",
+    fontSize: typography.heading1.fontSize,
+    fontWeight: typography.heading1.fontWeight,
     color: colors.text,
     letterSpacing: -0.5,
   },
   subtitle: {
-    fontSize: moderateScale(12),
+    fontSize: typography.bodySecondary.fontSize,
+    fontWeight: typography.bodySecondary.fontWeight,
     color: colors.textSecondary,
     lineHeight: moderateScale(16),
   },
@@ -164,8 +166,8 @@ const createStyles = (colors: typeof Colors.light) => StyleSheet.create({
     borderRadius: moderateScale(10),
     borderWidth: 1.5,
     borderColor: colors.border,
-    fontSize: moderateScale(18),
-    fontWeight: "700",
+    fontSize: typography.sizes.titleSmall,
+    fontWeight: typography.weights.bold,
     color: colors.text,
     backgroundColor: colors.surface,
   },
@@ -193,18 +195,19 @@ const createStyles = (colors: typeof Colors.light) => StyleSheet.create({
   },
   verifyBtnText: {
     color: "#fff",
-    fontSize: moderateScale(15),
-    fontWeight: "700",
+    fontSize: typography.buttonText.fontSize,
+    fontWeight: typography.buttonText.fontWeight,
   },
   resendBtn: {
     alignItems: "center",
   },
   resendText: {
-    fontSize: moderateScale(12),
+    fontSize: typography.bodySecondary.fontSize,
+    fontWeight: typography.bodySecondary.fontWeight,
     color: colors.textSecondary,
   },
   resendLink: {
     color: colors.primary,
-    fontWeight: "600",
+    fontWeight: typography.weights.semibold,
   },
 });

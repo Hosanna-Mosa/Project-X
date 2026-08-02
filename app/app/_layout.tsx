@@ -42,6 +42,87 @@ import { useState } from "react";
 import { GlobalSocketHandler } from "@/components/GlobalSocketHandler";
 import Colors from "@/constants/colors";
 import { useThemeStore } from "@/contexts/themeStore";
+import { typography } from "@/constants/typography";
+import { TextInput } from "react-native";
+
+// --- Global Typography Patch ---
+const patchComponentStyle = (Component: any) => {
+  const originalRender = Component.render;
+  if (!originalRender) return;
+
+  Component.render = function (props: any, ref: any) {
+    if (props && props.style) {
+      const flat = StyleSheet.flatten(props.style);
+      const updated = { ...flat };
+      let changed = false;
+
+      // 1. Intercept Font Size & Weight mapping to Typography
+      if (typeof flat.fontSize === "number") {
+        const size = flat.fontSize;
+        if (size >= 24) {
+          updated.fontSize = typography.heading1.fontSize;
+          if (flat.fontWeight === undefined || flat.fontWeight === "700" || flat.fontWeight === "800" || flat.fontWeight === "900" || flat.fontWeight === "bold") {
+            updated.fontWeight = typography.heading1.fontWeight;
+          }
+          changed = true;
+        } else if (size >= 18) {
+          updated.fontSize = typography.heading2.fontSize;
+          if (flat.fontWeight === undefined || flat.fontWeight === "700" || flat.fontWeight === "800" || flat.fontWeight === "bold") {
+            updated.fontWeight = typography.heading2.fontWeight;
+          }
+          changed = true;
+        } else if (size >= 15) {
+          updated.fontSize = typography.sizes.bodyLarge;
+          changed = true;
+        } else if (size >= 13) {
+          updated.fontSize = typography.body.fontSize;
+          changed = true;
+        } else if (size >= 11) {
+          updated.fontSize = typography.bodySecondary.fontSize;
+          changed = true;
+        } else {
+          updated.fontSize = typography.sizes.caption;
+          changed = true;
+        }
+      }
+
+      // 2. Set Font Family based on Weight to ensure Inter is used everywhere
+      const weight = flat.fontWeight;
+      if (weight === "800" || weight === "900" || weight === "bold" || weight === "700") {
+        updated.fontFamily = "Inter_700Bold";
+        changed = true;
+      } else if (weight === "600") {
+        updated.fontFamily = "Inter_600SemiBold";
+        changed = true;
+      } else if (weight === "500") {
+        updated.fontFamily = "Inter_500Medium";
+        changed = true;
+      } else {
+        updated.fontFamily = "Inter_400Regular";
+        changed = true;
+      }
+
+      if (changed) {
+        props = {
+          ...props,
+          style: updated,
+        };
+      }
+    } else {
+      // Default to regular Inter font if no style is specified
+      props = {
+        ...props,
+        style: { fontFamily: "Inter_400Regular" },
+      };
+    }
+    return originalRender.call(this, props, ref);
+  };
+};
+
+import { StyleSheet } from "react-native";
+patchComponentStyle(Text);
+patchComponentStyle(TextInput);
+// -------------------------------
 
 SplashScreen.preventAutoHideAsync();
 
