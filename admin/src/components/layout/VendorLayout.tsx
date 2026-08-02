@@ -37,8 +37,7 @@ export function VendorLayout({ children, searchPlaceholder }: VendorLayoutProps)
 
   return (
     <div className="flex min-h-screen w-full bg-background">
-      {/* Sidebar */}
-      <aside className="w-[240px] min-h-screen bg-card border-r border-border flex flex-col justify-between shrink-0 sticky top-0">
+      <aside className="w-[240px] h-screen bg-card border-r border-border flex flex-col justify-between shrink-0 sticky top-0 overflow-y-auto">
         <div>
           <div className="px-6 py-8">
             <h1 className="text-xl font-bold text-primary flex items-center gap-2">

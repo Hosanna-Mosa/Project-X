@@ -271,6 +271,15 @@ export default function HomeScreen() {
   const [hasShownStartupAd, setHasShownStartupAd] = useState(false);
   const [activeStartupAd, setActiveStartupAd] = useState<any | null>(null);
 
+  useEffect(() => {
+    if (activeStartupAd) {
+      const timer = setTimeout(() => {
+        setActiveStartupAd(null);
+      }, 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [activeStartupAd]);
+
   const getInitialWord = () => {
     const today = new Date();
     const days = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
@@ -1228,7 +1237,7 @@ export default function HomeScreen() {
           <View style={{ position: 'absolute', top: insets.top + 15, left: 16, right: 16, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }} pointerEvents="box-none">
             <TouchableOpacity onPress={() => router.push("/delivery/saved-addresses")} style={{ flexDirection: 'row', alignItems: 'center' }}>
               <Ionicons name="location" size={18} color="#fff" style={{ marginRight: 6, textShadowColor: 'rgba(0,0,0,0.3)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2 }} />
-              <Text style={{ color: '#fff', fontSize: 16, fontWeight: '700', textShadowColor: 'rgba(0,0,0,0.3)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2 }}>
+              <Text style={{ color: '#fff', fontSize: 13, fontWeight: '700', textShadowColor: 'rgba(0,0,0,0.3)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2 }}>
                 {selectedAddress ? (selectedAddress.label && selectedAddress.label !== "Other" ? selectedAddress.label.toUpperCase() : "ADDRESS") : "ADDRESS"}
               </Text>
             </TouchableOpacity>
@@ -1323,7 +1332,7 @@ export default function HomeScreen() {
         </View>
 
         {/* Service Categories */}
-        <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 16, marginTop: 35 }}>
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingHorizontal: 16, marginTop: 15 }}>
           <ServiceCategoryNew icon="bag-outline" label="TASK" active={false} onPress={() => { console.log(">>> [CLICK] TASK button pressed (main header)"); router.push("/helper-task"); }} />
           <ServiceCategoryNew icon="car-outline" label="RIDES" active={false} onPress={() => { console.log(">>> [CLICK] RIDES button pressed (main header)"); router.push("/all-services"); }} />
           <ServiceCategoryNew icon="fast-food-outline" label="FOOD" active={activeService === 'Food'} onPress={() => { console.log(">>> [CLICK] FOOD button pressed (main header)"); handleServiceSwitch('Food'); }} />
@@ -2059,24 +2068,24 @@ export default function HomeScreen() {
       {activeStartupAd && (
         <Modal visible={hasShownStartupAd && !!activeStartupAd} transparent animationType="fade">
           <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'center', alignItems: 'center', padding: 24 }}>
-            <View style={{ width: '100%', backgroundColor: '#fff', borderRadius: 24, overflow: 'hidden', position: 'relative' }}>
+            <View style={{ width: '90%', maxWidth: 340, backgroundColor: '#fff', borderRadius: 16, overflow: 'hidden', position: 'relative' }}>
               <TouchableOpacity 
-                style={{ position: 'absolute', top: 12, right: 12, zIndex: 10, backgroundColor: 'rgba(255,255,255,0.8)', padding: 6, borderRadius: 16 }}
+                style={{ position: 'absolute', top: 12, right: 12, zIndex: 10, backgroundColor: 'rgba(255,255,255,0.8)', padding: 6, borderRadius: 14 }}
                 onPress={() => setActiveStartupAd(null)}
               >
-                <Feather name="x" size={20} color="#000" />
+                <Feather name="x" size={18} color="#000" />
               </TouchableOpacity>
-              <Image source={{ uri: activeStartupAd.imageUrl }} style={{ width: '100%', height: 300 }} resizeMode="cover" />
-              <View style={{ padding: 20 }}>
-                <Text style={{ fontSize: 20, fontWeight: '800', color: '#111827', marginBottom: 8 }}>{activeStartupAd.title}</Text>
+              <Image source={{ uri: activeStartupAd.imageUrl }} style={{ width: '100%', height: 200 }} resizeMode="cover" />
+              <View style={{ padding: 18 }}>
+                <Text style={{ fontSize: 18, fontWeight: '800', color: '#111827', marginBottom: 6 }}>{activeStartupAd.title}</Text>
                 {activeStartupAd.description && (
-                  <Text style={{ fontSize: 14, color: '#4B5563', lineHeight: 20 }}>{activeStartupAd.description}</Text>
+                  <Text style={{ fontSize: 13, color: '#4B5563', lineHeight: 18 }}>{activeStartupAd.description}</Text>
                 )}
                 <TouchableOpacity 
-                  style={{ backgroundColor: '#7C3AED', paddingVertical: 14, borderRadius: 12, alignItems: 'center', marginTop: 20 }}
+                  style={{ backgroundColor: '#7C3AED', paddingVertical: 12, borderRadius: 10, alignItems: 'center', marginTop: 16 }}
                   onPress={() => setActiveStartupAd(null)}
                 >
-                  <Text style={{ color: '#fff', fontSize: 16, fontWeight: 'bold' }}>Continue to App</Text>
+                  <Text style={{ color: '#fff', fontSize: 14, fontWeight: 'bold' }}>Continue to App</Text>
                 </TouchableOpacity>
               </View>
             </View>

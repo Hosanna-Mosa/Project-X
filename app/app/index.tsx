@@ -17,6 +17,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { moderateScale } from "react-native-size-matters";
 import Colors from "@/constants/colors";
+import { typography } from "@/constants/typography";
 import { useAuthStore } from "@/contexts/authStore";
 import { useThemeStore } from "@/contexts/themeStore";
 
@@ -327,16 +328,16 @@ const createStyles = (colors: typeof Colors.light) => StyleSheet.create({
     alignItems: "center",
   },
   brandTitle: {
-    fontSize: moderateScale(32),
-    fontWeight: "800",
+    fontSize: typography.sizes.titleLarge * 1.3,
+    fontWeight: typography.weights.black,
     color: "#002045",
     letterSpacing: -1,
     marginBottom: 4,
   },
   brandTagline: {
-    fontSize: moderateScale(14),
+    fontSize: typography.body.fontSize,
     color: "#43474e",
-    fontWeight: "500",
+    fontWeight: typography.weights.medium,
   },
   scrollContainer: {
     flexGrow: 1,
@@ -359,14 +360,14 @@ const createStyles = (colors: typeof Colors.light) => StyleSheet.create({
     width: "100%",
   },
   cardTitle: {
-    fontSize: moderateScale(26),
-    fontWeight: "700",
+    fontSize: typography.heading1.fontSize,
+    fontWeight: typography.weights.bold,
     color: "#191c1e",
     textAlign: "center",
     marginBottom: 8,
   },
   cardSubtitle: {
-    fontSize: moderateScale(14),
+    fontSize: typography.body.fontSize,
     color: "#43474e",
     textAlign: "center",
     lineHeight: moderateScale(20),
@@ -395,13 +396,13 @@ const createStyles = (colors: typeof Colors.light) => StyleSheet.create({
     elevation: 2,
   },
   tabText: {
-    fontSize: moderateScale(14),
-    fontWeight: "600",
+    fontSize: typography.body.fontSize,
+    fontWeight: typography.weights.semibold,
     color: "#43474e",
   },
   tabTextActive: {
     color: "#191c1e",
-    fontWeight: "700",
+    fontWeight: typography.weights.bold,
   },
   form: {
     gap: 16,
@@ -415,13 +416,13 @@ const createStyles = (colors: typeof Colors.light) => StyleSheet.create({
     alignItems: "center",
   },
   fieldLabel: {
-    fontSize: moderateScale(12),
-    fontWeight: "600",
+    fontSize: typography.bodySecondary.fontSize,
+    fontWeight: typography.weights.semibold,
     color: "#191c1e",
   },
   forgotText: {
-    fontSize: moderateScale(12),
-    fontWeight: "600",
+    fontSize: typography.bodySecondary.fontSize,
+    fontWeight: typography.weights.semibold,
     color: "#0061a5",
   },
   inputContainer: {
@@ -437,7 +438,7 @@ const createStyles = (colors: typeof Colors.light) => StyleSheet.create({
   },
   input: {
     flex: 1,
-    fontSize: moderateScale(14),
+    fontSize: typography.body.fontSize,
     color: "#191c1e",
     height: "100%",
   },
@@ -461,19 +462,19 @@ const createStyles = (colors: typeof Colors.light) => StyleSheet.create({
   },
   signInBtnText: {
     color: "#002045",
-    fontSize: moderateScale(16),
-    fontWeight: "700",
+    fontSize: typography.buttonText.fontSize,
+    fontWeight: typography.buttonText.fontWeight,
   },
   signUpLinkRow: {
     marginTop: 24,
     alignItems: "center",
   },
   signUpLinkText: {
-    fontSize: moderateScale(14),
+    fontSize: typography.body.fontSize,
     color: "#43474e",
   },
   signUpLinkHighlight: {
     color: "#0061a5",
-    fontWeight: "700",
+    fontWeight: typography.weights.bold,
   },
 });

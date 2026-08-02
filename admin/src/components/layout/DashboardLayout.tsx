@@ -23,7 +23,7 @@ export function DashboardLayout({ children, searchPlaceholder }: DashboardLayout
 
   return (
     <div className="flex min-h-screen w-full bg-background">
-      <div className={`transition-all duration-300 ease-in-out overflow-hidden flex shrink-0 ${isSidebarOpen ? "w-[240px]" : "w-0"}`}>
+      <div className={`transition-all duration-300 ease-in-out overflow-hidden flex shrink-0 sticky top-0 h-screen ${isSidebarOpen ? "w-[240px]" : "w-0"}`}>
         <AppSidebar />
       </div>
       <div className="flex-1 flex flex-col min-w-0">

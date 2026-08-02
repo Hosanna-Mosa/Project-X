@@ -5,7 +5,7 @@ import {
   Truck, Users as UsersIcon, Star, DollarSign, SlidersHorizontal, UserPlus, 
   Eye, Trash2, Ban, Phone, MessageSquare, MapPin, MoreVertical, 
   ChevronLeft, ChevronRight, Navigation, Compass, Calendar, ArrowUpRight, ExternalLink,
-  ShoppingBag, CheckCircle2, XCircle, Wallet, Plus
+  ShoppingBag, CheckCircle2, XCircle, Wallet, Plus, Search
 } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { adminFetch } from "@/lib/api-client";
@@ -124,6 +124,7 @@ export default function Drivers() {
 
   // Tab State
   const [activeTab, setActiveTab] = useState<"fleet" | "zones">("fleet");
+  const [searchQuery, setSearchQuery] = useState("");
 
   // Zone Assignment States
   const [isAssignZoneOpen, setIsAssignZoneOpen] = useState(false);
@@ -435,7 +436,17 @@ export default function Drivers() {
 
   const onlineDrivers = drivers.filter((d: any) => d.status === "ONLINE").length;
 
-  const filteredDrivers = drivers.filter((d: any) => {
+  const searchedDrivers = drivers.filter((d: any) => {
+    const query = searchQuery.toLowerCase().trim();
+    if (!query) return true;
+    const name = d.user?.name?.toLowerCase() || "";
+    const phone = d.user?.phone?.toLowerCase() || "";
+    const email = d.user?.email?.toLowerCase() || "";
+    const vehicleNum = d.vehicleNumber?.toLowerCase() || "";
+    return name.includes(query) || phone.includes(query) || email.includes(query) || vehicleNum.includes(query);
+  });
+
+  const filteredDrivers = searchedDrivers.filter((d: any) => {
     if (statusFilter === "ALL") return true;
     if (statusFilter === "ONLINE") return d.status === "ONLINE";
     if (statusFilter === "OFFLINE") return d.status === "OFFLINE";
@@ -448,7 +459,7 @@ export default function Drivers() {
   const safePage = Math.min(currentPage, totalPages);
   const paginatedDrivers = filteredDrivers.slice((safePage - 1) * itemsPerPage, safePage * itemsPerPage);
 
-  const driverMarkers = drivers.map((d: any) => {
+  const driverMarkers = searchedDrivers.map((d: any) => {
     const lng = d.currentLocation?.coordinates?.[0] || 81.8040;
     const lat = d.currentLocation?.coordinates?.[1] || 17.0005;
     return {
@@ -595,6 +606,19 @@ export default function Drivers() {
                 <p className="text-sm text-muted-foreground mt-0.5">Real-time monitoring and administrative control of all registered drivers.</p>
               </div>
               <div className="flex items-center gap-3">
+                <div className="relative w-64">
+                  <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    type="text"
+                    placeholder="Search drivers..."
+                    value={searchQuery}
+                    onChange={(e) => {
+                      setSearchQuery(e.target.value);
+                      setCurrentPage(1);
+                    }}
+                    className="pl-9 h-10 rounded-xl bg-muted/30 border-border"
+                  />
+                </div>
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <button className="flex items-center gap-2 px-4 py-2 border border-border rounded-xl text-sm font-medium text-foreground hover:bg-muted/50 transition-colors">
@@ -1248,17 +1272,29 @@ export default function Drivers() {
               <h3 className="text-lg font-bold text-foreground">Zone Assignments</h3>
               <p className="text-sm text-muted-foreground mt-0.5">Manage and link drivers to operational regions/zones.</p>
             </div>
-            <button
-              onClick={() => {
-                setSelectedDriverForZone("");
-                setSelectedZoneForDriver("");
-                setIsEditingAssignment(false);
-                setIsAssignZoneOpen(true);
-              }}
-              className="flex items-center gap-2 px-5 py-2.5 bg-primary text-primary-foreground rounded-xl text-sm font-semibold hover:opacity-90 transition-opacity"
-            >
-              <Plus className="h-4 w-4" /> Assign Zone to Driver
-            </button>
+            <div className="flex items-center gap-3">
+              <div className="relative w-64">
+                <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+                <Input
+                  type="text"
+                  placeholder="Search drivers..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-9 h-10 rounded-xl bg-muted/30 border-border"
+                />
+              </div>
+              <button
+                onClick={() => {
+                  setSelectedDriverForZone("");
+                  setSelectedZoneForDriver("");
+                  setIsEditingAssignment(false);
+                  setIsAssignZoneOpen(true);
+                }}
+                className="flex items-center gap-2 px-5 py-2.5 bg-primary text-primary-foreground rounded-xl text-sm font-semibold hover:opacity-90 transition-opacity"
+              >
+                <Plus className="h-4 w-4" /> Assign Zone to Driver
+              </button>
+            </div>
           </div>
 
           <div className="overflow-x-auto">
@@ -1273,7 +1309,12 @@ export default function Drivers() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
-                {drivers.map((d: any) => {
+                {searchedDrivers.length === 0 ? (
+                  <tr>
+                    <td colSpan={5} className="px-6 py-12 text-center text-muted-foreground text-sm">No drivers found matching the search query.</td>
+                  </tr>
+                ) : (
+                  searchedDrivers.map((d: any) => {
                   const assignedZoneId = d.preferredZone?._id || d.preferredZone;
                   const zoneObj = zonesList.find((z: any) => z._id === assignedZoneId);
                   
@@ -1342,8 +1383,9 @@ export default function Drivers() {
                       </td>
                     </tr>
                   );
-                })}
-              </tbody>
+                })
+              )}
+            </tbody>
             </table>
           </div>
         </div>

@@ -57,9 +57,8 @@ export function AppSidebar() {
     localStorage.removeItem("support_data");
     navigate("/vendor-login");
   };
-
   return (
-    <aside className="w-[240px] min-h-screen bg-card border-r border-border flex flex-col justify-between shrink-0">
+    <aside className="w-[240px] h-screen bg-card border-r border-border flex flex-col justify-between shrink-0 sticky top-0 overflow-y-auto">
       <div>
         <div className="px-6 py-6">
           <h1 className="text-xl font-extrabold text-[#00665c] tracking-wide">FLAVOUR</h1>
