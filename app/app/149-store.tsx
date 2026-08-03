@@ -97,7 +97,7 @@ export default function Store149Screen() {
             {/* Top Bar Navigation */}
             <View style={styles.topNav}>
               <TouchableOpacity style={styles.navButton} onPress={() => router.back()}>
-                <Ionicons name="arrow-back" size={moderateScale(24)} color="#1F2937" />
+                <Ionicons name="arrow-back" size={moderateScale(24)} color="#FFFFFF" />
               </TouchableOpacity>
             </View>
 
@@ -116,33 +116,33 @@ export default function Store149Screen() {
             <View style={styles.bannerDesignContainer}>
 
               {/* Multiple Pulsing Rings */}
-              <Animated.View style={[styles.glowRing, pulsingStyle, { width: 220, height: 220, borderRadius: 110, backgroundColor: 'rgba(253, 224, 71, 0.4)' }]} />
-              <Animated.View style={[styles.glowRing, pulsingStyle, { width: 160, height: 160, borderRadius: 80, backgroundColor: 'rgba(245, 158, 11, 0.6)' }]} />
+              <Animated.View style={[styles.glowRing, pulsingStyle, { width: 220, height: 220, borderRadius: 110, backgroundColor: 'rgba(237, 233, 254, 0.3)' }]} />
+              <Animated.View style={[styles.glowRing, pulsingStyle, { width: 160, height: 160, borderRadius: 80, backgroundColor: 'rgba(167, 139, 250, 0.4)' }]} />
 
               {/* Particle System (Food Icons and Stars) */}
               <Animated.View style={[styles.floatingElement, { top: -10, left: 30 }, getFloatStyle(floatAnim2, 20), getRotateStyle(rotateAnimFast)]}>
-                <Ionicons name="fast-food" size={moderateScale(32)} color="#FDE047" />
+                <Ionicons name="fast-food" size={moderateScale(32)} color="#C4B5FD" />
               </Animated.View>
               <Animated.View style={[styles.floatingElement, { bottom: 15, left: 15 }, getFloatStyle(floatAnim3, 15), getRotateStyle(rotateAnim)]}>
-                <Ionicons name="pizza" size={moderateScale(38)} color="#F59E0B" />
+                <Ionicons name="pizza" size={moderateScale(38)} color="#A78BFA" />
               </Animated.View>
               <Animated.View style={[styles.floatingElement, { top: 15, right: 30 }, getFloatStyle(floatAnim2, 25), getRotateStyle(rotateAnim, true)]}>
-                <Ionicons name="restaurant" size={moderateScale(28)} color="#FDE047" />
+                <Ionicons name="restaurant" size={moderateScale(28)} color="#C4B5FD" />
               </Animated.View>
               <Animated.View style={[styles.floatingElement, { bottom: 25, right: 15 }, getFloatStyle(floatAnim3, 20), getRotateStyle(rotateAnimFast, true)]}>
-                <Ionicons name="ice-cream" size={moderateScale(36)} color="#F59E0B" />
+                <Ionicons name="ice-cream" size={moderateScale(36)} color="#A78BFA" />
               </Animated.View>
 
               <Animated.View style={[styles.floatingElement, { top: 50, left: -5 }, getFloatStyle(floatAnim, 10)]}>
-                <Ionicons name="star" size={moderateScale(20)} color="#FEF08A" />
+                <Ionicons name="star" size={moderateScale(20)} color="#FFFFFF" />
               </Animated.View>
               <Animated.View style={[styles.floatingElement, { top: 65, right: -5 }, getFloatStyle(floatAnim, 15)]}>
-                <Ionicons name="sparkles" size={moderateScale(24)} color="#FEF08A" />
+                <Ionicons name="sparkles" size={moderateScale(24)} color="#FFFFFF" />
               </Animated.View>
 
               {/* Center 3D-like Badge */}
               <Animated.View style={[styles.centerBadgeContainer, getFloatStyle(floatAnim, 12)]}>
-                <LinearGradient colors={['#FEF08A', '#F59E0B', '#D97706']} style={styles.centerBadge} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}>
+                <LinearGradient colors={['#F5F3FF', '#C4B5FD', '#A78BFA']} style={styles.centerBadge} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}>
                   <View style={styles.centerBadgeInner}>
                     <Text style={styles.badgeTextTop}>CRAVING?</Text>
                     <Text style={styles.badgeTextMain}>₹149</Text>
@@ -417,14 +417,14 @@ const styles = StyleSheet.create({
   },
   logoBadge: {
     borderWidth: 2,
-    borderColor: '#FFD700',
+    borderColor: '#FFFFFF',
     borderRadius: moderateScale(12),
     paddingHorizontal: 12,
     paddingVertical: 4,
     marginRight: 8,
   },
   logoBadgeText: {
-    color: '#FFD700',
+    color: '#FFFFFF',
     fontSize: moderateScale(24),
     fontWeight: '900',
   },
@@ -463,7 +463,7 @@ const styles = StyleSheet.create({
   floatingElement: {
     position: 'absolute',
     zIndex: 10,
-    shadowColor: '#F59E0B',
+    shadowColor: '#A78BFA',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.5,
     shadowRadius: 8,
@@ -489,11 +489,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 2,
-    borderColor: '#FEF08A',
+    borderColor: '#FFFFFF',
     borderStyle: 'dashed',
   },
   badgeTextTop: {
-    color: '#FEF08A',
+    color: '#C4B5FD',
     fontSize: moderateScale(12),
     fontWeight: '800',
     letterSpacing: 1.5,
@@ -508,7 +508,7 @@ const styles = StyleSheet.create({
     textShadowRadius: 5,
   },
   badgeTextBottom: {
-    color: '#FEF08A',
+    color: '#C4B5FD',
     fontSize: moderateScale(14),
     fontWeight: '800',
     letterSpacing: 1,
@@ -554,7 +554,7 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   selectButtonText: {
-    color: '#2563EB',
+    color: '#7E3AF2',
     fontSize: moderateScale(10),
     fontWeight: '700',
   },
