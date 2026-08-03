@@ -992,7 +992,7 @@ export default function HomeScreen() {
     return Array.from(cuisinesSet).slice(0, 20);
   }, [restaurants, meatCenters, activeService]);
 
-  const showCategories = !hasNoLocation && (showHomeSkeleton || loadingDrivers || (nearbyDriversCount ?? 0) > 0);
+  const showCategories = !hasNoLocation && (showHomeSkeleton || loadingDrivers || visibleItems.length > 0 || (nearbyDriversCount ?? 0) > 0);
 
 
 
