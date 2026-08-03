@@ -271,14 +271,7 @@ export default function HomeScreen() {
   const [hasShownStartupAd, setHasShownStartupAd] = useState(false);
   const [activeStartupAd, setActiveStartupAd] = useState<any | null>(null);
 
-  useEffect(() => {
-    if (activeStartupAd) {
-      const timer = setTimeout(() => {
-        setActiveStartupAd(null);
-      }, 3000);
-      return () => clearTimeout(timer);
-    }
-  }, [activeStartupAd]);
+  // Removed auto-close timer for activeStartupAd so it holds until closed by user
 
   const getInitialWord = () => {
     const today = new Date();
@@ -1063,8 +1056,8 @@ export default function HomeScreen() {
           <Text style={{ fontSize: 13, fontWeight: '700', color: '#111827' }} numberOfLines={1}>{item.name}</Text>
           <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4 }}>
             <Text style={{ fontSize: 11, color: '#9CA3AF', textDecorationLine: 'line-through' }}>₹{item.originalPrice || item.price + 50}</Text>
-            <View style={{ backgroundColor: '#FEF08A', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, marginLeft: 6 }}>
-              <Text style={{ fontSize: 11, fontWeight: '800', color: '#B45309' }}>₹{item.price}</Text>
+            <View style={{ backgroundColor: '#F3E8FF', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, marginLeft: 6 }}>
+              <Text style={{ fontSize: 11, fontWeight: '800', color: '#7C3AED' }}>₹{item.price}</Text>
             </View>
           </View>
           <Text style={{ fontSize: 11, color: '#6B7280', marginTop: 4 }} numberOfLines={1}>{item.brand || "Minerva Coffee Shop"}</Text>
@@ -1400,28 +1393,28 @@ export default function HomeScreen() {
             ) : null}
 
             {/* 149 Store */}
-            {store149Items.length > 0 && (
+            {activeService === 'Food' && store149Items.length > 0 && (
               <View style={{ margin: 16, backgroundColor: '#F5F3FF', borderRadius: 24, padding: 16 }}>
                 <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
                   <View>
                     <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                      <View style={{ backgroundColor: '#000000', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4 }}>
-                        <Text style={{ color: '#D4AF37', fontWeight: '600', fontFamily: 'Inter_600SemiBold', fontSize: 16 }}>149</Text>
+                      <View style={{ backgroundColor: '#7C3AED', borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4 }}>
+                        <Text style={{ color: '#FFFFFF', fontWeight: 'bold', fontFamily: 'Inter_600SemiBold', fontSize: 16 }}>149</Text>
                       </View>
-                      <Text style={{ fontSize: 20, fontWeight: '600', fontFamily: 'Inter_600SemiBold', marginLeft: 8, color: '#D4AF37' }}>store</Text>
+                      <Text style={{ fontSize: 20, fontWeight: '800', fontFamily: 'Inter_600SemiBold', marginLeft: 8, color: '#7C3AED' }}>store</Text>
                     </View>
                     <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4 }}>
-                      <Ionicons name="checkmark-circle" size={14} color="#D4AF37" />
+                      <Ionicons name="checkmark-circle" size={14} color="#7C3AED" />
                       <Text style={{ fontSize: 12, marginLeft: 4, fontWeight: '600' }}>
                         <Text style={{ color: '#111827' }}>Meals at </Text>
-                        <Text style={{ color: '#D4AF37' }}>₹149 </Text>
-                        <Text style={{ color: '#D4AF37' }}>+ Free Delivery</Text>
+                        <Text style={{ color: '#7C3AED', fontWeight: '700' }}>₹149 </Text>
+                        <Text style={{ color: '#7C3AED', fontWeight: '700' }}>+ Free Delivery</Text>
                       </Text>
                     </View>
                   </View>
                   <TouchableOpacity style={{ flexDirection: 'row', alignItems: 'center' }} onPress={() => router.push("/149-store")}>
-                    <Text style={{ color: '#D4AF37', fontSize: 14, fontWeight: '700' }}>View All</Text>
-                    <Ionicons name="chevron-forward" size={14} color="#D4AF37" />
+                    <Text style={{ color: '#7C3AED', fontSize: 14, fontWeight: '700' }}>View All</Text>
+                    <Ionicons name="chevron-forward" size={14} color="#7C3AED" />
                   </TouchableOpacity>
                 </View>
 
