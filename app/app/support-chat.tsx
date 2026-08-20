@@ -15,7 +15,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
-import { router } from "expo-router";
+import { router, useLocalSearchParams } from "expo-router";
 import { moderateScale } from "react-native-size-matters";
 import { designTokens, type ThemeTokens } from "@/constants/colors";
 import { fontFamilies } from "@/constants/typography";
@@ -66,6 +66,7 @@ function formatDate(iso: string): string {
 
 export default function SupportChatScreen() {
   const insets = useSafeAreaInsets();
+  const params = useLocalSearchParams<{ ticketId?: string }>();
   const { theme } = useThemeStore();
   const tokens = designTokens[theme];
   const accent = tokens.services.food;
@@ -92,6 +93,18 @@ export default function SupportChatScreen() {
     try {
       const tickets = await customFetch<SupportTicket[]>("/api/v1/support/tickets");
       setAllTickets(tickets || []);
+
+      // Opened via a deep link (notification tap) with a specific ticket in mind — jump
+      // straight into that conversation instead of the cases list.
+      if (params.ticketId) {
+        const target = (tickets || []).find((t) => t._id === params.ticketId);
+        if (target) {
+          setTicket(target);
+          setViewMode("chat");
+          return;
+        }
+      }
+
       const currentActive = ticketRef.current;
       if (currentActive) {
         const activeT = (tickets || []).find((t) => t._id === currentActive._id);

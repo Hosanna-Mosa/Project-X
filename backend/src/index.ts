@@ -57,6 +57,46 @@ connectDB().then(async () => {
     res.json({ message: "Multi-Service Logistics Platform Backend API" });
   });
 
+  // Universal/App Links verification files — let a plain https:// link (shared via
+  // WhatsApp/SMS/etc.) open the customer app directly instead of a browser, on whichever
+  // domain app/app.config.js's associatedDomains/intentFilters point at.
+  //
+  // Both files below need one real, account-specific value filled in before this actually
+  // works — nothing in this repo can generate them, they come from your own developer
+  // accounts. Until then this is safe to leave as-is: links will just always open the web
+  // fallback page instead of the app, matching current behavior.
+  app.get("/.well-known/apple-app-site-association", (req, res) => {
+    // APPLE_TEAM_ID: Apple Developer account → Membership → Team ID.
+    const teamId = process.env.APPLE_TEAM_ID || "TEAMID";
+    res.type("application/json").json({
+      applinks: {
+        apps: [],
+        details: [
+          {
+            appID: `${teamId}.com.flavour.customer`,
+            paths: ["/restaurant-menu/*", "/restaurant-menu"],
+          },
+        ],
+      },
+    });
+  });
+
+  app.get("/.well-known/assetlinks.json", (req, res) => {
+    // ANDROID_SHA256_FINGERPRINT: your release-signing certificate's SHA256 fingerprint,
+    // from `cd app && eas credentials` (Android → your build profile → view credentials).
+    const fingerprint = process.env.ANDROID_SHA256_FINGERPRINT || "AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA:AA";
+    res.type("application/json").json([
+      {
+        relation: ["delegate_permission/common.handle_all_urls"],
+        target: {
+          namespace: "android_app",
+          package_name: "com.flavour.customer",
+          sha256_cert_fingerprints: [fingerprint],
+        },
+      },
+    ]);
+  });
+
   // API Routes
   // API Routes v1
   app.use("/api/v1/auth", authRoutes);

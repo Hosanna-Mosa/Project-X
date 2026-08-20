@@ -461,6 +461,42 @@ export class SocketManager {
 
         this.io.to(data.orderId).emit("receive_message", payload);
         console.log(`[CHAT][EMIT] order=${data.orderId} from=${from} id=${payload.id} recipients=${this.getRoomSize(data.orderId)}`);
+
+        // Push-notify the other party so an out-of-app message isn't missed (fire-and-forget).
+        (async () => {
+          try {
+            const orderDoc = await Order.findOne(mongoose.Types.ObjectId.isValid(data.orderId) ? { _id: data.orderId } : { _id: null });
+            if (!orderDoc) return;
+
+            let recipientUserId: string | undefined;
+            let recipientDeepLink: { screen: string; params?: Record<string, string> };
+            if (from === "driver") {
+              recipientUserId = orderDoc.user?.toString();
+              recipientDeepLink = { screen: "/chat", params: { orderId: data.orderId } };
+            } else {
+              if (orderDoc.driver) {
+                const drv = await Driver.findById(orderDoc.driver);
+                recipientUserId = drv?.user?.toString();
+              }
+              recipientDeepLink = { screen: "/chat", params: { orderId: data.orderId } };
+            }
+
+            // Don't notify the sender, and skip if we couldn't resolve a recipient.
+            if (!recipientUserId || recipientUserId === authUser?.userId) return;
+
+            const { NotificationService } = require("../services/notification.service");
+            await NotificationService.getInstance().sendNotification({
+              userId: recipientUserId,
+              title: "New message 💬",
+              body: data.text?.length > 120 ? `${data.text.slice(0, 117)}...` : data.text,
+              type: "transactional",
+              category: "chat",
+              data: { orderId: data.orderId, deepLink: recipientDeepLink },
+            });
+          } catch (err) {
+            console.error("[CHAT] Failed to send chat push notification:", err);
+          }
+        })();
       });
 
       socket.on("disconnect", async () => {

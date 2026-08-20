@@ -14,6 +14,7 @@ import Zone from "../../database/models/Zone";
 import { ValidationError } from "../../utils/errors";
 import { NotificationService } from "../../services/notification.service";
 import { InvoiceService } from "../../services/invoice.service";
+import ChatMessage from "../../database/models/ChatMessage";
 
 export class OrdersService {
   private routingService = new RoutingService();
@@ -205,6 +206,23 @@ export class OrdersService {
         if (vendorObj) {
           vendorName = vendorObj.name;
           vendorPhone = vendorObj.phone;
+
+          // Alert the vendor's dashboard (web push + in-app history) of the new order.
+          // Vendors aren't mobile-app users, so this only reaches them via Phase 4's web push —
+          // sendNotification() is id-agnostic and already checks the Vendor collection too.
+          NotificationService.getInstance()
+            .sendNotification({
+              userId: vendorObj._id.toString(),
+              title: "New order received 🛎️",
+              body: `A new ${effectiveType.toLowerCase()} order just came in. Tap to view details.`,
+              type: "transactional",
+              category: "order_status",
+              data: {
+                orderId: savedOrder._id,
+                deepLink: { app: "admin", screen: "/vendor/dashboard" },
+              },
+            })
+            .catch((err) => console.error("[orders.service] Failed to send vendor new-order notification:", err));
         }
       } catch (err) {
         console.error("Error fetching vendor for order broadcast:", err);
@@ -617,6 +635,24 @@ export class OrdersService {
     return order;
   }
 
+  /**
+   * Fetch chat history for an order, restricted to that order's customer or assigned driver
+   * (used to hydrate the chat screen when opened via a deep link, not just live socket messages).
+   */
+  async getChatHistory(orderId: string, requestingUserId: string) {
+    const order = await Order.findOne(this.getOrderQuery(orderId)).populate({
+      path: "driver",
+      populate: { path: "user" },
+    });
+    if (!order) throw new Error("Order not found");
+
+    const driverUserId = (order.driver as any)?.user?._id?.toString();
+    const isParty = order.user?.toString() === requestingUserId || driverUserId === requestingUserId;
+    if (!isParty) throw new Error("Unauthorized to view this chat");
+
+    return ChatMessage.find({ orderId: order._id.toString() }).sort({ createdAt: 1 });
+  }
+
   async increaseOrderPrice(orderId: string, amount: number, userId: string) {
     const order = await Order.findOne(this.getOrderQuery(orderId));
     if (!order) throw new Error("Order not found");
@@ -710,12 +746,16 @@ export class OrdersService {
 
           const notificationService = NotificationService.getInstance();
           for (const d of driversToNotify) {
-            if (d.user && (d.user as any).fcmToken) {
+            if (d.user && (d.user as any).expoPushToken) {
               await notificationService.sendPushNotification(
-                (d.user as any).fcmToken,
+                (d.user as any).expoPushToken,
                 "Task Price Increased! 💰",
                 `Customer added a tip! New task price: ₹${newPrice}`,
-                { type: "new_order", orderId: order._id.toString() }
+                {
+                  type: "new_order",
+                  orderId: order._id.toString(),
+                  deepLink: { screen: "/(tabs)", params: { orderId: order._id.toString() } },
+                }
               );
             }
           }
@@ -841,6 +881,7 @@ export class OrdersService {
               orderId: populated._id,
               status: status,
               serviceType: populated.serviceType,
+              deepLink: { screen: "/tracking", params: { orderId: populated._id.toString() } },
             }
           });
         }
@@ -1024,6 +1065,7 @@ export class OrdersService {
             orderId: populated._id,
             status: OrderStatus.DRIVER_ASSIGNED,
             serviceType: populated.serviceType,
+            deepLink: { screen: "/tracking", params: { orderId: populated._id.toString() } },
           }
         });
       } catch (err) {
@@ -1096,6 +1138,7 @@ export class OrdersService {
             type: "sos",
             passengerName,
             driverName,
+            deepLink: { app: "admin", screen: `/support/chats/${supportTicket._id.toString()}` },
           }
         });
       } catch (err) {
@@ -1104,7 +1147,8 @@ export class OrdersService {
     }
 
     // 4. Also notify driver if passenger triggers, or passenger if driver triggers
-    const receiverUserId = userId === passengerUser?._id.toString() ? driverUser?._id?.toString() : passengerUser?._id?.toString();
+    const triggeredByPassenger = userId === passengerUser?._id.toString();
+    const receiverUserId = triggeredByPassenger ? driverUser?._id?.toString() : passengerUser?._id?.toString();
     if (receiverUserId) {
       try {
         await notificationService.sendNotification({
@@ -1113,7 +1157,14 @@ export class OrdersService {
           body: "SOS has been triggered for this trip. Emergency contacts and authorities are being notified.",
           type: "alert",
           category: "system",
-          data: { orderId, type: "sos" }
+          data: {
+            orderId,
+            type: "sos",
+            // Receiver is the driver when the passenger triggered SOS, and vice versa.
+            deepLink: triggeredByPassenger
+              ? { screen: "/active-order", params: { orderId: orderId.toString() } }
+              : { screen: "/tracking", params: { orderId: orderId.toString() } },
+          }
         });
       } catch (err) {
         console.error(`[orders.service] SOS peer alert failed:`, err);

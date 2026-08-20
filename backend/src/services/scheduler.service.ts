@@ -92,6 +92,10 @@ export class SchedulerService {
               data: {
                 orderId: order._id,
                 type: "abandoned_booking",
+                // Note: no screen shows a single stale pending order by ID — ride-searching.tsx
+                // needs a fresh serviceId/rideId to (re)start a search, not an orderId. Send them
+                // home to start over instead of a route that would silently ignore the param.
+                deepLink: { screen: "/(tabs)" },
               },
             });
             nudgeCount++;
@@ -166,6 +170,7 @@ export class SchedulerService {
             category: "commute_alert",
             data: {
               type: "commute_promo",
+              deepLink: { screen: "/(tabs)" },
             },
           });
           count++;

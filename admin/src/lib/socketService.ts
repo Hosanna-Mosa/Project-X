@@ -19,7 +19,10 @@ class SocketService {
   public connect() {
     if (this.socket) return;
 
-    const token = localStorage.getItem("admin_token") || localStorage.getItem("vendor_token");
+    const token =
+      localStorage.getItem("admin_token") ||
+      localStorage.getItem("vendor_token") ||
+      localStorage.getItem("support_token");
     console.log(`[Vendor Socket] Connecting to ${SOCKET_URL}/ws/v1/socket.io`);
 
     this.socket = io(SOCKET_URL, {

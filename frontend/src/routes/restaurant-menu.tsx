@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useParams, Link } from "react-router-dom";
+import { useParams, useSearchParams, Link } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 
 interface Restaurant {
@@ -14,6 +14,7 @@ interface Restaurant {
 }
 
 interface MenuItem {
+  _id: string;
   name: string;
   price: number;
   description: string;
@@ -28,6 +29,8 @@ function Icon({ name, className = "" }: { name: string; className?: string }) {
 
 export default function RestaurantMenuFront() {
   const { id } = useParams<{ id: string }>();
+  const [searchParams] = useSearchParams();
+  const highlightedItemId = searchParams.get("item");
   const [restaurant, setRestaurant] = useState<Restaurant | null>(null);
   const [menu, setMenu] = useState<MenuItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -61,6 +64,13 @@ export default function RestaurantMenuFront() {
       fetchRestaurantData();
     }
   }, [id, API_BASE_URL]);
+
+  // Shared via a "share this dish" link — scroll straight to it once the menu has loaded.
+  useEffect(() => {
+    if (loading || !highlightedItemId) return;
+    const el = document.getElementById(`menu-item-${highlightedItemId}`);
+    el?.scrollIntoView({ behavior: "smooth", block: "center" });
+  }, [loading, highlightedItemId]);
 
   if (loading) {
     return (
@@ -382,12 +392,15 @@ export default function RestaurantMenuFront() {
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-5">
                     {items.map((item, idx) => (
                       <motion.div
+                        id={`menu-item-${item._id}`}
                         initial={{ opacity: 0, scale: 0.95 }}
                         whileInView={{ opacity: 1, scale: 1 }}
                         viewport={{ once: true }}
                         transition={{ delay: idx * 0.05, duration: 0.3 }}
-                        key={idx}
-                        className="bg-white border-2 border-transparent hover:border-slate-100 rounded-[1.5rem] p-3 md:p-4 flex justify-between gap-3 md:gap-4 shadow-[0_2px_10px_-3px_rgba(6,81,237,0.1)] hover:shadow-[0_8px_30px_-4px_rgba(6,81,237,0.15)] transition-all duration-300 group"
+                        key={item._id || idx}
+                        className={`bg-white border-2 rounded-[1.5rem] p-3 md:p-4 flex justify-between gap-3 md:gap-4 shadow-[0_2px_10px_-3px_rgba(6,81,237,0.1)] hover:shadow-[0_8px_30px_-4px_rgba(6,81,237,0.15)] transition-all duration-300 group ${
+                          item._id === highlightedItemId ? "border-[#0651ED] ring-4 ring-[#0651ED]/15" : "border-transparent hover:border-slate-100"
+                        }`}
                       >
                         <div className="space-y-1.5 flex-1 py-1 flex flex-col justify-between">
                           <div>

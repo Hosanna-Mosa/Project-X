@@ -1,16 +1,16 @@
 import { ReactNode } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { 
-  LayoutDashboard, 
-  UtensilsCrossed, 
-  Settings, 
+import {
+  LayoutDashboard,
+  UtensilsCrossed,
+  Settings,
   LogOut,
-  Bell,
   Search,
   Drumstick,
   CalendarClock
 } from "lucide-react";
 import { TopBar } from "./TopBar";
+import { NotificationBell } from "./NotificationBell";
 
 interface VendorLayoutProps {
   children: ReactNode;
@@ -121,10 +121,7 @@ export function VendorLayout({ children, searchPlaceholder }: VendorLayoutProps)
           </div>
           
           <div className="flex items-center gap-4">
-            <button className="h-10 w-10 flex items-center justify-center rounded-xl bg-muted/50 hover:bg-muted transition-colors relative">
-              <Bell className="h-5 w-5 text-foreground" />
-              <span className="absolute top-2.5 right-2.5 h-2 w-2 bg-destructive rounded-full border-2 border-card" />
-            </button>
+            <NotificationBell />
             <div className="h-8 w-px bg-border mx-2" />
             <div className="flex items-center gap-3">
               <p className="text-sm font-medium text-foreground hidden md:block">Active Shop</p>

@@ -1,5 +1,6 @@
 import mongoose, { Schema, Document, Types } from "mongoose";
 import bcrypt from "bcryptjs";
+import { webPushSubscriptionSchema, IWebPushSubscription } from "./WebPushSubscription";
 
 export enum UserRole {
   USER = "USER",
@@ -47,6 +48,7 @@ export interface IUser extends Document, IUserMethods {
   favorites?: Types.ObjectId[];
   isBlocked?: boolean;
   expoPushToken?: string;
+  webPushSubscriptions?: IWebPushSubscription[];
   createdAt: Date;
   updatedAt: Date;
 }
@@ -60,6 +62,7 @@ const UserSchema: Schema = new Schema(
     profilePic: { type: String },
     isBlocked: { type: Boolean, default: false },
     expoPushToken: { type: String },
+    webPushSubscriptions: [webPushSubscriptionSchema],
     role: {
       type: String,
       enum: Object.values(UserRole),

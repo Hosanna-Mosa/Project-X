@@ -2,6 +2,10 @@ import { Response } from "express";
 import { AuthRequest } from "../../middleware/auth.middleware";
 import { NotificationService } from "../../services/notification.service";
 import { SchedulerService } from "../../services/scheduler.service";
+import User from "../../database/models/User";
+import Vendor from "../../database/models/Vendor";
+
+const VENDOR_ROLES = ["restaurant_vendor", "meat_vendor"];
 
 export class NotificationsController {
   private notificationService = NotificationService.getInstance();
@@ -128,6 +132,60 @@ export class NotificationsController {
       return res.json({ success: true, message: `Dispatched ${count} abandoned cart nudges.` });
     } catch (error: any) {
       console.error("[NotificationsController] checkAbandoned failed:", error);
+      return res.status(500).json({ message: "Internal server error" });
+    }
+  }
+
+  /**
+   * POST /api/v1/notifications/web-push/subscribe
+   * Registers a browser push subscription against whichever collection the caller's JWT
+   * resolves to — Vendor for vendor logins, User for everyone else (admin/support in practice).
+   */
+  async webPushSubscribe(req: AuthRequest, res: Response) {
+    try {
+      const id = req.user?.userId;
+      const { subscription } = req.body;
+      if (!id) return res.status(401).json({ message: "Unauthorized" });
+      if (!subscription?.endpoint || !subscription?.keys?.p256dh || !subscription?.keys?.auth) {
+        return res.status(400).json({ message: "A valid push subscription is required" });
+      }
+
+      // Typed as `Model<any>` — TS can't merge User's and Vendor's overloaded
+      // findByIdAndUpdate signatures into one callable union.
+      const Model: import("mongoose").Model<any> = VENDOR_ROLES.includes(req.user?.role as string) ? Vendor : User;
+      await Model.findByIdAndUpdate(id, {
+        $addToSet: {
+          webPushSubscriptions: {
+            endpoint: subscription.endpoint,
+            keys: { p256dh: subscription.keys.p256dh, auth: subscription.keys.auth },
+          },
+        },
+      });
+
+      return res.json({ message: "Subscribed to web push" });
+    } catch (error: any) {
+      console.error("[NotificationsController] webPushSubscribe failed:", error);
+      return res.status(500).json({ message: "Internal server error" });
+    }
+  }
+
+  /**
+   * POST /api/v1/notifications/web-push/unsubscribe
+   * Removes a single subscription (e.g. the browser revoked permission) by endpoint.
+   */
+  async webPushUnsubscribe(req: AuthRequest, res: Response) {
+    try {
+      const id = req.user?.userId;
+      const { endpoint } = req.body;
+      if (!id) return res.status(401).json({ message: "Unauthorized" });
+      if (!endpoint) return res.status(400).json({ message: "endpoint is required" });
+
+      const Model: import("mongoose").Model<any> = VENDOR_ROLES.includes(req.user?.role as string) ? Vendor : User;
+      await Model.findByIdAndUpdate(id, { $pull: { webPushSubscriptions: { endpoint } } });
+
+      return res.json({ message: "Unsubscribed from web push" });
+    } catch (error: any) {
+      console.error("[NotificationsController] webPushUnsubscribe failed:", error);
       return res.status(500).json({ message: "Internal server error" });
     }
   }

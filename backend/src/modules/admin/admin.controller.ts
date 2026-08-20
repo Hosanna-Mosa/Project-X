@@ -1,6 +1,6 @@
 import { Request, Response } from "express";
 import Order, { OrderStatus } from "../../database/models/Order";
-import Driver, { DriverStatus } from "../../database/models/Driver";
+import Driver, { DriverStatus, OnboardingStatus } from "../../database/models/Driver";
 import User from "../../database/models/User";
 import SupportTicket from "../../database/models/SupportTicket";
 import Coupon from "../../database/models/Coupon";
@@ -10,6 +10,7 @@ import AppVersion from "../../database/models/AppVersion";
 import Zone from "../../database/models/Zone";
 import Banner from "../../database/models/Banner";
 import { SocketManager } from "../../sockets/socket.manager";
+import { NotificationService } from "../../services/notification.service";
 
 export class AdminController {
   async getAllOrders(req: Request, res: Response) {
@@ -274,6 +275,8 @@ export class AdminController {
       const driver = await Driver.findById(id);
       if (!driver) return res.status(404).json({ message: "Driver not found" });
 
+      const previousOnboardingStatus = driver.onboardingStatus;
+
       if (status !== undefined) driver.status = status;
       if (isAvailable !== undefined) driver.isAvailable = isAvailable;
       if (vehicleType !== undefined) driver.vehicleType = vehicleType;
@@ -288,11 +291,61 @@ export class AdminController {
         driver.preferredZones = (preferredZones || []).slice(0, 2);
       }
 
+      let previousIsBlocked: boolean | undefined;
       if (isBlocked !== undefined && driver.user) {
+        const existingUser = await User.findById(driver.user).select("isBlocked");
+        previousIsBlocked = existingUser?.isBlocked;
         await User.findByIdAndUpdate(driver.user, { isBlocked });
       }
 
       await driver.save();
+
+      // Notify the driver of status changes that affect their ability to work (fire-and-forget).
+      if (driver.user) {
+        const notificationService = NotificationService.getInstance();
+
+        if (onboardingStatus === OnboardingStatus.COMPLETED && previousOnboardingStatus !== OnboardingStatus.COMPLETED) {
+          notificationService
+            .sendNotification({
+              userId: driver.user.toString(),
+              title: "You're approved to drive! 🎉",
+              body: "Your onboarding has been verified. You can now go online and start accepting jobs.",
+              type: "transactional",
+              category: "system",
+              data: { deepLink: { screen: "/(tabs)" } },
+            })
+            .catch((err) => console.error("[admin.controller] Failed to send onboarding-approved notification:", err));
+        }
+
+        if (onboardingStatus === OnboardingStatus.REJECTED && previousOnboardingStatus !== OnboardingStatus.REJECTED) {
+          notificationService
+            .sendNotification({
+              userId: driver.user.toString(),
+              title: "Onboarding not approved",
+              body: "We couldn't verify your documents. Please review your submission and try again, or contact support.",
+              type: "alert",
+              category: "system",
+              data: { deepLink: { screen: "/onboarding" } },
+            })
+            .catch((err) => console.error("[admin.controller] Failed to send onboarding-rejected notification:", err));
+        }
+
+        if (isBlocked !== undefined && previousIsBlocked !== undefined && isBlocked !== previousIsBlocked) {
+          notificationService
+            .sendNotification({
+              userId: driver.user.toString(),
+              title: isBlocked ? "Account suspended" : "Account reactivated",
+              body: isBlocked
+                ? "Your driver account has been suspended. Contact support for details."
+                : "Your driver account is active again. You can go online and start accepting jobs.",
+              type: "alert",
+              category: "system",
+              data: { deepLink: { screen: isBlocked ? "/support" : "/(tabs)" } },
+            })
+            .catch((err) => console.error("[admin.controller] Failed to send block-status notification:", err));
+        }
+      }
+
       return res.json({ message: "Driver updated successfully", driver });
     } catch (error) {
       console.error("Error updating driver:", error);
@@ -510,6 +563,25 @@ export class AdminController {
         }
       } catch (err) {
         console.error("Socket emit admin support update error:", err);
+      }
+
+      // Push-notify the customer/driver when staff sends a reply (fire-and-forget).
+      if (replyText && sender !== "user" && ticket.userId) {
+        try {
+          await NotificationService.getInstance().sendNotification({
+            userId: ticket.userId.toString(),
+            title: "Support replied 💬",
+            body: replyText.length > 120 ? `${replyText.slice(0, 117)}...` : replyText,
+            type: "transactional",
+            category: "chat",
+            data: {
+              ticketId: ticket._id,
+              deepLink: { screen: "/support-chat", params: { ticketId: ticket._id.toString() } },
+            },
+          });
+        } catch (err) {
+          console.error("[admin.controller] Failed to send support reply notification:", err);
+        }
       }
 
       return res.json(ticket);

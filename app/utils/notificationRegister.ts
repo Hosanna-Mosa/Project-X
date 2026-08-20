@@ -33,10 +33,20 @@ export async function registerForPushNotificationsAsync() {
 
   if (Platform.OS === "android") {
     await Notifications.setNotificationChannelAsync("default", {
-      name: "default",
+      name: "Order & account updates",
       importance: Notifications.AndroidImportance.MAX,
       vibrationPattern: [0, 250, 250, 250],
       lightColor: "#FF231F7C",
+    });
+    await Notifications.setNotificationChannelAsync("chat", {
+      name: "Chat messages",
+      importance: Notifications.AndroidImportance.MAX,
+      vibrationPattern: [0, 250, 250, 250],
+      lightColor: "#FF231F7C",
+    });
+    await Notifications.setNotificationChannelAsync("promo", {
+      name: "Offers & promotions",
+      importance: Notifications.AndroidImportance.DEFAULT,
     });
   }
 
