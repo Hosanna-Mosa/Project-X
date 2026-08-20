@@ -22,6 +22,7 @@ import { useDeliveryStore } from "@/contexts/deliveryStore";
 import { useCartStore } from "@/contexts/cartStore";
 import { useAuthStore } from "@/contexts/authStore";
 import { AppTabBar, useAppTabBarHeight } from "@/components/AppTabBar";
+import { shareRestaurant } from "@/utils/shareLink";
 
 interface FoodItem {
   _id: string;
@@ -409,6 +410,12 @@ export default function RestaurantMenu() {
               />
               <TouchableOpacity style={styles.modalCloseBtn} onPress={() => setSelectedDishDetail(null)}>
                 <Ionicons name="close" size={22} color="#fff" />
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalCloseBtn, { right: undefined, left: 16 }]}
+                onPress={() => shareRestaurant(id as string, name as string, selectedDishDetail._id, selectedDishDetail.name)}
+              >
+                <Ionicons name="share-outline" size={20} color="#fff" />
               </TouchableOpacity>
               <View style={[styles.modalContent, { paddingBottom: insets.bottom + 20 }]}>
                 <View style={styles.modalHeadRow}>

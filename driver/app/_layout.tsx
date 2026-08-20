@@ -23,6 +23,7 @@ import { LocationHandler } from "@/components/LocationHandler";
 import { GlobalSocketHandler } from "@/components/GlobalSocketHandler";
 import UpdateModal from "@/components/UpdateModal";
 import { registerForPushNotificationsAsync } from "../utils/notificationRegister";
+import { navigateToNotificationTarget } from "@/utils/deepLink";
 import "@/utils/networkLogger";
 
 SplashScreen.preventAutoHideAsync();
@@ -155,18 +156,20 @@ function RootLayoutNav() {
         }
       });
 
-      // 3. Notification Tap / Response Listener (Priority 4)
+      // 3. Notification Tap / Response Listener — app was already running (foreground/background)
       const responseSubscription = Notifications.addNotificationResponseReceivedListener((response: any) => {
         const data = response.notification.request.content.data;
         console.log("[PushNotifications] Notification tapped (Driver). Payload data:", data);
-        
-        if (data && data.orderId) {
-          // Deep link to the active order screen
-          router.push({
-            pathname: "/active-order",
-            params: { orderId: data.orderId }
-          });
-        }
+        navigateToNotificationTarget(data);
+      });
+
+      // 4. Cold-start check — app was fully killed and got opened BY tapping a notification.
+      // addNotificationResponseReceivedListener above never fires for this case.
+      Notifications.getLastNotificationResponseAsync().then((response: any) => {
+        if (!response) return;
+        const data = response.notification.request.content.data;
+        console.log("[PushNotifications] Cold-started from notification (Driver). Payload data:", data);
+        navigateToNotificationTarget(data);
       });
 
       return () => {

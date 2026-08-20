@@ -13,12 +13,13 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
-import { router } from "expo-router";
+import { router, useLocalSearchParams } from "expo-router";
 import { moderateScale } from "react-native-size-matters";
 import { designTokens, type ThemeTokens } from "@/constants/colors";
 import { fontFamilies } from "@/constants/typography";
 import { useThemeStore } from "@/contexts/themeStore";
 import { socketService } from "@/utils/socketService";
+import { customFetch } from "@/utils/api/custom-fetch";
 import { useDeliveryStore, OrderStatus } from "@/contexts/deliveryStore";
 
 const RIDE_TYPES = ["bike", "auto", "cab", "cab_prime"];
@@ -38,7 +39,11 @@ const STATUS_LABEL: Partial<Record<OrderStatus, string>> = {
 
 export default function ChatScreen() {
   const insets = useSafeAreaInsets();
-  const { currentOrderId, driver, activeChat, addChatMessage, setUnreadCount, setIsChatActive, serviceType, status } = useDeliveryStore();
+  const params = useLocalSearchParams<{ orderId?: string }>();
+  const {
+    currentOrderId, driver, activeChat, addChatMessage, setUnreadCount, setIsChatActive, serviceType, status,
+    setOrderId, setDriver, setServiceType, setChatMessages,
+  } = useDeliveryStore();
   const { theme } = useThemeStore();
   const tokens = designTokens[theme];
 
@@ -56,6 +61,43 @@ export default function ChatScreen() {
     socketService.emit("assign_task_confirmed", { orderId: currentOrderId });
     setTaskAssigned(true);
   };
+
+  // Opened via a deep link (notification tap, or the notification list) with just an
+  // orderId — the store won't already have this order's driver/history loaded, so fetch
+  // and hydrate it ourselves instead of relying on the normal in-app tracking flow.
+  useEffect(() => {
+    const deepLinkOrderId = params.orderId;
+    if (!deepLinkOrderId || deepLinkOrderId === currentOrderId) return;
+
+    setOrderId(deepLinkOrderId);
+
+    customFetch<any>(`/api/v1/orders/${deepLinkOrderId}`)
+      .then((order) => {
+        if (order?.serviceType) setServiceType(order.serviceType);
+        if (order?.driver) {
+          setDriver({
+            id: order.driver._id,
+            name: order.driver.name || order.driver.user?.name || "Driver",
+            phone: order.driver.phone || order.driver.user?.phone || "",
+            vehicle: order.driver.vehicleType || "unknown",
+          });
+        }
+      })
+      .catch((err) => console.error("[Chat] Failed to load order for deep link:", err));
+
+    customFetch<any[]>(`/api/v1/orders/${deepLinkOrderId}/chat`)
+      .then((history) => {
+        setChatMessages(
+          (history || []).map((m) => ({
+            id: m._id,
+            text: m.text,
+            sender: m.role === "driver" ? "driver" : "customer",
+            timestamp: m.time,
+          }))
+        );
+      })
+      .catch((err) => console.error("[Chat] Failed to load chat history for deep link:", err));
+  }, [params.orderId]);
 
   useEffect(() => {
     if (!currentOrderId) return;

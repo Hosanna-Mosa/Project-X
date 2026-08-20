@@ -107,6 +107,19 @@ export class OrdersController {
     }
   }
 
+  async getChatHistory(req: AuthRequest, res: Response, next: NextFunction) {
+    try {
+      const { id } = req.params;
+      const userId = req.user?.userId;
+      if (!userId) throw new UnauthorizedError("User is not authenticated");
+
+      const messages = await ordersService.getChatHistory(id as string, userId);
+      return res.json(messages);
+    } catch (error) {
+      next(error);
+    }
+  }
+
   async getInvoice(req: Request, res: Response, next: NextFunction) {
     try {
       const { id } = req.params;

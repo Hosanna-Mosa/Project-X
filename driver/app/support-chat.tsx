@@ -13,7 +13,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather, Ionicons } from "@expo/vector-icons";
-import { router } from "expo-router";
+import { router, useLocalSearchParams } from "expo-router";
 import Colors from "@/constants/colors";
 import { useDriverStore } from "@/store/driverStore";
 import { socketService } from "@/utils/socketService";
@@ -39,6 +39,7 @@ interface SupportTicket {
 
 export default function SupportChatScreen() {
   const insets = useSafeAreaInsets();
+  const params = useLocalSearchParams<{ ticketId?: string }>();
   const token = useDriverStore((s) => s.token);
 
   const [viewMode, setViewMode] = useState<"loading" | "list" | "chat" | "create">("loading");
@@ -85,6 +86,18 @@ export default function SupportChatScreen() {
     try {
       const tickets: SupportTicket[] = await supportFetch("/api/v1/support/tickets");
       setAllTickets(tickets || []);
+
+      // Opened via a deep link (notification tap) with a specific ticket in mind — jump
+      // straight into that conversation regardless of the single/multiple-ticket defaults below.
+      if (showLoading && params.ticketId) {
+        const target = tickets.find((t) => t._id === params.ticketId);
+        if (target) {
+          setTicket(target);
+          setViewMode("chat");
+          return;
+        }
+      }
+
       if (tickets && tickets.length > 0) {
         if (showLoading) {
           if (tickets.length === 1) {

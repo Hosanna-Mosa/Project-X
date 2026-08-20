@@ -88,6 +88,7 @@ export interface DeliveryState {
   setStops: (stops: DeliveryStop[]) => void;
   resetDelivery: () => void;
   addChatMessage: (msg: ChatMessage) => void;
+  setChatMessages: (msgs: ChatMessage[]) => void;
   clearChat: () => void;
   setUnreadCount: (count: number) => void;
   incrementUnreadCount: () => void;
@@ -210,9 +211,10 @@ export const useDeliveryStore = create<DeliveryState>((set, get) => ({
   setRoute: (route) => set({ route }),
   setStops: (stops) => set({ stops }),
   resetDelivery: () => set(initialState),
-  addChatMessage: (msg) => set((state) => ({ 
-    activeChat: [...state.activeChat, msg] 
+  addChatMessage: (msg) => set((state) => ({
+    activeChat: [...state.activeChat, msg]
   })),
+  setChatMessages: (activeChat) => set({ activeChat }),
   clearChat: () => set({ activeChat: [], unreadCount: 0 }),
   setUnreadCount: (unreadCount) => set({ unreadCount }),
   incrementUnreadCount: () => set((state) => ({ unreadCount: state.unreadCount + 1 })),

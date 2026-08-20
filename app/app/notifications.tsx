@@ -8,6 +8,7 @@ import { designTokens, type ThemeTokens } from "@/constants/colors";
 import { fontFamilies } from "@/constants/typography";
 import { useThemeStore } from "@/contexts/themeStore";
 import { customFetch } from "@/utils/api/custom-fetch";
+import { navigateToNotificationTarget } from "@/utils/deepLink";
 
 interface NotificationItem {
   _id: string;
@@ -17,6 +18,7 @@ interface NotificationItem {
   category: string;
   isRead: boolean;
   createdAt: string;
+  data?: any;
 }
 
 const CATEGORY_ICON: Record<string, keyof typeof Ionicons.glyphMap> = {
@@ -70,6 +72,7 @@ export default function NotificationsScreen() {
       setItems((prev) => prev.map((n) => (n._id === item._id ? { ...n, isRead: true } : n)));
       customFetch(`/api/v1/notifications/${item._id}/read`, { method: "PATCH" }).catch(() => {});
     }
+    navigateToNotificationTarget(item.data);
   };
 
   const handleMarkAllRead = async () => {

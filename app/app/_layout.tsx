@@ -33,6 +33,7 @@ import * as Notifications from "expo-notifications";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { useAuthStore } from "@/contexts/authStore";
 import { setAuthTokenGetter, setBaseUrl } from "@/utils/api/custom-fetch";
+import { navigateToNotificationTarget } from "@/utils/deepLink";
 
 // The API URL should be retrieved from environment variables or app config
 const apiUrl = process.env.EXPO_PUBLIC_API_URL || Constants.expoConfig?.extra?.apiUrl;
@@ -311,18 +312,20 @@ export default function RootLayout() {
       }
     });
 
-    // 3. Notification Tap / Response Listener (Priority 4)
+    // 3. Notification Tap / Response Listener — app was already running (foreground/background)
     const responseSubscription = Notifications.addNotificationResponseReceivedListener((response) => {
       const data = response.notification.request.content.data;
       console.log("[PushNotifications] Notification tapped. Payload data:", data);
-      
-      if (data && data.orderId) {
-        // Deep link to the order tracking screen
-        router.push({
-          pathname: "/tracking",
-          params: { orderId: data.orderId }
-        });
-      }
+      navigateToNotificationTarget(data);
+    });
+
+    // 4. Cold-start check — app was fully killed and got opened BY tapping a notification.
+    // addNotificationResponseReceivedListener above never fires for this case.
+    Notifications.getLastNotificationResponseAsync().then((response) => {
+      if (!response) return;
+      const data = response.notification.request.content.data;
+      console.log("[PushNotifications] Cold-started from notification. Payload data:", data);
+      navigateToNotificationTarget(data);
     });
 
     return () => {

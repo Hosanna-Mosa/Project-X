@@ -1,5 +1,6 @@
 import mongoose, { Schema, Document } from "mongoose";
 import bcrypt from "bcryptjs";
+import { webPushSubscriptionSchema, IWebPushSubscription } from "./WebPushSubscription";
 
 export interface IVendor extends Document {
   name: string;
@@ -86,6 +87,7 @@ export interface IVendor extends Document {
   isOpen: boolean;
   deliveryFee: number;
   minOrderValue: number;
+  webPushSubscriptions?: IWebPushSubscription[];
   createdAt: Date;
   updatedAt: Date;
   matchPassword: (password: string) => Promise<boolean>;
@@ -215,6 +217,7 @@ const VendorSchema: Schema = new Schema(
     isOpen: { type: Boolean, default: true },
     deliveryFee: { type: Number, default: 0 },
     minOrderValue: { type: Number, default: 0 },
+    webPushSubscriptions: [webPushSubscriptionSchema],
   },
   { timestamps: true }
 );

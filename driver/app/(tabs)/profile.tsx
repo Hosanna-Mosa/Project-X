@@ -395,6 +395,13 @@ export default function ProfileScreen() {
         fields: [],
       },
       {
+        key: "notifications",
+        icon: "bell" as const,
+        title: "Notifications",
+        subtitle: "Jobs, chat, payouts and account updates",
+        fields: [],
+      },
+      {
         key: "settings",
         icon: "settings" as const,
         title: "Settings",
@@ -907,6 +914,8 @@ export default function ProfileScreen() {
                       router.push("/support");
                     } else if (item.key === "address") {
                       router.push("/saved-addresses");
+                    } else if (item.key === "notifications") {
+                      router.push("/notifications");
                     } else {
                       setActiveSection(item.key);
                     }

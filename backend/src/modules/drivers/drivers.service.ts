@@ -7,6 +7,7 @@ import Zone from "../../database/models/Zone";
 import { PaymentService } from "../payments/payment.service";
 import { SocketManager } from "../../sockets/socket.manager";
 import { ZonesService } from "../zones/zones.service";
+import { NotificationService } from "../../services/notification.service";
 
 export interface HighDemandArea {
   id: string;
@@ -628,6 +629,18 @@ export class DriverService {
       await payoutRecord.save({ session });
 
       await session.commitTransaction();
+
+      // Confirm the payout to the driver (fire-and-forget).
+      NotificationService.getInstance()
+        .sendNotification({
+          userId: user._id.toString(),
+          title: "Payout processed 💰",
+          body: `₹${payoutAmount} is on its way to your bank account.`,
+          type: "transactional",
+          category: "system",
+          data: { deepLink: { screen: "/(tabs)/earnings" } },
+        })
+        .catch((err) => console.error("[drivers.service] Failed to send payout notification:", err));
 
       return {
         message: "Cash out initiated",

@@ -89,7 +89,7 @@ export class QueueManager {
               body: `Your scheduled ${order.serviceType} ride is starting in 15 minutes.`,
               type: "transactional",
               category: "order_status",
-              data: { orderId: order._id }
+              data: { orderId: order._id, deepLink: { screen: "/tracking", params: { orderId: order._id.toString() } } }
             });
           } catch (err) {
             console.error("[queue.service] Error sending customer reservation notification:", err);
@@ -103,7 +103,7 @@ export class QueueManager {
               body: `Your assigned job starts in 15 minutes. Please head to the customer.`,
               type: "transactional",
               category: "order_status",
-              data: { orderId: order._id }
+              data: { orderId: order._id, deepLink: { screen: "/active-order", params: { orderId: order._id.toString() } } }
             });
           } catch (err) {
             console.error("[queue.service] Error sending driver reservation notification:", err);

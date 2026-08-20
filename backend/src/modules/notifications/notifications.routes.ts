@@ -15,4 +15,9 @@ router.delete("/:id", authenticateToken, controller.deleteNotification.bind(cont
 router.post("/trigger-commute", authenticateToken, controller.triggerCommute.bind(controller));
 router.post("/check-abandoned", authenticateToken, controller.checkAbandoned.bind(controller));
 
+// Browser Web Push (admin/support/vendor dashboard) — role-agnostic, keyed off whatever the
+// JWT's userId resolves to (a User for admin/support, a Vendor for vendor logins).
+router.post("/web-push/subscribe", authenticateToken, controller.webPushSubscribe.bind(controller));
+router.post("/web-push/unsubscribe", authenticateToken, controller.webPushUnsubscribe.bind(controller));
+
 export default router;

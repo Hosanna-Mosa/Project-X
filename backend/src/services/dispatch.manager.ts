@@ -160,6 +160,7 @@ export class DispatchManagerService {
           data: {
             orderId: orderId,
             type: "NEW_ORDER_OFFER",
+            deepLink: { screen: "/(tabs)", params: { orderId: orderId.toString() } },
           },
         });
       } catch (pErr: any) {

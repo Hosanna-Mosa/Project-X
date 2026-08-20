@@ -1,7 +1,20 @@
 import axios from "axios";
+import webpush from "web-push";
 import Notification, { INotification } from "../database/models/Notification";
 import User from "../database/models/User";
+import Vendor from "../database/models/Vendor";
+import { IWebPushSubscription } from "../database/models/WebPushSubscription";
 import { SocketManager } from "../sockets/socket.manager";
+
+if (process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY) {
+  webpush.setVapidDetails(
+    process.env.VAPID_SUBJECT || "mailto:support@example.com",
+    process.env.VAPID_PUBLIC_KEY,
+    process.env.VAPID_PRIVATE_KEY
+  );
+} else {
+  console.warn("[NotificationService] VAPID keys not set — browser web push is disabled.");
+}
 
 export interface SendNotificationPayload {
   userId: string;
@@ -70,13 +83,74 @@ export class NotificationService {
     try {
       const user = await User.findById(userId).select("expoPushToken");
       if (user && user.expoPushToken) {
-        await this.sendPushNotification(user.expoPushToken, title, body, data);
+        await this.sendPushNotification(user.expoPushToken, title, body, data, this.resolveChannelId(type, category));
       }
     } catch (err) {
       console.error("[NotificationService] Push notification fetch/dispatch failed:", err);
     }
 
+    // 4. Send browser Web Push if the target has any subscriptions registered — covers the
+    // admin/support dashboard (User) and the vendor dashboard (separate Vendor collection,
+    // but reuses this same userId-keyed call since a vendor's JWT userId is its Vendor _id).
+    try {
+      await this.sendWebPushToId(userId.toString(), title, body, data);
+    } catch (err) {
+      console.error("[NotificationService] Web push dispatch failed:", err);
+    }
+
     return notification;
+  }
+
+  /**
+   * Sends a browser Web Push notification to every subscription registered against the given
+   * id, checking the User collection first (admin/support) and falling back to Vendor. Prunes
+   * subscriptions the browser has revoked (410 Gone / 404 Not Found).
+   */
+  private async sendWebPushToId(id: string, title: string, body: string, data?: any): Promise<void> {
+    if (!process.env.VAPID_PUBLIC_KEY || !process.env.VAPID_PRIVATE_KEY) return;
+
+    let subscriptions: IWebPushSubscription[] | undefined;
+    // Typed as `Model<any>` rather than `typeof User | typeof Vendor` — TS can't merge the two
+    // models' overloaded findByIdAndUpdate signatures into one callable union.
+    let ownerModel: import("mongoose").Model<any> = User;
+
+    const user = await User.findById(id).select("webPushSubscriptions");
+    if (user?.webPushSubscriptions?.length) {
+      subscriptions = user.webPushSubscriptions;
+    } else {
+      const vendor = await Vendor.findById(id).select("webPushSubscriptions");
+      if (vendor?.webPushSubscriptions?.length) {
+        subscriptions = vendor.webPushSubscriptions;
+        ownerModel = Vendor;
+      }
+    }
+    if (!subscriptions || subscriptions.length === 0) return;
+
+    const payload = JSON.stringify({ title, body, data });
+
+    await Promise.all(
+      subscriptions.map(async (sub) => {
+        try {
+          await webpush.sendNotification(sub as any, payload);
+        } catch (err: any) {
+          if (err.statusCode === 404 || err.statusCode === 410) {
+            await ownerModel.findByIdAndUpdate(id, { $pull: { webPushSubscriptions: { endpoint: sub.endpoint } } });
+          } else {
+            console.error("[NotificationService] Web push send failed:", err.message || err);
+          }
+        }
+      })
+    );
+  }
+
+  /**
+   * Maps a notification's type/category to an Android notification channel, so users can
+   * mute promotions independently from order/chat alerts at the OS level.
+   */
+  private resolveChannelId(type?: string, category?: string): string {
+    if (category === "chat") return "chat";
+    if (type === "promotional" || category === "abandoned_booking" || category === "commute_alert") return "promo";
+    return "default";
   }
 
   /**
@@ -87,7 +161,8 @@ export class NotificationService {
     expoPushTokens: string[],
     title: string,
     body: string,
-    data?: any
+    data?: any,
+    channelId: string = "default"
   ): Promise<boolean> {
     // 1. Filter out invalid tokens
     const validTokens = expoPushTokens.filter(token => token && token.startsWith("ExponentPushToken"));
@@ -114,7 +189,7 @@ export class NotificationService {
           title,
           body,
           data,
-          channelId: "default", // Route explicitly to our custom high-importance channel
+          channelId, // Routes to the matching Android channel registered client-side (default/chat/promo)
           _displayInForeground: true,
         }));
 
@@ -187,9 +262,10 @@ export class NotificationService {
     expoPushToken: string,
     title: string,
     body: string,
-    data?: any
+    data?: any,
+    channelId: string = "default"
   ): Promise<boolean> {
-    return this.sendPushNotificationsBatch([expoPushToken], title, body, data);
+    return this.sendPushNotificationsBatch([expoPushToken], title, body, data, channelId);
   }
 
   /**
