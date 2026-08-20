@@ -1,34 +1,35 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
+  Alert,
+  Animated,
+  Dimensions,
+  Linking,
+  Modal,
   Platform,
   ScrollView,
+  Share,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
   View,
-  Linking,
-  Alert,
-  TextInput,
-  Modal,
-  ImageBackground,
-  Image,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Feather } from "@expo/vector-icons";
+import { Ionicons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
-import { ActivityIndicator, Animated, Dimensions } from "react-native";
-import Colors from "@/constants/colors";
-import { useDeliveryStore } from "@/contexts/deliveryStore";
+import { moderateScale } from "react-native-size-matters";
+import { designTokens, type ThemeTokens } from "@/constants/colors";
+import { fontFamilies } from "@/constants/typography";
+import { useDeliveryStore, OrderStatus } from "@/contexts/deliveryStore";
 import { useThemeStore } from "@/contexts/themeStore";
 import { socketService } from "@/utils/socketService";
+import { customFetch } from "@/utils/api/custom-fetch";
 import { MapBackground, MapBackgroundRef } from "@/components/MapBackground";
 import { BottomSheet } from "@/components/BottomSheet";
-import { OrderStatusTimeline } from "@/components/OrderStatusTimeline";
-import { OrderStatus } from "@/contexts/deliveryStore";
-import { customFetch } from "@/utils/api/custom-fetch";
-import { hide } from "expo-router/build/utils/splash";
 
-const STATUS_SEQUENCE: OrderStatus[] = [
+const RIDE_TYPES = ["bike", "auto", "cab", "cab_prime"];
+
+const STATUS_ORDER: OrderStatus[] = [
   "confirmed",
   "driver_assigned",
   "en_route_pickup",
@@ -39,30 +40,133 @@ const STATUS_SEQUENCE: OrderStatus[] = [
   "delivered",
 ];
 
+function normalizeStatus(backendStatus: string): OrderStatus {
+  const s = backendStatus.toLowerCase();
+  switch (s) {
+    case "created":
+    case "searching_driver":
+      return "confirmed";
+    case "driver_assigned":
+      return "driver_assigned";
+    case "en_route_pickup":
+    case "on_the_way":
+      return "en_route_pickup";
+    case "arrived_pickup":
+      return "arrived_pickup";
+    case "picking_items":
+      return "picking_items";
+    case "en_route_delivery":
+    case "in_transit":
+      return "en_route_delivery";
+    case "arrived_delivery":
+      return "arrived_delivery";
+    case "delivered":
+    case "completed":
+      return "delivered";
+    case "cancelled":
+      return "cancelled";
+    default:
+      return "confirmed";
+  }
+}
+
+function calculateBearing(lat1: number, lng1: number, lat2: number, lng2: number): number {
+  const rad = Math.PI / 180;
+  const phi1 = lat1 * rad;
+  const phi2 = lat2 * rad;
+  const deltaLambda = (lng2 - lng1) * rad;
+  const y = Math.sin(deltaLambda) * Math.cos(phi2);
+  const x = Math.cos(phi1) * Math.sin(phi2) - Math.sin(phi1) * Math.cos(phi2) * Math.cos(deltaLambda);
+  const theta = Math.atan2(y, x);
+  return (theta * (180 / Math.PI) + 360) % 360;
+}
+
+function calculateDynamicETA(
+  driverLoc: { lat: number; lng: number } | null,
+  targetLoc: { lat: number; lng: number } | null,
+  fallbackEta: number
+): number {
+  if (!driverLoc || !targetLoc || !driverLoc.lat || !targetLoc.lat) return fallbackEta;
+  const R = 6371;
+  const rad = Math.PI / 180;
+  const dLat = (targetLoc.lat - driverLoc.lat) * rad;
+  const dLng = (targetLoc.lng - driverLoc.lng) * rad;
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(driverLoc.lat * rad) * Math.cos(targetLoc.lat * rad) * Math.sin(dLng / 2) * Math.sin(dLng / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  const distanceKm = R * c;
+  const minutes = Math.round((distanceKm / 22) * 60);
+  return Math.max(1, minutes);
+}
+
+function formatClock(date: Date | null): string {
+  if (!date) return "";
+  return date.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+}
+
+function formatDuration(ms: number): string {
+  const totalMinutes = Math.max(1, Math.round(ms / 60000));
+  const h = Math.floor(totalMinutes / 60);
+  const m = totalMinutes % 60;
+  if (h <= 0) return `${m} min`;
+  return `${h} h ${m} m`;
+}
+
+type TimelineStep = { label: string; done: boolean; current: boolean };
+
+/** Collapses the granular backend status enum into the 4-node checklist the
+ * design calls for, per service group. Every "done"/"current" flag below is
+ * derived from the real order status — nothing here is a fabricated
+ * timestamp or invented sub-step. */
+function buildTimeline(status: OrderStatus, isRide: boolean, isHelper: boolean): TimelineStep[] {
+  const idx = STATUS_ORDER.indexOf(status === "delivered" ? "delivered" : status);
+  const at = (s: OrderStatus) => idx >= STATUS_ORDER.indexOf(s);
+
+  if (isRide) {
+    const labels = ["Captain assigned", "Heading to pickup", "Trip in progress", "Trip completed"];
+    const done = [at("driver_assigned"), at("arrived_pickup"), at("arrived_delivery"), at("delivered")];
+    const currentIdx = done.lastIndexOf(false);
+    return labels.map((label, i) => ({ label, done: done[i], current: i === currentIdx }));
+  }
+  if (isHelper) {
+    const labels = ["Offer accepted", "Helper arrived", "Task in progress", "Task completed"];
+    const done = [at("driver_assigned"), at("arrived_pickup"), at("en_route_delivery"), at("delivered")];
+    const currentIdx = done.lastIndexOf(false);
+    return labels.map((label, i) => ({ label, done: done[i], current: i === currentIdx }));
+  }
+  const labels = ["Order placed", "Prepared", "Out for delivery", "Delivered"];
+  const done = [true, at("en_route_delivery"), at("arrived_delivery"), at("delivered")];
+  const currentIdx = done.lastIndexOf(false);
+  return labels.map((label, i) => ({ label, done: done[i], current: i === currentIdx }));
+}
+
 function OrderReviewCard({
   orderId,
   isRide,
   isHelper,
-  colors,
+  tokens,
+  accent,
 }: {
   orderId: string;
   isRide: boolean;
   isHelper: boolean;
-  colors: any;
+  tokens: ThemeTokens;
+  accent: ThemeTokens["services"]["food"];
 }) {
+  const styles = useMemo(() => createStyles(tokens, accent), [tokens, accent]);
   const [rating, setRating] = useState(5);
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [comment, setComment] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [existingReview, setExistingReview] = useState<any>(null);
-  const styles = React.useMemo(() => createStyles(colors), [colors]);
 
   const availableTags = isRide
-    ? ["⚡ On Time", "🚗 Smooth Ride", "😊 Polite Driver", "🧼 Clean Vehicle", "📍 Great Route"]
-    : (isHelper
-      ? ["⚡ Punctual", "💪 Very Helpful", "😊 Polite Behavior", "⭐ Great Skill", "👍 Efficient Work"]
-      : ["⚡ Fast Delivery", "🍱 Fresh & Hot", "📦 Well Packaged", "😊 Friendly Partner", "👍 Perfect Order"]);
+    ? ["On time", "Smooth ride", "Polite captain", "Clean vehicle", "Great route"]
+    : isHelper
+      ? ["On time", "Careful with items", "Polite", "Hard working"]
+      : ["Fast delivery", "Fresh & hot", "Well packaged", "Friendly partner"];
 
   useEffect(() => {
     if (!orderId) return;
@@ -73,43 +177,27 @@ function OrderReviewCard({
           setExistingReview(res.review);
         }
       })
-      .catch(() => {
-        // No review yet
-      });
+      .catch(() => {});
   }, [orderId]);
 
   const toggleTag = (tag: string) => {
-    if (selectedTags.includes(tag)) {
-      setSelectedTags(selectedTags.filter((t) => t !== tag));
-    } else {
-      setSelectedTags([...selectedTags, tag]);
-    }
+    setSelectedTags((prev) => (prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag]));
   };
 
   const handleSubmit = async () => {
-    if (!orderId) {
-      Alert.alert("Error", "Order ID is missing. Cannot submit feedback.");
-      return;
-    }
+    if (!orderId) return;
     try {
       setIsSubmitting(true);
       const res = await customFetch<any>("/api/v1/reviews", {
         method: "POST",
-        body: JSON.stringify({
-          orderId,
-          rating,
-          comment,
-          tags: selectedTags,
-        }),
+        body: JSON.stringify({ orderId, rating, comment, tags: selectedTags }),
       });
       if (res) {
         setIsSubmitted(true);
         setExistingReview(res.review || { rating, comment, tags: selectedTags });
-        Alert.alert("Thank You!", "Your review has been submitted successfully.");
       }
     } catch (err: any) {
-      console.error("Submit review error:", err);
-      Alert.alert("Error", err.message || "Failed to submit review. Please try again.");
+      Alert.alert("Couldn't submit", err.message || "Please try again.");
     } finally {
       setIsSubmitting(false);
     }
@@ -117,119 +205,71 @@ function OrderReviewCard({
 
   if (isSubmitted && existingReview) {
     return (
-      <View style={[styles.reviewContainerCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-        <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", width: "100%" }}>
-          <Text style={[styles.reviewHeaderTitle, { color: colors.text }]}>Your Feedback</Text>
-          <View style={{ flexDirection: "row", alignItems: "center", backgroundColor: colors.success + "18", paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12, gap: 4 }}>
-            <Feather name="check" size={14} color={colors.success} />
-            <Text style={{ fontSize: 12, fontWeight: "600", color: colors.success }}>Submitted</Text>
+      <View style={styles.reviewCard}>
+        <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
+          <Text style={styles.reviewTitle}>Your feedback</Text>
+          <View style={styles.submittedPill}>
+            <Ionicons name="checkmark" size={12} color={tokens.success} />
+            <Text style={[styles.submittedPillText, { color: tokens.success }]}>Submitted</Text>
           </View>
         </View>
-
-        <View style={{ flexDirection: "row", gap: 6, marginVertical: 8 }}>
+        <View style={{ flexDirection: "row", gap: 6, marginTop: 10 }}>
           {[1, 2, 3, 4, 5].map((star) => (
-            <Feather
-              key={star}
-              name="star"
-              size={22}
-              color={star <= existingReview.rating ? "#F59E0B" : colors.border}
-            />
+            <Ionicons key={star} name="star" size={20} color={star <= existingReview.rating ? "#F59E0B" : tokens.border} />
           ))}
         </View>
-
-        {existingReview.tags && existingReview.tags.length > 0 && (
-          <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6, marginVertical: 4, width: "100%" }}>
+        {existingReview.tags?.length > 0 && (
+          <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6, marginTop: 10 }}>
             {existingReview.tags.map((tag: string, idx: number) => (
-              <View key={idx} style={{ backgroundColor: colors.primary + "15", paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12 }}>
-                <Text style={{ fontSize: 12, color: colors.primary, fontWeight: "500" }}>{tag}</Text>
+              <View key={idx} style={[styles.reviewTagChip, { backgroundColor: accent.skin }]}>
+                <Text style={[styles.reviewTagChipText, { color: accent.accent }]}>{tag}</Text>
               </View>
             ))}
           </View>
         )}
-
-        {existingReview.comment ? (
-          <Text style={{ fontSize: 13, color: colors.textSecondary, fontStyle: "italic", alignSelf: "flex-start", marginTop: 4 }}>
-            "{existingReview.comment}"
-          </Text>
-        ) : null}
+        {existingReview.comment ? <Text style={styles.reviewComment}>"{existingReview.comment}"</Text> : null}
       </View>
     );
   }
 
   return (
-    <View style={[styles.reviewContainerCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-      <Text style={[styles.reviewHeaderTitle, { color: colors.text, alignSelf: "flex-start" }]}>Rate your Experience</Text>
-
-      {/* Interactive Star Picker */}
-      <View style={{ flexDirection: "row", gap: 8, marginVertical: 8 }}>
+    <View style={styles.reviewCard}>
+      <Text style={[styles.reviewTitle, { alignSelf: "center" }]}>Rate your experience</Text>
+      <View style={{ flexDirection: "row", gap: 10, marginTop: 12, alignSelf: "center" }}>
         {[1, 2, 3, 4, 5].map((star) => (
           <TouchableOpacity key={star} onPress={() => setRating(star)} activeOpacity={0.7}>
-            <Feather
-              name="star"
-              size={28}
-              color={star <= rating ? "#F59E0B" : colors.border}
-            />
+            <Ionicons name="star" size={32} color={star <= rating ? "#F59E0B" : tokens.border} />
           </TouchableOpacity>
         ))}
       </View>
-      <Text style={{ fontSize: 12, fontWeight: "600", color: "#F59E0B", marginBottom: 6 }}>
-        {rating === 5 ? "Excellent! 🌟" : rating === 4 ? "Good 👍" : rating === 3 ? "Average 👌" : rating === 2 ? "Below Average 😐" : "Poor 👎"}
-      </Text>
-
-      {/* Feedback Chips */}
-      <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6, marginVertical: 6, justifyContent: "center" }}>
+      <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6, marginTop: 16, justifyContent: "center" }}>
         {availableTags.map((tag) => {
           const selected = selectedTags.includes(tag);
           return (
             <TouchableOpacity
               key={tag}
-              style={[
-                styles.tagChip,
-                {
-                  backgroundColor: selected ? colors.primary : colors.background,
-                  borderColor: selected ? colors.primary : colors.border,
-                },
-              ]}
+              style={[styles.reviewTagChip, { backgroundColor: selected ? accent.skin : tokens.surface, borderWidth: 1, borderColor: selected ? accent.accent : tokens.borderStrong }]}
               onPress={() => toggleTag(tag)}
             >
-              <Text style={[styles.tagChipText, { color: selected ? "#FFFFFF" : colors.text }]}>{tag}</Text>
+              <Text style={[styles.reviewTagChipText, { color: selected ? accent.accent : tokens.sec }]}>{tag}</Text>
             </TouchableOpacity>
           );
         })}
       </View>
-
-      {/* Optional Comment Field */}
       <TextInput
-        style={[
-          styles.commentInput,
-          {
-            backgroundColor: colors.background,
-            borderColor: colors.border,
-            color: colors.text,
-          },
-        ]}
-        placeholder="Write comments or feedback (optional)..."
-        placeholderTextColor={colors.textMuted}
+        style={styles.reviewCommentInput}
+        placeholder="Write a comment (optional)"
+        placeholderTextColor={tokens.muted}
         value={comment}
         onChangeText={setComment}
         multiline
-        numberOfLines={2}
       />
-
-      {/* Submit Button */}
       <TouchableOpacity
-        style={[
-          styles.submitReviewBtn,
-          { backgroundColor: colors.primary, opacity: isSubmitting ? 0.6 : 1 },
-        ]}
+        style={[styles.reviewSubmitBtn, { backgroundColor: accent.accent, opacity: isSubmitting ? 0.6 : 1 }]}
         onPress={handleSubmit}
         disabled={isSubmitting}
       >
-        {isSubmitting ? (
-          <ActivityIndicator size="small" color="#FFFFFF" />
-        ) : (
-          <Text style={styles.submitReviewBtnText}>Submit Feedback</Text>
-        )}
+        <Text style={[styles.reviewSubmitBtnText, { color: accent.on }]}>{isSubmitting ? "Submitting…" : "Submit rating"}</Text>
       </TouchableOpacity>
     </View>
   );
@@ -238,14 +278,72 @@ function OrderReviewCard({
 export default function TrackingScreen() {
   const insets = useSafeAreaInsets();
   const params = useLocalSearchParams<{ orderId?: string }>();
-  const { status, setStatus, currentOrderId, setOrderId, serviceType, setServiceType, route, setRoute, stops, setStops, driver, setDriver, unreadCount, incrementUnreadCount, resetDelivery } = useDeliveryStore();
+  const {
+    status,
+    setStatus,
+    currentOrderId,
+    setOrderId,
+    serviceType,
+    setServiceType,
+    route,
+    setRoute,
+    stops,
+    setStops,
+    driver,
+    setDriver,
+    unreadCount,
+    resetDelivery,
+  } = useDeliveryStore();
+
+  const { theme } = useThemeStore();
+  const tokens = designTokens[theme];
+
+  const isRide = RIDE_TYPES.includes(serviceType?.toLowerCase() || "");
+  const isHelper = serviceType?.toLowerCase() === "helper";
+
+  const [vendorName, setVendorName] = useState<string | null>(null);
+  const [vendorPartnerType, setVendorPartnerType] = useState<string | null>(null);
+  const accentKey: keyof ThemeTokens["services"] = isRide
+    ? "ride"
+    : isHelper
+      ? "task"
+      : vendorPartnerType === "meat"
+        ? "meat"
+        : vendorName
+          ? "food"
+          : "delivery";
+  const accent = tokens.services[accentKey];
+  const styles = useMemo(() => createStyles(tokens, accent), [theme, accentKey]);
+
+  const [eta, setEta] = useState(15);
+  const [orderCreatedAt, setOrderCreatedAt] = useState<Date | null>(null);
+  const [deliveredAt, setDeliveredAt] = useState<Date | null>(null);
+  const [tripModalVisible, setTripModalVisible] = useState(false);
+  const [helperStatus, setHelperStatus] = useState<string>("");
+  const [deliveryOtp, setDeliveryOtp] = useState<string | null>(null);
+  const [startOtp, setStartOtp] = useState<string | null>(null);
+  const [driverLocation, setDriverLocation] = useState<{ lat: number; lng: number; heading?: number } | null>(null);
+  const [radius, setRadius] = useState<number | null>(null);
+  const [totalPrice, setTotalPrice] = useState<number | null>(null);
+  const mapRef = useRef<MapBackgroundRef>(null);
+
+  const cancellationAlerted = useRef(false);
+
+  const handleOrderCancelledByDriver = () => {
+    if (cancellationAlerted.current) return;
+    cancellationAlerted.current = true;
+    resetDelivery();
+    router.replace("/(tabs)");
+    setTimeout(() => {
+      Alert.alert("Order cancelled", "We're sorry — this order could not be completed and has been cancelled.", [{ text: "OK", onPress: () => {} }], { cancelable: true });
+    }, 500);
+  };
 
   const handleSOS = () => {
     if (!currentOrderId) return;
-
     Alert.alert(
       "Emergency SOS",
-      "Are you sure you want to trigger SOS? This will instantly alert our support team and emergency contacts.",
+      "This will instantly alert our support team and your emergency contacts.",
       [
         { text: "Cancel", style: "cancel" },
         {
@@ -253,157 +351,55 @@ export default function TrackingScreen() {
           style: "destructive",
           onPress: async () => {
             try {
-              await customFetch(`/api/v1/orders/${currentOrderId}/sos`, {
-                method: "POST"
-              });
-              Alert.alert(
-                "SOS Dispatched",
-                "Your emergency alert has been sent. Support is on the way."
-              );
+              await customFetch(`/api/v1/orders/${currentOrderId}/sos`, { method: "POST" });
+              Alert.alert("SOS dispatched", "Your emergency alert has been sent. Support is on the way.");
             } catch (err: any) {
-              console.error("SOS trigger error:", err);
               Alert.alert("Error", err.message || "Failed to trigger SOS. Please call emergency services.");
             }
-          }
-        }
+          },
+        },
       ]
     );
   };
 
-  const cancellationAlerted = React.useRef(false);
-
-  const handleOrderCancelledByDriver = () => {
-    if (cancellationAlerted.current) return;
-    cancellationAlerted.current = true;
-
-    // Redirect immediately to clear the stuck map screen
-    resetDelivery();
-    router.replace("/(tabs)");
-
-    setTimeout(() => {
-      Alert.alert(
-        "Delivery Cancelled",
-        "We are sorry, the driver is unable to complete your delivery. Your order has been cancelled.",
-        [
-          {
-            text: "OK",
-            onPress: () => { }
-          }
-        ],
-        { cancelable: true }
-      );
-    }, 500);
-  };
-  const [eta, setEta] = useState(15);
-  const [driverModalVisible, setDriverModalVisible] = useState(false);
-  const [tripModalVisible, setTripModalVisible] = useState(false);
-
-  const [helperStatus, setHelperStatus] = useState<string>("");
-  const [deliveryOtp, setDeliveryOtp] = useState<string | null>(null);
-  const [startOtp, setStartOtp] = useState<string | null>(null);
-  const [driverLocation, setDriverLocation] = useState<{ lat: number, lng: number } | null>(null);
-  const [radius, setRadius] = useState<number | null>(null);
-  const mapRef = React.useRef<MapBackgroundRef>(null);
-
-  const animatedProgress = React.useRef(new Animated.Value(0)).current;
-  const pulse1 = React.useRef(new Animated.Value(0)).current;
-  const pulse2 = React.useRef(new Animated.Value(0)).current;
-
-  useEffect(() => {
-    if (!driver) {
-      const anim = Animated.loop(
-        Animated.timing(animatedProgress, {
-          toValue: 1,
-          duration: 2000,
-          useNativeDriver: true,
-        })
-      );
-      anim.start();
-
-      const createPulse = (value: Animated.Value, delay: number) => {
-        return Animated.loop(
-          Animated.sequence([
-            Animated.delay(delay),
-            Animated.timing(value, {
-              toValue: 1,
-              duration: 2000,
-              useNativeDriver: true,
-            }),
-          ])
-        );
-      };
-
-      const anim1 = createPulse(pulse1, 0);
-      const anim2 = createPulse(pulse2, 1000);
-
-      anim1.start();
-      anim2.start();
-
-      return () => {
-        anim.stop();
-        anim1.stop();
-        anim2.stop();
-      };
+  const handleShareTrip = async () => {
+    try {
+      await Share.share({
+        message: `I'm on a Flavour ${isRide ? "ride" : "trip"}${driver?.name ? ` with ${driver.name}` : ""}. Heading to ${stops?.[stops.length - 1]?.address || "my destination"}.`,
+      });
+    } catch {
+      // user dismissed the share sheet
     }
+  };
+
+  // Radar / pulse animation shown only while no driver is assigned yet.
+  const pulse1 = useRef(new Animated.Value(0)).current;
+  const pulse2 = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    if (driver) return;
+    const createPulse = (value: Animated.Value, delay: number) =>
+      Animated.loop(Animated.sequence([Animated.delay(delay), Animated.timing(value, { toValue: 1, duration: 2000, useNativeDriver: true })]));
+    const a1 = createPulse(pulse1, 0);
+    const a2 = createPulse(pulse2, 1000);
+    a1.start();
+    a2.start();
+    return () => {
+      a1.stop();
+      a2.stop();
+    };
   }, [driver]);
 
-  const screenWidth = Dimensions.get("window").width;
-  const translateX = animatedProgress.interpolate({
-    inputRange: [0, 1],
-    outputRange: [-120, screenWidth],
-  });
-
   useEffect(() => {
     if (cancellationAlerted.current) return;
-    if (params.orderId && params.orderId !== currentOrderId) {
-      setOrderId(params.orderId);
-    }
+    if (params.orderId && params.orderId !== currentOrderId) setOrderId(params.orderId);
   }, [params.orderId, currentOrderId]);
 
   useEffect(() => {
-    if (status === "cancelled") {
-      handleOrderCancelledByDriver();
-    }
+    if (status === "cancelled") handleOrderCancelledByDriver();
   }, [status]);
 
-  const { theme } = useThemeStore();
-  const colors = Colors[theme];
-  const styles = React.useMemo(() => createStyles(colors), [theme]);
-
-  const isRide = ["bike", "auto", "cab", "cab_prime"].includes(serviceType?.toLowerCase() || "");
-  const isHelper = serviceType?.toLowerCase() === "helper";
-
-  const [bottomSheetHeight, setBottomSheetHeight] = useState(300);
-
-  const normalizeStatus = (backendStatus: string): OrderStatus => {
-    const s = backendStatus.toLowerCase();
-    switch (s) {
-      case "created":
-      case "searching_driver":
-        return "confirmed";
-      case "driver_assigned":
-        return "driver_assigned";
-      case "en_route_pickup":
-      case "on_the_way":
-        return "en_route_pickup";
-      case "arrived_pickup":
-        return "arrived_pickup";
-      case "picking_items":
-        return "picking_items";
-      case "en_route_delivery":
-      case "in_transit":
-        return "en_route_delivery";
-      case "arrived_delivery":
-        return "arrived_delivery";
-      case "delivered":
-      case "completed":
-        return "delivered";
-      case "cancelled":
-        return "cancelled";
-      default:
-        return "confirmed";
-    }
-  };
+  const deliveryStop = stops?.find((s) => s.type?.toLowerCase() === "delivery" || s.type?.toLowerCase() === "drop");
+  const pickupStop = stops?.find((s) => s.type?.toLowerCase() === "pickup" || s.type?.toLowerCase() === "store");
 
   useEffect(() => {
     if (!currentOrderId) return;
@@ -411,80 +407,67 @@ export default function TrackingScreen() {
     const fetchOrderDetails = () => {
       customFetch<any>(`/api/v1/orders/${currentOrderId}`)
         .then((order) => {
-          if (order) {
-            console.log("[POLLING] Fetched order details:", order.status);
-            if (order.status) {
-              const statusStr = String(order.status).toLowerCase();
-              if (statusStr === "cancelled" || statusStr === "cancelled_by_driver") {
-                handleOrderCancelledByDriver();
-                return;
-              }
-              setStatus(normalizeStatus(order.status));
+          if (!order) return;
+          if (order.status) {
+            const statusStr = String(order.status).toLowerCase();
+            if (statusStr === "cancelled" || statusStr === "cancelled_by_driver") {
+              handleOrderCancelledByDriver();
+              return;
             }
-            if (order.driver) {
-              setDriver({
-                id: order.driver._id,
-                name: order.driver.name || order.driver.user?.name || order.driver.firstName || "Driver",
-                phone: order.driver.phone || order.driver.user?.phone || "",
-                vehicle: order.driver.vehicleType || "unknown",
-                vehicleNumber: order.driver.vehicleNumber || order.driver.licensePlate || "",
-                vehicleModel: order.driver.vehicleModel || order.driver.vehicleMake || order.driver.vehicleType || "Vehicle",
-                rating: order.driver.rating || "4.8",
-                trips: order.driver.totalTrips || order.driver.trips || "0",
-                duration: order.driver.duration || order.driver.experience || "New",
-              });
-
-              if (order.driver.currentLocation && order.driver.currentLocation.coordinates) {
-                const coords = order.driver.currentLocation.coordinates;
-                if (coords[0] != null && coords[1] != null) {
-                  setDriverLocation((prev) => {
-                    const lat = coords[1];
-                    const lng = coords[0];
-                    if (!prev || Math.abs(prev.lat - lat) > 0.00001 || Math.abs(prev.lng - lng) > 0.00001) {
-                      const computedHeading = (prev && (prev.lat !== lat || prev.lng !== lng))
-                        ? calculateBearing(prev.lat, prev.lng, lat, lng)
-                        : prev?.heading || 0;
-                      return { lat, lng, heading: computedHeading };
-                    }
-                    return prev;
-                  });
-                }
+            const normalized = normalizeStatus(order.status);
+            setStatus(normalized);
+            if (normalized === "delivered") setDeliveredAt((prev) => prev || new Date());
+          }
+          if (order.driver) {
+            setDriver({
+              id: order.driver._id,
+              name: order.driver.name || order.driver.user?.name || order.driver.firstName || "Driver",
+              phone: order.driver.phone || order.driver.user?.phone || "",
+              vehicle: order.driver.vehicleType || "unknown",
+            });
+            if (order.driver.currentLocation?.coordinates) {
+              const coords = order.driver.currentLocation.coordinates;
+              if (coords[0] != null && coords[1] != null) {
+                setDriverLocation((prev) => {
+                  const lat = coords[1];
+                  const lng = coords[0];
+                  if (!prev || Math.abs(prev.lat - lat) > 0.00001 || Math.abs(prev.lng - lng) > 0.00001) {
+                    const heading = prev && (prev.lat !== lat || prev.lng !== lng) ? calculateBearing(prev.lat, prev.lng, lat, lng) : prev?.heading || 0;
+                    return { lat, lng, heading };
+                  }
+                  return prev;
+                });
               }
             }
-            if (order.stops && order.stops.length > 0) {
-              const mappedStops = order.stops.map((s: any) => ({
+          }
+          if (order.vendor && typeof order.vendor === "object") {
+            setVendorName(order.vendor.name || null);
+            setVendorPartnerType(order.vendor.partnerType || null);
+          }
+          if (order.stops?.length > 0) {
+            setStops(
+              order.stops.map((s: any) => ({
                 id: s._id,
                 address: s.address,
                 lat: s.location.coordinates[1],
                 lng: s.location.coordinates[0],
                 type: s.type,
                 items: s.items?.lines || [],
-              }));
-              setStops(mappedStops);
-            }
-            if (order.radius) {
-              setRadius(order.radius);
-            }
-            if (order.deliveryOtp) {
-              setDeliveryOtp(order.deliveryOtp);
-            }
-            if (order.serviceType) {
-              setServiceType(order.serviceType);
-            }
-            if (order.restaurantPickupCode) {
-              setStartOtp(order.restaurantPickupCode);
-            }
-            if (order.duration) {
-              const durMinutes = parseInt(order.duration.toString().replace(/[^0-9]/g, "")) || 15;
-              setEta(durMinutes);
-            }
-            if (order.polyline) {
-              setRoute({
-                totalDistance: order.totalDistance || 0,
-                estimatedTime: order.duration || 15,
-                polyline: order.polyline,
-              });
-            }
+              }))
+            );
+          }
+          if (order.radius) setRadius(order.radius);
+          if (order.deliveryOtp) setDeliveryOtp(order.deliveryOtp);
+          if (order.serviceType) setServiceType(order.serviceType);
+          if (order.restaurantPickupCode) setStartOtp(order.restaurantPickupCode);
+          if (order.totalPrice != null) setTotalPrice(order.totalPrice);
+          if (order.createdAt) setOrderCreatedAt((prev) => prev || new Date(order.createdAt));
+          if (order.duration) {
+            const durMinutes = parseInt(order.duration.toString().replace(/[^0-9]/g, ""), 10) || 15;
+            setEta(durMinutes);
+          }
+          if (order.polyline) {
+            setRoute({ totalDistance: order.totalDistance || 0, estimatedTime: order.duration || 15, polyline: order.polyline });
           }
         })
         .catch((err) => console.error("Error fetching order in tracking:", err));
@@ -492,264 +475,167 @@ export default function TrackingScreen() {
 
     fetchOrderDetails();
     const interval = setInterval(fetchOrderDetails, 7000);
-
     return () => clearInterval(interval);
   }, [currentOrderId]);
 
-  const calculateBearing = (lat1: number, lng1: number, lat2: number, lng2: number): number => {
-    const rad = Math.PI / 180;
-    const phi1 = lat1 * rad;
-    const phi2 = lat2 * rad;
-    const deltaLambda = (lng2 - lng1) * rad;
-    const y = Math.sin(deltaLambda) * Math.cos(phi2);
-    const x = Math.cos(phi1) * Math.sin(phi2) - Math.sin(phi1) * Math.cos(phi2) * Math.cos(deltaLambda);
-    const theta = Math.atan2(y, x);
-    return (theta * (180 / Math.PI) + 360) % 360;
-  };
-
-  const calculateDynamicETA = (
-    driverLoc: { lat: number; lng: number } | null,
-    targetLoc: { lat: number; lng: number } | null,
-    fallbackEta: number = 15
-  ): number => {
-    if (!driverLoc || !targetLoc || !driverLoc.lat || !targetLoc.lat) return fallbackEta;
-
-    const R = 6371; // Earth radius in km
-    const rad = Math.PI / 180;
-    const dLat = (targetLoc.lat - driverLoc.lat) * rad;
-    const dLng = (targetLoc.lng - driverLoc.lng) * rad;
-    const a =
-      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-      Math.cos(driverLoc.lat * rad) * Math.cos(targetLoc.lat * rad) *
-      Math.sin(dLng / 2) * Math.sin(dLng / 2);
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-    const distanceKm = R * c;
-
-    // Average city travel speed ~22 km/h
-    const minutes = Math.round((distanceKm / 22) * 60);
-    return Math.max(1, minutes);
-  };
-
-  const deliveryStop = stops?.find(s => s.type?.toLowerCase() === "delivery" || s.type?.toLowerCase() === "drop");
-  const pickupStop = stops?.find(s => s.type?.toLowerCase() === "pickup" || s.type?.toLowerCase() === "store");
-
   useEffect(() => {
-    if (currentOrderId) {
-      socketService.connect();
-      socketService.trackOrder(currentOrderId);
+    if (!currentOrderId) return;
+    socketService.connect();
+    socketService.trackOrder(currentOrderId);
 
-      const onOrderAccepted = (data: any) => {
-        console.log("Driver accepted the order:", data.driver);
-        setDriver(data.driver);
-        setStatus("driver_assigned");
-      };
+    const onOrderAccepted = (data: any) => {
+      setDriver(data.driver);
+      setStatus("driver_assigned");
+    };
 
-      const onLocationUpdate = (data: any) => {
-        if (data.lat != null && data.lng != null) {
-          setDriverLocation((prev) => {
-            let heading = data.heading;
-
-            // If heading isn't provided or is exactly 0, try to calculate it based on movement vector
-            if (!heading && prev) {
-              const dLat = Math.abs(prev.lat - data.lat);
-              const dLng = Math.abs(prev.lng - data.lng);
-              // Only calculate if moved significantly (> ~1 meter) to avoid jitter spinning
-              if (dLat > 0.00001 || dLng > 0.00001) {
-                heading = calculateBearing(prev.lat, prev.lng, data.lat, data.lng);
-              } else {
-                heading = prev.heading;
-              }
-            }
-
-            return { lat: data.lat, lng: data.lng, heading: heading || 0 };
-          });
-
-          // Calculate real-time dynamic ETA to active stop
-          const activeStop = (status === "pending" || status === "confirmed" || status === "driver_assigned" || status === "en_route_pickup" || status === "arrived_pickup")
-            ? (pickupStop || stops?.[0])
-            : (deliveryStop || stops?.[stops.length - 1]);
-
-          if (activeStop && activeStop.lat != null && activeStop.lng != null) {
-            const dynamicMins = calculateDynamicETA({ lat: data.lat, lng: data.lng }, { lat: Number(activeStop.lat), lng: Number(activeStop.lng) }, eta);
-            setEta(dynamicMins);
-          }
+    const onLocationUpdate = (data: any) => {
+      if (data.lat == null || data.lng == null) return;
+      setDriverLocation((prev) => {
+        let heading = data.heading;
+        if (!heading && prev) {
+          const dLat = Math.abs(prev.lat - data.lat);
+          const dLng = Math.abs(prev.lng - data.lng);
+          heading = dLat > 0.00001 || dLng > 0.00001 ? calculateBearing(prev.lat, prev.lng, data.lat, data.lng) : prev.heading;
         }
-      };
+        return { lat: data.lat, lng: data.lng, heading: heading || 0 };
+      });
 
-      const onStatusUpdate = (data: any) => {
-        console.log("[SOCKET] Status update received:", data);
-        if (data.status) {
-          const statusStr = String(data.status).toLowerCase();
-          if (statusStr === "cancelled" || statusStr === "cancelled_by_driver") {
-            handleOrderCancelledByDriver();
-            return;
-          }
-          setStatus(normalizeStatus(data.status));
-        }
-      };
+      const activeStop =
+        status === "pending" || status === "confirmed" || status === "driver_assigned" || status === "en_route_pickup" || status === "arrived_pickup"
+          ? pickupStop || stops?.[0]
+          : deliveryStop || stops?.[stops.length - 1];
+      if (activeStop && activeStop.lat != null && activeStop.lng != null) {
+        setEta(calculateDynamicETA({ lat: data.lat, lng: data.lng }, { lat: Number(activeStop.lat), lng: Number(activeStop.lng) }, eta));
+      }
+    };
 
-      const onOrderCancelled = (data: any) => {
-        console.log("[SOCKET] Order cancelled received:", data);
+    const onStatusUpdate = (data: any) => {
+      if (!data.status) return;
+      const statusStr = String(data.status).toLowerCase();
+      if (statusStr === "cancelled" || statusStr === "cancelled_by_driver") {
         handleOrderCancelledByDriver();
-      };
+        return;
+      }
+      const normalized = normalizeStatus(data.status);
+      setStatus(normalized);
+      if (normalized === "delivered") setDeliveredAt((prev) => prev || new Date());
+    };
 
-      const onHelperStatusUpdate = (data: { text: string }) => {
-        console.log("[SOCKET] Helper status update:", data);
-        if (data.text) setHelperStatus(data.text);
-      };
+    const onOrderCancelled = () => handleOrderCancelledByDriver();
+    const onHelperStatusUpdate = (data: { text: string }) => {
+      if (data.text) setHelperStatus(data.text);
+    };
 
-      socketService.on("order_accepted", onOrderAccepted);
-      socketService.on("driver_location_update", onLocationUpdate);
-      socketService.on("order_status_update", onStatusUpdate);
-      socketService.on("order_cancelled", onOrderCancelled);
-      socketService.on("helper_status_update", onHelperStatusUpdate);
+    socketService.on("order_accepted", onOrderAccepted);
+    socketService.on("driver_location_update", onLocationUpdate);
+    socketService.on("order_status_update", onStatusUpdate);
+    socketService.on("order_cancelled", onOrderCancelled);
+    socketService.on("helper_status_update", onHelperStatusUpdate);
 
-      const timer = setInterval(() => {
-        setEta((prev) => Math.max(1, prev - 1));
-      }, 30000);
+    const timer = setInterval(() => setEta((prev) => Math.max(1, prev - 1)), 30000);
 
-      return () => {
-        clearInterval(timer);
-        socketService.off("order_accepted", onOrderAccepted);
-        socketService.off("driver_location_update", onLocationUpdate);
-        socketService.off("order_status_update", onStatusUpdate);
-        socketService.off("order_cancelled", onOrderCancelled);
-        socketService.off("helper_status_update", onHelperStatusUpdate);
-      };
-    }
+    return () => {
+      clearInterval(timer);
+      socketService.off("order_accepted", onOrderAccepted);
+      socketService.off("driver_location_update", onLocationUpdate);
+      socketService.off("order_status_update", onStatusUpdate);
+      socketService.off("order_cancelled", onOrderCancelled);
+      socketService.off("helper_status_update", onHelperStatusUpdate);
+    };
   }, [currentOrderId]);
 
-  const handleBack = () => {
-    router.replace("/(tabs)/orders");
-  };
-
+  const handleBack = () => router.replace("/(tabs)/orders");
   const userLocCoords = deliveryStop ? { lat: Number(deliveryStop.lat), lng: Number(deliveryStop.lng) } : null;
 
+  // ---------------------------------------------------------------------
+  // Completed state
+  // ---------------------------------------------------------------------
   if (status === "delivered") {
     const foodItems = deliveryStop?.items || [];
+    const elapsed = orderCreatedAt && deliveredAt ? formatDuration(deliveredAt.getTime() - orderCreatedAt.getTime()) : null;
+    const headline = isRide ? "Ride completed" : isHelper ? "Task complete" : "Order delivered";
+    const subline = isRide
+      ? `You arrived safely${driver?.name ? ` with ${driver.name}` : ""}.`
+      : isHelper
+        ? `${driver?.name || "Your helper"} finished the task${elapsed ? ` in ${elapsed}` : ""}.`
+        : `Delivered by ${driver?.name || "your delivery partner"}${elapsed ? ` in ${elapsed}` : ""}.`;
+
     return (
-      <View style={[styles.successContainer, { backgroundColor: colors.background }]}>
-        <View style={styles.successHeaderCard}>
-          <View style={[styles.successIconCircle, { backgroundColor: colors.success + "15" }]}>
-            <Feather name="check-circle" size={80} color={colors.success} />
+      <View style={[styles.doneRoot, { paddingTop: insets.top + 12, paddingBottom: insets.bottom + 16 }]}>
+        <View style={styles.doneHead}>
+          <View style={styles.doneCheck}>
+            <Ionicons name="checkmark" size={moderateScale(28)} color="#fff" />
           </View>
-          <Text style={[styles.successTitle, { color: colors.text }]}>
-            {isRide ? "Ride Completed!" : (isHelper ? "Task Completed!" : "Order Delivered!")}
-          </Text>
-          <Text style={[styles.successSubtitle, { color: colors.textSecondary }]}>
-            {isRide
-              ? `You have arrived safely at your destination with ${driver?.name || "your captain"}.`
-              : (isHelper
-                ? `Your helper task has been completed successfully by ${driver?.name || "your helper"}.`
-                : `Your meal has been delivered successfully by ${driver?.name || "our delivery partner"}.`
-              )}
-          </Text>
+          <Text style={styles.doneTitle}>{headline}</Text>
+          <Text style={styles.doneSubtitle}>{subline}</Text>
+          {totalPrice != null && <Text style={styles.donePrice}>₹{Math.round(totalPrice)} paid</Text>}
         </View>
 
-        <ScrollView style={styles.successDetailsScroll} showsVerticalScrollIndicator={false}>
+        <ScrollView style={{ flex: 1, width: "100%" }} showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 20 }}>
           {isRide ? (
-            <View style={[styles.successCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-              <Text style={[styles.successCardHeader, { color: colors.text }]}>Ride Route</Text>
+            <View style={styles.doneCard}>
+              <Text style={styles.doneCardTitle}>Route</Text>
               <View style={{ gap: 8, paddingVertical: 4 }}>
                 <View style={{ flexDirection: "row", gap: 8, alignItems: "center" }}>
-                  <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: colors.success }} />
-                  <Text style={{ fontSize: 13, color: colors.text, flex: 1 }} numberOfLines={2}>
-                    {stops?.find((s) => s.type === "pickup")?.address || "Pickup Location"}
-                  </Text>
+                  <View style={[styles.dotSmall, { backgroundColor: tokens.success }]} />
+                  <Text style={styles.doneAddrText} numberOfLines={2}>{stops?.find((s) => s.type === "pickup")?.address || "Pickup location"}</Text>
                 </View>
-                <View style={{ width: 2, height: 12, backgroundColor: colors.border, marginLeft: 3 }} />
+                <View style={{ width: 2, height: 12, backgroundColor: tokens.border, marginLeft: 3 }} />
                 <View style={{ flexDirection: "row", gap: 8, alignItems: "center" }}>
-                  <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: colors.error }} />
-                  <Text style={{ fontSize: 13, color: colors.text, flex: 1 }} numberOfLines={2}>
-                    {deliveryStop?.address || "Destination Location"}
-                  </Text>
+                  <View style={[styles.dotSmall, { backgroundColor: tokens.error, borderRadius: 2 }]} />
+                  <Text style={styles.doneAddrText} numberOfLines={2}>{deliveryStop?.address || "Destination"}</Text>
                 </View>
               </View>
             </View>
           ) : (
             <>
-              {/* Order Summary / Task Details */}
-              <View style={[styles.successCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-                <Text style={[styles.successCardHeader, { color: colors.text }]}>
-                  {isHelper ? "Task Details" : "Delivered Items"}
-                </Text>
+              <View style={styles.doneCard}>
+                <Text style={styles.doneCardTitle}>{isHelper ? "Task details" : "Delivered items"}</Text>
                 {isHelper ? (
-                  <View style={{ gap: 8 }}>
-                    <Text style={{ fontSize: 14, color: colors.text }}>
-                      Service: <Text style={{ fontWeight: "700" }}>General Helper & Task Specialist</Text>
-                    </Text>
-                    <Text style={{ fontSize: 14, color: colors.text }}>
-                      Booked Location: <Text style={{ fontWeight: "700" }}>{stops?.[0]?.address || "N/A"}</Text>
-                    </Text>
-                  </View>
-                ) : (
+                  <Text style={styles.doneAddrText}>Booked location: {stops?.[0]?.address || "—"}</Text>
+                ) : foodItems.length > 0 ? (
                   foodItems.map((item: any, idx: number) => (
-                    <View key={idx} style={styles.successItemRow}>
-                      <Text style={[styles.successItemQty, { color: colors.primary }]}>{item.quantity}x</Text>
-                      <Text style={[styles.successItemName, { color: colors.text }]}>{item.name}</Text>
+                    <View key={idx} style={{ flexDirection: "row", gap: 8, paddingVertical: 4 }}>
+                      <Text style={[styles.doneAddrText, { fontFamily: fontFamilies.body.bold, color: accent.accent }]}>{item.quantity}x</Text>
+                      <Text style={styles.doneAddrText}>{item.name}</Text>
                     </View>
                   ))
-                )}
-                {!isHelper && foodItems.length === 0 && (
-                  <Text style={{ color: colors.textMuted, fontSize: 13 }}>Items successfully handed over.</Text>
+                ) : (
+                  <Text style={styles.doneAddrText}>Items successfully handed over.</Text>
                 )}
               </View>
-
-              {/* Delivery Address */}
               {deliveryStop?.address && (
-                <View style={[styles.successCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-                  <Text style={[styles.successCardHeader, { color: colors.text }]}>Delivery Address</Text>
-                  <Text style={[styles.successAddressText, { color: colors.textSecondary }]}>
-                    {deliveryStop.address}
-                  </Text>
+                <View style={styles.doneCard}>
+                  <Text style={styles.doneCardTitle}>Delivery address</Text>
+                  <Text style={styles.doneAddrText}>{deliveryStop.address}</Text>
                 </View>
               )}
             </>
           )}
 
-          {/* Feedback Section */}
-          <OrderReviewCard
-            orderId={currentOrderId || ""}
-            isRide={isRide}
-            isHelper={isHelper}
-            colors={colors}
-          />
+          <OrderReviewCard orderId={currentOrderId || ""} isRide={isRide} isHelper={isHelper} tokens={tokens} accent={accent} />
+          <View style={{ height: 8 }} />
         </ScrollView>
 
-        <View style={[styles.successFooter, { paddingBottom: insets.bottom || 12 }]}>
-          <TouchableOpacity style={[styles.successHomeBtn, { backgroundColor: colors.primary }]} onPress={handleBack}>
-            <Text style={styles.successHomeBtnText}>Go Back to Home</Text>
+        <View style={{ width: "100%", paddingHorizontal: 20, paddingTop: 8 }}>
+          <TouchableOpacity style={[styles.doneHomeBtn, { backgroundColor: accent.accent }]} onPress={handleBack}>
+            <Text style={[styles.doneHomeBtnText, { color: accent.on }]}>Back to orders</Text>
           </TouchableOpacity>
         </View>
       </View>
     );
   }
 
-  let bannerText = "Walk to your pickup-point";
-  let bannerColor = "#0EA5E9";
-  let etaHeader = "Pickup in ";
-  let etaValue = `${eta} mins`;
-  let etaSubtext = "Captain on the way";
+  // ---------------------------------------------------------------------
+  // Live tracking state
+  // ---------------------------------------------------------------------
+  let bannerText = isHelper ? "Helper is on the way" : isRide ? "Captain on the way" : "Heading to pickup";
+  if (status === "arrived_pickup") bannerText = isRide ? "Captain has arrived" : isHelper ? "Helper has arrived" : "Arrived at the store";
+  else if (status === "en_route_delivery") bannerText = isRide ? "Trip in progress" : isHelper ? "Task in progress" : "Out for delivery";
+  else if (status === "arrived_delivery") bannerText = isRide ? "Arrived at destination" : "Arrived at your location";
 
-  if (status === "arrived_pickup") {
-    bannerText = "Captain has arrived!";
-    bannerColor = "#16A34A";
-    etaHeader = "Meet at pickup point";
-    etaValue = "";
-    etaSubtext = "Your ride is waiting for you";
-  } else if (status === "en_route_delivery") {
-    bannerText = "Trip Started";
-    bannerColor = "#16A34A";
-    etaHeader = "Drop-off in ";
-    etaValue = `${eta} mins`;
-    etaSubtext = "Heading to your destination";
-  } else if (status === "arrived_delivery") {
-    bannerText = "Arrived at Destination";
-    bannerColor = "#16A34A";
-    etaHeader = "You have arrived!";
-    etaValue = "";
-    etaSubtext = "Please share the end ride OTP";
-  }
+  const timeline = buildTimeline(status, isRide, isHelper);
+  const pickupLabel = vendorName || pickupStop?.address || stops?.[0]?.address || "Pickup location";
 
   return (
     <View style={styles.root}>
@@ -759,366 +645,215 @@ export default function TrackingScreen() {
         polyline={["en_route_delivery", "arrived_delivery"].includes(status) ? route?.polyline : undefined}
         driverLocation={driverLocation}
         userLocation={userLocCoords}
-        radiusCenter={
-          stops?.[0]?.lat !== undefined && stops?.[0]?.lng !== undefined
-            ? { lat: stops[0].lat, lng: stops[0].lng }
-            : null
-        }
+        radiusCenter={stops?.[0]?.lat !== undefined && stops?.[0]?.lng !== undefined ? { lat: stops[0].lat, lng: stops[0].lng } : null}
         radiusMeters={radius ? radius * 1000 : undefined}
         style={StyleSheet.absoluteFill}
       />
 
-      <View
-        style={[
-          styles.topControls,
-          {
-            paddingTop: insets.top + (Platform.OS === "web" ? 67 : 0) + 12,
-          },
-        ]}
-        pointerEvents="box-none"
-      >
+      <View style={[styles.topBar, { paddingTop: insets.top + (Platform.OS === "web" ? 67 : 0) + 12 }]} pointerEvents="box-none">
         <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
-          <Feather name="arrow-left" size={22} color={colors.text} />
+          <Ionicons name="chevron-back" size={moderateScale(20)} color={tokens.text} />
         </TouchableOpacity>
-        <View style={styles.etaBadge}>
-          <View style={styles.etaDot} />
-          <Text style={styles.etaText}>ETA: {eta} mins away</Text>
+        <View style={[styles.etaChip, { backgroundColor: accent.accent }]}>
+          <Text style={[styles.etaChipText, { color: accent.on }]}>{status === "arrived_pickup" || status === "arrived_delivery" ? bannerText : `${bannerText} · ${eta} min`}</Text>
         </View>
-        {/* Spacer to keep ETA centered */}
-        <View style={{ width: 44 }} />
+        <View style={{ width: moderateScale(40) }} />
       </View>
 
-      <BottomSheet style={styles.bottomSheet} defaultHeight={Dimensions.get('window').height * 0.45} disableExpand={false}>
+      <BottomSheet style={styles.bottomSheet} defaultHeight={Dimensions.get("window").height * 0.5} disableExpand={false}>
         <ScrollView showsVerticalScrollIndicator={false}>
           {!driver ? (
-            <View style={styles.findingDriverContainer}>
-              <View style={styles.radarContainer}>
-                <Animated.View
-                  style={[
-                    styles.radarCircle,
-                    {
-                      borderColor: colors.primary,
-                      transform: [{
-                        scale: pulse1.interpolate({
-                          inputRange: [0, 1],
-                          outputRange: [1, 2.2],
-                        })
-                      }],
-                      opacity: pulse1.interpolate({
-                        inputRange: [0, 1],
-                        outputRange: [0.5, 0],
-                      })
-                    }
-                  ]}
-                />
-                <Animated.View
-                  style={[
-                    styles.radarCircle,
-                    {
-                      borderColor: colors.primary,
-                      transform: [{
-                        scale: pulse2.interpolate({
-                          inputRange: [0, 1],
-                          outputRange: [1, 2.2],
-                        })
-                      }],
-                      opacity: pulse2.interpolate({
-                        inputRange: [0, 1],
-                        outputRange: [0.5, 0],
-                      })
-                    }
-                  ]}
-                />
-                <View style={[styles.radarCenter, { backgroundColor: colors.primary }]}>
-                  <Feather name="search" size={24} color={colors.background} />
+            <View style={styles.findingWrap}>
+              <View style={styles.radarWrap}>
+                <Animated.View style={[styles.radarRing, { borderColor: accent.accent, transform: [{ scale: pulse1.interpolate({ inputRange: [0, 1], outputRange: [1, 2.2] }) }], opacity: pulse1.interpolate({ inputRange: [0, 1], outputRange: [0.5, 0] }) }]} />
+                <Animated.View style={[styles.radarRing, { borderColor: accent.accent, transform: [{ scale: pulse2.interpolate({ inputRange: [0, 1], outputRange: [1, 2.2] }) }], opacity: pulse2.interpolate({ inputRange: [0, 1], outputRange: [0.5, 0] }) }]} />
+                <View style={[styles.radarCenter, { backgroundColor: accent.accent }]}>
+                  <Ionicons name="search" size={22} color={accent.on} />
                 </View>
               </View>
-
-              <Text style={styles.findingTitle}>
-                {isRide ? "Finding your captain..." : (isHelper ? "Finding your helper..." : "Finding your delivery partner...")}
-              </Text>
-              <Text style={styles.findingSubtitle}>
-                {isRide ? "Scanning nearby captains within your surroundings..." : (isHelper ? "Connecting with qualified task specialists..." : "Scanning nearby delivery partners in your area...")}
-              </Text>
-
-              <View style={styles.progressTrack}>
-                <Animated.View
-                  style={[
-                    styles.progressBarActive,
-                    {
-                      transform: [{ translateX }],
-                    },
-                  ]}
-                />
-              </View>
+              <Text style={styles.findingTitle}>{isRide ? "Finding your captain…" : isHelper ? "Finding your helper…" : "Finding your delivery partner…"}</Text>
+              <Text style={styles.findingSubtitle}>This usually takes under a minute.</Text>
             </View>
           ) : (
             <>
-              {isRide ? (
-                <View style={[styles.rideDriverCardContainer, { backgroundColor: colors.surface }]}>
-                  {/* Blue Banner */}
-                  <View style={[styles.blueBanner, { backgroundColor: bannerColor }]}>
-                    <Text style={styles.blueBannerText}>{bannerText}</Text>
-                  </View>
-
-                  {/* ETA Section */}
-                  <View style={styles.rideEtaSection}>
-                    <Text style={[styles.pickupTimeText, { color: colors.text }]}>
-                      {etaHeader}<Text style={{ color: '#16A34A' }}>{etaValue}</Text>
-                    </Text>
-                    <Text style={styles.captainOnWayText}>{etaSubtext}</Text>
-                  </View>
-
-                  {/* PIN Section */}
-                  {startOtp && ["confirmed", "driver_assigned", "en_route_pickup", "arrived_pickup"].includes(status) && (
-                    <View style={styles.pinRow}>
-                      <Text style={[styles.pinLabel, { color: colors.textSecondary }]}>Start your order with PIN</Text>
-                      <View style={styles.pinBoxes}>
-                        {String(startOtp).split('').map((digit, i) => (
-                          <View key={i} style={[styles.pinBox, { borderColor: colors.border, backgroundColor: colors.surface }]}>
-                            <Text style={[styles.pinDigit, { color: colors.text }]}>{digit}</Text>
-                          </View>
-                        ))}
-                      </View>
-                    </View>
-                  )}
-
-                  {/* End Ride OTP Section */}
-                  {deliveryOtp && status === "arrived_delivery" && (
-                    <View style={styles.pinRow}>
-                      <Text style={[styles.pinLabel, { color: colors.textSecondary }]}>End Ride OTP</Text>
-                      <View style={styles.pinBoxes}>
-                        {String(deliveryOtp).split('').map((digit, i) => (
-                          <View key={i} style={[styles.pinBox, { borderColor: colors.border, backgroundColor: colors.surface }]}>
-                            <Text style={[styles.pinDigit, { color: colors.text }]}>{digit}</Text>
-                          </View>
-                        ))}
-                      </View>
-                    </View>
-                  )}
-
-                  {/* Driver Info */}
-                  <View style={[styles.rideDriverDetailsRow, { backgroundColor: colors.surfaceSecondary + "40" }]}>
-                    <View style={styles.rideDriverTextInfo}>
-                      <Text style={[styles.vehicleNumber, { color: colors.text }]}>{driver?.vehicleNumber || "Waiting for plate..."}</Text>
-                      <Text style={styles.vehicleModel}>{driver?.vehicleModel?.toUpperCase() || driver?.vehicle?.toUpperCase() || "UNKNOWN VEHICLE"}</Text>
-                      <Text style={styles.rideDriverName}>{driver?.name?.toUpperCase() || "DRIVER"}</Text>
-                    </View>
-                    <TouchableOpacity onPress={() => setDriverModalVisible(true)}>
-                      <View style={styles.rideDriverAvatarContainer}>
-                        <View style={[styles.rideDriverAvatar, { backgroundColor: colors.surfaceSecondary, borderColor: colors.border }]}>
-                          <Feather name="user" size={32} color={colors.textSecondary} />
+              {/* Timeline */}
+              <View style={styles.timelineBlock}>
+                {timeline.map((step, i) => (
+                  <View key={step.label} style={{ flexDirection: "row", gap: 12 }}>
+                    <View style={{ alignItems: "center" }}>
+                      {step.done ? (
+                        <View style={[styles.stepDotDone, { backgroundColor: accent.accent }]}>
+                          <Ionicons name="checkmark" size={11} color={accent.on} />
                         </View>
-                      </View>
-                    </TouchableOpacity>
-                  </View>
-
-                  {/* Action Buttons Row */}
-                  <View style={{ flexDirection: 'row', gap: 12, marginHorizontal: 16, marginTop: 16 }}>
-                    {/* Call Button */}
-                    <TouchableOpacity
-                      style={{ flex: 1, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface, borderRadius: 20, paddingVertical: 12, alignItems: 'center', justifyContent: 'center' }}
-                      onPress={() => Linking.openURL(`tel:${driver?.phone || "1234567890"}`)}
-                    >
-                      <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                        <Feather name="phone" size={18} color={colors.textSecondary} style={{ marginRight: 8 }} />
-                        <Text style={{ fontSize: 14, fontWeight: '600', color: colors.textSecondary }}>Call</Text>
-                      </View>
-                    </TouchableOpacity>
-
-                    {/* Chat/Message Button */}
-                    <TouchableOpacity
-                      style={{ flex: 1, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface, borderRadius: 20, paddingVertical: 12, alignItems: 'center', justifyContent: 'center' }}
-                      onPress={() => router.push("/chat")}
-                    >
-                      <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                        <Feather name="message-square" size={18} color={colors.primary} style={{ marginRight: 8 }} />
-                        <Text style={{ fontSize: 14, fontWeight: '600', color: colors.primary }}>Chat</Text>
-                      </View>
-                    </TouchableOpacity>
-                  </View>
-
-                  {/* Pickup Location & Trip Details */}
-                  <View style={styles.pickupLocationRow}>
-                    <View style={{ flex: 1 }}>
-                      <Text style={styles.pickupFromLabel}>Pickup From</Text>
-                      <Text style={[styles.pickupFromText, { color: colors.text }]} numberOfLines={1}>
-                        {stops?.[0]?.address || "Location"}
-                      </Text>
+                      ) : step.current ? (
+                        <View style={styles.stepDotCurrentWrap}>
+                          <View style={[styles.stepDotCurrentPulse, { backgroundColor: accent.accent }]} />
+                          <View style={[styles.stepDotCurrent, { backgroundColor: accent.accent }]} />
+                        </View>
+                      ) : (
+                        <View style={styles.stepDotFuture} />
+                      )}
+                      {i < timeline.length - 1 && <View style={[styles.stepLine, { backgroundColor: step.done ? accent.accent : tokens.borderStrong }]} />}
                     </View>
-                    <TouchableOpacity style={[styles.tripDetailsBtn, { borderColor: colors.border, backgroundColor: colors.surface }]} onPress={() => setTripModalVisible(true)}>
-                      <Text style={[styles.tripDetailsText, { color: colors.text }]}>Trip Details</Text>
-                    </TouchableOpacity>
+                    <View style={{ paddingBottom: 14 }}>
+                      <Text style={[styles.stepLabel, { color: step.current ? accent.accent : step.done ? tokens.text : tokens.muted }]}>{step.label}</Text>
+                      {i === 0 && orderCreatedAt && <Text style={styles.stepSub}>{formatClock(orderCreatedAt)}</Text>}
+                      {step.current && !isHelper && <Text style={styles.stepSub}>{eta} min away</Text>}
+                      {step.current && isHelper && helperStatus ? <Text style={styles.stepSub}>{helperStatus}</Text> : null}
+                    </View>
                   </View>
+                ))}
+              </View>
+
+              {/* Partner card */}
+              <View style={styles.partnerRow}>
+                <View style={styles.partnerAvatar}>
+                  <Ionicons name="person" size={22} color={tokens.sec} />
+                </View>
+                <View style={{ flex: 1, minWidth: 0 }}>
+                  <Text style={styles.partnerName} numberOfLines={1}>{driver.name || "Assigned partner"}</Text>
+                  <Text style={styles.partnerMeta}>{driver.vehicle && driver.vehicle !== "unknown" ? driver.vehicle.charAt(0).toUpperCase() + driver.vehicle.slice(1) : isHelper ? "Helper" : "Delivery partner"}</Text>
+                </View>
+                <TouchableOpacity style={[styles.circleBtn, { backgroundColor: accent.accent }]} onPress={() => Linking.openURL(`tel:${driver.phone || ""}`)}>
+                  <Ionicons name="call" size={17} color={accent.on} />
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.circleBtnOutline} onPress={() => router.push("/chat")}>
+                  <Ionicons name="chatbubble-outline" size={17} color={tokens.text} />
+                  {unreadCount > 0 && (
+                    <View style={[styles.badge, { backgroundColor: tokens.error }]}>
+                      <Text style={styles.badgeText}>{unreadCount}</Text>
+                    </View>
+                  )}
+                </TouchableOpacity>
+              </View>
+
+              {/* PIN blocks */}
+              {isRide && startOtp && ["confirmed", "driver_assigned", "en_route_pickup", "arrived_pickup"].includes(status) && (
+                <View style={[styles.pinCard, { backgroundColor: accent.skin, borderColor: accent.accent }]}>
+                  <Text style={[styles.pinLabel, { color: accent.accent }]}>Start ride PIN</Text>
+                  <View style={styles.pinBoxes}>
+                    {String(startOtp).split("").map((digit, i) => (
+                      <View key={i} style={[styles.pinBox, { borderColor: accent.accent }]}>
+                        <Text style={styles.pinDigit}>{digit}</Text>
+                      </View>
+                    ))}
+                  </View>
+                  <Text style={styles.pinHint}>Give this to your captain to start the trip.</Text>
+                </View>
+              )}
+              {isRide && deliveryOtp && status === "arrived_delivery" && (
+                <View style={[styles.pinCard, { backgroundColor: accent.skin, borderColor: accent.accent }]}>
+                  <Text style={[styles.pinLabel, { color: accent.accent }]}>End ride PIN</Text>
+                  <View style={styles.pinBoxes}>
+                    {String(deliveryOtp).split("").map((digit, i) => (
+                      <View key={i} style={[styles.pinBox, { borderColor: accent.accent }]}>
+                        <Text style={styles.pinDigit}>{digit}</Text>
+                      </View>
+                    ))}
+                  </View>
+                </View>
+              )}
+              {!isRide && !isHelper && deliveryOtp && (
+                <View style={[styles.pinCard, { backgroundColor: accent.skin, borderColor: accent.accent }]}>
+                  <Text style={[styles.pinLabel, { color: accent.accent }]}>Delivery PIN</Text>
+                  <View style={styles.pinBoxes}>
+                    {String(deliveryOtp).split("").map((digit, i) => (
+                      <View key={i} style={[styles.pinBox, { borderColor: accent.accent }]}>
+                        <Text style={styles.pinDigit}>{digit}</Text>
+                      </View>
+                    ))}
+                  </View>
+                  <Text style={styles.pinHint}>Only give this code when your items are safely received.</Text>
+                </View>
+              )}
+
+              {/* Helper live status */}
+              {isHelper && helperStatus ? (
+                <View style={[styles.helperUpdate, { backgroundColor: accent.skin }]}>
+                  <Text style={[styles.helperUpdateLabel, { color: accent.accent }]}>Helper update</Text>
+                  <Text style={styles.helperUpdateText}>{helperStatus}</Text>
+                </View>
+              ) : null}
+
+              {/* Addresses */}
+              <View style={styles.addrCard}>
+                <View style={styles.addrRail}>
+                  <View style={[styles.addrDot, { borderColor: accent.accent }]} />
+                  <View style={styles.addrLine} />
+                  <View style={[styles.addrDot, { backgroundColor: tokens.text, borderWidth: 0 }]} />
+                </View>
+                <View style={{ flex: 1, minWidth: 0, gap: 12 }}>
+                  <View>
+                    <Text style={styles.addrLabel}>{isRide ? "Pickup" : "Picked up from"}</Text>
+                    <Text style={styles.addrText} numberOfLines={1}>{pickupLabel}</Text>
+                  </View>
+                  <View>
+                    <Text style={styles.addrLabel}>{isRide ? "Drop-off" : "Delivering to"}</Text>
+                    <Text style={styles.addrText} numberOfLines={1}>{deliveryStop?.address || stops?.[stops.length - 1]?.address || "—"}</Text>
+                  </View>
+                </View>
+              </View>
+
+              {/* Footer actions */}
+              {isRide ? (
+                <View style={{ flexDirection: "row", gap: 10, marginTop: 4 }}>
+                  <TouchableOpacity style={styles.footerBtnOutline} onPress={handleShareTrip}>
+                    <Text style={styles.footerBtnOutlineText}>Share trip</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={[styles.footerBtnOutline, { borderColor: tokens.error }]} onPress={handleSOS}>
+                    <Text style={[styles.footerBtnOutlineText, { color: tokens.error }]}>Emergency</Text>
+                  </TouchableOpacity>
                 </View>
               ) : (
-                <>
-                  <View style={styles.driverCard}>
-                    <TouchableOpacity onPress={() => setDriverModalVisible(true)}>
-                      <View style={styles.driverAvatar}>
-                        <Feather name="user" size={28} color={colors.text} />
-                      </View>
-                    </TouchableOpacity>
-                    <View style={styles.driverInfo}>
-                      <Text style={styles.driverName}>{driver.name || "Assigned Driver"}</Text>
-                      <View style={styles.ratingRow}>
-                        <Feather name="star" size={12} color="#F59E0B" />
-                        <Text style={styles.ratingText}>{driver.rating || "4.9"}</Text>
-                      </View>
-                      <Text style={styles.driverMotto}>
-                        {isHelper ? "Here to help you with tasks" : "Loves delivering on time"}
-                      </Text>
-                    </View>
-                    <View style={styles.driverActions}>
-                      <TouchableOpacity
-                        style={[styles.actionBtn, { backgroundColor: "#EF4444" }]}
-                        onPress={handleSOS}
-                      >
-                        <Feather name="alert-triangle" size={18} color="#FFFFFF" />
-                      </TouchableOpacity>
-                      <TouchableOpacity
-                        style={styles.actionBtn}
-                        onPress={() => Linking.openURL(`tel:${driver.phone || "1234567890"}`)}
-                      >
-                        <Feather name="phone" size={18} color={colors.textSecondary} />
-                      </TouchableOpacity>
-                      <TouchableOpacity style={styles.actionBtn} onPress={() => router.push("/chat")}>
-                        <Feather name="message-square" size={18} color={colors.primary} />
-                        {unreadCount > 0 && (
-                          <View style={styles.badge}>
-                            <Text style={styles.badgeText}>{unreadCount}</Text>
-                          </View>
-                        )}
-                      </TouchableOpacity>
-                    </View>
-                  </View>
-
-                  <View style={styles.divider} />
-
-                  {!isRide && deliveryOtp && (
-                    <View style={styles.otpCard}>
-                      <Feather name="shield" size={20} color={colors.primary} />
-                      <View style={styles.otpTextContainer}>
-                        <Text style={styles.otpTitle}>Share OTP to receive order</Text>
-                        <Text style={styles.otpSubtitle}>Only give this code when your items are safely received</Text>
-                      </View>
-                      <View style={styles.otpBadge}>
-                        <Text style={styles.otpCode}>{deliveryOtp}</Text>
-                      </View>
-                    </View>
-                  )}
-
-                  {isHelper && helperStatus ? (
-                    <View style={{ backgroundColor: '#E0E7FF', padding: 12, borderRadius: 12, marginVertical: 10, borderWidth: 1, borderColor: '#C7D2FE' }}>
-                      <Text style={{ fontSize: 12, color: '#4F46E5', fontWeight: '700', marginBottom: 4 }}>HELPER UPDATE</Text>
-                      <Text style={{ fontSize: 15, color: '#312E81', fontWeight: '500' }}>{helperStatus}</Text>
-                    </View>
-                  ) : null}
-
-                  <OrderStatusTimeline currentStatus={status} serviceType={serviceType || undefined} />
-                </>
+                <View style={{ flexDirection: "row", gap: 10, marginTop: 4 }}>
+                  <TouchableOpacity style={styles.footerBtnOutline} onPress={() => setTripModalVisible(true)}>
+                    <Text style={styles.footerBtnOutlineText}>Order details</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={[styles.footerBtnOutline, { borderColor: tokens.error }]} onPress={handleSOS}>
+                    <Text style={[styles.footerBtnOutlineText, { color: tokens.error }]}>Help</Text>
+                  </TouchableOpacity>
+                </View>
               )}
+              <View style={{ height: 12 }} />
             </>
           )}
-
-          {/* Tracking Ad Banner */}
-          <View style={{ width: '100%', height: 120, position: 'relative', marginTop: 16, borderRadius: 12, overflow: 'hidden' }}>
-            <Image
-              source={{ uri: "https://images.unsplash.com/photo-1549488344-c628e5db369e?w=800" }}
-              style={{ width: '100%', height: '100%' }}
-              resizeMode="cover"
-            />
-            <View style={{ position: 'absolute', top: 8, right: 8, backgroundColor: 'rgba(0,0,0,0.5)', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
-              <Text style={{ color: '#fff', fontSize: 10, fontWeight: 'bold' }}>Ad</Text>
-            </View>
-            <View style={{ position: 'absolute', bottom: 0, left: 0, right: 0, backgroundColor: 'rgba(0,0,0,0.7)', paddingHorizontal: 12, paddingVertical: 8 }}>
-              <Text style={{ color: '#fff', fontSize: 14, fontWeight: '800' }}>Stay Hydrated on the go!</Text>
-              <Text style={{ color: '#E5E7EB', fontSize: 11, marginTop: 2 }}>Get 20% off on all soft drinks.</Text>
-            </View>
-          </View>
         </ScrollView>
       </BottomSheet>
-      <Modal visible={driverModalVisible} animationType="slide" transparent>
+
+      <Modal visible={tripModalVisible} animationType="slide" transparent onRequestClose={() => setTripModalVisible(false)}>
         <View style={styles.modalOverlay}>
-          <View style={[styles.modalContent, { backgroundColor: colors.surface }]}>
-            <TouchableOpacity style={styles.closeModalBtn} onPress={() => setDriverModalVisible(false)}>
-              <Feather name="x" size={20} color={colors.text} />
-            </TouchableOpacity>
-
-            <View style={styles.modalHero}>
-              <View style={[StyleSheet.absoluteFill, { borderTopLeftRadius: 24, borderTopRightRadius: 24, overflow: 'hidden' }]}>
-                {/* Modern Vibrant Gradient/Image Banner */}
-                <Image
-                  source={{ uri: "https://images.unsplash.com/photo-1579546929518-9e396f3cc809?w=800" }} // Vibrant colorful abstract or cityscape
-                  style={{ width: '100%', height: '100%' }}
-                  resizeMode="cover"
-                />
-                <View style={{ position: 'absolute', top: 0, bottom: 0, left: 0, right: 0, backgroundColor: 'rgba(0,0,0,0.2)' }} />
+          <TouchableOpacity style={StyleSheet.absoluteFill} activeOpacity={1} onPress={() => setTripModalVisible(false)} />
+          <View style={styles.modalContent}>
+            <View style={styles.sheetHandle} />
+            <Text style={styles.modalTitle}>Order details</Text>
+            <View style={{ flexDirection: "row", gap: 12, marginTop: 16, marginBottom: 20 }}>
+              <View style={styles.addrRail}>
+                <View style={[styles.addrDot, { borderColor: accent.accent }]} />
+                <View style={styles.addrLine} />
+                <View style={[styles.addrDot, { backgroundColor: tokens.text, borderWidth: 0 }]} />
               </View>
-            </View>
-
-            <View style={styles.modalDriverProfileContainer}>
-              <View style={styles.modalDriverAvatar}>
-                <Feather name="user" size={40} color={colors.textSecondary} />
-              </View>
-              <Text style={[styles.modalDriverName, { color: colors.text }]}>{driver?.name?.toUpperCase() || "DRIVER"}</Text>
-            </View>
-
-            <View style={styles.modalStatsRow}>
-              <View style={styles.modalStatItem}>
-                <Text style={styles.modalStatLabel}>Rating</Text>
-                <Text style={[styles.modalStatValue, { color: colors.text }]}>{driver?.rating || "4.8"} ★</Text>
-              </View>
-              <View style={styles.modalStatDivider} />
-              <View style={styles.modalStatItem}>
-                <Text style={styles.modalStatLabel}>Trips</Text>
-                <Text style={[styles.modalStatValue, { color: colors.text }]}>{driver?.trips || "0"}</Text>
-              </View>
-              <View style={styles.modalStatDivider} />
-              <View style={styles.modalStatItem}>
-                <Text style={styles.modalStatLabel}>Duration</Text>
-                <Text style={[styles.modalStatValue, { color: colors.text }]}>{driver?.duration || "New"}</Text>
-              </View>
-            </View>
-
-            <View style={{ height: 40 }} />
-          </View>
-        </View>
-      </Modal>
-
-      <Modal visible={tripModalVisible} animationType="slide" transparent>
-        <View style={styles.modalOverlay}>
-          <View style={[styles.modalContent, { backgroundColor: colors.surface }]}>
-            <TouchableOpacity style={styles.closeModalBtn} onPress={() => setTripModalVisible(false)}>
-              <Feather name="x" size={20} color={colors.text} />
-            </TouchableOpacity>
-
-            <View style={{ padding: 24, paddingTop: 40 }}>
-              <Text style={{ fontSize: 20, fontWeight: '800', color: colors.text, marginBottom: 20 }}>Trip Details</Text>
-
-              <View style={{ flexDirection: 'row', gap: 12, marginBottom: 24 }}>
-                <View style={{ width: 12, alignItems: 'center' }}>
-                  <View style={{ width: 12, height: 12, borderRadius: 6, backgroundColor: colors.success, marginTop: 4 }} />
-                  <View style={{ width: 2, flex: 1, backgroundColor: colors.border, marginVertical: 4 }} />
-                  <View style={{ width: 12, height: 12, borderRadius: 6, backgroundColor: colors.error, marginBottom: 4 }} />
+              <View style={{ flex: 1, gap: 20 }}>
+                <View>
+                  <Text style={styles.addrLabel}>PICKUP</Text>
+                  <Text style={[styles.addrText, { marginTop: 2 }]}>{pickupLabel}</Text>
                 </View>
-                <View style={{ flex: 1, gap: 24 }}>
-                  <View>
-                    <Text style={{ fontSize: 12, color: colors.textSecondary, fontWeight: '700', marginBottom: 2 }}>PICKUP</Text>
-                    <Text style={{ fontSize: 15, color: colors.text, fontWeight: '600' }}>{stops?.[0]?.address || "Pickup Location"}</Text>
-                  </View>
-                  <View>
-                    <Text style={{ fontSize: 12, color: colors.textSecondary, fontWeight: '700', marginBottom: 2 }}>DROP-OFF</Text>
-                    <Text style={{ fontSize: 15, color: colors.text, fontWeight: '600' }}>{stops?.[stops.length - 1]?.address || "Drop-off Location"}</Text>
-                  </View>
+                <View>
+                  <Text style={styles.addrLabel}>DROP-OFF</Text>
+                  <Text style={[styles.addrText, { marginTop: 2 }]}>{stops?.[stops.length - 1]?.address || "—"}</Text>
                 </View>
               </View>
-
-              <View style={{ flexDirection: 'row', justifyContent: 'space-between', borderTopWidth: 1, borderColor: colors.border, paddingTop: 16 }}>
-                <Text style={{ fontSize: 14, color: colors.textSecondary, fontWeight: '600' }}>Order ID</Text>
-                <Text style={{ fontSize: 14, color: colors.text, fontWeight: '800' }}>{currentOrderId?.substring(0, 8).toUpperCase()}</Text>
-              </View>
             </View>
+            <View style={styles.modalOrderIdRow}>
+              <Text style={styles.addrLabel}>ORDER ID</Text>
+              <Text style={styles.modalOrderIdValue}>{currentOrderId?.substring(0, 8).toUpperCase()}</Text>
+            </View>
+            {totalPrice != null && (
+              <View style={styles.modalOrderIdRow}>
+                <Text style={styles.addrLabel}>TOTAL</Text>
+                <Text style={styles.modalOrderIdValue}>₹{Math.round(totalPrice)}</Text>
+              </View>
+            )}
+            <View style={{ height: insets.bottom + 16 }} />
           </View>
         </View>
       </Modal>
@@ -1126,645 +861,102 @@ export default function TrackingScreen() {
   );
 }
 
-const createStyles = (colors: typeof Colors.light) => StyleSheet.create({
-  root: {
-    flex: 1,
-    backgroundColor: colors.background,
-  },
-  topControls: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    zIndex: 10,
-    paddingHorizontal: 20,
-  },
-  backBtn: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: colors.surface,
-    alignItems: "center",
-    justifyContent: "center",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 10,
-    elevation: 5,
-  },
-  etaBadge: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    backgroundColor: colors.surface,
-    paddingHorizontal: 20,
-    paddingVertical: 14,
-    borderRadius: 30,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 12,
-    elevation: 6,
-  },
-  etaDot: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    backgroundColor: colors.success,
-  },
-  etaText: {
-    fontSize: 17,
-    fontWeight: "700",
-    color: colors.text,
-  },
-  bottomSheet: {
-    position: "absolute",
-    bottom: 0,
-    left: 0,
-    right: 0,
-    paddingBottom: 0,
-  },
-  findingDriverContainer: {
-    paddingVertical: 40,
-    alignItems: 'center',
-    justifyContent: 'center',
-    width: '100%',
-    paddingHorizontal: 24,
-  },
-  radarContainer: {
-    width: 120,
-    height: 120,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 24,
-    position: 'relative',
-  },
-  radarCircle: {
-    position: 'absolute',
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    borderWidth: 2,
-  },
-  radarCenter: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    alignItems: 'center',
-    justifyContent: 'center',
-    zIndex: 10,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 4,
-  },
-  progressTrack: {
-    height: 4,
-    width: '100%',
-    borderRadius: 2,
-    backgroundColor: colors.borderLight,
-    overflow: "hidden",
-    position: "relative",
-    marginTop: 24,
-  },
-  progressBarActive: {
-    position: "absolute",
-    left: 0,
-    top: 0,
-    bottom: 0,
-    width: 120,
-    backgroundColor: colors.primary,
-    borderRadius: 2,
-  },
-  findingTitle: {
-    fontSize: 20,
-    fontWeight: '800',
-    color: colors.text,
-    textAlign: 'center',
-    marginBottom: 8,
-  },
-  findingSubtitle: {
-    fontSize: 14,
-    color: colors.textMuted,
-    textAlign: 'center',
-    paddingHorizontal: 40,
-  },
-  driverCard: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 14,
-    marginBottom: 16,
-  },
-  driverAvatar: {
-    width: 64,
-    height: 64,
-    borderRadius: 16,
-    backgroundColor: colors.surfaceSecondary,
-    alignItems: "center",
-    justifyContent: "center",
-    borderWidth: 2,
-    borderColor: colors.border,
-  },
-  driverInfo: {
-    flex: 1,
-    gap: 3,
-  },
-  driverName: {
-    fontSize: 18,
-    fontWeight: "700",
-    color: colors.text,
-  },
-  ratingRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-  },
-  ratingText: {
-    fontSize: 13,
-    fontWeight: "600",
-    color: colors.text,
-  },
-  driverMotto: {
-    fontSize: 12,
-    color: colors.textSecondary,
-  },
-  driverActions: {
-    flexDirection: "row",
-    gap: 8,
-  },
-  actionBtn: {
-    width: 44,
-    height: 44,
-    borderRadius: 12,
-    backgroundColor: colors.surfaceSecondary,
-    alignItems: "center",
-    justifyContent: "center",
-    position: "relative",
-  },
-  badge: {
-    position: "absolute",
-    top: -5,
-    right: -5,
-    backgroundColor: colors.error,
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    alignItems: "center",
-    justifyContent: "center",
-    borderWidth: 2,
-    borderColor: colors.surface,
-    elevation: 4,
-  },
-  badgeText: {
-    color: "#fff",
-    fontSize: 10,
-    fontWeight: "800",
-  },
-  divider: {
-    height: 1,
-    backgroundColor: colors.border,
-    marginBottom: 16,
-  },
-  nextStatusBtn: {
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 12,
-    paddingVertical: 12,
-    alignItems: "center",
-    marginTop: 8,
-  },
-  nextStatusText: {
-    fontSize: 13,
-    color: colors.textSecondary,
-    fontWeight: "500",
-  },
-  doneBtn: {
-    backgroundColor: colors.primary,
-    borderRadius: 16,
-    paddingVertical: 16,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 8,
-    marginTop: 10,
-    shadowColor: colors.primary,
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.3,
-    shadowRadius: 12,
-    elevation: 6,
-  },
-  doneBtnText: {
-    color: "#fff",
-    fontSize: 16,
-    fontWeight: "700",
-  },
-  otpCard: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: `${colors.primary}12`,
-    borderWidth: 1,
-    borderColor: `${colors.primary}30`,
-    borderRadius: 16,
-    padding: 8,
-    marginBottom: 10,
-    gap: 12,
-  },
-  otpTextContainer: {
-    flex: 1,
-    gap: 1,
-  },
-  otpTitle: {
-    fontSize: 13,
-    fontWeight: "700",
-    color: colors.text,
-  },
-  otpSubtitle: {
-    fontSize: 9,
-    color: colors.textMuted,
+const createStyles = (tokens: ThemeTokens, accent: ThemeTokens["services"]["food"]) =>
+  StyleSheet.create({
+    root: { flex: 1, backgroundColor: tokens.bg },
+    topBar: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", zIndex: 10, paddingHorizontal: 16 },
+    backBtn: {
+      width: moderateScale(40), height: moderateScale(40), borderRadius: moderateScale(20),
+      backgroundColor: tokens.surface, borderWidth: 1, borderColor: tokens.border, alignItems: "center", justifyContent: "center",
+      shadowColor: "#000", shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.1, shadowRadius: 10, elevation: 5,
+    },
+    etaChip: { borderRadius: 12, paddingHorizontal: 14, paddingVertical: 9, shadowColor: "#000", shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.12, shadowRadius: 10, elevation: 5 },
+    etaChipText: { fontFamily: fontFamilies.body.bold, fontSize: moderateScale(13) },
 
-  },
-  otpBadge: {
-    backgroundColor: colors.primary,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 10,
-  },
-  otpCode: {
-    color: "#fff",
-    fontSize: 16,
-    fontWeight: "800",
-    letterSpacing: 1.5,
-  },
-  successContainer: {
-    flex: 1,
-    paddingHorizontal: 24,
-    paddingTop: Platform.OS === "ios" ? 60 : 40,
-    alignItems: "center",
-  },
-  successHeaderCard: {
-    alignItems: "center",
-    marginVertical: 24,
-    gap: 12,
-  },
-  successIconCircle: {
-    width: 120,
-    height: 120,
-    borderRadius: 60,
-    alignItems: "center",
-    justifyContent: "center",
-    marginBottom: 8,
-  },
-  successTitle: {
-    fontSize: 21,
-    fontWeight: "900",
-    textAlign: "center",
-  },
-  successSubtitle: {
-    fontSize: 13,
-    textAlign: "center",
-    lineHeight: 18,
-    paddingHorizontal: 16,
-  },
-  successDetailsScroll: {
-    flex: 1,
-    width: "100%",
-    marginBottom: 16,
-  },
-  successCard: {
-    borderRadius: 16,
-    borderWidth: 1,
-    padding: 16,
-    marginBottom: 14,
-    width: "100%",
-  },
-  successCardHeader: {
-    fontSize: 11,
-    fontWeight: "800",
-    textTransform: "uppercase",
-    letterSpacing: 0.5,
-    marginBottom: 10,
-  },
-  successItemRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    paddingVertical: 4,
-  },
-  successItemQty: {
-    fontSize: 14,
-    fontWeight: "800",
-  },
-  successItemName: {
-    fontSize: 14,
-    fontWeight: "600",
-  },
-  successAddressText: {
-    fontSize: 13,
-    lineHeight: 18,
-  },
-  successFooter: {
-    width: "100%",
-    paddingTop: 12,
-  },
-  successHomeBtn: {
-    borderRadius: 14,
-    paddingVertical: 15,
-    alignItems: "center",
-    justifyContent: "center",
-    width: "100%",
-    elevation: 3,
-  },
-  successHomeBtnText: {
-    color: "#fff",
-    fontSize: 16,
-    fontWeight: "800",
-  },
-  reviewContainerCard: {
-    padding: 16,
-    borderRadius: 16,
-    borderWidth: 1,
-    alignItems: "center",
-    marginBottom: 16,
-    width: "100%",
-  },
-  reviewHeaderTitle: {
-    fontSize: 14,
-    fontWeight: "700",
-  },
-  tagChip: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 16,
-    borderWidth: 1,
-  },
-  tagChipText: {
-    fontSize: 12,
-    fontWeight: "500",
-  },
-  commentInput: {
-    width: "100%",
-    borderRadius: 12,
-    borderWidth: 1,
-    padding: 10,
-    fontSize: 13,
-    marginTop: 8,
-    textAlignVertical: "top",
-    minHeight: 50,
-  },
-  submitReviewBtn: {
-    width: "100%",
-    paddingVertical: 12,
-    borderRadius: 12,
-    alignItems: "center",
-    justifyContent: "center",
-    marginTop: 12,
-  },
-  submitReviewBtnText: {
-    fontWeight: "700",
-    color: "#FFFFFF",
-  },
-  rideDriverCardContainer: {
-    width: "100%",
-    borderRadius: 16,
-    overflow: "hidden",
-    marginTop: 0,
-    elevation: 4,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: -4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 10,
-  },
-  blueBanner: {
-    backgroundColor: "#0EA5E9",
-    paddingVertical: 12,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  blueBannerText: {
-    color: "#fff",
-    fontSize: 14,
-    fontWeight: "700",
-  },
-  rideEtaSection: {
-    paddingHorizontal: 16,
-    paddingVertical: 16,
-  },
-  pickupTimeText: {
-    fontSize: 22,
-    fontWeight: "800",
-  },
-  captainOnWayText: {
-    fontSize: 14,
-    color: "#64748B",
-    marginTop: 4,
-    fontWeight: "500",
-  },
-  pinRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: 16,
-    paddingBottom: 16,
-  },
-  pinLabel: {
-    fontSize: 13,
-    fontWeight: "600",
-    flex: 1,
-    marginRight: 8,
-  },
-  pinBoxes: {
-    flexDirection: "row",
-    gap: 8,
-  },
-  pinBox: {
-    width: 32,
-    height: 36,
-    borderWidth: 1,
-    borderRadius: 6,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  pinDigit: {
-    fontSize: 16,
-    fontWeight: "700",
-  },
-  rideDriverDetailsRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderRadius: 12,
-    marginHorizontal: 16,
-  },
-  rideDriverTextInfo: {
-    flex: 1,
-  },
-  vehicleNumber: {
-    fontSize: 18,
-    fontWeight: "800",
-    letterSpacing: 0.5,
-  },
-  vehicleModel: {
-    fontSize: 13,
-    color: "#64748B",
-    marginTop: 2,
-    fontWeight: "500",
-  },
-  rideDriverName: {
-    fontSize: 11,
-    color: "#64748B",
-    marginTop: 4,
-    fontWeight: "600",
-  },
-  rideDriverAvatarContainer: {
-    alignItems: "center",
-    position: "relative",
-  },
-  rideDriverAvatar: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    borderWidth: 1.5,
-    alignItems: "center",
-    justifyContent: "center",
-    overflow: "hidden",
-  },
-  topCaptainBadge: {
-    position: "absolute",
-    bottom: -8,
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: "#fff",
-  },
-  topCaptainText: {
-    fontSize: 9,
-    fontWeight: "800",
-    color: "#fff",
-  },
-  messageButton: {
-    marginHorizontal: 16,
-    marginTop: 16,
-    borderWidth: 1,
-    borderRadius: 20,
-    paddingVertical: 12,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  messageButtonInner: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
-  messageButtonText: {
-    fontSize: 14,
-    fontWeight: "600",
-  },
-  pickupLocationRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: 16,
-    paddingVertical: 16,
-    borderTopWidth: 1,
-    borderTopColor: "#F1F5F9",
-    marginTop: 16,
-  },
-  pickupFromLabel: {
-    fontSize: 11,
-    color: "#64748B",
-    fontWeight: "500",
-  },
-  pickupFromText: {
-    fontSize: 13,
-    fontWeight: "700",
-    marginTop: 2,
-    paddingRight: 16,
-  },
-  tripDetailsBtn: {
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderWidth: 1,
-    borderRadius: 16,
-  },
-  tripDetailsText: {
-    fontSize: 12,
-    fontWeight: "600",
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: "rgba(0,0,0,0.5)",
-    justifyContent: "flex-end",
-  },
-  modalContent: {
-    width: "100%",
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    position: "relative",
-  },
-  closeModalBtn: {
-    position: "absolute",
-    top: 16,
-    right: 16,
-    zIndex: 10,
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: "#fff",
-    alignItems: "center",
-    justifyContent: "center",
-    elevation: 4,
-  },
-  modalHero: {
-    height: 180,
-    width: "100%",
-  },
-  modalDriverProfileContainer: {
-    alignItems: "center",
-    marginTop: -40,
-  },
-  modalDriverAvatar: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: "#fff",
-    borderWidth: 4,
-    borderColor: "#fff",
-    alignItems: "center",
-    justifyContent: "center",
-    elevation: 4,
-  },
-  modalDriverName: {
-    fontSize: 18,
-    fontWeight: "800",
-    marginTop: 12,
-  },
-  modalStatsRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    marginTop: 24,
-  },
-  modalStatItem: {
-    alignItems: "center",
-    paddingHorizontal: 16,
-  },
-  modalStatLabel: {
-    fontSize: 12,
-    color: "#64748B",
-    fontWeight: "500",
-  },
-  modalStatValue: {
-    fontSize: 15,
-    fontWeight: "700",
-    marginTop: 4,
-  },
-  modalStatDivider: {
-    width: 1,
-    height: 30,
-    backgroundColor: "#E2E8F0",
-  },
-});
+    bottomSheet: { position: "absolute", bottom: 0, left: 0, right: 0, paddingHorizontal: 20, paddingBottom: 0 },
+
+    findingWrap: { alignItems: "center", justifyContent: "center", paddingVertical: 28 },
+    radarWrap: { width: 110, height: 110, alignItems: "center", justifyContent: "center", marginBottom: 18 },
+    radarRing: { position: "absolute", width: 76, height: 76, borderRadius: 999, borderWidth: 2 },
+    radarCenter: { width: 56, height: 56, borderRadius: 999, alignItems: "center", justifyContent: "center" },
+    findingTitle: { fontFamily: fontFamilies.heading.semibold, fontSize: moderateScale(19), color: tokens.text, textAlign: "center" },
+    findingSubtitle: { fontFamily: fontFamilies.body.regular, fontSize: moderateScale(13), color: tokens.sec, marginTop: 6, textAlign: "center" },
+
+    timelineBlock: { paddingTop: 14, marginBottom: 8 },
+    stepDotDone: { width: 20, height: 20, borderRadius: 10, alignItems: "center", justifyContent: "center" },
+    stepDotCurrentWrap: { width: 20, height: 20, alignItems: "center", justifyContent: "center" },
+    stepDotCurrentPulse: { position: "absolute", width: 20, height: 20, borderRadius: 10, opacity: 0.3 },
+    stepDotCurrent: { width: 11, height: 11, borderRadius: 6 },
+    stepDotFuture: { width: 18, height: 18, borderRadius: 9, borderWidth: 2, borderColor: tokens.borderStrong, backgroundColor: tokens.surface },
+    stepLine: { width: 2, flex: 1, minHeight: 16, marginTop: 2 },
+    stepLabel: { fontFamily: fontFamilies.body.semibold, fontSize: moderateScale(14) },
+    stepSub: { fontFamily: fontFamilies.body.medium, fontSize: moderateScale(12), color: tokens.sec, marginTop: 2 },
+
+    partnerRow: {
+      flexDirection: "row", alignItems: "center", gap: 12, paddingVertical: 14, marginBottom: 10,
+      borderTopWidth: 1, borderBottomWidth: 1, borderColor: tokens.border,
+    },
+    partnerAvatar: { width: 46, height: 46, borderRadius: 999, backgroundColor: tokens.sunken, borderWidth: 1, borderColor: tokens.border, alignItems: "center", justifyContent: "center" },
+    partnerName: { fontFamily: fontFamilies.body.semibold, fontSize: moderateScale(15), color: tokens.text },
+    partnerMeta: { fontFamily: fontFamilies.body.medium, fontSize: moderateScale(12), color: tokens.sec, marginTop: 2 },
+    circleBtn: { width: 40, height: 40, borderRadius: 999, alignItems: "center", justifyContent: "center" },
+    circleBtnOutline: { width: 40, height: 40, borderRadius: 999, borderWidth: 1, borderColor: tokens.borderStrong, alignItems: "center", justifyContent: "center", position: "relative" },
+    badge: { position: "absolute", top: -4, right: -4, minWidth: 16, height: 16, borderRadius: 8, alignItems: "center", justifyContent: "center", borderWidth: 2, borderColor: tokens.surface, paddingHorizontal: 2 },
+    badgeText: { color: "#fff", fontSize: 9, fontFamily: fontFamilies.body.bold },
+
+    pinCard: { borderWidth: 1, borderRadius: 16, padding: 14, marginBottom: 12 },
+    pinLabel: { fontFamily: fontFamilies.body.bold, fontSize: moderateScale(11), letterSpacing: 1, textTransform: "uppercase" },
+    pinBoxes: { flexDirection: "row", gap: 8, marginTop: 10 },
+    pinBox: { flex: 1, borderWidth: 1, borderRadius: 10, paddingVertical: 10, alignItems: "center", backgroundColor: tokens.surface },
+    pinDigit: { fontFamily: fontFamilies.heading.bold, fontSize: moderateScale(18), color: tokens.text },
+    pinHint: { fontFamily: fontFamilies.body.regular, fontSize: moderateScale(12), color: tokens.sec, marginTop: 10, lineHeight: 17 },
+
+    helperUpdate: { borderRadius: 14, padding: 13, marginBottom: 14 },
+    helperUpdateLabel: { fontFamily: fontFamilies.body.bold, fontSize: moderateScale(10), letterSpacing: 1, textTransform: "uppercase" },
+    helperUpdateText: { fontFamily: fontFamilies.body.medium, fontSize: moderateScale(14), color: tokens.text, marginTop: 4 },
+
+    addrCard: { flexDirection: "row", gap: 12, backgroundColor: tokens.bg, borderWidth: 1, borderColor: tokens.border, borderRadius: 14, padding: 14, marginBottom: 16 },
+    addrRail: { width: 12, alignItems: "center", paddingTop: 4 },
+    addrDot: { width: 9, height: 9, borderRadius: 999, borderWidth: 2.5 },
+    addrLine: { width: 2, flex: 1, minHeight: 20, backgroundColor: tokens.borderStrong, marginVertical: 4 },
+    addrLabel: { fontFamily: fontFamilies.body.bold, fontSize: moderateScale(10), letterSpacing: 1, textTransform: "uppercase", color: tokens.muted },
+    addrText: { fontFamily: fontFamilies.body.medium, fontSize: moderateScale(14), color: tokens.text, marginTop: 3 },
+
+    footerBtnOutline: { flex: 1, borderWidth: 1, borderColor: tokens.borderStrong, borderRadius: 14, minHeight: moderateScale(48), alignItems: "center", justifyContent: "center" },
+    footerBtnOutlineText: { fontFamily: fontFamilies.body.semibold, fontSize: moderateScale(14), color: tokens.sec },
+
+    modalOverlay: { flex: 1, justifyContent: "flex-end", backgroundColor: "rgba(0,0,0,0.45)" },
+    modalContent: { backgroundColor: tokens.surface, borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingHorizontal: 20, paddingTop: 12 },
+    sheetHandle: { width: 38, height: 4, borderRadius: 2, backgroundColor: tokens.borderStrong, alignSelf: "center", marginBottom: 14 },
+    modalTitle: { fontFamily: fontFamilies.heading.semibold, fontSize: moderateScale(20), color: tokens.text },
+    modalOrderIdRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", borderTopWidth: 1, borderColor: tokens.border, paddingVertical: 14 },
+    modalOrderIdValue: { fontFamily: fontFamilies.body.bold, fontSize: moderateScale(14), color: tokens.text },
+
+    // Completed screen
+    doneRoot: { flex: 1, backgroundColor: tokens.bg, alignItems: "center" },
+    doneHead: { alignItems: "center", paddingHorizontal: 24, marginBottom: 8 },
+    doneCheck: { width: 64, height: 64, borderRadius: 999, backgroundColor: tokens.success, alignItems: "center", justifyContent: "center", marginBottom: 14 },
+    doneTitle: { fontFamily: fontFamilies.heading.semibold, fontSize: moderateScale(24), letterSpacing: -0.3, color: tokens.text, textAlign: "center" },
+    doneSubtitle: { fontFamily: fontFamilies.body.regular, fontSize: moderateScale(14), lineHeight: moderateScale(20), color: tokens.sec, textAlign: "center", marginTop: 8, paddingHorizontal: 12 },
+    donePrice: { fontFamily: fontFamilies.body.semibold, fontSize: moderateScale(14), color: tokens.text, marginTop: 8 },
+    doneCard: { backgroundColor: tokens.surface, borderWidth: 1, borderColor: tokens.border, borderRadius: 16, padding: 16, marginTop: 14 },
+    doneCardTitle: { fontFamily: fontFamilies.body.bold, fontSize: moderateScale(11), letterSpacing: 0.6, textTransform: "uppercase", color: tokens.muted, marginBottom: 10 },
+    doneAddrText: { fontFamily: fontFamilies.body.medium, fontSize: moderateScale(14), lineHeight: moderateScale(19), color: tokens.text },
+    dotSmall: { width: 8, height: 8, borderRadius: 4 },
+    doneHomeBtn: { borderRadius: 14, minHeight: moderateScale(52), alignItems: "center", justifyContent: "center" },
+    doneHomeBtnText: { fontFamily: fontFamilies.body.bold, fontSize: moderateScale(15) },
+
+    reviewCard: { backgroundColor: tokens.surface, borderWidth: 1, borderColor: tokens.border, borderRadius: 16, padding: 16, marginTop: 14 },
+    reviewTitle: { fontFamily: fontFamilies.heading.semibold, fontSize: moderateScale(17), color: tokens.text },
+    submittedPill: { flexDirection: "row", alignItems: "center", gap: 4, backgroundColor: tokens.successSkin, borderRadius: 12, paddingHorizontal: 10, paddingVertical: 4 },
+    submittedPillText: { fontFamily: fontFamilies.body.semibold, fontSize: moderateScale(11) },
+    reviewTagChip: { borderRadius: 999, paddingHorizontal: 12, paddingVertical: 8 },
+    reviewTagChipText: { fontFamily: fontFamilies.body.medium, fontSize: moderateScale(12) },
+    reviewComment: { fontFamily: fontFamilies.body.regular, fontStyle: "italic", fontSize: moderateScale(13), color: tokens.sec, marginTop: 10 },
+    reviewCommentInput: {
+      borderWidth: 1, borderColor: tokens.border, borderRadius: 12, padding: 12, fontFamily: fontFamilies.body.regular, fontSize: moderateScale(13),
+      color: tokens.text, marginTop: 14, minHeight: 60, textAlignVertical: "top",
+    },
+    reviewSubmitBtn: { borderRadius: 14, minHeight: moderateScale(50), alignItems: "center", justifyContent: "center", marginTop: 14 },
+    reviewSubmitBtnText: { fontFamily: fontFamilies.body.bold, fontSize: moderateScale(15) },
+  });

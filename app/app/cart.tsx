@@ -1,614 +1,484 @@
-import React from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
+  ActivityIndicator,
   Image,
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
   View,
-  StatusBar,
 } from "react-native";
 import { Feather, Ionicons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { moderateScale } from "react-native-size-matters";
+import { designTokens, type ThemeTokens } from "@/constants/colors";
+import { fontFamilies } from "@/constants/typography";
+import { useThemeStore } from "@/contexts/themeStore";
 import { useCartStore } from "@/contexts/cartStore";
 import { customFetch } from "@/utils/api/custom-fetch";
-import { useHomeStore } from "@/contexts/homeStore";
-
-const DELIVERY_FEE_ORIGINAL = 199;
-const DELIVERY_FEE = 39; 
-const TAXES_AND_FEES = 85;
-const SERVICE_FEE = 49;
-const DISCOUNT = 160;
-
-const getMockCustomization = (itemName: string) => {
-  if (itemName.toLowerCase().includes("pancake")) {
-    return "Pancakes, Bacon, Coffee - Medium, Hash Brown Sticks";
-  }
-  if (itemName.toLowerCase().includes("burger")) {
-    return "Small Bun (4\"), Two Small Beef Patties, Tomato, Lettuce, Pickles, Diced Onions, Mustard";
-  }
-  return "Standard preparation";
-};
-
-const COMPLEMENTS = [
-  { id: '1', name: 'Medium Drink', price: 149, image: 'https://images.unsplash.com/photo-1556881286-fc6915169721?w=200' },
-  { id: '2', name: 'Large Drink', price: 199, image: 'https://images.unsplash.com/photo-1556881286-fc6915169721?w=200' },
-  { id: '3', name: 'French Fries', price: 129, image: 'https://images.unsplash.com/photo-1576107232684-1279f3908594?w=200' },
-];
+import { AppTabBar, useAppTabBarHeight } from "@/components/AppTabBar";
 
 export default function CartScreen() {
   const insets = useSafeAreaInsets();
-  const { vendorName } = useLocalSearchParams();
+  const tabBarHeight = useAppTabBarHeight();
+  const { theme } = useThemeStore();
+  const tokens = designTokens[theme];
+  const { vendorName: paramVendorName } = useLocalSearchParams();
   const { items, getTotalPrice, vendorId, updateQuantity, addItem } = useCartStore();
-  const [fetchedVendorName, setFetchedVendorName] = React.useState<string | null>(null);
-  const [menuItems, setMenuItems] = React.useState<any[]>([]);
 
-  React.useEffect(() => {
-    if (vendorId) {
-      customFetch<any>(`/api/v1/vendors/${vendorId}`)
-        .then(v => {
-          if (v && v.name) setFetchedVendorName(v.name);
+  // The cart doesn't currently track which service (food vs meat) its
+  // vendor belongs to, so this always renders in the food accent.
+  const accent = tokens.services.food;
+  const styles = useMemo(() => createStyles(tokens, accent), [theme]);
+
+  const [fetchedVendorName, setFetchedVendorName] = useState<string | null>(null);
+  const [deliveryFee, setDeliveryFee] = useState<number | null>(null);
+  const [menuItems, setMenuItems] = useState<any[]>([]);
+  const [recentOrders, setRecentOrders] = useState<any[]>([]);
+  const [loadingRecent, setLoadingRecent] = useState(false);
+
+  const [showPromoInput, setShowPromoInput] = useState(false);
+  const [promoCode, setPromoCode] = useState("");
+  const [appliedPromo, setAppliedPromo] = useState<any>(null);
+  const [isApplyingPromo, setIsApplyingPromo] = useState(false);
+  const [promoError, setPromoError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!vendorId) return;
+    // Only food vendors expose a public by-id lookup today — meat centers
+    // don't, so their delivery fee genuinely can't be sourced here yet.
+    customFetch<any>(`/api/v1/vendors/${vendorId}`)
+      .then((v) => {
+        if (v?.name) setFetchedVendorName(v.name);
+        if (typeof v?.deliveryFee === "number") setDeliveryFee(v.deliveryFee);
+      })
+      .catch(() => {});
+  }, [vendorId]);
+
+  useEffect(() => {
+    if (!vendorId) return;
+    customFetch<any[]>(`/api/v1/food/vendor/${vendorId}`)
+      .then((data) => {
+        if (data?.length) setMenuItems(data);
+        else fetchMeatMenu();
+      })
+      .catch(fetchMeatMenu);
+
+    function fetchMeatMenu() {
+      customFetch<any[]>(`/api/v1/meat/menu/${vendorId}`)
+        .then((meatData) => {
+          if (Array.isArray(meatData)) {
+            setMenuItems(
+              meatData.map((item: any) => ({
+                ...item,
+                isVeg: false,
+                images: item.images || [item.image || "https://images.unsplash.com/photo-1587593810167-a84920ea0781?w=400"],
+                description: item.description || `Fresh ${item.name} - ${item.weight}`,
+              }))
+            );
+          }
         })
         .catch(() => {});
     }
   }, [vendorId]);
 
-  React.useEffect(() => {
-    if (vendorId) {
-      customFetch<any[]>(`/api/v1/food/vendor/${vendorId}`)
-        .then(data => {
-          if (data && Array.isArray(data) && data.length > 0) {
-            setMenuItems(data);
-          } else {
-            // Try fetching meat menu
-            customFetch<any[]>(`/api/v1/meat/menu/${vendorId}`)
-              .then(meatData => {
-                if (meatData && Array.isArray(meatData)) {
-                  const normalized = meatData.map((item: any) => ({
-                    ...item,
-                    isVeg: false,
-                    images: item.images || [item.image || "https://images.unsplash.com/photo-1587593810167-a84920ea0781?w=400"],
-                    description: item.description || `Fresh ${item.name} - ${item.weight}`,
-                  }));
-                  setMenuItems(normalized);
-                }
-              })
-              .catch(() => {});
-          }
-        })
-        .catch(() => {
-          customFetch<any[]>(`/api/v1/meat/menu/${vendorId}`)
-            .then(meatData => {
-              if (meatData && Array.isArray(meatData)) {
-                const normalized = meatData.map((item: any) => ({
-                  ...item,
-                  isVeg: false,
-                  images: item.images || [item.image || "https://images.unsplash.com/photo-1587593810167-a84920ea0781?w=400"],
-                  description: item.description || `Fresh ${item.name} - ${item.weight}`,
-                }));
-                setMenuItems(normalized);
-              }
-            })
-            .catch(() => {});
+  // Empty-cart "order again" — real order history, best-effort vendor name.
+  useEffect(() => {
+    if (items.length > 0) return;
+    setLoadingRecent(true);
+    customFetch<any[]>("/api/v1/orders")
+      .then((orders) => {
+        const withVendor = (orders || []).filter((o) => o.vendor);
+        const seen = new Set<string>();
+        const deduped = withVendor.filter((o) => {
+          const vId = typeof o.vendor === "object" ? o.vendor._id : o.vendor;
+          if (seen.has(vId)) return false;
+          seen.add(vId);
+          return true;
         });
-    }
-  }, [vendorId]);
+        setRecentOrders(deduped.slice(0, 3));
+      })
+      .catch(() => {})
+      .finally(() => setLoadingRecent(false));
+  }, [items.length]);
 
-  const complements = React.useMemo(() => {
-    return menuItems.filter(menuItem => !items.some(cartItem => cartItem._id === menuItem._id));
-  }, [menuItems, items]);
+  const complements = useMemo(
+    () => menuItems.filter((m) => !items.some((c) => c._id === m._id)),
+    [menuItems, items]
+  );
 
-  const displayVendorName = vendorName ? String(vendorName) : (fetchedVendorName || "Whataburger");
-
+  const displayVendorName = paramVendorName ? String(paramVendorName) : fetchedVendorName || "your vendor";
   const subtotal = getTotalPrice();
-  const total = Math.round((subtotal + TAXES_AND_FEES + DELIVERY_FEE + SERVICE_FEE - DISCOUNT) * 100) / 100;
-  const originalTotal = Math.round((subtotal + TAXES_AND_FEES + DELIVERY_FEE_ORIGINAL + SERVICE_FEE) * 100) / 100;
+
+  let discount = 0;
+  if (appliedPromo) {
+    if (appliedPromo.discountType === "PERCENTAGE") {
+      discount = (subtotal * appliedPromo.discountValue) / 100;
+      if (appliedPromo.maxDiscount) discount = Math.min(discount, appliedPromo.maxDiscount);
+    } else {
+      discount = appliedPromo.discountValue;
+    }
+  }
+  const total = Math.max(0, Math.round((subtotal + (deliveryFee || 0) - discount) * 100) / 100);
+
+  const handleApplyPromo = async () => {
+    if (!promoCode.trim()) return;
+    setIsApplyingPromo(true);
+    setPromoError(null);
+    try {
+      const response = await customFetch<any>("/api/v1/orders/validate-coupon", {
+        method: "POST",
+        body: JSON.stringify({ code: promoCode.trim(), cartTotal: subtotal }),
+      });
+      if (response?.code) {
+        setAppliedPromo(response);
+        setShowPromoInput(false);
+      }
+    } catch (error: any) {
+      setPromoError((error?.message || "Invalid promo code").replace(/^HTTP \d+.*?: /, "").trim());
+    } finally {
+      setIsApplyingPromo(false);
+    }
+  };
 
   const goToCheckout = () => {
     router.push({
       pathname: "/checkout",
       params: {
         subtotal: String(subtotal),
-        taxes: String(TAXES_AND_FEES),
-        deliveryFee: String(DELIVERY_FEE),
+        deliveryFee: deliveryFee != null ? String(deliveryFee) : "",
+        discount: String(discount),
+        couponCode: appliedPromo?.code || "",
         total: String(total),
         vendorName: displayVendorName,
       },
     });
   };
 
-  return (
-    <View style={styles.container}>
-      <StatusBar barStyle="dark-content" translucent backgroundColor="transparent" />
-      
-      {/* Header Layout */}
-      <View style={[styles.header, { paddingTop: insets.top + 16 }]}>
-        <TouchableOpacity style={styles.headerButton} onPress={() => router.back()}>
-          <Feather name="x" size={moderateScale(28)} color="#000000" />
-        </TouchableOpacity>
-        
-        <View style={styles.headerTitleContainer}>
-          <Text style={styles.headerSubtitle}>Your cart from</Text>
-          <Text style={styles.headerTitle} numberOfLines={1} ellipsizeMode="tail">{displayVendorName}</Text>
+  if (items.length === 0) {
+    const lastOrder = recentOrders[0];
+    const lastVendorName = lastOrder && typeof lastOrder.vendor === "object" ? lastOrder.vendor.name : null;
+    const daysAgo = lastOrder ? Math.max(0, Math.floor((Date.now() - new Date(lastOrder.createdAt).getTime()) / 86400000)) : null;
+
+    return (
+      <View style={styles.root}>
+        <View style={[styles.header, { paddingTop: insets.top + 6 }]}>
+          <TouchableOpacity style={styles.iconBtn} onPress={() => router.back()}>
+            <Ionicons name="chevron-back" size={moderateScale(20)} color={tokens.text} />
+          </TouchableOpacity>
+          <Text style={styles.headerTitleSolo}>Cart</Text>
         </View>
-        <View style={{ width: 40 }} />
+
+        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: tabBarHeight + 24 }}>
+          <View style={styles.emptyWrap}>
+            <View style={styles.emptyIconCircle}>
+              <Ionicons name="bag-outline" size={moderateScale(30)} color={accent.accent} />
+            </View>
+            <Text style={styles.emptyTitle}>Your cart is empty</Text>
+            <Text style={styles.emptySubtitle}>
+              {lastVendorName
+                ? `Nothing here yet. Your last order was ${lastVendorName}, ${daysAgo === 0 ? "today" : `${daysAgo} day${daysAgo === 1 ? "" : "s"} ago`}.`
+                : "Nothing here yet — find something to add from a restaurant or meat center."}
+            </Text>
+            <TouchableOpacity style={styles.primaryBtn} activeOpacity={0.85} onPress={() => router.replace("/(tabs)")}>
+              <Text style={styles.primaryBtnText}>Browse restaurants</Text>
+            </TouchableOpacity>
+            {lastVendorName && (
+              <TouchableOpacity
+                style={styles.secondaryBtn}
+                activeOpacity={0.85}
+                onPress={() =>
+                  router.push({
+                    pathname: "/restaurant-menu",
+                    params: { id: typeof lastOrder.vendor === "object" ? lastOrder.vendor._id : lastOrder.vendor, name: lastVendorName },
+                  })
+                }
+              >
+                <Text style={styles.secondaryBtnText}>Order from {lastVendorName} again</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+
+          {recentOrders.length > 0 && (
+            <View style={styles.recentSection}>
+              <Text style={styles.recentLabel}>Order again</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 12 }}>
+                {recentOrders.map((o) => {
+                  const vName = typeof o.vendor === "object" ? o.vendor.name : "Vendor";
+                  const vId = typeof o.vendor === "object" ? o.vendor._id : o.vendor;
+                  return (
+                    <TouchableOpacity
+                      key={o._id}
+                      style={styles.recentCard}
+                      activeOpacity={0.85}
+                      onPress={() => router.push({ pathname: "/restaurant-menu", params: { id: vId, name: vName } })}
+                    >
+                      <View style={styles.recentImagePlaceholder} />
+                      <Text style={styles.recentName} numberOfLines={1}>{vName}</Text>
+                      <Text style={styles.recentMeta}>₹{Math.round(o.totalPrice || 0)}</Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </ScrollView>
+            </View>
+          )}
+          {loadingRecent && <ActivityIndicator style={{ marginTop: 20 }} color={accent.accent} />}
+        </ScrollView>
+
+        <AppTabBar active="home" accent="food" />
+      </View>
+    );
+  }
+
+  return (
+    <View style={styles.root}>
+      <View style={[styles.header, { paddingTop: insets.top + 6 }]}>
+        <TouchableOpacity style={styles.iconBtn} onPress={() => router.back()}>
+          <Ionicons name="chevron-back" size={moderateScale(20)} color={tokens.text} />
+        </TouchableOpacity>
+        <View style={{ minWidth: 0 }}>
+          <Text style={styles.headerEyebrow}>Your cart from</Text>
+          <Text style={styles.headerTitle} numberOfLines={1}>{displayVendorName}</Text>
+        </View>
       </View>
 
-      <ScrollView
-        contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 180 }]}
-        showsVerticalScrollIndicator={false}
-      >
-        <View style={styles.divider} />
-
-        {/* Order Items List */}
-        <View style={styles.itemsListContainer}>
-          {items.map((item, index) => (
-            <View key={item._id}>
-              <View style={styles.itemCard}>
-                <View style={styles.itemImageContainer}>
-                  <Image
-                    source={{ uri: item.images?.[0] || "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=300" }}
-                    style={styles.itemImage}
-                  />
-                </View>
-                
-                <View style={styles.itemDetails}>
-                  <Text style={styles.itemName}>{item.name}</Text>
-                  <Text style={styles.itemCustomization}>
-                    {getMockCustomization(item.name)}
-                  </Text>
-                  <View style={styles.priceAndQtyRow}>
-                    <Text style={styles.itemPrice}>₹{item.price.toFixed(2)}</Text>
-                    <View style={styles.qtyController}>
-                        <TouchableOpacity
-                          onPress={() => updateQuantity(item._id, item.quantity - 1)}
-                          style={styles.qtyBtn}
-                        >
-                          <Feather name="minus" size={moderateScale(16)} color="#000000" />
-                        </TouchableOpacity>
-                        <Text style={styles.qtyText}>{item.quantity}</Text>
-                        <TouchableOpacity
-                          onPress={() => updateQuantity(item._id, item.quantity + 1)}
-                          style={styles.qtyBtn}
-                        >
-                          <Feather name="plus" size={moderateScale(16)} color="#000000" />
-                        </TouchableOpacity>
+      <ScrollView contentContainerStyle={{ paddingBottom: insets.bottom + 160 }} showsVerticalScrollIndicator={false}>
+        <View style={styles.section}>
+          <View style={styles.itemsCard}>
+            {items.map((item, idx) => (
+              <View key={item._id} style={[styles.itemRow, idx < items.length - 1 && styles.itemRowDivider]}>
+                <View style={styles.itemThumbWrap}>
+                  {item.images?.[0] ? (
+                    <Image source={{ uri: item.images[0] }} style={styles.itemThumb} />
+                  ) : (
+                    <View style={[styles.itemThumb, styles.itemThumbFallback]}>
+                      <Ionicons name="restaurant-outline" size={moderateScale(16)} color={tokens.muted} />
                     </View>
+                  )}
+                  <View style={[styles.dietIcon, { borderColor: item.isVeg ? tokens.veg : tokens.nonveg }]}>
+                    {item.isVeg ? (
+                      <View style={[styles.vegDot, { backgroundColor: tokens.veg }]} />
+                    ) : (
+                      <View style={styles.nonvegTriangle} />
+                    )}
                   </View>
                 </View>
+                <View style={{ flex: 1, minWidth: 0 }}>
+                  <Text style={styles.itemName} numberOfLines={1}>{item.name}</Text>
+                  {!!item.category && <Text style={styles.itemMeta} numberOfLines={1}>{item.category}</Text>}
+                </View>
+                <View style={styles.qtyPill}>
+                  <TouchableOpacity style={styles.qtyBtn} onPress={() => updateQuantity(item._id, item.quantity - 1)}>
+                    <Feather name="minus" size={14} color={accent.accent} />
+                  </TouchableOpacity>
+                  <Text style={styles.qtyText}>{item.quantity}</Text>
+                  <TouchableOpacity style={styles.qtyBtn} onPress={() => updateQuantity(item._id, item.quantity + 1)}>
+                    <Feather name="plus" size={14} color={accent.accent} />
+                  </TouchableOpacity>
+                </View>
+                <Text style={styles.itemLinePrice}>₹{item.price * item.quantity}</Text>
               </View>
-              {index < items.length - 1 ? <View style={styles.itemDivider} /> : null}
-            </View>
-          ))}
+            ))}
+            <TouchableOpacity style={styles.addMoreRow} onPress={() => router.back()}>
+              <Text style={styles.addMoreText}>+ Add more items</Text>
+            </TouchableOpacity>
+          </View>
         </View>
 
-        <View style={styles.addMoreContainer}>
-          <TouchableOpacity style={styles.addMoreBtn} onPress={() => router.back()}>
-            <Feather name="plus" size={16} color="#000000" />
-            <Text style={styles.addMoreBtnText}>Add more items</Text>
-          </TouchableOpacity>
-        </View>
-
-        <View style={styles.thickDivider} />
-
-        {/* Complement Your Cart Section */}
         {complements.length > 0 && (
-          <>
-            <Text style={styles.sectionTitle}>Complement your cart</Text>
-            <ScrollView 
-              horizontal 
-              showsHorizontalScrollIndicator={false} 
-              contentContainerStyle={styles.complementsList}
-            >
-              {complements.map((comp) => (
+          <View style={styles.section}>
+            <Text style={styles.sectionLabel}>Complement your cart</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 12 }}>
+              {complements.slice(0, 8).map((comp) => (
                 <View key={comp._id} style={styles.complementCard}>
-                  <View style={styles.compImageContainer}>
-                    <Image source={{ uri: comp.images?.[0] || 'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=300' }} style={styles.compImage} />
-                    <TouchableOpacity
-                      onPress={() => addItem({ ...comp, _id: comp.id || comp._id, description: "", category: "", isVeg: true, images: [comp.image] }, vendorId)}
-                      style={styles.compAddBtn}
-                    >
-                      <Feather name="plus" size={moderateScale(16)} color="#000000" />
+                  <Image source={{ uri: comp.images?.[0] }} style={styles.complementImage} />
+                  <Text style={styles.complementName} numberOfLines={1}>{comp.name}</Text>
+                  <View style={styles.complementFooter}>
+                    <Text style={styles.complementPrice}>₹{comp.price}</Text>
+                    <TouchableOpacity style={styles.complementAddBtn} onPress={() => addItem(comp, vendorId!)}>
+                      <Ionicons name="add" size={16} color={accent.accent} />
                     </TouchableOpacity>
                   </View>
-                  <Text style={styles.compName} numberOfLines={1}>{comp.name}</Text>
-                  <Text style={styles.compPrice}>₹{comp.price.toFixed(2)}</Text>
                 </View>
               ))}
             </ScrollView>
-            <View style={styles.thickDivider} />
-          </>
+          </View>
         )}
 
-        {/* Order Summary Card */}
-        <View style={styles.summaryContainer}>
-          <Text style={styles.summaryTitle}>Summary</Text>
-          
-          <TouchableOpacity style={styles.dealsRow}>
-            <Ionicons name="pricetag-outline" size={moderateScale(24)} color="#000000" />
-            <Text style={styles.dealsText}>Offers and Coupons</Text>
+        <View style={styles.section}>
+          <TouchableOpacity
+            style={styles.couponRow}
+            activeOpacity={0.85}
+            onPress={() => (appliedPromo ? setAppliedPromo(null) : setShowPromoInput((s) => !s))}
+          >
+            <View style={styles.couponIconCircle}>
+              <Ionicons name="pricetag" size={moderateScale(15)} color={accent.accent} />
+            </View>
+            <View style={{ flex: 1, minWidth: 0 }}>
+              <Text style={styles.couponTitle}>{appliedPromo ? `${appliedPromo.code} applied` : "Have a promo code?"}</Text>
+              <Text style={styles.couponSub}>
+                {appliedPromo ? `You saved ₹${Math.round(discount)}` : "Tap to add it at checkout"}
+              </Text>
+            </View>
+            <Text style={styles.couponAction}>{appliedPromo ? "Remove" : "Apply"}</Text>
           </TouchableOpacity>
 
-          <View style={styles.summaryRow}>
-            <Text style={styles.summaryLabel}>Subtotal</Text>
-            <Text style={styles.summaryValue}>₹{subtotal.toFixed(2)}</Text>
-          </View>
-
-          <View style={styles.summaryRow}>
-            <View style={styles.labelContainer}>
-              <Text style={styles.summaryLabel}>Delivery Fee</Text>
-              <TouchableOpacity onPress={() => Alert.alert("Delivery Fee", "Standard delivery partner fee based on distance.")}>
-                <Feather name="info" size={moderateScale(12)} color="#74777f" />
+          {showPromoInput && !appliedPromo && (
+            <View style={styles.promoInputRow}>
+              <TextInput
+                style={styles.promoInput}
+                placeholder="Enter code"
+                placeholderTextColor={tokens.muted}
+                autoCapitalize="characters"
+                value={promoCode}
+                onChangeText={setPromoCode}
+              />
+              <TouchableOpacity style={styles.promoApplyBtn} onPress={handleApplyPromo} disabled={isApplyingPromo}>
+                {isApplyingPromo ? <ActivityIndicator size="small" color={accent.on} /> : <Text style={styles.promoApplyBtnText}>Apply</Text>}
               </TouchableOpacity>
             </View>
-            <View style={styles.feeContainer}>
-              <Text style={styles.crossedOutValue}>₹{DELIVERY_FEE_ORIGINAL.toFixed(2)}</Text>
-              <Text style={styles.summaryValue}>₹{DELIVERY_FEE.toFixed(2)}</Text>
-            </View>
-          </View>
+          )}
+          {!!promoError && <Text style={styles.promoError}>{promoError}</Text>}
+        </View>
 
-          <View style={styles.summaryRow}>
-            <View style={styles.labelContainer}>
-              <Text style={styles.summaryLabel}>Taxes & Charges</Text>
-              <TouchableOpacity onPress={() => Alert.alert("Taxes & Charges", "Includes GST and restaurant handling charges.")}>
-                <Feather name="info" size={moderateScale(12)} color="#74777f" />
-              </TouchableOpacity>
+        <View style={styles.section}>
+          <Text style={styles.sectionLabel}>Bill summary</Text>
+          <View style={styles.billCard}>
+            <View style={styles.billRow}>
+              <Text style={styles.billLabel}>Item total</Text>
+              <Text style={styles.billValue}>₹{subtotal}</Text>
             </View>
-            <Text style={styles.summaryValue}>₹{TAXES_AND_FEES.toFixed(2)}</Text>
-          </View>
-
-          <View style={styles.summaryRow}>
-            <View style={styles.labelContainer}>
-              <Text style={styles.summaryLabel}>Platform Fee</Text>
-              <TouchableOpacity onPress={() => Alert.alert("Platform Fee", "This small fee helps us run the platform efficiently.")}>
-                <Feather name="info" size={moderateScale(12)} color="#74777f" />
-              </TouchableOpacity>
-            </View>
-            <Text style={styles.summaryValue}>₹{SERVICE_FEE.toFixed(2)}</Text>
-          </View>
-
-          <View style={styles.totalRow}>
-            <Text style={styles.totalLabel}>Total</Text>
-            <View style={styles.totalValueContainer}>
-              <Text style={styles.crossedOutTotal}>₹{originalTotal.toFixed(2)}</Text>
-              <Text style={styles.finalTotalValue}>₹{total.toFixed(2)}</Text>
+            {deliveryFee != null ? (
+              <View style={styles.billRow}>
+                <Text style={styles.billLabel}>Delivery fee</Text>
+                <Text style={styles.billValue}>{deliveryFee === 0 ? "Free" : `₹${deliveryFee}`}</Text>
+              </View>
+            ) : (
+              <Text style={styles.billNote}>Delivery fee is confirmed at checkout.</Text>
+            )}
+            {appliedPromo && (
+              <View style={styles.billRow}>
+                <Text style={[styles.billLabel, { color: tokens.success }]}>Coupon {appliedPromo.code}</Text>
+                <Text style={[styles.billValue, { color: tokens.success }]}>−₹{Math.round(discount)}</Text>
+              </View>
+            )}
+            <View style={styles.billDivider} />
+            <View style={styles.billRow}>
+              <Text style={styles.billTotalLabel}>To pay</Text>
+              <Text style={styles.billTotalValue}>₹{total}</Text>
             </View>
           </View>
         </View>
       </ScrollView>
 
-      {/* Sticky Footer */}
-      <View style={[styles.stickyFooter, { paddingBottom: 12 }]}>
-        {items.length > 0 ? (
-          <TouchableOpacity 
-            style={styles.continueBtn} 
-            onPress={goToCheckout}
-            activeOpacity={0.9}
-          >
-            <Text style={styles.continueBtnText}>Continue</Text>
-          </TouchableOpacity>
-        ) : (
-          <TouchableOpacity 
-            style={[styles.continueBtn, { backgroundColor: '#74777f' }]} 
-            onPress={() => {
-              useHomeStore.getState().setActiveService('Food');
-              router.push("/(tabs)");
-            }}
-            activeOpacity={0.9}
-          >
-            <Text style={styles.continueBtnText}>Go back to Food Screen</Text>
-          </TouchableOpacity>
-        )}
+      <View style={[styles.footer, { paddingBottom: insets.bottom + 14 }]}>
+        <TouchableOpacity style={styles.continueBtn} activeOpacity={0.9} onPress={goToCheckout}>
+          <Text style={styles.continueBtnText}>Continue</Text>
+          <Text style={styles.continueBtnPrice}>· ₹{total}</Text>
+        </TouchableOpacity>
       </View>
     </View>
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#ffffff",
-  },
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: 16,
-    paddingBottom: 16,
-  },
-  headerButton: {
-    width: moderateScale(40),
-    height: moderateScale(40),
-    alignItems: "flex-start",
-    justifyContent: "center",
-  },
-  headerTitleContainer: {
-    alignItems: "flex-start",
-    flex: 1,
-    paddingLeft: 4,
-  },
-  headerSubtitle: {
-    fontSize: moderateScale(10),
-    color: "#191c1e",
-    fontWeight: "600",
-  },
-  headerTitle: {
-    fontSize: moderateScale(13),
-    fontWeight: "800",
-    color: "#000000",
-    marginTop: 2,
-  },
-  content: {
-    paddingTop: 0,
-  },
-  divider: {
-    height: 1,
-    backgroundColor: "#eceef0",
-    width: "100%",
-  },
-  thickDivider: {
-    height: 8,
-    backgroundColor: "#f5f5f5",
-    width: "100%",
-    marginVertical: 20,
-    borderTopWidth: 1,
-    borderBottomWidth: 1,
-    borderColor: "#eceef0",
-  },
-  itemsListContainer: {
-    paddingHorizontal: 20,
-    paddingTop: 10,
-  },
-  itemCard: {
-    flexDirection: "row",
-    paddingVertical: 20,
-  },
-  itemDivider: {
-    height: 1,
-    backgroundColor: "#eceef0",
-  },
-  itemImageContainer: {
-    width: 80,
-    height: 80,
-    marginRight: 16,
-    position: "relative",
-    justifyContent: "center",
-  },
-  itemImage: {
-    width: 80,
-    height: 80,
-    borderRadius: moderateScale(8),
-    resizeMode: "cover",
-  },
-  itemDetails: {
-    flex: 1,
-    justifyContent: "flex-start",
-    gap: 4,
-  },
-  itemName: {
-    fontSize: moderateScale(16),
-    fontWeight: "700",
-    color: "#000000",
-  },
-  itemCustomization: {
-    fontSize: moderateScale(14),
-    color: "#74777f",
-    lineHeight: moderateScale(20),
-  },
-  itemPrice: {
-    fontSize: moderateScale(16),
-    fontWeight: "700",
-    color: "#000000",
-  },
-  priceAndQtyRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    marginTop: 4,
-  },
-  qtyController: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#eceef0",
-    borderRadius: moderateScale(16),
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    gap: 12,
-  },
-  qtyBtn: {
-    padding: 4,
-  },
-  qtyText: {
-    fontSize: moderateScale(14),
-    fontWeight: "700",
-    color: "#000000",
-  },
-  addMoreContainer: {
-    alignItems: "flex-end",
-    paddingHorizontal: 20,
-    marginTop: 10,
-  },
-  addMoreBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#f2f2f2",
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: moderateScale(20),
-    gap: 6,
-  },
-  addMoreBtnText: {
-    fontSize: moderateScale(14),
-    fontWeight: "700",
-    color: "#000000",
-  },
-  sectionTitle: {
-    fontSize: moderateScale(18),
-    fontWeight: "800",
-    color: "#000000",
-    paddingHorizontal: 20,
-    marginBottom: 16,
-  },
-  complementsList: {
-    paddingHorizontal: 20,
-    gap: 16,
-  },
-  complementCard: {
-    width: 120,
-  },
-  compImageContainer: {
-    width: 120,
-    height: 120,
-    borderRadius: moderateScale(12),
-    borderWidth: 1,
-    borderColor: "#eceef0",
-    overflow: "hidden",
-    position: "relative",
-    marginBottom: 8,
-  },
-  compImage: {
-    width: "100%",
-    height: "100%",
-    resizeMode: "cover",
-  },
-  compAddBtn: {
-    position: "absolute",
-    bottom: 8,
-    right: 8,
-    backgroundColor: "#ffffff",
-    borderRadius: moderateScale(16),
-    width: moderateScale(32),
-    height: moderateScale(32),
-    alignItems: "center",
-    justifyContent: "center",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.15,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  compName: {
-    fontSize: moderateScale(14),
-    fontWeight: "600",
-    color: "#000000",
-    marginBottom: 4,
-  },
-  compPrice: {
-    fontSize: moderateScale(14),
-    color: "#74777f",
-  },
-  summaryContainer: {
-    paddingHorizontal: 20,
-    paddingBottom: 20,
-  },
-  summaryTitle: {
-    fontSize: moderateScale(20),
-    fontWeight: "800",
-    color: "#000000",
-    marginBottom: 16,
-  },
-  dealsRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-    paddingBottom: 16,
-    borderBottomWidth: 1,
-    borderColor: "#eceef0",
-    marginBottom: 16,
-  },
-  dealsText: {
-    fontSize: moderateScale(16),
-    fontWeight: "600",
-    color: "#000000",
-  },
-  summaryRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 12,
-  },
-  labelContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-  },
-  summaryLabel: {
-    fontSize: moderateScale(16),
-    fontWeight: "600",
-    color: "#43474e",
-  },
-  summaryValue: {
-    fontSize: moderateScale(16),
-    fontWeight: "600",
-    color: "#000000",
-  },
-  feeContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-  },
-  crossedOutValue: {
-    fontSize: moderateScale(16),
-    fontWeight: "600",
-    color: "#74777f",
-    textDecorationLine: "line-through",
-  },
-  totalRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginTop: 20,
-    marginBottom: 10,
-  },
-  totalLabel: {
-    fontSize: moderateScale(20),
-    fontWeight: "800",
-    color: "#000000",
-  },
-  totalValueContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-  },
-  crossedOutTotal: {
-    fontSize: moderateScale(18),
-    color: "#74777f",
-    fontWeight: "600",
-    textDecorationLine: "line-through",
-  },
-  finalTotalValue: {
-    fontSize: moderateScale(20),
-    fontWeight: "800",
-    color: "#000000",
-  },
-  stickyFooter: {
-    position: "absolute",
-    bottom: 0,
-    left: 0,
-    right: 0,
-    backgroundColor: "#ffffff",
-    
-    paddingTop: 16,
-    paddingHorizontal: 20,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: -4 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 10,
-  },
-  continueBtn: {
-    backgroundColor: "#000000",
-    borderRadius: moderateScale(12),
-    height: moderateScale(56),
-    alignItems: "center",
-    justifyContent: "center",
-    width: "100%",
-  },
-  continueBtnText: {
-    color: "#ffffff",
-    fontSize: moderateScale(18),
-    fontWeight: "700",
-  },
-});
+const createStyles = (tokens: ThemeTokens, accent: ThemeTokens["services"]["food"]) =>
+  StyleSheet.create({
+    root: { flex: 1, backgroundColor: tokens.bg },
+    header: { flexDirection: "row", alignItems: "center", gap: 12, paddingHorizontal: 16, paddingBottom: 12 },
+    iconBtn: {
+      width: moderateScale(40), height: moderateScale(40), borderRadius: moderateScale(20),
+      backgroundColor: tokens.surface, borderWidth: 1, borderColor: tokens.border, alignItems: "center", justifyContent: "center",
+    },
+    headerEyebrow: { fontFamily: fontFamilies.body.bold, fontSize: moderateScale(10), letterSpacing: 1, textTransform: "uppercase", color: tokens.muted },
+    headerTitle: { fontFamily: fontFamilies.body.semibold, fontSize: moderateScale(17), letterSpacing: -0.1, color: tokens.text, marginTop: 2 },
+    headerTitleSolo: { fontFamily: fontFamilies.body.semibold, fontSize: moderateScale(17), color: tokens.text },
+
+    section: { paddingHorizontal: 16, paddingTop: 18 },
+    sectionLabel: { fontFamily: fontFamilies.body.bold, fontSize: moderateScale(11), letterSpacing: 1, textTransform: "uppercase", color: tokens.muted, marginBottom: 12 },
+
+    itemsCard: { backgroundColor: tokens.surface, borderWidth: 1, borderColor: tokens.border, borderRadius: 18, paddingHorizontal: 14 },
+    itemRow: { flexDirection: "row", alignItems: "center", gap: 10, paddingVertical: 12 },
+    itemRowDivider: { borderBottomWidth: 1, borderBottomColor: tokens.border },
+    itemThumbWrap: { flexShrink: 0 },
+    itemThumb: { width: moderateScale(46), height: moderateScale(46), borderRadius: 10, backgroundColor: tokens.sunken },
+    itemThumbFallback: { alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: tokens.border },
+    dietIcon: {
+      position: "absolute", bottom: -4, left: -4, width: 16, height: 16, borderWidth: 1.5, borderRadius: 3,
+      backgroundColor: tokens.surface, alignItems: "center", justifyContent: "center",
+    },
+    vegDot: { width: 7, height: 7, borderRadius: 4 },
+    nonvegTriangle: { width: 0, height: 0, borderLeftWidth: 3.5, borderRightWidth: 3.5, borderBottomWidth: 6, borderLeftColor: "transparent", borderRightColor: "transparent", borderBottomColor: tokens.nonveg },
+    itemName: { fontFamily: fontFamilies.body.semibold, fontSize: moderateScale(15), color: tokens.text },
+    itemMeta: { fontFamily: fontFamilies.body.medium, fontSize: moderateScale(13), color: tokens.sec, marginTop: 2 },
+    qtyPill: {
+      flexDirection: "row", alignItems: "center", justifyContent: "space-between", width: moderateScale(92),
+      backgroundColor: accent.skin, borderWidth: 1, borderColor: accent.accent, borderRadius: 10, minHeight: moderateScale(34), flexShrink: 0,
+    },
+    qtyBtn: { width: 30, height: 34, alignItems: "center", justifyContent: "center" },
+    qtyText: { fontFamily: fontFamilies.body.bold, fontSize: moderateScale(14), color: accent.accent },
+    itemLinePrice: { fontFamily: fontFamilies.body.semibold, fontSize: moderateScale(15), color: tokens.text, width: 56, textAlign: "right", flexShrink: 0 },
+    addMoreRow: { paddingVertical: 13 },
+    addMoreText: { fontFamily: fontFamilies.body.bold, fontSize: moderateScale(13), color: accent.accent },
+
+    complementCard: { width: 132, backgroundColor: tokens.surface, borderWidth: 1, borderColor: tokens.border, borderRadius: 14, padding: 10 },
+    complementImage: { width: "100%", height: 72, borderRadius: 8, backgroundColor: tokens.sunken, marginBottom: 9 },
+    complementName: { fontFamily: fontFamilies.body.semibold, fontSize: moderateScale(14), color: tokens.text },
+    complementFooter: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: 7 },
+    complementPrice: { fontFamily: fontFamilies.body.semibold, fontSize: moderateScale(14), color: tokens.text },
+    complementAddBtn: { width: 28, height: 28, borderRadius: 9, borderWidth: 1, borderColor: accent.accent, alignItems: "center", justifyContent: "center" },
+
+    couponRow: {
+      flexDirection: "row", alignItems: "center", gap: 12, backgroundColor: tokens.surface,
+      borderWidth: 1, borderColor: accent.accent, borderStyle: "dashed", borderRadius: 16, padding: 14, minHeight: 56,
+    },
+    couponIconCircle: { width: 34, height: 34, borderRadius: 11, backgroundColor: accent.skin, alignItems: "center", justifyContent: "center", flexShrink: 0 },
+    couponTitle: { fontFamily: fontFamilies.body.semibold, fontSize: moderateScale(15), color: tokens.text },
+    couponSub: { fontFamily: fontFamilies.body.medium, fontSize: moderateScale(13), color: tokens.sec, marginTop: 2 },
+    couponAction: { fontFamily: fontFamilies.body.bold, fontSize: moderateScale(12), letterSpacing: 0.5, textTransform: "uppercase", color: accent.accent, flexShrink: 0 },
+    promoInputRow: { flexDirection: "row", gap: 10, marginTop: 10 },
+    promoInput: {
+      flex: 1, backgroundColor: tokens.surface, borderWidth: 1, borderColor: tokens.border, borderRadius: 12,
+      paddingHorizontal: 14, height: moderateScale(44), fontFamily: fontFamilies.body.medium, fontSize: moderateScale(14), color: tokens.text,
+    },
+    promoApplyBtn: { backgroundColor: accent.accent, borderRadius: 12, paddingHorizontal: 18, alignItems: "center", justifyContent: "center" },
+    promoApplyBtnText: { fontFamily: fontFamilies.body.bold, fontSize: moderateScale(13), color: accent.on },
+    promoError: { fontFamily: fontFamilies.body.medium, fontSize: moderateScale(12), color: tokens.error, marginTop: 8 },
+
+    billCard: { backgroundColor: tokens.surface, borderWidth: 1, borderColor: tokens.border, borderRadius: 18, padding: 16, gap: 11 },
+    billRow: { flexDirection: "row", justifyContent: "space-between" },
+    billLabel: { fontFamily: fontFamilies.body.regular, fontSize: moderateScale(15), color: tokens.sec },
+    billValue: { fontFamily: fontFamilies.body.medium, fontSize: moderateScale(15), color: tokens.text },
+    billNote: { fontFamily: fontFamilies.body.regular, fontSize: moderateScale(13), color: tokens.muted },
+    billDivider: { borderTopWidth: 1, borderTopColor: tokens.borderStrong, borderStyle: "dashed", marginTop: 3, paddingTop: 1 },
+    billTotalLabel: { fontFamily: fontFamilies.body.semibold, fontSize: moderateScale(17), color: tokens.text },
+    billTotalValue: { fontFamily: fontFamilies.heading.semibold, fontSize: moderateScale(24), letterSpacing: -0.3, color: tokens.text },
+
+    footer: {
+      position: "absolute", left: 0, right: 0, bottom: 0, backgroundColor: tokens.surface,
+      borderTopWidth: 1, borderTopColor: tokens.border, borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingHorizontal: 16, paddingTop: 14,
+    },
+    continueBtn: {
+      backgroundColor: accent.accent, borderRadius: 14, minHeight: moderateScale(52),
+      flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8,
+    },
+    continueBtnText: { fontFamily: fontFamilies.body.bold, fontSize: moderateScale(15), color: accent.on },
+    continueBtnPrice: { fontFamily: fontFamilies.body.bold, fontSize: moderateScale(15), color: accent.on, opacity: 0.85 },
+
+    emptyWrap: { alignItems: "center", paddingTop: 60, paddingHorizontal: 32 },
+    emptyIconCircle: { width: 76, height: 76, borderRadius: 24, backgroundColor: accent.skin, alignItems: "center", justifyContent: "center", marginBottom: 20 },
+    emptyTitle: { fontFamily: fontFamilies.heading.semibold, fontSize: moderateScale(22), letterSpacing: -0.2, color: tokens.text, textAlign: "center" },
+    emptySubtitle: { fontFamily: fontFamilies.body.regular, fontSize: moderateScale(15), lineHeight: moderateScale(21), color: tokens.sec, textAlign: "center", marginTop: 10, marginBottom: 22 },
+    primaryBtn: { width: "100%", backgroundColor: accent.accent, borderRadius: 14, minHeight: moderateScale(48), alignItems: "center", justifyContent: "center" },
+    primaryBtnText: { fontFamily: fontFamilies.body.bold, fontSize: moderateScale(15), color: accent.on },
+    secondaryBtn: { width: "100%", marginTop: 10, borderWidth: 1, borderColor: tokens.borderStrong, borderRadius: 14, minHeight: moderateScale(48), alignItems: "center", justifyContent: "center" },
+    secondaryBtnText: { fontFamily: fontFamilies.body.semibold, fontSize: moderateScale(15), color: accent.accent },
+
+    recentSection: { paddingHorizontal: 16, paddingTop: 36 },
+    recentLabel: { fontFamily: fontFamilies.body.bold, fontSize: moderateScale(11), letterSpacing: 1, textTransform: "uppercase", color: tokens.muted, marginBottom: 12 },
+    recentCard: { width: 150 },
+    recentImagePlaceholder: { width: 150, height: 100, borderRadius: 8, backgroundColor: tokens.sunken, borderWidth: 1, borderColor: tokens.border },
+    recentName: { fontFamily: fontFamilies.body.semibold, fontSize: moderateScale(14), color: tokens.text, marginTop: 8 },
+    recentMeta: { fontFamily: fontFamilies.body.medium, fontSize: moderateScale(13), color: tokens.sec, marginTop: 2 },
+  });

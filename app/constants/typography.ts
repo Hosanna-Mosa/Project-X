@@ -1,5 +1,25 @@
 import { moderateScale } from "react-native-size-matters";
 
+// Font families from the new design-system spec. Each RN <Text> needs an
+// exact fontFamily per weight (these are static font files, not a single
+// variable font), so pick the family by the weight you actually want.
+// `heading` (Familjen Grotesk) is for display/headline text; `body`
+// (Figtree) is for everything else — labels, paragraphs, buttons.
+export const fontFamilies = {
+  heading: {
+    regular: "FamiljenGrotesk_400Regular",
+    medium: "FamiljenGrotesk_500Medium",
+    semibold: "FamiljenGrotesk_600SemiBold",
+    bold: "FamiljenGrotesk_700Bold",
+  },
+  body: {
+    regular: "Figtree_400Regular",
+    medium: "Figtree_500Medium",
+    semibold: "Figtree_600SemiBold",
+    bold: "Figtree_700Bold",
+  },
+};
+
 export const typography = {
   // Global size configurations
   sizes: {

@@ -19,8 +19,6 @@ interface AuthState {
   requestOTP: (phone: string) => Promise<{ success: boolean; message: string }>;
   verifyOTP: (phone: string, code: string, role: string, name?: string, email?: string, password?: string) => Promise<{ success: boolean; isNewUser?: boolean }>;
   loginWithPassword: (phoneOrEmail: string, password: string, role: string) => Promise<{ success: boolean }>;
-  /** Registers a new user account and logs them in, saving the token */
-  register: (name: string, phone: string, email: string, password: string) => Promise<{ success: boolean }>;
   initializeAuth: () => Promise<void>;
   toggleFavorite: (restaurantId: string) => Promise<void>;
 }
@@ -32,7 +30,14 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   error: null,
   isInitialized: false,
 
-  setUser: (user) => set({ user }),
+  // Mirrored into AsyncStorage so the cached user initializeAuth() restores on
+  // the next cold start isn't a stale copy from sign-in time. Without this,
+  // fields edited after sign-in (email, username) came back missing until the
+  // profile refetch landed — and stayed missing if it failed.
+  setUser: (user) => {
+    set({ user });
+    if (user) AsyncStorage.setItem("user", JSON.stringify(user)).catch(() => {});
+  },
 
   setToken: (token) => {
     set({ token });
@@ -200,32 +205,4 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     }
   },
 
-  /**
-   * Dedicated signup action — calls /verify-otp with a fixed dummy code
-   * to create the account, then persists the returned token.
-   */
-  register: async (name: string, phone: string, email: string, password: string) => {
-    set({ loading: true, error: null });
-    try {
-      const response = await fetch(`${apiUrl}/api/v1/auth/verify-otp`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ phone, code: "123456", role: "USER", name, email, password }),
-      });
-      const data = await response.json();
-      set({ loading: false });
-
-      if (!response.ok) throw new Error(data.message || "Registration failed");
-
-      set({ user: data.user, token: data.token });
-      await Promise.all([
-        AsyncStorage.setItem("token", data.token),
-        AsyncStorage.setItem("user", JSON.stringify(data.user)),
-      ]);
-      return { success: true };
-    } catch (err: any) {
-      set({ loading: false, error: err.message });
-      throw err;
-    }
-  },
 }));

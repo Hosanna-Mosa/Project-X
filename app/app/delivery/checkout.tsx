@@ -1,6 +1,7 @@
-import React, { useEffect } from "react";
+import React, { useMemo, useState } from "react";
 import {
-  Platform,
+  ActivityIndicator,
+  Alert,
   ScrollView,
   StyleSheet,
   Text,
@@ -8,91 +9,80 @@ import {
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Feather } from "@expo/vector-icons";
+import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
-import Colors from "@/constants/colors";
+import { moderateScale } from "react-native-size-matters";
+import { designTokens, type ThemeTokens } from "@/constants/colors";
+import { fontFamilies } from "@/constants/typography";
+import { useThemeStore } from "@/contexts/themeStore";
 import { useDeliveryStore } from "@/contexts/deliveryStore";
 import { useAuthStore } from "@/contexts/authStore";
-import { useThemeStore } from "@/contexts/themeStore";
 import { RazorpayIntegration } from "@/utils/razorpay";
-import { Alert, ActivityIndicator } from "react-native";
-import Constants from "expo-constants";
+import { customFetch } from "@/utils/api/custom-fetch";
 
-const apiUrl = process.env.EXPO_PUBLIC_API_URL;
-
-export default function CheckoutScreen() {
+export default function DeliveryCheckoutScreen() {
   const insets = useSafeAreaInsets();
-  const [isProcessing, setIsProcessing] = React.useState(false);
-  const { stops, price, paymentMethod, setStatus, route, resetDelivery, setOrderId, setServiceType, vendorId } = useDeliveryStore();
-  const { user } = useAuthStore();
-
   const { theme } = useThemeStore();
-  const colors = Colors[theme];
-  const styles = React.useMemo(() => createStyles(colors), [theme]);
+  const tokens = designTokens[theme];
+  const accent = tokens.services.delivery;
+  const styles = useMemo(() => createStyles(tokens, accent), [theme]);
+
+  const [isProcessing, setIsProcessing] = useState(false);
+  const { stops, price, route, setStatus, setOrderId, setServiceType, vendorId } = useDeliveryStore();
+  const { user, token } = useAuthStore();
+
+  const itemsEstimate = useMemo(
+    () => stops.reduce((sum, s) => sum + (s.items || []).reduce((iSum, i) => iSum + (i.estimatedPrice || 0) * i.quantity, 0), 0),
+    [stops]
+  );
+  const deliveryFee = price ? Math.round((price.baseFee + price.distanceCost) * 100) / 100 : 0;
+  const stopCharges = price?.stopCharges ?? 0;
 
   const handleConfirm = async () => {
-    if (!user) {
-      Alert.alert("Authentication Required", "Please log in to confirm your order.");
+    if (!user || !token) {
+      Alert.alert("Login required", "Please log in to confirm your order.");
       return;
     }
     if (!price || stops.length === 0) return;
-    
+
     setIsProcessing(true);
     try {
-      // 1. Create Razorpay Order on Backend
-      const orderResponse = await fetch(`${apiUrl}/api/v1/payments/create-order`, {
+      const rzpOrder = await customFetch<any>("/api/v1/payments/create-order", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ amount: price.total }),
       });
-      const razorpayOrder = await orderResponse.json();
 
-      // 2. Open Razorpay Gateway
       const paymentResult = await RazorpayIntegration.open({
-        key: razorpayOrder.key,
-        amount: razorpayOrder.amount,
-        currency: razorpayOrder.currency,
-        name: razorpayOrder.name || "Precision Logistics",
-        order_id: razorpayOrder.id,
-        prefill: {
-          email: user?.email || razorpayOrder.prefill?.email || "customer@example.com",
-          contact: user?.phone || "",
-        },
-        theme: razorpayOrder.theme || { color: colors.primary },
+        key: rzpOrder.key,
+        amount: rzpOrder.amount,
+        currency: rzpOrder.currency,
+        name: rzpOrder.name,
+        order_id: rzpOrder.id,
+        prefill: { email: user?.email || rzpOrder.prefill?.email, contact: user?.phone || "" },
+        theme: rzpOrder.theme,
       });
 
-      // 3. Verify Payment AND Create Order
-      const verifyResponse = await fetch(`${apiUrl}/api/v1/payments/verify`, {
+      const verifyResponse = await customFetch<any>("/api/v1/payments/verify", {
         method: "POST",
-        headers: { 
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${useAuthStore.getState().token}`
-        },
         body: JSON.stringify({
           ...paymentResult,
           orderData: {
-            stops: stops.map(s => ({ ...s, items: s.items || [] })),
+            stops: stops.map((s) => ({ ...s, items: s.items || [] })),
             totalDistance: route?.totalDistance,
             totalPrice: price.total,
-            vendorId: vendorId,
-          }
+            vendorId,
+          },
         }),
       });
 
-      if (verifyResponse.ok) {
-        const data = await verifyResponse.json();
-        const finalOrder = data.order;
-        setOrderId(finalOrder._id || finalOrder.id);
-        setServiceType("delivery");
-        setStatus("confirmed");
-        Alert.alert("Success", "Delivery confirmed and paid!");
-        router.push("/tracking");
-      } else {
-        throw new Error("Payment verification or order creation failed");
-      }
+      const finalOrder = verifyResponse.order;
+      setOrderId(finalOrder._id || finalOrder.id);
+      setServiceType("delivery");
+      setStatus("confirmed");
+      router.push("/tracking");
     } catch (error: any) {
-      console.error("Order Creation Failed:", error);
-      Alert.alert("Error", error.message || "Failed to process order");
+      console.error("Delivery checkout failed:", error);
+      Alert.alert("Order failed", error?.message || "Unable to process your order.");
     } finally {
       setIsProcessing(false);
     }
@@ -100,441 +90,183 @@ export default function CheckoutScreen() {
 
   return (
     <View style={styles.root}>
-      <View
-        style={[
-          styles.header,
-          {
-            paddingTop: insets.top + (Platform.OS === "web" ? 67 : 16),
-          },
-        ]}
-      >
-        <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
-          <Feather name="arrow-left" size={18} color={colors.text} />
+      <View style={[styles.header, { paddingTop: insets.top + 6 }]}>
+        <TouchableOpacity style={styles.iconBtn} onPress={() => router.back()}>
+          <Ionicons name="chevron-back" size={moderateScale(20)} color={tokens.text} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Precision Logistics</Text>
-        <TouchableOpacity style={styles.avatarSm}>
-          <Feather name="user" size={16} color={colors.primary} />
-        </TouchableOpacity>
+        <View style={{ minWidth: 0 }}>
+          <Text style={styles.headerTitle}>Review route</Text>
+          <Text style={styles.headerSub}>
+            {stops.length} {stops.length === 1 ? "stop" : "stops"}
+            {route?.totalDistance != null ? ` · ${route.totalDistance} km` : ""}
+            {route?.estimatedTime != null ? ` · about ${route.estimatedTime} min` : ""}
+          </Text>
+        </View>
       </View>
 
-      <ScrollView
-        contentContainerStyle={[
-          styles.content,
-          {
-            paddingBottom: insets.bottom + (Platform.OS === "web" ? 34 : 120),
-          },
-        ]}
-        showsVerticalScrollIndicator={false}
-      >
-        <View style={styles.titleSection}>
-          <Text style={styles.title}>Order Summary</Text>
-          <Text style={styles.subtitle}>Review your route and delivery breakdown</Text>
-        </View>
-
-        <View style={styles.card}>
-          <View style={styles.cardHeader}>
-            <View style={styles.activeDot} />
-            <Text style={styles.cardTitle}>Active Route Stops</Text>
-          </View>
-
+      <ScrollView contentContainerStyle={{ paddingBottom: insets.bottom + 150 }} showsVerticalScrollIndicator={false}>
+        <View style={styles.section}>
+          <Text style={styles.sectionLabel}>Active route</Text>
           {stops.length === 0 ? (
             <View style={styles.emptyStops}>
-              <Feather name="map-pin" size={20} color={colors.textMuted} />
-              <Text style={styles.emptyText}>No stops added</Text>
+              <Ionicons name="location-outline" size={20} color={tokens.muted} />
+              <Text style={styles.emptyStopsText}>No stops added</Text>
             </View>
           ) : (
-            <View style={styles.stopsList}>
-              {stops.map((stop, i) => (
-                <View key={stop.id} style={styles.stopEntry}>
-                  <View style={styles.stopTimeline}>
-                    <View style={styles.stopDot}>
-                      <Feather name="map-pin" size={10} color={colors.primary} />
-                    </View>
-                    {i < stops.length - 1 && <View style={styles.stopLine} />}
-                  </View>
-                  <View style={styles.stopInfo}>
-                    <Text style={styles.stopOrderLabel}>STOP {String(i + 1).padStart(2, "0")}</Text>
-                    <Text style={styles.stopStoreName}>
-                      {stop.storeName || "Stop " + (i + 1)}
-                    </Text>
-                    <Text style={styles.stopAddress}>{stop.address}</Text>
-                    {stop.items && stop.items.map((item, j) => (
-                      <View key={j} style={styles.itemRow}>
-                        <Text style={styles.itemName}>
-                          {item.name} (x{item.quantity})
-                        </Text>
-                        <Text style={styles.itemPayment}>Store Payment</Text>
-                      </View>
-                    ))}
-                    {(!stop.items || stop.items.length === 0) && (
-                      <Text style={styles.noItemsText}>Items to be verified on-site</Text>
+            <View style={styles.routeCard}>
+              <View style={styles.routeRail}>
+                <View style={styles.pickupDot} />
+                {stops.map((_, i) => (
+                  <React.Fragment key={i}>
+                    <View style={styles.railLine} />
+                    <View style={styles.stopNumber}><Text style={styles.stopNumberText}>{i + 1}</Text></View>
+                  </React.Fragment>
+                ))}
+                <View style={styles.railLine} />
+                <View style={styles.dropSquare} />
+              </View>
+              <View style={{ flex: 1, minWidth: 0, gap: 12 }}>
+                <Text style={styles.routeStartEnd}>Start</Text>
+                {stops.map((stop) => (
+                  <View key={stop.id}>
+                    <Text style={styles.stopName} numberOfLines={1}>{stop.storeName || stop.address}</Text>
+                    {stop.items && stop.items.length > 0 && (
+                      <Text style={styles.stopMeta}>
+                        {stop.items.length} {stop.items.length === 1 ? "item" : "items"}
+                        {stop.items.some((i) => i.estimatedPrice != null) ? ` · ₹${stop.items.reduce((s, i) => s + (i.estimatedPrice || 0) * i.quantity, 0)} est.` : ""}
+                      </Text>
                     )}
                   </View>
-                </View>
-              ))}
+                ))}
+                <Text style={styles.routeStartEnd}>Drop</Text>
+              </View>
             </View>
           )}
         </View>
 
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>Delivery Breakdown</Text>
-          <View style={styles.feeRows}>
-            <View style={styles.feeRow}>
-              <Feather name="monitor" size={12} color={colors.textMuted} />
-              <Text style={styles.feeName}>Base Fee</Text>
-              <Text style={styles.feeAmount}>${price?.baseFee.toFixed(2) ?? "2.00"}</Text>
-            </View>
-            <View style={styles.feeRow}>
-              <Feather name="map-pin" size={12} color={colors.textMuted} />
-              <Text style={styles.feeName}>Distance Cost</Text>
-              <Text style={styles.feeAmount}>${price?.distanceCost.toFixed(2) ?? "4.50"}</Text>
-            </View>
-            <View style={styles.feeRow}>
-              <Feather name="git-branch" size={12} color={colors.textMuted} />
-              <Text style={styles.feeName}>Stop Charges ({stops.length})</Text>
-              <Text style={styles.feeAmount}>${price?.stopCharges.toFixed(2) ?? "3.00"}</Text>
-            </View>
-            <View style={styles.totalRow}>
-              <Text style={styles.totalLabel}>Total Amount</Text>
-              <Text style={styles.totalAmount}>${price?.total.toFixed(2) ?? "9.50"}</Text>
+        {itemsEstimate > 0 && (
+          <View style={styles.section}>
+            <Text style={styles.sectionLabel}>Store payment</Text>
+            <View style={styles.storePaymentCard}>
+              <View style={styles.storePaymentRow}>
+                <Text style={styles.storePaymentLabel}>Your estimate for items</Text>
+                <Text style={styles.storePaymentValue}>₹{itemsEstimate}</Text>
+              </View>
+              <Text style={styles.storePaymentNote}>
+                The rider pays at each counter and shares the bill photo. Items are verified on-site and the difference is settled after delivery — this amount is not charged now.
+              </Text>
             </View>
           </View>
+        )}
 
-          <View style={styles.infoBox}>
-            <Feather name="info" size={12} color="#F59E0B" />
-            <Text style={styles.infoText}>
-              Pay stores directly for items upon delivery. This total reflects the logistics service fee only.
-            </Text>
+        <View style={styles.section}>
+          <Text style={styles.sectionLabel}>Delivery charges</Text>
+          <View style={styles.billCard}>
+            <View style={styles.billRow}>
+              <Text style={styles.billLabel}>Delivery fee{route?.totalDistance != null ? ` · ${route.totalDistance} km` : ""}</Text>
+              <Text style={styles.billValue}>₹{deliveryFee}</Text>
+            </View>
+            {stopCharges > 0 && (
+              <View style={styles.billRow}>
+                <Text style={styles.billLabel}>Multi-stop charge · {stops.length} stops</Text>
+                <Text style={styles.billValue}>₹{stopCharges}</Text>
+              </View>
+            )}
+            <View style={styles.billDivider} />
+            <View style={styles.billRow}>
+              <Text style={styles.billTotalLabel}>To pay now</Text>
+              <Text style={styles.billTotalValue}>₹{price?.total ?? 0}</Text>
+            </View>
           </View>
         </View>
 
-        <View style={styles.paymentRow}>
-          <Feather name="credit-card" size={16} color={colors.textSecondary} />
-          <View style={styles.paymentInfo}>
-            <Text style={styles.paymentLabel}>PAYMENT METHOD</Text>
-            <Text style={styles.paymentValue}>•••• {paymentMethod.split(" ").pop()}</Text>
+        <View style={styles.section}>
+          <View style={styles.methodRow}>
+            <View style={styles.methodIcon}>
+              <Ionicons name="card-outline" size={moderateScale(17)} color={tokens.sec} />
+            </View>
+            <View style={{ flex: 1, minWidth: 0 }}>
+              <Text style={styles.methodTitle}>Razorpay</Text>
+              <Text style={styles.methodSub}>UPI, cards, wallets — choose on the next step</Text>
+            </View>
           </View>
-          <TouchableOpacity>
-            <Text style={styles.changeLink}>Change</Text>
-          </TouchableOpacity>
         </View>
       </ScrollView>
 
-      <View
-        style={[
-          styles.footer,
-          {
-            paddingBottom: insets.bottom + (Platform.OS === "web" ? 34 : 16),
-          },
-        ]}
-      >
-        <TouchableOpacity
-          style={[styles.confirmBtn, isProcessing && styles.confirmBtnDisabled]}
-          onPress={handleConfirm}
-          activeOpacity={0.88}
-          disabled={isProcessing}
-        >
+      <View style={[styles.footer, { paddingBottom: insets.bottom + 14 }]}>
+        <View style={styles.trustRow}>
+          <Ionicons name="lock-closed" size={13} color={tokens.success} />
+          <Text style={styles.trustText}>Encrypted and secure transaction · Razorpay</Text>
+        </View>
+        <TouchableOpacity style={[styles.payBtn, (isProcessing || stops.length === 0) && { opacity: 0.6 }]} onPress={handleConfirm} disabled={isProcessing || stops.length === 0}>
           {isProcessing ? (
-            <ActivityIndicator color="#fff" />
+            <ActivityIndicator size="small" color={accent.on} />
           ) : (
             <>
-              <Text style={styles.confirmBtnText}>Confirm & Pay ${price?.total.toFixed(2) ?? "0.00"}</Text>
-              <Feather name="shield" size={16} color="#fff" />
+              <Text style={styles.payBtnText}>Pay securely</Text>
+              <Text style={styles.payBtnPrice}>· ₹{price?.total ?? 0}</Text>
             </>
           )}
         </TouchableOpacity>
-        <Text style={styles.secureText}>ENCRYPTED & SECURE TRANSACTION</Text>
       </View>
     </View>
   );
 }
 
-const createStyles = (colors: typeof Colors.light) => StyleSheet.create({
-  root: {
-    flex: 1,
-    backgroundColor: colors.background,
-  },
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-    paddingHorizontal: 20,
-    paddingBottom: 12,
-    backgroundColor: colors.background,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-  },
-  backBtn: {
-    width: 34,
-    height: 34,
-    borderRadius: 10,
-    backgroundColor: colors.surface,
-    alignItems: "center",
-    justifyContent: "center",
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  headerTitle: {
-    flex: 1,
-    fontSize: 15,
-    fontWeight: "700",
-    color: colors.text,
-  },
-  avatarSm: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: `${colors.primary}15`,
-    alignItems: "center",
-    justifyContent: "center",
-    borderWidth: 2,
-    borderColor: colors.primary,
-  },
-  content: {
-    padding: 16,
-    gap: 12,
-  },
-  titleSection: {
-    gap: 4,
-  },
-  title: {
-    fontSize: 18,
-    fontWeight: "800",
-    color: colors.text,
-  },
-  subtitle: {
-    fontSize: 12,
-    color: colors.textSecondary,
-  },
-  card: {
-    backgroundColor: colors.surface,
-    borderRadius: 14,
-    padding: 14,
-    gap: 12,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: colors.surface === "#FFFFFF" ? 0.06 : 0.2,
-    shadowRadius: 10,
-    elevation: 4,
-  },
-  cardHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-  },
-  activeDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: colors.primary,
-  },
-  cardTitle: {
-    fontSize: 14,
-    fontWeight: "700",
-    color: colors.text,
-  },
-  emptyStops: {
-    alignItems: "center",
-    gap: 8,
-    paddingVertical: 16,
-  },
-  emptyText: {
-    color: colors.textMuted,
-    fontSize: 12,
-  },
-  stopsList: {
-    gap: 16,
-  },
-  stopEntry: {
-    flexDirection: "row",
-    gap: 12,
-  },
-  stopTimeline: {
-    alignItems: "center",
-    width: 24,
-  },
-  stopDot: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    backgroundColor: `${colors.primary}15`,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  stopLine: {
-    width: 2,
-    flex: 1,
-    backgroundColor: colors.border,
-    marginTop: 4,
-    minHeight: 20,
-  },
-  stopInfo: {
-    flex: 1,
-    gap: 4,
-    paddingBottom: 8,
-  },
-  stopOrderLabel: {
-    fontSize: 9,
-    fontWeight: "700",
-    color: colors.textMuted,
-    letterSpacing: 1,
-  },
-  stopStoreName: {
-    fontSize: 13,
-    fontWeight: "700",
-    color: colors.text,
-  },
-  stopAddress: {
-    fontSize: 11,
-    color: colors.textSecondary,
-    marginBottom: 4,
-  },
-  itemRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    backgroundColor: colors.surfaceSecondary,
-    borderRadius: 8,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    marginTop: 2,
-  },
-  itemName: {
-    fontSize: 11,
-    color: colors.text,
-    fontWeight: "500",
-  },
-  itemPayment: {
-    fontSize: 10,
-    color: colors.textMuted,
-    fontStyle: "italic",
-  },
-  noItemsText: {
-    fontSize: 11,
-    color: colors.textMuted,
-    fontStyle: "italic",
-  },
-  feeRows: {
-    gap: 12,
-  },
-  feeRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-  },
-  feeName: {
-    flex: 1,
-    fontSize: 12,
-    color: colors.textSecondary,
-  },
-  feeAmount: {
-    fontSize: 12,
-    fontWeight: "600",
-    color: colors.text,
-  },
-  totalRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    borderTopWidth: 1,
-    borderTopColor: colors.border,
-    paddingTop: 12,
-    marginTop: 4,
-  },
-  totalLabel: {
-    fontSize: 14,
-    fontWeight: "700",
-    color: colors.text,
-  },
-  totalAmount: {
-    fontSize: 18,
-    fontWeight: "800",
-    color: colors.primary,
-  },
-  infoBox: {
-    flexDirection: "row",
-    gap: 8,
-    backgroundColor: "#FEF3C7",
-    borderRadius: 12,
-    padding: 12,
-    alignItems: "flex-start",
-  },
-  infoText: {
-    flex: 1,
-    fontSize: 10,
-    color: "#92400E",
-    lineHeight: 16,
-  },
-  paymentRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-    backgroundColor: colors.surface,
-    borderRadius: 12,
-    padding: 12,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  paymentInfo: {
-    flex: 1,
-    gap: 2,
-  },
-  paymentLabel: {
-    fontSize: 9,
-    fontWeight: "600",
-    color: colors.textMuted,
-    letterSpacing: 0.5,
-  },
-  paymentValue: {
-    fontSize: 13,
-    fontWeight: "600",
-    color: colors.text,
-  },
-  changeLink: {
-    fontSize: 12,
-    fontWeight: "700",
-    color: colors.primary,
-  },
-  footer: {
-    position: "absolute",
-    bottom: 0,
-    left: 0,
-    right: 0,
-    backgroundColor: colors.background,
-    paddingHorizontal: 16,
-    paddingTop: 16,
-    borderTopWidth: 1,
-    borderTopColor: colors.border,
-    gap: 8,
-  },
-  confirmBtn: {
-    backgroundColor: colors.primary,
-    borderRadius: 14,
-    paddingVertical: 14,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 8,
-    shadowColor: colors.primary,
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.35,
-    shadowRadius: 16,
-    elevation: 8,
-  },
-  confirmBtnDisabled: {
-    backgroundColor: colors.textMuted,
-    shadowOpacity: 0,
-  },
-  confirmBtnText: {
-    color: "#fff",
-    fontSize: 15,
-    fontWeight: "700",
-  },
-  secureText: {
-    textAlign: "center",
-    fontSize: 9,
-    fontWeight: "600",
-    color: colors.textMuted,
-    letterSpacing: 1,
-  },
-});
+const createStyles = (tokens: ThemeTokens, accent: ThemeTokens["services"]["delivery"]) =>
+  StyleSheet.create({
+    root: { flex: 1, backgroundColor: tokens.bg },
+    header: { flexDirection: "row", alignItems: "center", gap: 12, paddingHorizontal: 16, paddingBottom: 10 },
+    iconBtn: {
+      width: moderateScale(40), height: moderateScale(40), borderRadius: moderateScale(20),
+      backgroundColor: tokens.surface, borderWidth: 1, borderColor: tokens.border, alignItems: "center", justifyContent: "center",
+    },
+    headerTitle: { fontFamily: fontFamilies.body.semibold, fontSize: moderateScale(17), color: tokens.text },
+    headerSub: { fontFamily: fontFamilies.body.medium, fontSize: moderateScale(12), color: tokens.sec, marginTop: 2 },
+
+    section: { paddingHorizontal: 16, paddingTop: 18 },
+    sectionLabel: { fontFamily: fontFamilies.body.bold, fontSize: moderateScale(11), letterSpacing: 1, textTransform: "uppercase", color: tokens.muted, marginBottom: 10 },
+
+    emptyStops: { alignItems: "center", gap: 8, paddingVertical: 20 },
+    emptyStopsText: { fontFamily: fontFamilies.body.medium, fontSize: moderateScale(13), color: tokens.muted },
+
+    routeCard: { flexDirection: "row", gap: 12, backgroundColor: tokens.surface, borderWidth: 1, borderColor: tokens.border, borderRadius: 18, padding: 14 },
+    routeRail: { width: 18, alignItems: "center", paddingTop: 6, gap: 4 },
+    pickupDot: { width: 10, height: 10, borderRadius: 5, borderWidth: 2.5, borderColor: accent.accent },
+    railLine: { width: 2, flex: 1, minHeight: 18, backgroundColor: tokens.borderStrong },
+    stopNumber: { width: 18, height: 18, borderRadius: 9, backgroundColor: accent.accent, alignItems: "center", justifyContent: "center" },
+    stopNumberText: { fontFamily: fontFamilies.body.bold, fontSize: moderateScale(10), color: accent.on },
+    dropSquare: { width: 10, height: 10, borderRadius: 2, backgroundColor: tokens.text },
+    routeStartEnd: { fontFamily: fontFamilies.body.medium, fontSize: moderateScale(14), color: tokens.text },
+    stopName: { fontFamily: fontFamilies.body.medium, fontSize: moderateScale(14), color: tokens.text },
+    stopMeta: { fontFamily: fontFamilies.body.regular, fontSize: moderateScale(12), color: tokens.sec, marginTop: 2 },
+
+    storePaymentCard: { backgroundColor: tokens.warningSkin, borderRadius: 16, padding: 14 },
+    storePaymentRow: { flexDirection: "row", justifyContent: "space-between", marginBottom: 8 },
+    storePaymentLabel: { fontFamily: fontFamilies.body.medium, fontSize: moderateScale(14), color: tokens.sec },
+    storePaymentValue: { fontFamily: fontFamilies.body.semibold, fontSize: moderateScale(14), color: tokens.text },
+    storePaymentNote: { fontFamily: fontFamilies.body.regular, fontSize: moderateScale(13), lineHeight: moderateScale(18), color: tokens.sec },
+
+    billCard: { backgroundColor: tokens.surface, borderWidth: 1, borderColor: tokens.border, borderRadius: 18, padding: 16, gap: 11 },
+    billRow: { flexDirection: "row", justifyContent: "space-between" },
+    billLabel: { fontFamily: fontFamilies.body.regular, fontSize: moderateScale(15), color: tokens.sec },
+    billValue: { fontFamily: fontFamilies.body.medium, fontSize: moderateScale(15), color: tokens.text },
+    billDivider: { borderTopWidth: 1, borderTopColor: tokens.borderStrong, borderStyle: "dashed", marginTop: 3, paddingTop: 1 },
+    billTotalLabel: { fontFamily: fontFamilies.body.semibold, fontSize: moderateScale(17), color: tokens.text },
+    billTotalValue: { fontFamily: fontFamilies.heading.semibold, fontSize: moderateScale(24), letterSpacing: -0.3, color: tokens.text },
+
+    methodRow: { flexDirection: "row", alignItems: "center", gap: 12, backgroundColor: tokens.surface, borderWidth: 1, borderColor: tokens.border, borderRadius: 16, padding: 13, minHeight: 60 },
+    methodIcon: { width: 36, height: 36, borderRadius: 11, backgroundColor: tokens.sunken, alignItems: "center", justifyContent: "center", flexShrink: 0 },
+    methodTitle: { fontFamily: fontFamilies.body.semibold, fontSize: moderateScale(15), color: tokens.text },
+    methodSub: { fontFamily: fontFamilies.body.regular, fontSize: moderateScale(12), lineHeight: moderateScale(17), color: tokens.sec, marginTop: 2 },
+
+    footer: { paddingHorizontal: 16, paddingTop: 12, borderTopWidth: 1, borderTopColor: tokens.border, backgroundColor: tokens.surface },
+    trustRow: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 9, marginBottom: 10 },
+    trustText: { fontFamily: fontFamilies.body.medium, fontSize: moderateScale(12), color: tokens.sec },
+    payBtn: {
+      backgroundColor: accent.accent, borderRadius: 14, minHeight: moderateScale(52),
+      flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8,
+    },
+    payBtnText: { fontFamily: fontFamilies.body.bold, fontSize: moderateScale(15), color: accent.on },
+    payBtnPrice: { fontFamily: fontFamilies.body.bold, fontSize: moderateScale(15), color: accent.on, opacity: 0.85 },
+  });

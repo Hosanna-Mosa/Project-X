@@ -4,6 +4,8 @@ export interface DeliveryItem {
   id: string;
   name: string;
   quantity: number;
+  /** The customer's own estimate of this item's price — never a price we control or verify. */
+  estimatedPrice?: number;
 }
 
 export interface DeliveryStop {
@@ -103,7 +105,7 @@ const initialState = {
   scheduling: "asap" as const,
   loadType: "mixed" as const,
   paymentMethod: "**** 4342",
-  currentLocation: "340 Main St, San Francisco, CA 94105",
+  currentLocation: "Detecting your location…",
   currentCoords: null,
   currentOrderId: null,
   serviceType: null,

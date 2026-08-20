@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from "react";
+import React, { useState, useCallback, useMemo } from "react";
 import {
   ScrollView,
   StyleSheet,
@@ -11,7 +11,8 @@ import {
   KeyboardAvoidingView,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Feather } from "@expo/vector-icons";
+import { Ionicons } from "@expo/vector-icons";
+import { moderateScale } from "react-native-size-matters";
 import { router, useFocusEffect } from "expo-router";
 import * as Location from "expo-location";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -19,47 +20,28 @@ import { customFetch } from "@/utils/api/custom-fetch";
 import { useAuthStore } from "@/contexts/authStore";
 import { useDeliveryStore } from "@/contexts/deliveryStore";
 import { useHomeStore } from "@/contexts/homeStore";
-
-// Brand Colors matching DESIGN.md
-const COLORS = {
-  surface: "#f7f9fb",
-  surfaceDim: "#d8dadc",
-  surfaceBright: "#f7f9fb",
-  surfaceContainerLowest: "#ffffff",
-  surfaceContainerLow: "#f2f4f6",
-  surfaceContainer: "#eceef0",
-  surfaceContainerHigh: "#e6e8ea",
-  surfaceContainerHighest: "#e0e3e5",
-  onSurface: "#191c1e",
-  onSurfaceVariant: "#43474e",
-  inverseSurface: "#2d3133",
-  inverseOnSurface: "#eff1f3",
-  outline: "#74777f",
-  outlineVariant: "#c4c6cf",
-  primary: "#002045", // Deep Sea Dark Blue
-  onPrimary: "#ffffff",
-  primaryContainer: "#1b365c",
-  secondary: "#0061a5", // Action Blue
-  onSecondary: "#ffffff",
-  secondaryContainer: "#d2e4ff", // Soft Blue for icons
-  onSecondaryContainer: "#004578",
-  error: "#ba1a1a",
-  background: "#f7f9fb",
-};
+import { designTokens, type ThemeTokens } from "@/constants/colors";
+import { fontFamilies } from "@/constants/typography";
+import { useThemeStore } from "@/contexts/themeStore";
 
 const RECENT_LOCATIONS_KEY = "recent_locations";
 
 export default function SavedAddressesScreen() {
   const insets = useSafeAreaInsets();
+  const { theme } = useThemeStore();
+  const tokens = designTokens[theme];
+  const accent = tokens.services.delivery;
+  const styles = useMemo(() => createStyles(tokens, accent), [theme]);
+
   const { user, setUser } = useAuthStore();
   const [addresses, setAddresses] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectingId, setSelectingId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
-  // Recent Locations
   const [recentLocations, setRecentLocations] = useState<any[]>([]);
   const [recentLoading, setRecentLoading] = useState(true);
+  const [currentLocLoading, setCurrentLocLoading] = useState(false);
 
   useFocusEffect(
     useCallback(() => {
@@ -93,14 +75,11 @@ export default function SavedAddressesScreen() {
     } catch (err) {
       console.warn("Failed to fetch recent locations from server, trying cache:", err);
     }
-
     try {
       const stored = await AsyncStorage.getItem(RECENT_LOCATIONS_KEY);
       if (stored) {
         const parsed = JSON.parse(stored);
-        if (Array.isArray(parsed)) {
-          setRecentLocations(parsed);
-        }
+        if (Array.isArray(parsed)) setRecentLocations(parsed);
       }
     } catch (err) {
       console.error("Failed to load recent locations from storage:", err);
@@ -109,41 +88,21 @@ export default function SavedAddressesScreen() {
     }
   };
 
-  const [currentLocLoading, setCurrentLocLoading] = useState(false);
-
   const handleUseCurrentLocation = async () => {
     if (currentLocLoading || selectingId) return;
     try {
       setCurrentLocLoading(true);
-      let { status } = await Location.requestForegroundPermissionsAsync();
+      const { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== "granted") {
-        Alert.alert("Permission Denied", "Please enable location services to use current location.");
+        Alert.alert("Permission denied", "Please enable location services to use current location.");
         return;
       }
       const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
-      const [place] = await Location.reverseGeocodeAsync({
-        latitude: loc.coords.latitude,
-        longitude: loc.coords.longitude,
-      });
-
-      let addressLine = "";
-      if (place) {
-        addressLine = [place.name, place.streetNumber, place.street, place.city, place.region]
-          .filter(Boolean)
-          .join(", ");
-      } else {
-        addressLine = "Current Location";
-      }
-
-      router.push({
-        pathname: "/delivery/add-address",
-        params: {
-          step: "2",
-          addressLine,
-          lat: String(loc.coords.latitude),
-          lng: String(loc.coords.longitude),
-        },
-      });
+      const [place] = await Location.reverseGeocodeAsync({ latitude: loc.coords.latitude, longitude: loc.coords.longitude });
+      const addressLine = place
+        ? [place.name, place.streetNumber, place.street, place.city, place.region].filter(Boolean).join(", ")
+        : "Current location";
+      router.push({ pathname: "/delivery/add-address", params: { step: "2", addressLine, lat: String(loc.coords.latitude), lng: String(loc.coords.longitude) } });
     } catch (err: any) {
       Alert.alert("Error", err.message || "Failed to determine current location.");
     } finally {
@@ -154,43 +113,23 @@ export default function SavedAddressesScreen() {
   const handleSelectRecentLocation = (item: any) => {
     if (selectingId || deletingId) return;
     const fullAddress = item.fullAddress || (item.name && item.address ? `${item.name}, ${item.address}` : item.address || item.name);
-    router.push({
-      pathname: "/delivery/add-address",
-      params: {
-        step: "2",
-        addressLine: fullAddress,
-        lat: String(item.lat),
-        lng: String(item.lng),
-      },
-    });
+    router.push({ pathname: "/delivery/add-address", params: { step: "2", addressLine: fullAddress, lat: String(item.lat), lng: String(item.lng) } });
   };
 
   const handleSelectAddress = async (addr: any) => {
     if (selectingId || deletingId) return;
-    
     const addressWithCoords = { ...addr };
     const lat = addr.coordinates?.lat ?? addr.location?.coordinates?.[1] ?? 17.4447;
     const lng = addr.coordinates?.lng ?? addr.location?.coordinates?.[0] ?? 78.3498;
-    
     addressWithCoords.coordinates = { lat, lng };
-    addressWithCoords.location = {
-      type: "Point",
-      coordinates: [lng, lat],
-    };
-    
+    addressWithCoords.location = { type: "Point", coordinates: [lng, lat] };
+
     try {
       setSelectingId(addr._id);
-      
-      // Update global coords and address in deliveryStore
       useDeliveryStore.getState().setCurrentCoords({ lat, lng });
       useDeliveryStore.getState().setCurrentLocation(addr.addressLine || addr.label || "");
-
-      // Get active service from homeStore
       const activeService = useHomeStore.getState().activeService;
-
-      // Trigger the background fetches and await them to complete!
       await useHomeStore.getState().fetchHomeData(lat, lng, activeService);
-
       await AsyncStorage.setItem("active_address", JSON.stringify(addressWithCoords));
       router.back();
     } catch (e) {
@@ -210,7 +149,7 @@ export default function SavedAddressesScreen() {
 
   const handleDeleteAddress = (id: string) => {
     if (selectingId || deletingId) return;
-    Alert.alert("Delete Address", "Are you sure you want to remove this address?", [
+    Alert.alert("Delete address", "Are you sure you want to remove this address?", [
       { text: "Cancel", style: "cancel" },
       {
         text: "Delete",
@@ -218,9 +157,7 @@ export default function SavedAddressesScreen() {
         onPress: async () => {
           try {
             setDeletingId(id);
-            const updatedAddresses = await customFetch<any[]>(`/api/v1/users/addresses/${id}`, {
-              method: "DELETE",
-            });
+            const updatedAddresses = await customFetch<any[]>(`/api/v1/users/addresses/${id}`, { method: "DELETE" });
             setAddresses(updatedAddresses || []);
             if (user) setUser({ ...user, addresses: updatedAddresses || [] });
           } catch (err: any) {
@@ -234,377 +171,159 @@ export default function SavedAddressesScreen() {
     ]);
   };
 
+  const handleMoreOptions = (addr: any) => {
+    Alert.alert(addr.label || "Address", undefined, [
+      { text: "Edit", onPress: () => handleEditAddress(addr) },
+      { text: "Delete", style: "destructive", onPress: () => handleDeleteAddress(addr._id) },
+      { text: "Cancel", style: "cancel" },
+    ]);
+  };
+
+  const parseInstructions = (addressLine: string) => {
+    const match = addressLine?.match(/\(Instructions: (.*?)\)/);
+    return match ? match[1] : null;
+  };
+  const stripMeta = (addressLine: string) => (addressLine || "").replace(/\s*\[Apt:.*?\]/, "").replace(/\s*\(Instructions:.*?\)/, "").trim();
+
+  const isEmpty = !loading && addresses.length === 0;
+
   return (
-    <KeyboardAvoidingView
-      behavior={Platform.OS === "ios" ? "padding" : "height"}
-      style={styles.root}
-    >
-      {/* Header matching screen.png */}
-      <View style={[styles.header, { paddingTop: insets.top + 16 }]}>
-        <TouchableOpacity style={styles.backBtn} onPress={() => router.back()} disabled={selectingId !== null}>
-          <Feather name="arrow-left" size={24} color={COLORS.onSurface} />
+    <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} style={styles.root}>
+      <View style={[styles.header, { paddingTop: insets.top + 6 }]}>
+        <TouchableOpacity style={styles.iconBtn} onPress={() => router.back()} disabled={selectingId !== null}>
+          <Ionicons name="chevron-back" size={moderateScale(20)} color={tokens.text} />
         </TouchableOpacity>
-        <View style={styles.headerTitleContainer}>
-          <Text style={styles.headerTitle}>Select Address</Text>
-        </View>
-        <View style={styles.headerSpacer} />
+        <Text style={styles.headerTitle}>Places</Text>
       </View>
 
-      <ScrollView
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={[styles.container, { paddingBottom: Math.max(insets.bottom, 16) + 80 }]}
-      >
-          {/* Current Location GPS Button */}
-          <TouchableOpacity
-            style={[styles.currentLocRow, currentLocLoading && { opacity: 0.8 }]}
-            onPress={handleUseCurrentLocation}
-            disabled={selectingId !== null || currentLocLoading}
-          >
-            <View style={styles.currentLocIconBox}>
-              {currentLocLoading ? (
-                <ActivityIndicator size="small" color={COLORS.onPrimary} />
-              ) : (
-                <Feather name="navigation" size={20} color={COLORS.onPrimary} />
-              )}
-            </View>
-            <View style={styles.currentLocTextCol}>
-              <Text style={styles.currentLocTitle}>
-                {currentLocLoading ? "Fetching Location..." : "Current Location"}
-              </Text>
-              <Text style={styles.currentLocSubtitle}>
-                {currentLocLoading ? "Finding your GPS coordinates..." : "Using GPS to find your location"}
-              </Text>
-            </View>
-            {currentLocLoading ? (
-              <ActivityIndicator size="small" color={COLORS.primary} />
-            ) : (
-              <Feather name="chevron-right" size={20} color={COLORS.outline} />
-            )}
+      {isEmpty ? (
+        <View style={styles.emptyWrap}>
+          <View style={styles.emptyIconCircle}>
+            <Ionicons name="location" size={moderateScale(28)} color={accent.accent} />
+          </View>
+          <Text style={styles.emptyTitle}>No saved places</Text>
+          <Text style={styles.emptySubtitle}>
+            Save the addresses you use often — home, work, your parents' place — and every flow in Flavour gets one tap shorter.
+          </Text>
+          <TouchableOpacity style={styles.primaryBtn} onPress={() => router.push("/delivery/add-address")}>
+            <Text style={styles.primaryBtnText}>Add your first address</Text>
           </TouchableOpacity>
-
-          {/* Saved Addresses Section */}
-          <View style={styles.sectionHeaderRow}>
-            <Text style={styles.sectionTitle}>Saved Addresses</Text>
+          <TouchableOpacity style={styles.secondaryBtn} onPress={handleUseCurrentLocation} disabled={currentLocLoading}>
+            {currentLocLoading ? <ActivityIndicator size="small" color={accent.accent} /> : <Text style={styles.secondaryBtnText}>Use current location</Text>}
+          </TouchableOpacity>
+        </View>
+      ) : (
+        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: insets.bottom + 24 }}>
+          <View style={styles.section}>
+            <TouchableOpacity style={styles.addBtn} onPress={() => router.push("/delivery/add-address")} disabled={selectingId !== null}>
+              <Text style={styles.addBtnText}>+ Add new address</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.currentLocRow} onPress={handleUseCurrentLocation} disabled={selectingId !== null || currentLocLoading}>
+              {currentLocLoading ? <ActivityIndicator size="small" color={accent.accent} /> : <Ionicons name="locate" size={15} color={accent.accent} />}
+              <Text style={styles.currentLocText}>{currentLocLoading ? "Fetching location…" : "Use current location"}</Text>
+            </TouchableOpacity>
           </View>
 
-          {loading && addresses.length === 0 ? (
-            <ActivityIndicator color={COLORS.secondary} style={{ paddingVertical: 20 }} />
-          ) : (
-            <View style={styles.cardList}>
-              {addresses.length === 0 ? (
-                <View style={styles.emptySectionCard}>
-                  <Text style={styles.emptyText}>No saved addresses yet</Text>
-                </View>
-              ) : (
-                addresses.map((addr) => {
+          <View style={styles.section}>
+            <Text style={styles.sectionLabel}>Saved</Text>
+            {loading && addresses.length === 0 ? (
+              <ActivityIndicator color={accent.accent} style={{ paddingVertical: 20 }} />
+            ) : (
+              <View style={styles.card}>
+                {addresses.map((addr, idx) => {
                   const isSelecting = selectingId === addr._id;
+                  const instructions = parseInstructions(addr.addressLine);
                   return (
-                    <View key={addr._id} style={[styles.addressCard, isSelecting && { opacity: 0.6 }]}>
-                      <TouchableOpacity
-                        style={styles.addressCardTouchable}
-                        onPress={() => handleSelectAddress(addr)}
-                        activeOpacity={0.7}
-                        disabled={selectingId !== null}
-                      >
-                        <View style={styles.addressIconBox}>
-                          {isSelecting ? (
-                            <ActivityIndicator size="small" color={COLORS.primary} />
-                          ) : (
-                            <Feather
-                              name={
-                                addr.label?.toLowerCase() === "home"
-                                  ? "home"
-                                  : addr.label?.toLowerCase() === "office" || addr.label?.toLowerCase() === "work"
-                                  ? "briefcase"
-                                  : "map-pin"
-                              }
-                              size={20}
-                              color={COLORS.primary}
-                            />
-                          )}
-                        </View>
-                        <View style={styles.addressInfo}>
-                          <Text style={styles.addressLabel}>{addr.label}</Text>
-                          <Text style={styles.addressLine} numberOfLines={1}>
-                            {addr.addressLine}
-                          </Text>
-                        </View>
-                      </TouchableOpacity>
-                      <View style={styles.addressActions}>
-                        <TouchableOpacity style={styles.actionBtn} onPress={() => handleEditAddress(addr)} disabled={selectingId !== null || deletingId !== null}>
-                          <Feather name="edit-2" size={16} color={COLORS.outline} />
-                        </TouchableOpacity>
-                        <TouchableOpacity style={styles.actionBtn} onPress={() => handleDeleteAddress(addr._id)} disabled={selectingId !== null || deletingId !== null}>
-                          {deletingId === addr._id ? (
-                            <ActivityIndicator size="small" color={COLORS.error} />
-                          ) : (
-                            <Feather name="trash-2" size={16} color={COLORS.error} />
-                          )}
-                        </TouchableOpacity>
+                    <TouchableOpacity
+                      key={addr._id}
+                      style={[styles.addressRow, idx < addresses.length - 1 && styles.addressRowDivider, isSelecting && { opacity: 0.6 }]}
+                      onPress={() => handleSelectAddress(addr)}
+                      disabled={selectingId !== null}
+                    >
+                      <View style={[styles.avatar, addr.label === "Home" && { backgroundColor: accent.skin }]}>
+                        {isSelecting ? <ActivityIndicator size="small" color={accent.accent} /> : <Text style={[styles.avatarText, addr.label === "Home" && { color: accent.accent }]}>{(addr.label || "?")[0].toUpperCase()}</Text>}
                       </View>
-                    </View>
+                      <View style={{ flex: 1, minWidth: 0 }}>
+                        <Text style={styles.addrLabel}>{addr.label}</Text>
+                        <Text style={styles.addrLine} numberOfLines={1}>{stripMeta(addr.addressLine)}</Text>
+                        {instructions && <Text style={styles.addrInstructions} numberOfLines={1}>{instructions}</Text>}
+                      </View>
+                      <TouchableOpacity onPress={() => handleMoreOptions(addr)} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }} disabled={selectingId !== null || deletingId !== null}>
+                        {deletingId === addr._id ? <ActivityIndicator size="small" color={tokens.error} /> : <Ionicons name="ellipsis-horizontal" size={18} color={tokens.muted} />}
+                      </TouchableOpacity>
+                    </TouchableOpacity>
                   );
-                })
+                })}
+              </View>
+            )}
+          </View>
+
+          {(recentLoading || recentLocations.length > 0) && (
+            <View style={styles.section}>
+              <Text style={styles.sectionLabel}>Recent</Text>
+              {recentLoading && recentLocations.length === 0 ? (
+                <ActivityIndicator color={accent.accent} style={{ paddingVertical: 16 }} />
+              ) : (
+                recentLocations.map((item, idx) => (
+                  <TouchableOpacity
+                    key={item.id || idx}
+                    style={[styles.recentRow, idx < recentLocations.length - 1 && styles.recentRowDivider]}
+                    onPress={() => handleSelectRecentLocation(item)}
+                    disabled={selectingId !== null}
+                  >
+                    <View style={styles.recentIcon}><Ionicons name="time-outline" size={16} color={tokens.sec} /></View>
+                    <Text style={styles.recentName} numberOfLines={1}>{item.name}{item.address ? `, ${item.address}` : ""}</Text>
+                    <Text style={styles.recentSave}>Save</Text>
+                  </TouchableOpacity>
+                ))
               )}
             </View>
           )}
-
-          {/* Recent Locations Section */}
-          <Text style={styles.sectionTitle}>Recent Locations</Text>
-          {recentLoading && recentLocations.length === 0 ? (
-            <ActivityIndicator color={COLORS.secondary} style={{ paddingVertical: 16 }} />
-          ) : recentLocations.length === 0 ? (
-            <View style={styles.emptySectionCard}>
-              <Text style={styles.emptyText}>No recent locations found</Text>
-            </View>
-          ) : (
-            <View style={styles.recentList}>
-              {recentLocations.map((item) => (
-                <TouchableOpacity
-                  key={item.id}
-                  style={styles.recentRow}
-                  onPress={() => handleSelectRecentLocation(item)}
-                  disabled={selectingId !== null}
-                >
-                  <View style={styles.recentIconBox}>
-                    <Feather name="clock" size={18} color={COLORS.onSurfaceVariant} />
-                  </View>
-                  <View style={styles.recentTextCol}>
-                    <Text style={styles.recentName}>{item.name}</Text>
-                    <Text style={styles.recentAddress} numberOfLines={1}>
-                      {item.address}
-                    </Text>
-                  </View>
-                </TouchableOpacity>
-              ))}
-            </View>
-          )}
-      </ScrollView>
-
-      {/* Sticky Bottom Add Address Button */}
-      <View style={[styles.footer, { paddingBottom: 12 }]}>
-        <TouchableOpacity
-          style={styles.primaryBtn}
-          onPress={() => router.push("/delivery/add-address")}
-          disabled={selectingId !== null}
-        >
-          <Feather name="plus" size={18} color={COLORS.onPrimary} style={{ marginRight: 8 }} />
-          <Text style={styles.primaryBtnText}>Add New Address</Text>
-        </TouchableOpacity>
-      </View>
+        </ScrollView>
+      )}
     </KeyboardAvoidingView>
   );
 }
 
-const styles = StyleSheet.create({
-  root: {
-    flex: 1,
-    backgroundColor: COLORS.background,
-  },
-  header: {
-    backgroundColor: COLORS.background,
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: 24,
-    paddingBottom: 16,
-  },
-  backBtn: {
-    padding: 4,
-    width: 32,
-    alignItems: "flex-start",
-  },
-  headerTitleContainer: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: "800",
-    color: COLORS.onSurface,
-  },
-  headerSpacer: {
-    width: 32,
-  },
-  container: {
-    paddingHorizontal: 24,
-    paddingTop: 4,
-  },
-  currentLocRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: COLORS.surfaceContainerLow,
-    borderRadius: 12,
-    padding: 12,
-    marginVertical: 6,
-    borderWidth: 1,
-    borderColor: COLORS.outlineVariant,
-  },
-  currentLocIconBox: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: COLORS.secondary,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  currentLocTextCol: {
-    flex: 1,
-    marginLeft: 12,
-  },
-  currentLocTitle: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: COLORS.primary,
-  },
-  currentLocSubtitle: {
-    fontSize: 11,
-    color: COLORS.onSurfaceVariant,
-    marginTop: 1,
-  },
-  sectionHeaderRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginTop: 8,
-    marginBottom: 6,
-  },
-  sectionTitle: {
-    fontSize: 16,
-    fontWeight: "700",
-    color: COLORS.onSurface,
-    marginTop: 10,
-    marginBottom: 6,
-  },
-  cardList: {
-    gap: 8,
-  },
-  addressCard: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: COLORS.surfaceContainerLowest,
-    borderRadius: 12,
-    padding: 12,
-    borderWidth: 1,
-    borderColor: COLORS.outlineVariant,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.04,
-    shadowRadius: 4,
-    elevation: 1,
-  },
-  addressCardTouchable: {
-    flexDirection: "row",
-    alignItems: "center",
-    flex: 1,
-  },
-  addressIconBox: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: COLORS.secondaryContainer,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  addressInfo: {
-    flex: 1,
-    marginLeft: 14,
-  },
-  addressLabel: {
-    fontSize: 15,
-    fontWeight: "700",
-    color: COLORS.onSurface,
-  },
-  addressLine: {
-    fontSize: 12,
-    color: COLORS.onSurfaceVariant,
-    marginTop: 2,
-  },
-  addressActions: {
-    flexDirection: "row",
-    gap: 12,
-    alignItems: "center",
-  },
-  actionBtn: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: COLORS.surfaceContainer,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  emptySectionCard: {
-    backgroundColor: COLORS.surfaceContainerLowest,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: COLORS.outlineVariant,
-    padding: 24,
-    alignItems: "center",
-  },
-  recentList: {
-    backgroundColor: COLORS.surfaceContainerLowest,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: COLORS.outlineVariant,
-    overflow: "hidden",
-    marginBottom: 10,
-  },
-  recentRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    padding: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.outlineVariant,
-  },
-  recentIconBox: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  recentTextCol: {
-    flex: 1,
-    marginLeft: 12,
-  },
-  recentName: {
-    fontSize: 13,
-    fontWeight: "600",
-    color: COLORS.onSurface,
-  },
-  recentAddress: {
-    fontSize: 11,
-    color: COLORS.onSurfaceVariant,
-    marginTop: 1,
-  },
+const createStyles = (tokens: ThemeTokens, accent: ThemeTokens["services"]["delivery"]) =>
+  StyleSheet.create({
+    root: { flex: 1, backgroundColor: tokens.bg },
+    header: { flexDirection: "row", alignItems: "center", gap: 12, paddingHorizontal: 16, paddingBottom: 10 },
+    iconBtn: {
+      width: moderateScale(40), height: moderateScale(40), borderRadius: moderateScale(20),
+      backgroundColor: tokens.surface, borderWidth: 1, borderColor: tokens.border, alignItems: "center", justifyContent: "center",
+    },
+    headerTitle: { fontFamily: fontFamilies.body.semibold, fontSize: moderateScale(17), color: tokens.text },
 
-  footer: {
-    position: "absolute",
-    bottom: 0,
-    left: 0,
-    right: 0,
-    backgroundColor: COLORS.surfaceContainerLowest,
-    borderTopWidth: 1,
-    borderTopColor: COLORS.outlineVariant,
-    paddingHorizontal: 24,
-    paddingTop: 12,
-  },
-  primaryBtn: {
-    backgroundColor: COLORS.primary,
-    height: 52,
-    borderRadius: 12,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  primaryBtnText: {
-    color: COLORS.onPrimary,
-    fontSize: 16,
-    fontWeight: "700",
-  },
-  emptyText: {
-    color: COLORS.onSurfaceVariant,
-    fontSize: 14,
-    fontWeight: "500",
-  },
-});
+    section: { paddingHorizontal: 16, paddingTop: 18 },
+    sectionLabel: { fontFamily: fontFamilies.body.bold, fontSize: moderateScale(11), letterSpacing: 1, textTransform: "uppercase", color: tokens.muted, marginBottom: 12 },
+
+    addBtn: { backgroundColor: tokens.surface, borderWidth: 1, borderStyle: "dashed", borderColor: accent.accent, borderRadius: 14, minHeight: moderateScale(52), alignItems: "center", justifyContent: "center" },
+    addBtnText: { fontFamily: fontFamilies.body.semibold, fontSize: moderateScale(15), color: accent.accent },
+    currentLocRow: { flexDirection: "row", alignItems: "center", gap: 8, justifyContent: "center", marginTop: 12, paddingVertical: 6 },
+    currentLocText: { fontFamily: fontFamilies.body.semibold, fontSize: moderateScale(13), color: accent.accent },
+
+    card: { backgroundColor: tokens.surface, borderWidth: 1, borderColor: tokens.border, borderRadius: 18, overflow: "hidden" },
+    addressRow: { flexDirection: "row", alignItems: "flex-start", gap: 12, padding: 14 },
+    addressRowDivider: { borderBottomWidth: 1, borderBottomColor: tokens.border },
+    avatar: { width: 36, height: 36, borderRadius: 11, backgroundColor: tokens.sunken, alignItems: "center", justifyContent: "center", flexShrink: 0 },
+    avatarText: { fontFamily: fontFamilies.body.bold, fontSize: moderateScale(13), color: tokens.sec },
+    addrLabel: { fontFamily: fontFamilies.body.semibold, fontSize: moderateScale(15), color: tokens.text },
+    addrLine: { fontFamily: fontFamilies.body.regular, fontSize: moderateScale(13), lineHeight: moderateScale(18), color: tokens.sec, marginTop: 3 },
+    addrInstructions: { fontFamily: fontFamilies.body.regular, fontSize: moderateScale(12), color: tokens.sec, marginTop: 5 },
+
+    recentRow: { flexDirection: "row", alignItems: "center", gap: 12, paddingVertical: 11, minHeight: 52 },
+    recentRowDivider: { borderBottomWidth: 1, borderBottomColor: tokens.border },
+    recentIcon: { width: 36, height: 36, borderRadius: 999, backgroundColor: tokens.sunken, alignItems: "center", justifyContent: "center", flexShrink: 0 },
+    recentName: { flex: 1, fontFamily: fontFamilies.body.medium, fontSize: moderateScale(15), color: tokens.text },
+    recentSave: { fontFamily: fontFamilies.body.bold, fontSize: moderateScale(13), color: accent.accent },
+
+    emptyWrap: { alignItems: "center", paddingTop: 76, paddingHorizontal: 32 },
+    emptyIconCircle: { width: 76, height: 76, borderRadius: 24, backgroundColor: accent.skin, alignItems: "center", justifyContent: "center", marginBottom: 20 },
+    emptyTitle: { fontFamily: fontFamilies.heading.semibold, fontSize: moderateScale(22), letterSpacing: -0.2, color: tokens.text, textAlign: "center" },
+    emptySubtitle: { fontFamily: fontFamilies.body.regular, fontSize: moderateScale(15), lineHeight: moderateScale(21), color: tokens.sec, textAlign: "center", marginTop: 10, marginBottom: 22 },
+    primaryBtn: { width: "100%", backgroundColor: accent.accent, borderRadius: 14, minHeight: moderateScale(48), alignItems: "center", justifyContent: "center" },
+    primaryBtnText: { fontFamily: fontFamilies.body.bold, fontSize: moderateScale(15), color: accent.on },
+    secondaryBtn: { width: "100%", marginTop: 10, borderWidth: 1, borderColor: tokens.borderStrong, borderRadius: 14, minHeight: moderateScale(48), alignItems: "center", justifyContent: "center" },
+    secondaryBtnText: { fontFamily: fontFamilies.body.semibold, fontSize: moderateScale(15), color: accent.accent },
+  });

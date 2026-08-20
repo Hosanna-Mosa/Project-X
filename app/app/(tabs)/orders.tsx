@@ -1,127 +1,89 @@
-import React, { useEffect, useState } from "react";
+import React, { useMemo, useState } from "react";
 import {
+  ActivityIndicator,
+  Alert,
+  Modal,
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
   View,
-  Modal,
-  TextInput,
-  Alert,
 } from "react-native";
-import { Feather } from "@expo/vector-icons";
+import { Ionicons } from "@expo/vector-icons";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { router, useFocusEffect } from "expo-router";
 import { moderateScale } from "react-native-size-matters";
-import Colors from "@/constants/colors";
+import { designTokens, type ThemeTokens, type ServiceTokens } from "@/constants/colors";
+import { fontFamilies } from "@/constants/typography";
 import { useThemeStore } from "@/contexts/themeStore";
-import { ScreenWrapper } from "@/components/ScreenWrapper";
 import { customFetch } from "@/utils/api/custom-fetch";
 import { useDeliveryStore } from "@/contexts/deliveryStore";
 import { useCartStore } from "@/contexts/cartStore";
-import { ActivityIndicator } from "react-native";
+import { AppTabBar, useAppTabBarHeight } from "@/components/AppTabBar";
 
-type FilterType = "all" | "active" | "past";
+const ACTIVE_STATUSES = ["SEARCHING_DRIVER", "DRIVER_ASSIGNED", "PICKED_UP", "ON_THE_WAY", "EN_ROUTE_PICKUP", "ARRIVED_PICKUP", "PICKING_ITEMS", "EN_ROUTE_DELIVERY", "ARRIVED_DELIVERY", "IN_TRANSIT", "driver_assigned", "confirmed", "pending"];
+const RIDE_TYPES = ["bike", "auto", "cab", "cab_prime"];
 
-const STATUS_COLORS: Record<string, string> = {
-  picking_items: Colors.light.primary,
-  on_the_way: Colors.light.teal,
-  delivered: Colors.light.success,
-  confirmed: Colors.light.warning,
-  driver_assigned: "#8B5CF6",
-  SEARCHING_DRIVER: Colors.light.warning,
-  DRIVER_ASSIGNED: "#8B5CF6",
-  PICKED_UP: Colors.light.teal,
-  DELIVERED: Colors.light.success,
-  CANCELLED: Colors.light.error,
+const SERVICE_META: Record<string, { label: string; accent: keyof ThemeTokens["services"] }> = {
+  food: { label: "Food", accent: "food" },
+  meat: { label: "Meat", accent: "meat" },
+  bike: { label: "Ride", accent: "ride" },
+  auto: { label: "Ride", accent: "ride" },
+  cab: { label: "Ride", accent: "ride" },
+  cab_prime: { label: "Ride", accent: "ride" },
+  helper: { label: "Task", accent: "task" },
+  delivery: { label: "Delivery", accent: "delivery" },
 };
 
-const STATUS_LABELS: Record<string, string> = {
-  SEARCHING_DRIVER: "Searching Driver",
-  DRIVER_ASSIGNED: "Driver Assigned",
-  PICKED_UP: "Picked Up",
-  DELIVERED: "Delivered",
-  CANCELLED: "Cancelled",
-};
+const REVIEW_TAGS = ["⚡ On time", "😊 Polite partner", "🍱 Great quality", "📦 Well packaged", "🚗 Safe trip"];
 
-const getServiceLabel = (type: string) => {
-  switch (type) {
-    case "bike": return "Bike Ride";
-    case "auto": return "Auto Ride";
-    case "cab": return "Cab Ride";
-    case "cab_prime": return "Cab Prime Ride";
-    case "helper": return "Helper Booking";
-    case "delivery": return "Delivery Service";
-    default: return "Delivery";
+function resolveServiceKey(order: any): string {
+  if (order.serviceType === "delivery" && order.vendor) {
+    // GET /api/v1/orders doesn't populate vendor (it's a raw id here), so
+    // there's no real field to tell a food order from a meat one at this
+    // list level — labelled "Food" as the more common case rather than
+    // guessing from a partnerType that isn't actually present on this
+    // response.
+    return "food";
   }
-};
+  return order.serviceType || "delivery";
+}
+
+function activeStatusCaption(order: any, serviceKey: string): string {
+  const status = String(order.status || "").toUpperCase();
+  if (serviceKey === "food" || serviceKey === "meat") {
+    if (["EN_ROUTE_DELIVERY", "PICKED_UP", "ON_THE_WAY"].includes(status)) return "Out for delivery";
+    if (["PICKING_ITEMS", "ARRIVED_PICKUP"].includes(status)) return "Preparing your order";
+    return "Order confirmed";
+  }
+  if (serviceKey === "helper") {
+    if (["EN_ROUTE_PICKUP", "DRIVER_ASSIGNED", "driver_assigned"].includes(status)) return "Helper on the way";
+    return "Matching a helper";
+  }
+  if (serviceKey === "delivery") return "Rider on the route";
+  if (["DRIVER_ASSIGNED", "driver_assigned"].includes(status)) return "Captain assigned";
+  return "Finding your captain";
+}
 
 export default function OrdersScreen() {
+  const insets = useSafeAreaInsets();
+  const tabBarHeight = useAppTabBarHeight();
   const { theme } = useThemeStore();
-  const colors = Colors[theme];
-  const styles = React.useMemo(() => createStyles(colors), [theme]);
+  const tokens = designTokens[theme];
+  const styles = useMemo(() => createStyles(tokens), [theme]);
 
-  const [filter, setFilter] = useState<FilterType>("all");
-  const [serviceFilter, setServiceFilter] = useState<"all" | "delivery" | "ride" | "helper">("all");
-  const [filterModalVisible, setFilterModalVisible] = useState(false);
-  const [searchQuery, setSearchQuery] = useState("");
   const [orders, setOrders] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [serviceFilters, setServiceFilters] = useState<Set<string>>(new Set());
+  const [showFilterSheet, setShowFilterSheet] = useState(false);
+  const [pendingServiceFilters, setPendingServiceFilters] = useState<Set<string>>(new Set());
 
-  // Review Modal state
   const [selectedOrderForReview, setSelectedOrderForReview] = useState<any | null>(null);
-  const [reviewModalVisible, setReviewModalVisible] = useState(false);
   const [reviewRating, setReviewRating] = useState(5);
   const [reviewComment, setReviewComment] = useState("");
-  const [reviewSelectedTags, setReviewSelectedTags] = useState<string[]>([]);
+  const [reviewTags, setReviewTags] = useState<string[]>([]);
   const [submittingReview, setSubmittingReview] = useState(false);
-
-  const handleOpenReviewModal = (order: any) => {
-    setSelectedOrderForReview(order);
-    setReviewRating(5);
-    setReviewComment("");
-    setReviewSelectedTags([]);
-    setReviewModalVisible(true);
-  };
-
-  const handleToggleReviewTag = (tag: string) => {
-    if (reviewSelectedTags.includes(tag)) {
-      setReviewSelectedTags(reviewSelectedTags.filter((t) => t !== tag));
-    } else {
-      setReviewSelectedTags([...reviewSelectedTags, tag]);
-    }
-  };
-
-  const handleSubmitReviewFromModal = async () => {
-    if (!selectedOrderForReview) return;
-    try {
-      setSubmittingReview(true);
-      const res = await customFetch<any>("/api/v1/reviews", {
-        method: "POST",
-        body: JSON.stringify({
-          orderId: selectedOrderForReview._id,
-          rating: reviewRating,
-          comment: reviewComment,
-          tags: reviewSelectedTags,
-        }),
-      });
-
-      if (res) {
-        Alert.alert("Thank You!", "Your rating has been submitted.");
-        setOrders((prevOrders) =>
-          prevOrders.map((o) =>
-            o._id === selectedOrderForReview._id ? { ...o, isReviewed: true } : o
-          )
-        );
-        setReviewModalVisible(false);
-        setSelectedOrderForReview(null);
-      }
-    } catch (err: any) {
-      console.error("Submit review modal error:", err);
-      Alert.alert("Error", err.message || "Failed to submit review. Please try again.");
-    } finally {
-      setSubmittingReview(false);
-    }
-  };
 
   useFocusEffect(
     React.useCallback(() => {
@@ -141,799 +103,437 @@ export default function OrdersScreen() {
     }
   };
 
-  const filtered = orders.filter((o) => {
-    const isActive = ["SEARCHING_DRIVER", "DRIVER_ASSIGNED", "PICKED_UP", "ON_THE_WAY", "EN_ROUTE_PICKUP", "ARRIVED_PICKUP", "PICKING_ITEMS", "EN_ROUTE_DELIVERY", "ARRIVED_DELIVERY", "IN_TRANSIT"].includes(o.status);
-    
-    // Status Filter (active / past / all)
-    if (filter === "active" && !isActive) return false;
-    if (filter === "past" && isActive) return false;
+  const withKey = useMemo(() => orders.map((o) => ({ ...o, __serviceKey: resolveServiceKey(o) })), [orders]);
+  const filtered = useMemo(
+    () => (serviceFilters.size === 0 ? withKey : withKey.filter((o) => serviceFilters.has(o.__serviceKey))),
+    [withKey, serviceFilters]
+  );
+  const scheduled = filtered.filter((o) => o.isReserved && ACTIVE_STATUSES.includes(o.status));
+  const active = filtered.filter((o) => !o.isReserved && ACTIVE_STATUSES.includes(o.status));
+  const past = filtered.filter((o) => !ACTIVE_STATUSES.includes(o.status) || (o.isReserved && !ACTIVE_STATUSES.includes(o.status)));
 
-    // Service Type Filter
-    if (serviceFilter === "delivery" && o.serviceType !== "delivery") return false;
-    if (serviceFilter === "ride" && !["bike", "auto", "cab", "cab_prime"].includes(o.serviceType)) return false;
-    if (serviceFilter === "helper" && o.serviceType !== "helper") return false;
+  const serviceCounts = useMemo(() => {
+    const counts: Record<string, number> = {};
+    withKey.forEach((o) => { counts[o.__serviceKey] = (counts[o.__serviceKey] || 0) + 1; });
+    return counts;
+  }, [withKey]);
 
-    // Search Query Filter
-    if (searchQuery.trim().length > 0) {
-      const query = searchQuery.toLowerCase().trim();
-      const matchesId = o._id.toLowerCase().includes(query);
-      const matchesAddress = o.stops?.some((s: any) => s.address?.toLowerCase().includes(query));
-      
-      const vendorName = typeof o.vendor === "object" ? o.vendor?.name : "";
-      const matchesVendor = vendorName?.toLowerCase().includes(query);
-      
-      const serviceLabel = getServiceLabel(o.serviceType).toLowerCase();
-      const matchesService = serviceLabel.includes(query);
+  const handleOpenReviewModal = (order: any) => {
+    setSelectedOrderForReview(order);
+    setReviewRating(5);
+    setReviewComment("");
+    setReviewTags([]);
+  };
 
-      if (!matchesId && !matchesAddress && !matchesVendor && !matchesService) {
-        return false;
-      }
+  const handleSubmitReview = async () => {
+    if (!selectedOrderForReview) return;
+    try {
+      setSubmittingReview(true);
+      await customFetch("/api/v1/reviews", {
+        method: "POST",
+        body: JSON.stringify({ orderId: selectedOrderForReview._id, rating: reviewRating, comment: reviewComment, tags: reviewTags }),
+      });
+      setOrders((prev) => prev.map((o) => (o._id === selectedOrderForReview._id ? { ...o, isReviewed: true } : o)));
+      setSelectedOrderForReview(null);
+    } catch (err: any) {
+      Alert.alert("Error", err.message || "Failed to submit review. Please try again.");
+    } finally {
+      setSubmittingReview(false);
     }
-
-    return true;
-  });
+  };
 
   const handleReorder = (order: any) => {
-    if (order.serviceType === "delivery") {
-      const { clearCart, addItem, updateQuantity } = useCartStore.getState();
-      clearCart();
-      const vendorId = typeof order.vendor === "object" ? order.vendor._id : order.vendor;
-      
-      const dropStop = order.stops?.find((s: any) => s.type === "drop");
-      if (dropStop && Array.isArray(dropStop.items)) {
-        dropStop.items.forEach((item: any) => {
-          addItem({ 
-            _id: item.id || item._id, 
-            name: item.name, 
-            price: item.price, 
-            description: "", 
-            category: "", 
-            isVeg: true, 
-            images: [] 
-          }, vendorId);
-          updateQuantity(item.id || item._id, item.quantity);
-        });
-      }
-      
-      const { getTotalPrice } = useCartStore.getState();
-      const subtotal = getTotalPrice() || order.totalPrice;
-      const deliveryFee = 0.99;
-      const taxes = subtotal * 0.05;
-      const total = subtotal + deliveryFee + taxes;
-      
-      router.push({
-        pathname: "/checkout",
-        params: { subtotal, deliveryFee, taxes, total }
-      });
-    } else {
+    const serviceKey = order.__serviceKey || resolveServiceKey(order);
+
+    if (RIDE_TYPES.includes(order.serviceType)) {
       const pickup = order.stops?.find((s: any) => s.type === "pickup") || order.stops?.[0];
       const drop = order.stops?.find((s: any) => s.type === "drop") || order.stops?.[order.stops.length - 1];
-      const middleStops = order.stops?.filter((s: any) => s.type === "stop") || [];
-
-      if (!pickup || !drop) {
-        console.warn("Invalid stops for reordering ride", order.stops);
-        return;
-      }
-
+      if (!pickup || !drop) return;
       router.push({
         pathname: "/ride-confirmation",
         params: {
           serviceId: order.serviceType,
           pickupName: pickup.address || "Pickup",
-          pickupLat: pickup.location?.coordinates?.[1] || 0,
-          pickupLng: pickup.location?.coordinates?.[0] || 0,
+          pickupLat: String(pickup.location?.coordinates?.[1] || 0),
+          pickupLng: String(pickup.location?.coordinates?.[0] || 0),
           dropName: drop.address || "Drop",
-          dropLat: drop.location?.coordinates?.[1] || 0,
-          dropLng: drop.location?.coordinates?.[0] || 0,
-          stops: JSON.stringify(middleStops.map((s: any) => ({
-            name: s.address || "Stop",
-            lat: s.location?.coordinates?.[1] || 0,
-            lng: s.location?.coordinates?.[0] || 0
-          })))
-        }
+          dropLat: String(drop.location?.coordinates?.[1] || 0),
+          dropLng: String(drop.location?.coordinates?.[0] || 0),
+        },
       });
+      return;
     }
+
+    if (order.serviceType === "helper") {
+      router.push("/helper-task");
+      return;
+    }
+
+    if (serviceKey === "food" || serviceKey === "meat") {
+      const { clearCart, addItem, updateQuantity } = useCartStore.getState();
+      clearCart();
+      const vendorId = typeof order.vendor === "object" ? order.vendor._id : order.vendor;
+      const dropStop = order.stops?.find((s: any) => s.type === "drop");
+      if (dropStop && Array.isArray(dropStop.items)) {
+        dropStop.items.forEach((item: any) => {
+          addItem(
+            {
+              _id: item.id || item._id,
+              name: item.name,
+              price: item.price,
+              description: "",
+              category: item.category || "",
+              isVeg: item.isVeg !== false,
+              images: item.image ? [item.image] : [],
+            },
+            vendorId
+          );
+          updateQuantity(item.id || item._id, item.quantity);
+        });
+      }
+      router.push("/cart");
+      return;
+    }
+
+    // Package delivery — prefill the real multi-stop entry screen instead
+    // of routing it through the food-cart flow it doesn't belong to.
+    const { resetDelivery, addStop } = useDeliveryStore.getState();
+    resetDelivery();
+    (order.stops || [])
+      .filter((s: any) => s.type !== "pickup")
+      .forEach((s: any) => {
+        addStop(s.address || "Stop", undefined, s.items || [], s.location?.coordinates?.[1], s.location?.coordinates?.[0]);
+      });
+    router.push("/delivery/entry");
   };
 
+  const openFilterSheet = () => {
+    setPendingServiceFilters(new Set(serviceFilters));
+    setShowFilterSheet(true);
+  };
+  const applyFilters = () => {
+    setServiceFilters(new Set(pendingServiceFilters));
+    setShowFilterSheet(false);
+  };
+  const toggleServiceFilter = (key: string) => {
+    setPendingServiceFilters((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  };
+  const pendingCount = useMemo(() => {
+    if (pendingServiceFilters.size === 0) return withKey.length;
+    return withKey.filter((o) => pendingServiceFilters.has(o.__serviceKey)).length;
+  }, [withKey, pendingServiceFilters]);
+
+  const isEmpty = !loading && orders.length === 0;
+
   return (
-    <ScreenWrapper>
-      <View style={styles.header}>
-        <View style={styles.headerLeft}>
-          <TouchableOpacity
-            style={styles.backBtn}
-            onPress={() => {
-              if (router.canGoBack()) router.back();
-              else router.replace("/(tabs)");
-            }}
-          >
-            <Feather name="arrow-left" size={moderateScale(18)} color={colors.text} />
-          </TouchableOpacity>
-          <Text style={styles.title}>My Orders</Text>
-        </View>
-        <TouchableOpacity
-          style={styles.filterIconBtn}
-          onPress={() => setFilterModalVisible(true)}
-        >
-          <Feather name="sliders" size={moderateScale(18)} color={serviceFilter !== "all" ? colors.primary : colors.text} />
+    <View style={styles.root}>
+      <View style={[styles.header, { paddingTop: insets.top + 14 }]}>
+        <Text style={styles.headline}>My orders</Text>
+        <TouchableOpacity style={styles.filterBtn} onPress={openFilterSheet}>
+          <Ionicons name="options-outline" size={moderateScale(17)} color={tokens.text} />
         </TouchableOpacity>
       </View>
 
-      {/* Search Input Bar */}
-      <View style={[styles.searchBarContainer, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-        <Feather name="search" size={moderateScale(16)} color={colors.textMuted} style={{ marginRight: 8 }} />
-        <TextInput
-          placeholder="Search by Order ID, store, or address..."
-          placeholderTextColor={colors.textMuted}
-          value={searchQuery}
-          onChangeText={setSearchQuery}
-          style={[styles.searchInput, { color: colors.text }]}
-        />
-        {searchQuery.length > 0 && (
-          <TouchableOpacity onPress={() => setSearchQuery("")}>
-            <Feather name="x" size={moderateScale(16)} color={colors.textMuted} />
-          </TouchableOpacity>
-        )}
-      </View>
-
-      <View style={styles.filterRow}>
-        {(["all", "active", "past"] as FilterType[]).map((f) => (
-          <TouchableOpacity
-            key={f}
-            style={[styles.filterBtn, filter === f && styles.filterBtnActive]}
-            onPress={() => setFilter(f)}
-          >
-            <Text
-              style={[
-                styles.filterBtnText,
-                filter === f && styles.filterBtnTextActive,
-              ]}
-            >
-              {f.charAt(0).toUpperCase() + f.slice(1)}
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </View>
-
-      <ScrollView
-        contentContainerStyle={styles.list}
-        showsVerticalScrollIndicator={false}
-      >
-        {loading ? (
-          <View style={styles.emptyState}>
-            <ActivityIndicator size="large" color={colors.primary} />
-            <Text style={styles.emptySubtitle}>Loading your orders...</Text>
-          </View>
-        ) : filtered.length === 0 ? (
-          <View style={styles.emptyState}>
-            <Feather name="box" size={moderateScale(48)} color={colors.textMuted} />
-            <Text style={styles.emptyTitle}>No Orders</Text>
-            <Text style={styles.emptySubtitle}>Your orders will appear here</Text>
-          </View>
-        ) : (
-          filtered.map((order) => {
-            const isActive = ["SEARCHING_DRIVER", "DRIVER_ASSIGNED", "PICKED_UP", "ON_THE_WAY", "EN_ROUTE_PICKUP", "ARRIVED_PICKUP", "PICKING_ITEMS", "EN_ROUTE_DELIVERY", "ARRIVED_DELIVERY", "IN_TRANSIT"].includes(order.status);
-            const isRide = ["bike", "auto", "cab", "cab_prime"].includes(order.serviceType);
-            const iconName = isRide ? "map-pin" : (order.stops?.length > 1 ? "git-branch" : "shopping-bag");
-            
-            const serviceLabel = getServiceLabel(order.serviceType);
-            const orderTitle = order.isReserved 
-              ? `Reserved ${serviceLabel}`
-              : (order.serviceType === "delivery" 
-                ? (order.stops?.length > 1 ? "Multi-Stop Delivery" : "Single Stop Delivery") 
-                : serviceLabel);
- 
-            return (
-              <TouchableOpacity
-                key={order._id}
-                style={[
-                  styles.orderCard,
-                  order.isReserved && isActive && { borderColor: colors.primary, borderWidth: 2 }
-                ]}
-                onPress={() => {
-                  if (isActive) {
-                    const { setServiceType } = useDeliveryStore.getState();
-                    setServiceType(order.serviceType || "delivery");
-                    router.push({
-                      pathname: "/tracking",
-                      params: { orderId: order._id }
-                    });
-                  }
-                }}
-                activeOpacity={0.88}
-              >
-                <View style={styles.orderCardTop}>
-                  <View style={styles.orderTypeIcon}>
-                    <Feather
-                      name={iconName}
-                      size={moderateScale(16)}
-                      color={colors.primary}
-                    />
-                  </View>
-                  <View style={styles.orderInfo}>
-                    <Text style={styles.orderType}>{orderTitle}</Text>
-                    <Text style={styles.orderId}>{order._id.startsWith("ORD-") ? order._id : order._id.substring(order._id.length - 8).toUpperCase()}</Text>
-                  </View>
-                  <View
-                    style={[
-                      styles.statusBadge,
-                      { backgroundColor: `${STATUS_COLORS[order.status] || colors.textMuted}15` },
-                    ]}
-                  >
-                    <View
-                      style={[
-                        styles.statusDot,
-                        { backgroundColor: STATUS_COLORS[order.status] || colors.textMuted },
-                      ]}
-                    />
-                    <Text
-                      style={[
-                        styles.statusText,
-                        { color: STATUS_COLORS[order.status] || colors.textMuted },
-                      ]}
-                    >
-                      {STATUS_LABELS[order.status] || order.status}
-                    </Text>
-                  </View>
+      {loading ? (
+        <ScrollView contentContainerStyle={{ paddingHorizontal: 16, paddingTop: 4, gap: 12 }}>
+          {[0, 1].map((i) => (
+            <View key={i} style={styles.skeletonCard}>
+              <View style={[styles.skeletonBar, { width: "22%", height: 11, marginBottom: 12 }]} />
+              <View style={{ flexDirection: "row", gap: 12 }}>
+                <View style={[styles.skeletonBar, { width: 52, height: 52, borderRadius: 8 }]} />
+                <View style={{ flex: 1, justifyContent: "center", gap: 8 }}>
+                  <View style={[styles.skeletonBar, { width: "56%", height: 14 }]} />
+                  <View style={[styles.skeletonBar, { width: "74%", height: 12 }]} />
                 </View>
+              </View>
+            </View>
+          ))}
+        </ScrollView>
+      ) : isEmpty ? (
+        <View style={styles.emptyWrap}>
+          <View style={styles.emptyIconCircle}><Ionicons name="receipt-outline" size={moderateScale(28)} color={tokens.services.food.accent} /></View>
+          <Text style={styles.emptyTitle}>No orders yet</Text>
+          <Text style={styles.emptySubtitle}>Food, meat, rides, helpers and courier runs will all show up here once you place your first one.</Text>
+          <TouchableOpacity style={[styles.primaryBtn, { backgroundColor: tokens.services.food.accent }]} onPress={() => router.replace("/(tabs)")}>
+            <Text style={[styles.primaryBtnText, { color: tokens.services.food.on }]}>Explore Flavour</Text>
+          </TouchableOpacity>
+        </View>
+      ) : (
+        <ScrollView contentContainerStyle={{ paddingBottom: tabBarHeight + 24 }} showsVerticalScrollIndicator={false}>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipsRow}>
+            <TouchableOpacity style={[styles.chip, serviceFilters.size === 0 && styles.chipActive]} onPress={() => setServiceFilters(new Set())}>
+              <Text style={[styles.chipText, serviceFilters.size === 0 && styles.chipTextActive]}>All</Text>
+            </TouchableOpacity>
+            {Object.entries(SERVICE_META).filter(([k]) => k !== "bike" && k !== "auto" && k !== "cab" && k !== "cab_prime").map(([key, meta]) => {
+              const isActive = serviceFilters.has(key);
+              return (
+                <TouchableOpacity
+                  key={key}
+                  style={[styles.chip, isActive && styles.chipActive]}
+                  onPress={() => setServiceFilters((prev) => { const n = new Set(prev); n.has(key) ? n.delete(key) : n.add(key); return n; })}
+                >
+                  <Text style={[styles.chipText, isActive && styles.chipTextActive]}>{meta.label}</Text>
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
 
-                <View style={styles.orderDetails}>
-                  {order.isReserved && (
-                    <View style={styles.scheduledBadge}>
-                      <Feather name="calendar" size={moderateScale(12)} color={colors.primary} />
-                      <Text style={styles.scheduledBadgeText}>
-                        Scheduled: {new Date(order.reservedAt).toLocaleString([], { weekday: 'short', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
-                      </Text>
-                    </View>
-                  )}
-                  <View style={styles.detailRow}>
-                    <Feather name="map-pin" size={moderateScale(12)} color={colors.textMuted} />
-                    <Text style={styles.detailText} numberOfLines={1}>
-                      {order.stops?.map((s: any) => s.address).join(" → ")}
-                    </Text>
-                  </View>
-                  <View style={styles.detailRow}>
-                    <Feather name="clock" size={moderateScale(12)} color={colors.textMuted} />
-                    <Text style={styles.detailText}>{new Date(order.createdAt).toLocaleString()}</Text>
-                  </View>
-                </View>
-
-                <View style={styles.orderCardBottom}>
-                  <Text style={styles.orderAmount}>${(order.totalPrice || 0).toFixed(2)}</Text>
-                  {isActive && (
-                    <TouchableOpacity
-                      style={styles.trackBtn}
-                      onPress={() => router.push({
-                        pathname: "/tracking",
-                        params: { orderId: order._id }
-                      })}
-                    >
-                      <Text style={styles.trackBtnText}>Track Order</Text>
-                      <Feather name="arrow-right" size={moderateScale(12)} color={colors.primary} />
-                    </TouchableOpacity>
-                  )}
-                  {!isActive && (
-                    <View style={{ flexDirection: "row", gap: 8, alignItems: "center" }}>
-                      {["DELIVERED", "COMPLETED", "delivered", "completed"].includes(order.status) && (
-                        order.isReviewed ? (
-                          <View style={[styles.reviewedBadge, { backgroundColor: "#F59E0B15" }]}>
-                            <Feather name="star" size={moderateScale(12)} color="#F59E0B" />
-                            <Text style={[styles.reviewedText, { color: "#F59E0B" }]}>Rated</Text>
-                          </View>
-                        ) : (
-                          <TouchableOpacity
-                            style={[styles.rateBtn, { borderColor: colors.primary, backgroundColor: colors.primary + "10" }]}
-                            onPress={() => handleOpenReviewModal(order)}
-                          >
-                            <Feather name="star" size={moderateScale(12)} color={colors.primary} />
-                            <Text style={[styles.rateBtnText, { color: colors.primary }]}>Rate</Text>
-                          </TouchableOpacity>
-                        )
-                      )}
-                      <TouchableOpacity
-                        style={styles.trackBtn}
-                        onPress={() => handleReorder(order)}
-                      >
-                        <Text style={styles.trackBtnText}>Reorder</Text>
-                        <Feather name="refresh-cw" size={moderateScale(12)} color={colors.primary} />
+          {scheduled.length > 0 && (
+            <View style={styles.section}>
+              <Text style={styles.sectionLabel}>Scheduled</Text>
+              {scheduled.map((order) => {
+                const accent = tokens.services[SERVICE_META[order.__serviceKey]?.accent || "ride"];
+                return (
+                  <View key={order._id} style={[styles.card, { borderLeftColor: accent.accent, borderLeftWidth: 3, marginBottom: 12 }]}>
+                    <Text style={[styles.cardEyebrow, { color: accent.accent }]}>{SERVICE_META[order.__serviceKey]?.label} · scheduled</Text>
+                    <Text style={styles.cardTitle}>{order.reservedAt ? new Date(order.reservedAt).toLocaleString([], { weekday: "short", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }) : "Scheduled"}</Text>
+                    <Text style={styles.cardMeta} numberOfLines={1}>{order.stops?.map((s: any) => s.address).join(" → ")}</Text>
+                    <Text style={styles.cardMeta}>est. ₹{Math.round(order.totalPrice || 0)}</Text>
+                    <View style={styles.actionRow}>
+                      <View style={[styles.actionBtnFilled, { backgroundColor: accent.skin, borderColor: accent.accent }]}><Text style={[styles.actionBtnFilledText, { color: accent.accent }]}>Edit time</Text></View>
+                      <TouchableOpacity style={styles.actionBtnOutline} onPress={() => router.push({ pathname: "/tracking", params: { orderId: order._id } })}>
+                        <Text style={styles.actionBtnOutlineText}>View</Text>
                       </TouchableOpacity>
                     </View>
-                  )}
-                </View>
-              </TouchableOpacity>
-            );
-          })
-        )}
-      </ScrollView>
+                  </View>
+                );
+              })}
+            </View>
+          )}
 
-      <Modal
-        visible={reviewModalVisible}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setReviewModalVisible(false)}
-      >
-        <View style={styles.modalBackdrop}>
-          <View style={[styles.modalCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-            <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", width: "100%", marginBottom: 12 }}>
-              <Text style={[styles.modalTitle, { color: colors.text }]}>Rate Your Order</Text>
-              <TouchableOpacity onPress={() => setReviewModalVisible(false)}>
-                <Feather name="x" size={moderateScale(20)} color={colors.textMuted} />
+          {active.length > 0 && (
+            <View style={styles.section}>
+              <Text style={styles.sectionLabel}>Active now</Text>
+              {active.map((order) => {
+                const accent = tokens.services[SERVICE_META[order.__serviceKey]?.accent || "ride"];
+                return (
+                  <View key={order._id} style={[styles.card, { borderLeftColor: accent.accent, borderLeftWidth: 3, marginBottom: 12 }]}>
+                    <View style={styles.liveRow}>
+                      <Text style={[styles.cardEyebrow, { color: accent.accent }]}>{SERVICE_META[order.__serviceKey]?.label}</Text>
+                      <View style={styles.liveDot}><View style={[styles.liveDotCore, { backgroundColor: accent.accent }]} /></View>
+                      <Text style={[styles.liveLabel, { color: accent.accent }]}>{activeStatusCaption(order, order.__serviceKey)}</Text>
+                    </View>
+                    <Text style={styles.cardTitle} numberOfLines={1}>{typeof order.vendor === "object" ? order.vendor?.name : order.stops?.[0]?.address || "Order"}</Text>
+                    <Text style={styles.cardMeta}>₹{Math.round(order.totalPrice || 0)}</Text>
+                    <TouchableOpacity style={[styles.trackBtn, { backgroundColor: accent.accent }]} onPress={() => router.push({ pathname: "/tracking", params: { orderId: order._id } })}>
+                      <Text style={[styles.trackBtnText, { color: accent.on }]}>Track order</Text>
+                    </TouchableOpacity>
+                  </View>
+                );
+              })}
+            </View>
+          )}
+
+          {past.length > 0 && (
+            <View style={styles.section}>
+              <Text style={styles.sectionLabel}>Past</Text>
+              {past.map((order) => {
+                const accent = tokens.services[SERVICE_META[order.__serviceKey]?.accent || "ride"];
+                const isCancelled = String(order.status).toUpperCase() === "CANCELLED";
+                const isDelivered = ["DELIVERED", "COMPLETED", "delivered", "completed"].includes(order.status);
+                const dateStr = order.createdAt ? new Date(order.createdAt).toLocaleDateString([], { day: "numeric", month: "short" }) : "";
+                return (
+                  <View key={order._id} style={[styles.card, { borderLeftColor: isCancelled ? tokens.borderStrong : accent.accent, borderLeftWidth: 3, marginBottom: 12 }]}>
+                    <View style={styles.liveRow}>
+                      <Text style={[styles.cardEyebrow, { color: isCancelled ? tokens.muted : accent.accent }]}>{SERVICE_META[order.__serviceKey]?.label}</Text>
+                      {isCancelled ? (
+                        <View style={styles.cancelledBadge}><Text style={styles.cancelledBadgeText}>Cancelled</Text></View>
+                      ) : (
+                        <Text style={styles.cardMetaRight}>{dateStr}</Text>
+                      )}
+                    </View>
+                    <Text style={styles.cardTitle} numberOfLines={1}>{typeof order.vendor === "object" ? order.vendor?.name : order.stops?.map((s: any) => s.address).join(" → ") || "Order"}</Text>
+                    <Text style={styles.cardMeta}>₹{Math.round(order.totalPrice || 0)}{order.__serviceKey === "delivery" ? " delivery" : ""}</Text>
+                    {!isCancelled && (
+                      <View style={styles.actionRow}>
+                        <TouchableOpacity style={[styles.actionBtnFilled, { backgroundColor: accent.skin, borderColor: accent.accent }]} onPress={() => handleReorder(order)}>
+                          <Text style={[styles.actionBtnFilledText, { color: accent.accent }]}>
+                            {RIDE_TYPES.includes(order.serviceType) ? "Rebook" : order.__serviceKey === "delivery" ? "Repeat route" : "Reorder"}
+                          </Text>
+                        </TouchableOpacity>
+                        {isDelivered && !order.isReviewed ? (
+                          <TouchableOpacity style={styles.actionBtnOutline} onPress={() => handleOpenReviewModal(order)}>
+                            <Text style={styles.actionBtnOutlineText}>Rate</Text>
+                          </TouchableOpacity>
+                        ) : (
+                          <TouchableOpacity style={styles.actionBtnOutline} onPress={() => router.push({ pathname: "/tracking", params: { orderId: order._id } })}>
+                            <Text style={styles.actionBtnOutlineText}>Receipt</Text>
+                          </TouchableOpacity>
+                        )}
+                      </View>
+                    )}
+                  </View>
+                );
+              })}
+            </View>
+          )}
+        </ScrollView>
+      )}
+
+      <AppTabBar active="orders" />
+
+      {/* Filter sheet */}
+      <Modal visible={showFilterSheet} transparent animationType="slide" onRequestClose={() => setShowFilterSheet(false)}>
+        <View style={styles.sheetOverlay}>
+          <TouchableOpacity style={styles.sheetScrim} activeOpacity={1} onPress={() => setShowFilterSheet(false)} />
+          <View style={styles.filterSheet}>
+            <View style={styles.sheetHandle} />
+            <Text style={styles.filterSheetTitle}>Filter orders</Text>
+            <Text style={styles.sectionLabel}>Service</Text>
+            <View style={{ gap: 8, marginBottom: 20 }}>
+              {Object.entries(SERVICE_META).filter(([k]) => k !== "bike" && k !== "auto" && k !== "cab" && k !== "cab_prime").map(([key, meta]) => {
+                const isSelected = pendingServiceFilters.has(key);
+                const accent = tokens.services[meta.accent];
+                const count = serviceCounts[key] || 0;
+                return (
+                  <TouchableOpacity
+                    key={key}
+                    style={[styles.filterOptionRow, isSelected && { borderColor: accent.accent, backgroundColor: accent.skin }]}
+                    onPress={() => toggleServiceFilter(key)}
+                  >
+                    <View style={[styles.checkbox, isSelected && { backgroundColor: accent.accent, borderColor: accent.accent }]}>
+                      {isSelected && <Ionicons name="checkmark" size={13} color={accent.on} />}
+                    </View>
+                    <Text style={styles.filterOptionLabel}>{meta.label}</Text>
+                    <Text style={styles.filterOptionCount}>{count}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+            <View style={{ flexDirection: "row", gap: 10 }}>
+              <TouchableOpacity style={styles.clearBtn} onPress={() => setPendingServiceFilters(new Set())}>
+                <Text style={styles.clearBtnText}>Clear all</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={[styles.showBtn, { backgroundColor: tokens.services.food.accent }]} onPress={applyFilters}>
+                <Text style={[styles.showBtnText, { color: tokens.services.food.on }]}>Show {pendingCount} orders</Text>
               </TouchableOpacity>
             </View>
+          </View>
+        </View>
+      </Modal>
 
-            <Text style={{ fontSize: moderateScale(13), color: colors.textSecondary, marginBottom: 12 }}>
-              How was your experience with order #{selectedOrderForReview?._id?.slice(-8).toUpperCase()}?
-            </Text>
-
-            {/* Star Rating */}
-            <View style={{ flexDirection: "row", gap: 10, marginVertical: 8, justifyContent: "center", width: "100%" }}>
+      {/* Review modal */}
+      <Modal visible={!!selectedOrderForReview} transparent animationType="fade" onRequestClose={() => setSelectedOrderForReview(null)}>
+        <View style={styles.reviewOverlay}>
+          <View style={styles.reviewCard}>
+            <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+              <Text style={styles.reviewTitle}>Rate your order</Text>
+              <TouchableOpacity onPress={() => setSelectedOrderForReview(null)}><Ionicons name="close" size={20} color={tokens.sec} /></TouchableOpacity>
+            </View>
+            <View style={{ flexDirection: "row", gap: 10, justifyContent: "center", marginBottom: 14 }}>
               {[1, 2, 3, 4, 5].map((star) => (
                 <TouchableOpacity key={star} onPress={() => setReviewRating(star)}>
-                  <Feather
-                    name="star"
-                    size={moderateScale(32)}
-                    color={star <= reviewRating ? "#F59E0B" : colors.border}
-                  />
+                  <Ionicons name={star <= reviewRating ? "star" : "star-outline"} size={moderateScale(30)} color={tokens.warning} />
                 </TouchableOpacity>
               ))}
             </View>
-
-            {/* Quick Feedback Tags */}
-            <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6, marginVertical: 10, justifyContent: "center" }}>
-              {(["⚡ On Time", "😊 Polite Partner", "🍱 Great Quality", "📦 Well Packaged", "🚗 Safe Trip"] as string[]).map((tag) => {
-                const isSelected = reviewSelectedTags.includes(tag);
+            <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6, justifyContent: "center", marginBottom: 12 }}>
+              {REVIEW_TAGS.map((tag) => {
+                const isSelected = reviewTags.includes(tag);
                 return (
                   <TouchableOpacity
                     key={tag}
-                    style={[
-                      styles.modalTagChip,
-                      {
-                        backgroundColor: isSelected ? colors.primary : colors.background,
-                        borderColor: isSelected ? colors.primary : colors.border,
-                      },
-                    ]}
-                    onPress={() => handleToggleReviewTag(tag)}
+                    style={[styles.reviewTagChip, isSelected && { backgroundColor: tokens.services.food.accent, borderColor: tokens.services.food.accent }]}
+                    onPress={() => setReviewTags((prev) => (isSelected ? prev.filter((t) => t !== tag) : [...prev, tag]))}
                   >
-                    <Text style={{ fontSize: moderateScale(12), fontWeight: "500", color: isSelected ? "#FFFFFF" : colors.text }}>
-                      {tag}
-                    </Text>
+                    <Text style={[styles.reviewTagText, isSelected && { color: tokens.services.food.on }]}>{tag}</Text>
                   </TouchableOpacity>
                 );
               })}
             </View>
-
-            {/* Comment */}
-            <TextInput
-              style={[
-                styles.modalCommentInput,
-                { backgroundColor: colors.background, borderColor: colors.border, color: colors.text },
-              ]}
-              placeholder="Add feedback comment (optional)..."
-              placeholderTextColor={colors.textMuted}
-              value={reviewComment}
-              onChangeText={setReviewComment}
-              multiline
-              numberOfLines={2}
-            />
-
-            {/* Modal Actions */}
+            <TextInput style={styles.reviewInput} placeholder="Add feedback (optional)" placeholderTextColor={tokens.muted} value={reviewComment} onChangeText={setReviewComment} multiline />
             <View style={{ flexDirection: "row", gap: 10, marginTop: 16, width: "100%" }}>
-              <TouchableOpacity
-                style={[styles.modalCancelBtn, { borderColor: colors.border }]}
-                onPress={() => setReviewModalVisible(false)}
-              >
-                <Text style={{ fontSize: moderateScale(14), fontWeight: "600", color: colors.textSecondary }}>Cancel</Text>
+              <TouchableOpacity style={styles.reviewCancelBtn} onPress={() => setSelectedOrderForReview(null)}>
+                <Text style={styles.reviewCancelBtnText}>Cancel</Text>
               </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.modalSubmitBtn, { backgroundColor: colors.primary, opacity: submittingReview ? 0.7 : 1 }]}
-                onPress={handleSubmitReviewFromModal}
-                disabled={submittingReview}
-              >
-                {submittingReview ? (
-                  <ActivityIndicator size="small" color="#FFFFFF" />
-                ) : (
-                  <Text style={{ fontSize: moderateScale(14), fontWeight: "700", color: "#FFFFFF" }}>Submit Review</Text>
-                )}
+              <TouchableOpacity style={[styles.reviewSubmitBtn, { backgroundColor: tokens.services.food.accent }]} onPress={handleSubmitReview} disabled={submittingReview}>
+                {submittingReview ? <ActivityIndicator size="small" color={tokens.services.food.on} /> : <Text style={[styles.reviewSubmitBtnText, { color: tokens.services.food.on }]}>Submit</Text>}
               </TouchableOpacity>
             </View>
           </View>
         </View>
       </Modal>
-
-      {/* Filter Modal */}
-      <Modal
-        visible={filterModalVisible}
-        animationType="slide"
-        transparent
-        onRequestClose={() => setFilterModalVisible(false)}
-      >
-        <View style={styles.filterModalOverlay}>
-          <View style={[styles.filterModalContent, { backgroundColor: colors.surface }]}>
-            <View style={styles.filterModalHeader}>
-              <Text style={[styles.filterModalTitle, { color: colors.text }]}>Filter Orders</Text>
-              <TouchableOpacity onPress={() => setFilterModalVisible(false)}>
-                <Feather name="x" size={moderateScale(24)} color={colors.text} />
-              </TouchableOpacity>
-            </View>
-
-            <Text style={[styles.filterGroupTitle, { color: colors.textSecondary }]}>SERVICE TYPE</Text>
-            <View style={styles.filterOptionsContainer}>
-              {[
-                { label: "All Services", value: "all" },
-                { label: "Food & Parcel Delivery", value: "delivery" },
-                { label: "Rides & Cabs", value: "ride" },
-                { label: "Helper Bookings", value: "helper" }
-              ].map((opt) => {
-                const isSelected = serviceFilter === opt.value;
-                return (
-                  <TouchableOpacity
-                    key={opt.value}
-                    style={[
-                      styles.filterOptionCard,
-                      { borderColor: colors.border },
-                      isSelected && { borderColor: colors.primary, backgroundColor: `${colors.primary}10` }
-                    ]}
-                    onPress={() => setServiceFilter(opt.value as any)}
-                  >
-                    <Text style={[
-                      styles.filterOptionText,
-                      { color: colors.text },
-                      isSelected && { color: colors.primary, fontWeight: "700" }
-                    ]}>
-                      {opt.label}
-                    </Text>
-                    {isSelected && <Feather name="check" size={moderateScale(16)} color={colors.primary} />}
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
-
-            <TouchableOpacity
-              style={[styles.applyFilterBtn, { backgroundColor: colors.primary }]}
-              onPress={() => setFilterModalVisible(false)}
-            >
-              <Text style={styles.applyFilterBtnText}>Apply Filters</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
-    </ScreenWrapper>
+    </View>
   );
 }
 
-const createStyles = (colors: typeof Colors.light) => StyleSheet.create({
-  root: {
-    flex: 1,
-  },
-  header: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-  },
-  headerLeft: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-  },
-  backBtn: {
-    width: moderateScale(34),
-    height: moderateScale(34),
-    borderRadius: moderateScale(10),
-    backgroundColor: colors.surface,
-    alignItems: "center",
-    justifyContent: "center",
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  title: {
-    fontSize: moderateScale(18),
-    fontWeight: "800",
-    color: colors.text,
-    letterSpacing: -0.3,
-  },
-  filterIconBtn: {
-    width: moderateScale(30),
-    height: moderateScale(30),
-    borderRadius: moderateScale(8),
-    backgroundColor: colors.surface,
-    alignItems: "center",
-    justifyContent: "center",
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  filterRow: {
-    flexDirection: "row",
-    paddingHorizontal: 20,
-    gap: 8,
-    marginBottom: 12,
-  },
-  filterBtn: {
-    paddingHorizontal: 12,
-    paddingVertical: 5,
-    borderRadius: moderateScale(15),
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  filterBtnActive: {
-    backgroundColor: colors.primary,
-    borderColor: colors.primary,
-  },
-  filterBtnText: {
-    fontSize: moderateScale(11),
-    fontWeight: "600",
-    color: colors.textSecondary,
-  },
-  filterBtnTextActive: {
-    color: "#fff",
-  },
-  list: {
-    paddingHorizontal: 20,
-    gap: 12,
-  },
-  emptyState: {
-    alignItems: "center",
-    paddingTop: 80,
-    gap: 12,
-  },
-  emptyTitle: {
-    fontSize: moderateScale(20),
-    fontWeight: "700",
-    color: colors.text,
-  },
-  emptySubtitle: {
-    fontSize: moderateScale(14),
-    color: colors.textMuted,
-  },
-  orderCard: {
-    backgroundColor: colors.surface,
-    borderRadius: moderateScale(12),
-    padding: 10,
-    gap: 10,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: colors.surface === "#FFFFFF" ? 0.06 : 0.2,
-    shadowRadius: 8,
-    elevation: 3,
-  },
-  orderCardTop: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-  },
-  orderTypeIcon: {
-    width: moderateScale(32),
-    height: moderateScale(32),
-    borderRadius: moderateScale(8),
-    backgroundColor: `${colors.primary}15`,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  orderInfo: {
-    flex: 1,
-    gap: 2,
-  },
-  orderType: {
-    fontSize: moderateScale(12),
-    fontWeight: "700",
-    color: colors.text,
-  },
-  orderId: {
-    fontSize: moderateScale(10),
-    color: colors.textMuted,
-  },
-  statusBadge: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: moderateScale(12),
-  },
-  statusDot: {
-    width: moderateScale(6),
-    height: moderateScale(6),
-    borderRadius: moderateScale(3),
-  },
-  statusText: {
-    fontSize: moderateScale(10),
-    fontWeight: "700",
-  },
-  orderDetails: {
-    gap: 6,
-  },
-  detailRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-  },
-  detailText: {
-    flex: 1,
-    fontSize: moderateScale(11),
-    color: colors.textSecondary,
-  },
-  orderCardBottom: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    borderTopWidth: 1,
-    borderTopColor: colors.borderLight,
-    paddingTop: 10,
-  },
-  orderAmount: {
-    fontSize: moderateScale(14),
-    fontWeight: "800",
-    color: colors.text,
-  },
-  trackBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-  },
-  trackBtnText: {
-    fontSize: moderateScale(11),
-    fontWeight: "600",
-    color: colors.primary,
-  },
-  scheduledBadge: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: `${colors.primary}10`,
-    paddingVertical: 6,
-    paddingHorizontal: 10,
-    borderRadius: moderateScale(8),
-    gap: 6,
-    marginBottom: 4,
-  },
-  scheduledBadgeText: {
-    fontSize: moderateScale(11),
-    fontWeight: "700",
-    color: colors.primary,
-  },
-  rateBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: moderateScale(8),
-    borderWidth: 1,
-  },
-  rateBtnText: {
-    fontSize: moderateScale(11),
-    fontWeight: "700",
-  },
-  reviewedBadge: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: moderateScale(8),
-  },
-  reviewedText: {
-    fontSize: moderateScale(11),
-    fontWeight: "700",
-  },
-  modalBackdrop: {
-    flex: 1,
-    backgroundColor: "rgba(0,0,0,0.5)",
-    justifyContent: "center",
-    alignItems: "center",
-    padding: 20,
-  },
-  modalCard: {
-    width: "100%",
-    borderRadius: moderateScale(16),
-    borderWidth: 1,
-    padding: 20,
-    alignItems: "center",
-  },
-  modalTitle: {
-    fontSize: moderateScale(18),
-    fontWeight: "700",
-  },
-  modalTagChip: {
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: moderateScale(14),
-    borderWidth: 1,
-  },
-  modalCommentInput: {
-    width: "100%",
-    borderRadius: moderateScale(10),
-    borderWidth: 1,
-    padding: 10,
-    fontSize: moderateScale(13),
-    marginTop: 6,
-    textAlignVertical: "top",
-    minHeight: moderateScale(50),
-  },
-  modalCancelBtn: {
-    flex: 1,
-    paddingVertical: 12,
-    borderRadius: moderateScale(10),
-    borderWidth: 1,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  modalSubmitBtn: {
-    flex: 1,
-    paddingVertical: 12,
-    borderRadius: moderateScale(10),
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  searchBarContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginHorizontal: 20,
-    marginBottom: 12,
-    paddingHorizontal: 12,
-    height: moderateScale(42),
-    borderRadius: moderateScale(12),
-    borderWidth: 1,
-  },
-  searchInput: {
-    flex: 1,
-    fontSize: moderateScale(13),
-    fontFamily: "Inter_500Medium",
-    padding: 0,
-  },
-  filterModalOverlay: {
-    flex: 1,
-    backgroundColor: "rgba(0,0,0,0.4)",
-    justifyContent: "flex-end",
-  },
-  filterModalContent: {
-    borderTopLeftRadius: moderateScale(24),
-    borderTopRightRadius: moderateScale(24),
-    padding: 24,
-    paddingBottom: 40,
-  },
-  filterModalHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 20,
-  },
-  filterModalTitle: {
-    fontSize: moderateScale(18),
-    fontWeight: "800",
-    letterSpacing: -0.3,
-  },
-  filterGroupTitle: {
-    fontSize: moderateScale(11),
-    fontWeight: "800",
-    letterSpacing: 0.8,
-    marginBottom: 12,
-  },
-  filterOptionsContainer: {
-    gap: 8,
-    marginBottom: 24,
-  },
-  filterOptionCard: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    padding: 14,
-    borderRadius: moderateScale(12),
-    borderWidth: 1.5,
-  },
-  filterOptionText: {
-    fontSize: moderateScale(13),
-    fontWeight: "600",
-  },
-  applyFilterBtn: {
-    padding: 14,
-    borderRadius: moderateScale(12),
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  applyFilterBtnText: {
-    color: "#fff",
-    fontSize: moderateScale(14),
-    fontWeight: "700",
-  },
-});
+const createStyles = (tokens: ThemeTokens) =>
+  StyleSheet.create({
+    root: { flex: 1, backgroundColor: tokens.bg },
+    header: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 16, paddingBottom: 10 },
+    headline: { fontFamily: fontFamilies.heading.semibold, fontSize: moderateScale(24), letterSpacing: -0.3, color: tokens.text },
+    filterBtn: {
+      width: moderateScale(40), height: moderateScale(40), borderRadius: moderateScale(20),
+      backgroundColor: tokens.surface, borderWidth: 1, borderColor: tokens.border, alignItems: "center", justifyContent: "center",
+    },
+
+    chipsRow: { paddingHorizontal: 16, gap: 8 },
+    chip: { backgroundColor: tokens.surface, borderWidth: 1, borderColor: tokens.borderStrong, borderRadius: 999, paddingHorizontal: 14, paddingVertical: 9, minHeight: 40 },
+    chipActive: { backgroundColor: tokens.text, borderColor: tokens.text },
+    chipText: { fontFamily: fontFamilies.body.semibold, fontSize: moderateScale(13), color: tokens.sec },
+    chipTextActive: { color: tokens.bg },
+
+    section: { paddingHorizontal: 16, paddingTop: 22 },
+    sectionLabel: { fontFamily: fontFamilies.body.bold, fontSize: moderateScale(11), letterSpacing: 1, textTransform: "uppercase", color: tokens.muted, marginBottom: 10 },
+
+    card: { backgroundColor: tokens.surface, borderWidth: 1, borderColor: tokens.border, borderRadius: 14, padding: 14 },
+    cardEyebrow: { fontFamily: fontFamilies.body.bold, fontSize: moderateScale(10), letterSpacing: 1, textTransform: "uppercase" },
+    cardTitle: { fontFamily: fontFamilies.body.semibold, fontSize: moderateScale(16), letterSpacing: -0.1, color: tokens.text, marginTop: 6 },
+    cardMeta: { fontFamily: fontFamilies.body.medium, fontSize: moderateScale(13), color: tokens.sec, marginTop: 4 },
+    cardMetaRight: { fontFamily: fontFamilies.body.medium, fontSize: moderateScale(12), color: tokens.sec },
+
+    liveRow: { flexDirection: "row", alignItems: "center", gap: 6 },
+    liveDot: { width: 8, height: 8, marginLeft: "auto", marginRight: 0 },
+    liveDotCore: { width: 8, height: 8, borderRadius: 4 },
+    liveLabel: { fontFamily: fontFamilies.body.semibold, fontSize: moderateScale(12) },
+    cancelledBadge: { backgroundColor: tokens.errorSkin, borderRadius: 5, paddingHorizontal: 7, paddingVertical: 3 },
+    cancelledBadgeText: { fontFamily: fontFamilies.body.bold, fontSize: moderateScale(10), letterSpacing: 0.5, textTransform: "uppercase", color: tokens.error },
+
+    actionRow: { flexDirection: "row", gap: 8, marginTop: 12 },
+    actionBtnFilled: { flex: 1, borderWidth: 1, borderRadius: 10, minHeight: 40, alignItems: "center", justifyContent: "center" },
+    actionBtnFilledText: { fontFamily: fontFamilies.body.semibold, fontSize: moderateScale(13) },
+    actionBtnOutline: { flex: 1, borderWidth: 1, borderColor: tokens.borderStrong, backgroundColor: tokens.surface, borderRadius: 10, minHeight: 40, alignItems: "center", justifyContent: "center" },
+    actionBtnOutlineText: { fontFamily: fontFamilies.body.semibold, fontSize: moderateScale(13), color: tokens.sec },
+    trackBtn: { marginTop: 12, borderRadius: 12, minHeight: 44, alignItems: "center", justifyContent: "center" },
+    trackBtnText: { fontFamily: fontFamilies.body.bold, fontSize: moderateScale(14) },
+
+    skeletonCard: { backgroundColor: tokens.surface, borderWidth: 1, borderColor: tokens.border, borderRadius: 14, padding: 14 },
+    skeletonBar: { backgroundColor: tokens.sunken, borderRadius: 6 },
+
+    emptyWrap: { flex: 1, alignItems: "center", paddingTop: 100, paddingHorizontal: 32 },
+    emptyIconCircle: { width: 72, height: 72, borderRadius: 24, backgroundColor: tokens.services.food.skin, alignItems: "center", justifyContent: "center", marginBottom: 18 },
+    emptyTitle: { fontFamily: fontFamilies.heading.semibold, fontSize: moderateScale(22), letterSpacing: -0.2, color: tokens.text, textAlign: "center" },
+    emptySubtitle: { fontFamily: fontFamilies.body.regular, fontSize: moderateScale(15), lineHeight: moderateScale(21), color: tokens.sec, textAlign: "center", marginTop: 10, marginBottom: 22 },
+    primaryBtn: { width: "100%", borderRadius: 14, minHeight: moderateScale(48), alignItems: "center", justifyContent: "center" },
+    primaryBtnText: { fontFamily: fontFamilies.body.bold, fontSize: moderateScale(15) },
+
+    sheetOverlay: { flex: 1, justifyContent: "flex-end" },
+    sheetScrim: { ...StyleSheet.absoluteFillObject, backgroundColor: "rgba(0,0,0,0.5)" },
+    sheetHandle: { width: 38, height: 4, borderRadius: 2, backgroundColor: tokens.borderStrong, alignSelf: "center", marginBottom: 18 },
+    filterSheet: { backgroundColor: tokens.surface, borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingTop: 12, paddingHorizontal: 20, paddingBottom: 24 },
+    filterSheetTitle: { fontFamily: fontFamilies.heading.semibold, fontSize: moderateScale(24), letterSpacing: -0.3, color: tokens.text, marginBottom: 18 },
+    filterOptionRow: { flexDirection: "row", alignItems: "center", gap: 12, borderWidth: 1, borderColor: tokens.borderStrong, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 12, minHeight: 48 },
+    checkbox: { width: 20, height: 20, borderRadius: 6, borderWidth: 2, borderColor: tokens.borderStrong, alignItems: "center", justifyContent: "center" },
+    filterOptionLabel: { flex: 1, fontFamily: fontFamilies.body.medium, fontSize: moderateScale(15), color: tokens.text },
+    filterOptionCount: { fontFamily: fontFamilies.body.medium, fontSize: moderateScale(13), color: tokens.sec },
+    clearBtn: { flex: 1, borderWidth: 1, borderColor: tokens.borderStrong, borderRadius: 14, minHeight: moderateScale(52), alignItems: "center", justifyContent: "center" },
+    clearBtnText: { fontFamily: fontFamilies.body.semibold, fontSize: moderateScale(15), color: tokens.sec },
+    showBtn: { flex: 1, borderRadius: 14, minHeight: moderateScale(52), alignItems: "center", justifyContent: "center" },
+    showBtnText: { fontFamily: fontFamilies.body.bold, fontSize: moderateScale(15) },
+
+    reviewOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.5)", justifyContent: "center", alignItems: "center", padding: 20 },
+    reviewCard: { width: "100%", borderRadius: 18, borderWidth: 1, borderColor: tokens.border, backgroundColor: tokens.surface, padding: 20 },
+    reviewTitle: { fontFamily: fontFamilies.body.semibold, fontSize: moderateScale(18), color: tokens.text },
+    reviewTagChip: { borderWidth: 1, borderColor: tokens.borderStrong, borderRadius: 999, paddingHorizontal: 10, paddingVertical: 6 },
+    reviewTagText: { fontFamily: fontFamilies.body.medium, fontSize: moderateScale(12), color: tokens.text },
+    reviewInput: { borderWidth: 1, borderColor: tokens.border, borderRadius: 12, padding: 12, minHeight: 60, fontFamily: fontFamilies.body.regular, fontSize: moderateScale(14), color: tokens.text, textAlignVertical: "top" },
+    reviewCancelBtn: { flex: 1, borderWidth: 1, borderColor: tokens.borderStrong, borderRadius: 12, paddingVertical: 13, alignItems: "center" },
+    reviewCancelBtnText: { fontFamily: fontFamilies.body.semibold, fontSize: moderateScale(14), color: tokens.sec },
+    reviewSubmitBtn: { flex: 1, borderRadius: 12, paddingVertical: 13, alignItems: "center" },
+    reviewSubmitBtnText: { fontFamily: fontFamilies.body.bold, fontSize: moderateScale(14) },
+  });

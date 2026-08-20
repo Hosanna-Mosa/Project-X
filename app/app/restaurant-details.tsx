@@ -1,22 +1,23 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useMemo } from "react";
 import {
   View,
   Text,
   StyleSheet,
-  Image,
   ScrollView,
   TouchableOpacity,
   ActivityIndicator,
-  StatusBar,
   Linking,
   Platform,
 } from "react-native";
 import { useLocalSearchParams, router } from "expo-router";
-import { Ionicons, Feather, MaterialIcons, MaterialCommunityIcons } from "@expo/vector-icons";
+import { Ionicons, Feather } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { moderateScale } from "react-native-size-matters";
 import Constants from "expo-constants";
-import Colors from "@/constants/colors";
+import { designTokens, type ThemeTokens } from "@/constants/colors";
+import { fontFamilies } from "@/constants/typography";
 import { useThemeStore } from "@/contexts/themeStore";
+import { AppTabBar, useAppTabBarHeight } from "@/components/AppTabBar";
 
 interface VendorDetails {
   _id: string;
@@ -24,541 +25,236 @@ interface VendorDetails {
   email?: string;
   phone: string;
   address: string;
-  detailedAddress?: {
-    shopNo?: string;
-    floor?: string;
-    area?: string;
-    city?: string;
-    landmark?: string;
-  };
+  detailedAddress?: { landmark?: string };
   rating: number;
   reviews: string;
   categories: string[];
   isPureVeg: boolean;
   isOpen: boolean;
-  deliveryFee: number;
-  minOrderValue: number;
-  partnerType?: string;
-  location?: {
-    type: string;
-    coordinates: number[]; // [longitude, latitude]
-  };
+  legal?: { fssaiNumber?: string };
+  location?: { type: string; coordinates: number[] };
 }
 
 export default function RestaurantDetails() {
-  const { id, name: searchName, image: searchImage, rating: searchRating, reviews: searchReviews, isMeat } = useLocalSearchParams();
+  const { id, name: searchName, rating: searchRating, reviews: searchReviews, isMeat } = useLocalSearchParams();
   const insets = useSafeAreaInsets();
+  const tabBarHeight = useAppTabBarHeight();
   const { theme } = useThemeStore();
-  const colors = Colors[theme];
+  const tokens = designTokens[theme];
+  const accent = tokens.services[isMeat === "true" ? "meat" : "food"];
+  const styles = useMemo(() => createStyles(tokens, accent), [theme, isMeat]);
+
   const [loading, setLoading] = useState(true);
   const [vendor, setVendor] = useState<VendorDetails | null>(null);
 
   useEffect(() => {
+    // There's no public by-id endpoint for meat centers today, only for
+    // food vendors — skip the doomed fetch for meat and fall back to
+    // whatever the previous screen already passed along.
+    if (!id || isMeat === "true") {
+      setLoading(false);
+      return;
+    }
     const fetchVendorDetails = async () => {
       try {
         const baseUrl = process.env.EXPO_PUBLIC_API_URL || Constants.expoConfig?.extra?.apiUrl;
-        const endpoint = `${baseUrl}/api/v1/vendors/${id}`;
-        const response = await fetch(endpoint);
-        if (response.ok) {
-          const data = await response.json();
-          setVendor(data);
-        }
+        const response = await fetch(`${baseUrl}/api/v1/vendors/${id}`);
+        if (response.ok) setVendor(await response.json());
       } catch (error) {
         console.error("Error fetching vendor details:", error);
       } finally {
         setLoading(false);
       }
     };
-    if (id) {
-      fetchVendorDetails();
-    } else {
-      setLoading(false);
-    }
-  }, [id]);
+    fetchVendorDetails();
+  }, [id, isMeat]);
 
   const handleCall = (phoneNumber: string) => {
-    Linking.openURL(`tel:${phoneNumber}`).catch((err) =>
-      console.error("Failed to make call:", err)
-    );
+    Linking.openURL(`tel:${phoneNumber}`).catch((err) => console.error("Failed to call:", err));
   };
 
   const handleEmail = (emailAddress: string) => {
-    Linking.openURL(`mailto:${emailAddress}`).catch((err) =>
-      console.error("Failed to send email:", err)
-    );
+    Linking.openURL(`mailto:${emailAddress}`).catch((err) => console.error("Failed to email:", err));
   };
 
   const handleNavigate = () => {
     const targetName = vendor?.name || (searchName as string) || "Restaurant";
-    
     if (vendor?.location?.coordinates && vendor.location.coordinates.length === 2) {
       const [lng, lat] = vendor.location.coordinates;
       const label = encodeURIComponent(targetName);
-      
-      // Select appropriate URI based on platform
       const url = Platform.select({
         ios: `maps://app?daddr=${lat},${lng}&q=${label}`,
         android: `google.navigation:q=${lat},${lng}`,
-        default: `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`
+        default: `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`,
       });
-
       Linking.canOpenURL(url).then((supported) => {
-        if (supported) {
-          Linking.openURL(url);
-        } else {
-          // Fallback to web link
-          Linking.openURL(`https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`);
-        }
-      }).catch((err) => {
-        console.error("Error launching maps navigation:", err);
-      });
+        if (supported) Linking.openURL(url);
+        else Linking.openURL(`https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`);
+      }).catch((err) => console.error("Error launching navigation:", err));
     } else {
-      // Fallback: search by address query in Google Maps
-      const addressQuery = encodeURIComponent(vendor?.address || (searchName as string));
+      const addressQuery = encodeURIComponent(vendor?.address || targetName);
       Linking.openURL(`https://www.google.com/maps/search/?api=1&query=${addressQuery}`).catch((err) =>
         console.error("Failed to open map query:", err)
       );
     }
   };
 
-  // Safe Fallback Values
-  const displayName = vendor?.name || (searchName as string) || "Restaurant Details";
-  const displayImage = (searchImage as string) || "https://images.unsplash.com/photo-1587593810167-a84920ea0781?w=600";
-  const displayRating = vendor?.rating || parseFloat(searchRating as string) || 4.5;
-  const displayReviews = vendor?.reviews || (searchReviews as string) || "200";
+  const displayName = vendor?.name || (searchName as string) || "Restaurant";
+  const displayRating = vendor?.rating || parseFloat(searchRating as string) || undefined;
+  const displayReviews = vendor?.reviews || (searchReviews as string) || undefined;
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <StatusBar barStyle="dark-content" translucent backgroundColor="transparent" />
+    <View style={styles.root}>
+      <View style={[styles.header, { paddingTop: insets.top + 6 }]}>
+        <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
+          <Ionicons name="chevron-back" size={moderateScale(20)} color={tokens.text} />
+        </TouchableOpacity>
+        <Text style={styles.headerTitle}>{isMeat === "true" ? "Meat center info" : "Restaurant info"}</Text>
+      </View>
 
-      <TouchableOpacity
-        onPress={() => router.back()}
-        style={[
-          styles.floatingBackButton,
-          {
-            top: insets.top + 12,
-            backgroundColor: colors.surface,
-            borderColor: colors.borderLight,
-          },
-        ]}
-        activeOpacity={0.85}
-      >
-        <Ionicons name="arrow-back" size={22} color={colors.primary} />
-      </TouchableOpacity>
-
-      <ScrollView
-        contentContainerStyle={{ paddingBottom: insets.bottom + 40 }}
-        showsVerticalScrollIndicator={false}
-      >
-        {/* Banner Image & Top Card overlap */}
-        <View style={styles.heroSection}>
-          <Image source={{ uri: displayImage }} style={styles.heroImage} />
-          
-          <View style={[styles.floatingCard, { borderColor: colors.borderLight }]}>
-            <Text style={styles.restaurantTitle}>{displayName}</Text>
-
-            {/* Rating row */}
-            <View style={styles.ratingRow}>
-              <Ionicons name="star" size={16} color="#0061a5" />
-              <Text style={styles.ratingValue}>{displayRating}</Text>
-              <Text style={styles.ratingCount}>({displayReviews} ratings)</Text>
+      {loading ? (
+        <ActivityIndicator size="large" color={accent.accent} style={{ marginTop: 60 }} />
+      ) : (
+        <ScrollView contentContainerStyle={{ paddingBottom: tabBarHeight + 24 }} showsVerticalScrollIndicator={false}>
+          <View style={styles.section}>
+            <Text style={styles.name}>{displayName}</Text>
+            <View style={styles.badgeRow}>
               {vendor?.isPureVeg && (
-                <>
-                  <Text style={styles.dot}>•</Text>
-                  <View style={styles.vegIndicator}>
-                    <View style={styles.vegDot} />
-                    <Text style={styles.vegText}>PURE VEG</Text>
-                  </View>
-                </>
+                <View style={styles.vegBadge}>
+                  <View style={styles.vegIconBox}><View style={styles.vegDot} /></View>
+                  <Text style={styles.vegBadgeText}>Pure veg</Text>
+                </View>
               )}
-            </View>
-
-            {/* Separator line */}
-            <View style={styles.cardSeparator} />
-
-            {/* Quick Metrics */}
-            <View style={styles.gridRow}>
-              <View style={styles.gridColumn}>
-                <Text style={styles.gridValue}>{vendor?.deliveryFee === 0 ? "Free" : `₹${vendor?.deliveryFee || 25}`}</Text>
-                <Text style={styles.gridLabel}>delivery fee</Text>
-              </View>
-              <View style={styles.verticalDivider} />
-              <View style={styles.gridColumn}>
-                <Text style={styles.gridValue}>₹{vendor?.minOrderValue || 150}</Text>
-                <Text style={styles.gridLabel}>min order</Text>
-              </View>
-              <View style={styles.verticalDivider} />
-              <View style={styles.gridColumn}>
-                <View style={[styles.statusBadge, { backgroundColor: vendor?.isOpen !== false ? "#F0FDF4" : "#FEF2F2" }]}>
-                  <Text style={[styles.statusBadgeText, { color: vendor?.isOpen !== false ? "#16A34A" : "#EF4444" }]}>
-                    {vendor?.isOpen !== false ? "OPEN NOW" : "CLOSED"}
+              {displayRating != null && (
+                <View style={styles.ratingBadge}>
+                  <Text style={styles.ratingBadgeText}>
+                    {displayRating} ★{displayReviews ? ` · ${displayReviews}` : ""}
                   </Text>
                 </View>
-              </View>
+              )}
+              {vendor && (
+                <View style={[styles.statusBadge, { backgroundColor: vendor.isOpen !== false ? tokens.successSkin : tokens.errorSkin }]}>
+                  <Text style={[styles.statusBadgeText, { color: vendor.isOpen !== false ? tokens.success : tokens.error }]}>
+                    {vendor.isOpen !== false ? "Open now" : "Closed"}
+                  </Text>
+                </View>
+              )}
             </View>
+            {!!vendor?.categories?.length && (
+              <Text style={styles.cuisineLine}>{vendor.categories.join(" · ")}</Text>
+            )}
           </View>
-        </View>
 
-        {loading ? (
-          <ActivityIndicator size="large" color={colors.primary} style={{ marginTop: 50 }} />
-        ) : (
-          <View style={styles.contentSection}>
-            
-            {/* CARD 1: RESTAURANT INFO & TIMINGS (Efficiently Grouped) */}
-            <View style={[styles.sectionCard, { borderColor: colors.borderLight }]}>
-              <Text style={styles.sectionTitle}>RESTAURANT INFO</Text>
-              
-              {/* Cuisines Sub-section */}
-              {vendor?.categories && vendor.categories.length > 0 && (
-                <View style={styles.subSection}>
-                  <Text style={styles.subSectionTitle}>CUISINES</Text>
-                  <View style={styles.cuisineTagsRow}>
-                    {vendor.categories.map((cat) => (
-                      <View key={cat} style={[styles.cuisineTag, { backgroundColor: colors.surfaceSecondary }]}>
-                        <Text style={[styles.cuisineTagText, { color: colors.text }]}>{cat}</Text>
-                      </View>
-                    ))}
-                  </View>
+          <View style={styles.divider} />
+
+          {vendor?.legal?.fssaiNumber && (
+            <View style={styles.section}>
+              <Text style={styles.sectionLabel}>Hygiene &amp; safety</Text>
+              <View style={styles.hygieneCard}>
+                <View style={styles.hygieneRow}>
+                  <Ionicons name="checkmark" size={14} color={tokens.success} />
+                  <Text style={styles.hygieneText}>Kitchen audited by FSSAI · licence {vendor.legal.fssaiNumber}</Text>
                 </View>
-              )}
-
-              {vendor?.categories && vendor.categories.length > 0 && <View style={styles.itemDivider} />}
-
-              {/* Delivery Hours */}
-              <View style={styles.detailRow}>
-                <View style={[styles.iconContainer, { backgroundColor: "#F0FDF4" }]}>
-                  <Feather name="clock" size={18} color="#16A34A" />
-                </View>
-                <View style={styles.rowTextContainer}>
-                  <Text style={styles.rowLabel}>Standard Delivery Hours</Text>
-                  <Text style={[styles.rowValue, { color: colors.text }]}>09:00 AM - 10:00 PM</Text>
-                </View>
-              </View>
-
-              <View style={styles.itemDivider} />
-
-              {/* Hygiene Policy */}
-              <View style={styles.detailRow}>
-                <View style={[styles.iconContainer, { backgroundColor: "#FEF2F2" }]}>
-                  <MaterialIcons name="security" size={18} color="#EF4444" />
-                </View>
-                <View style={styles.rowTextContainer}>
-                  <Text style={styles.rowLabel}>Hygiene & Safety Policy</Text>
-                  <Text style={[styles.rowValue, { color: colors.text, fontSize: 12, lineHeight: 18 }]}>
-                    This kitchen holds a valid FSSAI certification and enforces strict sanitization protocols.
-                  </Text>
+                <View style={styles.hygieneRow}>
+                  <Ionicons name="checkmark" size={14} color={tokens.success} />
+                  <Text style={styles.hygieneText}>Tamper-proof packaging on every order</Text>
                 </View>
               </View>
             </View>
+          )}
 
-            {/* CARD 2: LOCATION & CONTACT DETAILS (Efficiently Grouped) */}
-            <View style={[styles.sectionCard, { borderColor: colors.borderLight }]}>
-              <Text style={styles.sectionTitle}>LOCATION & CONTACT</Text>
-              
-              {/* Address Details */}
-              <View style={styles.detailRow}>
-                <View style={[styles.iconContainer, { backgroundColor: "#F5F3FF" }]}>
-                  <Ionicons name="location-outline" size={18} color="#8B5CF6" />
-                </View>
-                <View style={styles.rowTextContainer}>
-                  <Text style={styles.rowLabel}>Full Address</Text>
-                  <Text style={[styles.rowValue, { color: colors.text, lineHeight: 20 }]}>
-                    {vendor?.address || "Address details not available"}
-                  </Text>
-                </View>
+          {vendor?.address && (
+            <View style={styles.section}>
+              <Text style={styles.sectionLabel}>Address</Text>
+              <View style={styles.card}>
+                <Text style={styles.addressText}>
+                  {vendor.address}
+                  {vendor.detailedAddress?.landmark ? ` · Near ${vendor.detailedAddress.landmark}` : ""}
+                </Text>
+                <TouchableOpacity style={styles.navigateBtn} activeOpacity={0.85} onPress={handleNavigate}>
+                  <Text style={styles.navigateBtnText}>Navigate in Google Maps</Text>
+                </TouchableOpacity>
               </View>
+            </View>
+          )}
 
-              {/* Landmark details */}
-              {vendor?.detailedAddress?.landmark && (
-                <View style={[styles.detailRow, { marginTop: 12, marginLeft: 52 }]}>
-                  <Ionicons name="flag-outline" size={14} color="#F59E0B" />
-                  <Text style={[styles.landmarkText, { color: colors.textSecondary }]}>
-                    Landmark: <Text style={{ fontFamily: "Inter_600SemiBold" }}>{vendor.detailedAddress.landmark}</Text>
-                  </Text>
-                </View>
+          {(vendor?.phone || vendor?.email) && (
+            <View style={[styles.section, { flexDirection: "row", gap: 10 }]}>
+              {vendor?.phone && (
+                <TouchableOpacity style={styles.contactCard} activeOpacity={0.85} onPress={() => handleCall(vendor.phone)}>
+                  <Feather name="phone" size={15} color={tokens.sec} />
+                  <View style={{ minWidth: 0 }}>
+                    <Text style={styles.contactLabel}>Phone</Text>
+                    <Text style={styles.contactValue} numberOfLines={1}>{vendor.phone}</Text>
+                  </View>
+                </TouchableOpacity>
               )}
-
-              {/* Navigate Button */}
-              <TouchableOpacity
-                onPress={handleNavigate}
-                style={[styles.navigateBtn, { backgroundColor: colors.primary }]}
-                activeOpacity={0.8}
-              >
-                <Ionicons name="map-outline" size={18} color="#ffffff" />
-                <Text style={styles.navigateBtnText}>Navigate in Google Maps</Text>
-              </TouchableOpacity>
-
-              <View style={styles.itemDivider} />
-
-              {/* Phone item */}
-              <TouchableOpacity
-                onPress={() => handleCall(vendor?.phone || "9876543210")}
-                style={styles.detailRowAction}
-                activeOpacity={0.7}
-              >
-                <View style={[styles.iconContainer, { backgroundColor: `${colors.teal}10` }]}>
-                  <Feather name="phone" size={18} color={colors.teal} />
-                </View>
-                <View style={styles.rowTextContainer}>
-                  <Text style={styles.rowLabel}>Phone Number</Text>
-                  <Text style={[styles.rowValue, { color: colors.teal }]}>{vendor?.phone || "Not Available"}</Text>
-                </View>
-                <Feather name="chevron-right" size={18} color={colors.textMuted} />
-              </TouchableOpacity>
-
-              <View style={styles.itemDivider} />
-
-              {/* Email item */}
               {vendor?.email && (
-                <TouchableOpacity
-                  onPress={() => handleEmail(vendor.email!)}
-                  style={styles.detailRowAction}
-                  activeOpacity={0.7}
-                >
-                  <View style={[styles.iconContainer, { backgroundColor: `${colors.teal}10` }]}>
-                    <Feather name="mail" size={18} color={colors.teal} />
+                <TouchableOpacity style={styles.contactCard} activeOpacity={0.85} onPress={() => handleEmail(vendor.email!)}>
+                  <Feather name="mail" size={15} color={tokens.sec} />
+                  <View style={{ minWidth: 0 }}>
+                    <Text style={styles.contactLabel}>Email</Text>
+                    <Text style={styles.contactValue} numberOfLines={1}>{vendor.email}</Text>
                   </View>
-                  <View style={styles.rowTextContainer}>
-                    <Text style={styles.rowLabel}>Email Address</Text>
-                    <Text style={[styles.rowValue, { color: colors.teal }]}>{vendor.email}</Text>
-                  </View>
-                  <Feather name="chevron-right" size={18} color={colors.textMuted} />
                 </TouchableOpacity>
               )}
             </View>
-          </View>
-        )}
-      </ScrollView>
+          )}
+
+          {isMeat === "true" && !vendor && (
+            <View style={styles.section}>
+              <Text style={styles.hygieneText}>
+                Full details for meat centers aren't available yet — there's no public lookup endpoint for them, only the nearby-search listing.
+              </Text>
+            </View>
+          )}
+        </ScrollView>
+      )}
+
+      <AppTabBar accent={isMeat === "true" ? "meat" : "food"} cartVendorName={displayName} />
     </View>
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  floatingBackButton: {
-    position: "absolute",
-    left: 16,
-    width: 42,
-    height: 42,
-    borderRadius: 21,
-    borderWidth: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    zIndex: 20,
-    elevation: 5,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.12,
-    shadowRadius: 6,
-  },
-  heroSection: {
-    width: "100%",
-    position: "relative",
-    paddingBottom: 24,
-  },
-  heroImage: {
-    width: "100%",
-    height: 180,
-  },
-  floatingCard: {
-    backgroundColor: "#ffffff",
-    borderRadius: 16,
-    borderWidth: 1,
-    padding: 16,
-    marginHorizontal: 20,
-    marginTop: -30,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.05,
-    shadowRadius: 10,
-    elevation: 4,
-  },
-  restaurantTitle: {
-    fontSize: 20,
-    fontFamily: "Inter_700Bold",
-    color: "#002045",
-    textAlign: "center",
-    marginBottom: 6,
-  },
-  ratingRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 6,
-  },
-  ratingValue: {
-    fontSize: 14,
-    fontFamily: "Inter_700Bold",
-    color: "#002045",
-  },
-  ratingCount: {
-    fontSize: 13,
-    fontFamily: "Inter_500Medium",
-    color: "#43474e",
-  },
-  dot: {
-    fontSize: 14,
-    color: "#c4c6cf",
-  },
-  vegIndicator: {
-    flexDirection: "row",
-    alignItems: "center",
-    borderWidth: 1,
-    borderColor: "#16A34A",
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 4,
-    gap: 4,
-  },
-  vegDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: "#16A34A",
-  },
-  vegText: {
-    fontSize: 9,
-    fontFamily: "Inter_700Bold",
-    color: "#16A34A",
-  },
-  cardSeparator: {
-    height: 1,
-    backgroundColor: "#eceef0",
-    marginVertical: 12,
-  },
-  gridRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  gridColumn: {
-    alignItems: "center",
-    flex: 1,
-  },
-  gridValue: {
-    fontSize: 15,
-    fontFamily: "Inter_700Bold",
-    color: "#191c1e",
-  },
-  gridLabel: {
-    fontSize: 10,
-    fontFamily: "Inter_500Medium",
-    color: "#74777f",
-    marginTop: 2,
-  },
-  verticalDivider: {
-    width: 1,
-    height: 24,
-    backgroundColor: "#eceef0",
-  },
-  statusBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 6,
-  },
-  statusBadgeText: {
-    fontSize: 10,
-    fontFamily: "Inter_700Bold",
-  },
-  contentSection: {
-    paddingHorizontal: 20,
-    gap: 16,
-  },
-  sectionCard: {
-    backgroundColor: "#ffffff",
-    borderRadius: 16,
-    borderWidth: 1,
-    padding: 16,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.02,
-    shadowRadius: 8,
-    elevation: 2,
-  },
-  sectionTitle: {
-    fontSize: 11,
-    fontFamily: "Inter_700Bold",
-    color: "#74777f",
-    letterSpacing: 1,
-    marginBottom: 12,
-  },
-  subSection: {
-    marginBottom: 4,
-  },
-  subSectionTitle: {
-    fontSize: 10,
-    fontFamily: "Inter_700Bold",
-    color: "#a0a4a8",
-    marginBottom: 8,
-  },
-  cuisineTagsRow: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 8,
-  },
-  cuisineTag: {
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 6,
-  },
-  cuisineTagText: {
-    fontSize: 12,
-    fontFamily: "Inter_600SemiBold",
-  },
-  detailRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 16,
-  },
-  detailRowAction: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 16,
-  },
-  iconContainer: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  rowTextContainer: {
-    flex: 1,
-  },
-  rowLabel: {
-    fontSize: 11,
-    fontFamily: "Inter_500Medium",
-    color: "#74777f",
-  },
-  rowValue: {
-    fontSize: 13,
-    fontFamily: "Inter_600SemiBold",
-    marginTop: 2,
-  },
-  landmarkText: {
-    fontSize: 12,
-    fontFamily: "Inter_500Medium",
-    marginLeft: 6,
-  },
-  itemDivider: {
-    height: 1,
-    backgroundColor: "#eceef0",
-    marginVertical: 12,
-  },
-  navigateBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    height: 44,
-    borderRadius: 10,
-    marginTop: 16,
-    gap: 8,
-  },
-  navigateBtnText: {
-    color: "#ffffff",
-    fontSize: 13,
-    fontFamily: "Inter_700Bold",
-  },
-});
+const createStyles = (tokens: ThemeTokens, accent: ThemeTokens["services"]["food"]) =>
+  StyleSheet.create({
+    root: { flex: 1, backgroundColor: tokens.bg },
+    header: { flexDirection: "row", alignItems: "center", gap: 12, paddingHorizontal: 16, paddingBottom: 10 },
+    backBtn: {
+      width: moderateScale(40), height: moderateScale(40), borderRadius: moderateScale(20),
+      backgroundColor: tokens.surface, borderWidth: 1, borderColor: tokens.border, alignItems: "center", justifyContent: "center",
+    },
+    headerTitle: { fontFamily: fontFamilies.body.semibold, fontSize: moderateScale(17), color: tokens.text },
+
+    section: { paddingHorizontal: 16, paddingTop: 20 },
+    name: { fontFamily: fontFamilies.heading.semibold, fontSize: moderateScale(24), letterSpacing: -0.3, color: tokens.text },
+    badgeRow: { flexDirection: "row", alignItems: "center", gap: 8, marginTop: 10, flexWrap: "wrap" },
+    vegBadge: { flexDirection: "row", alignItems: "center", gap: 6, borderWidth: 1, borderColor: tokens.veg, borderRadius: 6, paddingHorizontal: 8, paddingVertical: 4 },
+    vegIconBox: { width: 13, height: 13, borderWidth: 1.5, borderColor: tokens.veg, borderRadius: 3, alignItems: "center", justifyContent: "center" },
+    vegDot: { width: 5, height: 5, borderRadius: 3, backgroundColor: tokens.veg },
+    vegBadgeText: { fontFamily: fontFamilies.body.bold, fontSize: moderateScale(11), letterSpacing: 1, textTransform: "uppercase", color: tokens.veg },
+    ratingBadge: { backgroundColor: tokens.successSkin, borderRadius: 6, paddingHorizontal: 9, paddingVertical: 5 },
+    ratingBadgeText: { fontFamily: fontFamilies.body.bold, fontSize: moderateScale(11), letterSpacing: 1, textTransform: "uppercase", color: tokens.success },
+    statusBadge: { borderRadius: 6, paddingHorizontal: 9, paddingVertical: 5 },
+    statusBadgeText: { fontFamily: fontFamilies.body.bold, fontSize: moderateScale(11), letterSpacing: 1, textTransform: "uppercase" },
+    cuisineLine: { fontFamily: fontFamilies.body.regular, fontSize: moderateScale(15), lineHeight: moderateScale(23), color: tokens.sec, marginTop: 14 },
+
+    divider: { height: 1, backgroundColor: tokens.border, marginHorizontal: 16, marginTop: 20 },
+
+    sectionLabel: { fontFamily: fontFamilies.body.bold, fontSize: moderateScale(11), letterSpacing: 1, textTransform: "uppercase", color: tokens.muted, marginBottom: 12 },
+    hygieneCard: { backgroundColor: tokens.successSkin, borderRadius: 16, padding: 14, gap: 9 },
+    hygieneRow: { flexDirection: "row", gap: 10, alignItems: "flex-start" },
+    hygieneText: { flex: 1, fontFamily: fontFamilies.body.regular, fontSize: moderateScale(14), lineHeight: moderateScale(20), color: tokens.sec },
+
+    card: { backgroundColor: tokens.surface, borderWidth: 1, borderColor: tokens.border, borderRadius: 16, padding: 14 },
+    addressText: { fontFamily: fontFamilies.body.regular, fontSize: moderateScale(15), lineHeight: moderateScale(22), color: tokens.text },
+    navigateBtn: { marginTop: 12, backgroundColor: accent.skin, borderWidth: 1, borderColor: accent.accent, borderRadius: 12, minHeight: moderateScale(44), alignItems: "center", justifyContent: "center" },
+    navigateBtnText: { fontFamily: fontFamilies.body.semibold, fontSize: moderateScale(14), color: accent.accent },
+
+    contactCard: {
+      flex: 1, backgroundColor: tokens.surface, borderWidth: 1, borderColor: tokens.border, borderRadius: 16,
+      paddingHorizontal: 14, paddingVertical: 13, minHeight: moderateScale(56), flexDirection: "row", alignItems: "center", gap: 10,
+    },
+    contactLabel: { fontFamily: fontFamilies.body.bold, fontSize: moderateScale(10), letterSpacing: 1, textTransform: "uppercase", color: tokens.muted },
+    contactValue: { fontFamily: fontFamilies.body.semibold, fontSize: moderateScale(14), color: tokens.text, marginTop: 2 },
+  });

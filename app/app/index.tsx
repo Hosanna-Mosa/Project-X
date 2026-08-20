@@ -16,14 +16,13 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { moderateScale } from "react-native-size-matters";
-import Colors from "@/constants/colors";
-import { typography } from "@/constants/typography";
+import { designTokens, type ThemeTokens, type ServiceTokens } from "@/constants/colors";
+import { fontFamilies } from "@/constants/typography";
 import { useAuthStore } from "@/contexts/authStore";
 import { useThemeStore } from "@/contexts/themeStore";
 
 export default function AuthScreen() {
   const insets = useSafeAreaInsets();
-  const [activeTab, setActiveTab] = useState<"Phone" | "Email">("Phone");
 
   // Arrival Animation States for "FLAVOUR"
   const [showSplash, setShowSplash] = useState(true);
@@ -67,15 +66,16 @@ export default function AuthScreen() {
       setShowSplash(false);
     });
   }, []);
-  const [phone, setPhone] = useState("");
-  const [email, setEmail] = useState("");
+  const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
   const [isPasswordVisible, setIsPasswordVisible] = useState(false);
+  const [sendingOtp, setSendingOtp] = useState(false);
 
-  const { loginWithPassword, loading, token, isInitialized } = useAuthStore();
+  const { loginWithPassword, requestOTP, loading, token, isInitialized } = useAuthStore();
   const { theme } = useThemeStore();
-  const colors = Colors[theme];
-  const styles = React.useMemo(() => createStyles(colors), [theme]);
+  const tokens = designTokens[theme];
+  const accent = tokens.services.food;
+  const styles = React.useMemo(() => createStyles(tokens, accent), [theme]);
 
   // Guard: if a token already exists, skip straight to the app.
   // This handles the edge case where the user navigates back to "/" while still logged in.
@@ -86,21 +86,10 @@ export default function AuthScreen() {
   }, [showSplash, isInitialized, token]);
 
   const handleSignIn = async () => {
-    const identifier = activeTab === "Phone" ? phone.trim() : email.trim();
-    if (!identifier) {
-      Alert.alert("Error", `Please enter your ${activeTab === "Phone" ? "phone number" : "email address"}`);
+    const trimmed = identifier.trim();
+    if (!trimmed) {
+      Alert.alert("Error", "Please enter your phone number or email");
       return;
-    }
-    if (activeTab === "Phone" && identifier.length < 10) {
-      Alert.alert("Error", "Please enter a valid phone number");
-      return;
-    }
-    if (activeTab === "Email") {
-      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-      if (!emailRegex.test(identifier)) {
-        Alert.alert("Error", "Please enter a valid email address");
-        return;
-      }
     }
     if (!password) {
       Alert.alert("Error", "Please enter your password");
@@ -108,7 +97,7 @@ export default function AuthScreen() {
     }
 
     try {
-      await loginWithPassword(identifier, password, "USER");
+      await loginWithPassword(trimmed, password, "USER");
       // Token is now saved in AsyncStorage & store → navigate in
       router.replace("/(tabs)");
     } catch (error: any) {
@@ -118,6 +107,24 @@ export default function AuthScreen() {
 
   const handleForgotPassword = () => {
     Alert.alert("Forgot Password", "Password recovery instructions will be sent to your account.");
+  };
+
+  const handleContinueWithOtp = async () => {
+    const trimmed = identifier.trim();
+    const digitsOnly = trimmed.replace(/\D/g, "");
+    if (digitsOnly.length < 10) {
+      Alert.alert("Phone number needed", "Enter your phone number above to continue with an OTP.");
+      return;
+    }
+    setSendingOtp(true);
+    try {
+      await requestOTP(digitsOnly);
+      router.push({ pathname: "/otp", params: { phone: digitsOnly } });
+    } catch (error: any) {
+      Alert.alert("Couldn't send code", error.message || "Please try again.");
+    } finally {
+      setSendingOtp(false);
+    }
   };
 
   // Show a loading indicator while auth state is being restored
@@ -169,312 +176,281 @@ export default function AuthScreen() {
       style={styles.root}
       behavior={Platform.OS === "ios" ? "padding" : "height"}
     >
-      {/* Top Header */}
-      <View style={[styles.headerRow, { paddingTop: insets.top + 20 }]}>
-        <Text style={styles.brandTitle}>Flavor</Text>
-        <Text style={styles.brandTagline}>Your city, delivered.</Text>
-      </View>
-
       <ScrollView
-        contentContainerStyle={styles.scrollContainer}
+        contentContainerStyle={[styles.scrollContainer, { paddingTop: insets.top + 24, minHeight: "100%" }]}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>Welcome Back</Text>
-          <Text style={styles.cardSubtitle}>
-            Sign in to track your real-time deliveries
+        {/* Brand mark + headline, centered in the space above the form */}
+        <View style={styles.heroBlock}>
+          <View style={styles.logoMark}>
+            <Text style={styles.logoMarkText}>F</Text>
+          </View>
+
+          <Text style={styles.headline} numberOfLines={1}>Welcome back</Text>
+          <Text style={styles.subhead}>
+            Food, meat, rides, helpers and courier runs. One app.
           </Text>
+        </View>
 
-          {/* Segmented Tab Switcher */}
-          <View style={styles.tabContainer}>
-            <TouchableOpacity
-              style={[styles.tab, activeTab === "Phone" && styles.tabActive]}
-              onPress={() => setActiveTab("Phone")}
-              activeOpacity={0.9}
-            >
-              <Text style={[styles.tabText, activeTab === "Phone" && styles.tabTextActive]}>
-                Phone
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.tab, activeTab === "Email" && styles.tabActive]}
-              onPress={() => setActiveTab("Email")}
-              activeOpacity={0.9}
-            >
-              <Text style={[styles.tabText, activeTab === "Email" && styles.tabTextActive]}>
-                Email
-              </Text>
-            </TouchableOpacity>
-          </View>
-
-          {/* Conditional input fields */}
-          <View style={styles.form}>
-            {activeTab === "Phone" ? (
-              <View style={styles.fieldWrapper}>
-                <Text style={styles.fieldLabel}>Phone Number</Text>
-                <View style={styles.inputContainer}>
-                  <Ionicons name="phone-portrait-outline" size={moderateScale(18)} color="#43474e" style={styles.inputIcon} />
-                  <TextInput
-                    style={styles.input}
-                    placeholder="e.g. 9876543210"
-                    placeholderTextColor="#74777f"
-                    value={phone}
-                    onChangeText={setPhone}
-                    keyboardType="phone-pad"
-                    autoComplete="tel"
-                  />
-                </View>
-              </View>
-            ) : (
-              <View style={styles.fieldWrapper}>
-                <Text style={styles.fieldLabel}>Email Address</Text>
-                <View style={styles.inputContainer}>
-                  <Ionicons name="mail-outline" size={moderateScale(18)} color="#43474e" style={styles.inputIcon} />
-                  <TextInput
-                    style={styles.input}
-                    placeholder="name@example.com"
-                    placeholderTextColor="#74777f"
-                    value={email}
-                    onChangeText={setEmail}
-                    keyboardType="email-address"
-                    autoCapitalize="none"
-                    autoCorrect={false}
-                  />
-                </View>
-              </View>
-            )}
-
-            {/* Password input field */}
-            <View style={styles.fieldWrapper}>
-              <View style={styles.labelRow}>
-                <Text style={styles.fieldLabel}>Password</Text>
-                <TouchableOpacity onPress={handleForgotPassword} activeOpacity={0.7}>
-                  <Text style={styles.forgotText}>Forgot?</Text>
-                </TouchableOpacity>
-              </View>
-              <View style={styles.inputContainer}>
-                <Ionicons name="lock-closed-outline" size={moderateScale(18)} color="#43474e" style={styles.inputIcon} />
-                <TextInput
-                  style={styles.input}
-                  placeholder="••••••••"
-                  placeholderTextColor="#74777f"
-                  value={password}
-                  onChangeText={setPassword}
-                  secureTextEntry={!isPasswordVisible}
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                />
-                <TouchableOpacity
-                  onPress={() => setIsPasswordVisible(!isPasswordVisible)}
-                  style={styles.eyeBtn}
-                  activeOpacity={0.7}
-                >
-                  <Ionicons
-                    name={isPasswordVisible ? "eye-off-outline" : "eye-outline"}
-                    size={moderateScale(20)}
-                    color="#43474e"
-                  />
-                </TouchableOpacity>
-              </View>
+        {/* Form */}
+        <View style={styles.form}>
+          <View style={styles.fieldWrapper}>
+            <Text style={styles.fieldLabel}>Phone or email</Text>
+            <View style={[styles.inputContainer, styles.inputContainerAccent]}>
+              <TextInput
+                style={styles.input}
+                placeholder="98490 21734"
+                placeholderTextColor={tokens.muted}
+                value={identifier}
+                onChangeText={setIdentifier}
+                autoCapitalize="none"
+                autoCorrect={false}
+              />
             </View>
+          </View>
 
-            {/* Sign In CTA Button */}
-            <TouchableOpacity
-              style={[
-                styles.signInBtn,
-                (!password || (activeTab === "Phone" ? !phone : !email) || loading) && styles.signInBtnDisabled
-              ]}
-              onPress={handleSignIn}
-              disabled={(!password || (activeTab === "Phone" ? !phone : !email) || loading)}
-              activeOpacity={0.85}
-            >
-              {loading ? (
-                <ActivityIndicator size="small" color="#002045" />
-              ) : (
-                <>
-                  <Text style={styles.signInBtnText}>Sign In</Text>
-                  <Ionicons name="arrow-forward" size={moderateScale(18)} color="#002045" style={{ marginLeft: 8 }} />
-                </>
-              )}
+          <View style={styles.fieldWrapper}>
+            <Text style={styles.fieldLabel}>Password</Text>
+            <View style={styles.inputContainer}>
+              <TextInput
+                style={styles.input}
+                placeholder="••••••••"
+                placeholderTextColor={tokens.muted}
+                value={password}
+                onChangeText={setPassword}
+                secureTextEntry={!isPasswordVisible}
+                autoCapitalize="none"
+                autoCorrect={false}
+              />
+              <TouchableOpacity
+                onPress={() => setIsPasswordVisible(!isPasswordVisible)}
+                style={styles.eyeBtn}
+                activeOpacity={0.7}
+              >
+                <Ionicons
+                  name={isPasswordVisible ? "eye-off-outline" : "eye-outline"}
+                  size={moderateScale(18)}
+                  color={tokens.sec}
+                />
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          <View style={styles.forgotRow}>
+            <TouchableOpacity onPress={handleForgotPassword} activeOpacity={0.7}>
+              <Text style={styles.forgotText}>Forgot?</Text>
             </TouchableOpacity>
           </View>
 
-          {/* Don't have account row */}
+          {/* Sign In CTA */}
           <TouchableOpacity
-            style={styles.signUpLinkRow}
-            onPress={() => router.replace("/signup")}
-            activeOpacity={0.7}
+            style={[styles.signInBtn, (!identifier || !password || loading) && styles.signInBtnDisabled]}
+            onPress={handleSignIn}
+            disabled={!identifier || !password || loading}
+            activeOpacity={0.85}
           >
-            <Text style={styles.signUpLinkText}>
-              Don't have an account? <Text style={styles.signUpLinkHighlight}>Create Account</Text>
-            </Text>
+            {loading ? (
+              <ActivityIndicator size="small" color={accent.on} />
+            ) : (
+              <Text style={styles.signInBtnText}>Sign in</Text>
+            )}
           </TouchableOpacity>
         </View>
+
+        {/* Divider */}
+        <View style={styles.dividerRow}>
+          <View style={styles.dividerLine} />
+          <Text style={styles.dividerText}>or</Text>
+          <View style={styles.dividerLine} />
+        </View>
+
+        {/* OTP alternative */}
+        <TouchableOpacity
+          style={styles.otpBtn}
+          onPress={handleContinueWithOtp}
+          disabled={sendingOtp}
+          activeOpacity={0.85}
+        >
+          {sendingOtp ? (
+            <ActivityIndicator size="small" color={tokens.text} />
+          ) : (
+            <Text style={styles.otpBtnText}>Continue with OTP instead</Text>
+          )}
+        </TouchableOpacity>
+
+        {/* Create account link */}
+        <TouchableOpacity
+          onPress={() => router.replace("/signup")}
+          activeOpacity={0.7}
+          style={styles.signUpLinkRow}
+        >
+          <Text style={styles.signUpLinkText}>
+            New here? <Text style={styles.signUpLinkHighlight}>Create an account</Text>
+          </Text>
+        </TouchableOpacity>
       </ScrollView>
     </KeyboardAvoidingView>
   );
 }
 
-const createStyles = (colors: typeof Colors.light) => StyleSheet.create({
+const createStyles = (tokens: ThemeTokens, accent: ServiceTokens) => StyleSheet.create({
   root: {
     flex: 1,
-    backgroundColor: "#f7f9fb",
-  },
-  headerRow: {
-    paddingHorizontal: 24,
-    paddingBottom: 16,
-    backgroundColor: "#f7f9fb",
-    alignItems: "center",
-  },
-  brandTitle: {
-    fontSize: typography.sizes.titleLarge * 1.3,
-    fontWeight: typography.weights.black,
-    color: "#002045",
-    letterSpacing: -1,
-    marginBottom: 4,
-  },
-  brandTagline: {
-    fontSize: typography.body.fontSize,
-    color: "#43474e",
-    fontWeight: typography.weights.medium,
+    backgroundColor: tokens.bg,
   },
   scrollContainer: {
     flexGrow: 1,
-    justifyContent: "center",
     paddingHorizontal: 24,
-    paddingTop: 8,
-    paddingBottom: 32,
+    paddingBottom: 40,
   },
-  card: {
-    backgroundColor: "#ffffff",
-    borderRadius: moderateScale(20),
-    borderWidth: 1,
-    borderColor: "#e6e8ea",
-    padding: 24,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.06,
-    shadowRadius: 12,
-    elevation: 4,
-    width: "100%",
-  },
-  cardTitle: {
-    fontSize: typography.heading1.fontSize,
-    fontWeight: typography.weights.bold,
-    color: "#191c1e",
-    textAlign: "center",
-    marginBottom: 8,
-  },
-  cardSubtitle: {
-    fontSize: typography.body.fontSize,
-    color: "#43474e",
-    textAlign: "center",
-    lineHeight: moderateScale(20),
-    marginBottom: 24,
-  },
-  tabContainer: {
-    flexDirection: "row",
-    backgroundColor: "#eceef0",
-    borderRadius: moderateScale(10),
-    padding: 4,
-    height: moderateScale(46),
-    marginBottom: 16,
-  },
-  tab: {
+  heroBlock: {
     flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    // Capped close to the block's actual content height so "centered" doesn't
+    // read as a big empty gap before the form — just gentle breathing room.
+    maxHeight: moderateScale(200),
+    minHeight: moderateScale(140),
+  },
+  logoMark: {
+    width: moderateScale(56),
+    height: moderateScale(56),
+    borderRadius: moderateScale(18),
+    backgroundColor: accent.accent,
     alignItems: "center",
     justifyContent: "center",
-    borderRadius: moderateScale(8),
+    marginBottom: 28,
   },
-  tabActive: {
-    backgroundColor: "#ffffff",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 2,
+  logoMarkText: {
+    fontFamily: fontFamilies.heading.bold,
+    fontSize: moderateScale(28),
+    color: accent.on,
   },
-  tabText: {
-    fontSize: typography.body.fontSize,
-    fontWeight: typography.weights.semibold,
-    color: "#43474e",
+  headline: {
+    fontFamily: fontFamilies.heading.bold,
+    fontSize: moderateScale(38),
+    lineHeight: moderateScale(40),
+    letterSpacing: -1.4,
+    color: tokens.text,
+    textAlign: "center",
   },
-  tabTextActive: {
-    color: "#191c1e",
-    fontWeight: typography.weights.bold,
+  subhead: {
+    fontFamily: fontFamilies.body.regular,
+    marginTop: 14,
+    fontSize: moderateScale(16),
+    lineHeight: moderateScale(22),
+    color: tokens.sec,
+    textAlign: "center",
   },
   form: {
-    gap: 16,
+    marginTop: 36,
+    gap: 12,
   },
   fieldWrapper: {
-    gap: 8,
-  },
-  labelRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
+    gap: 7,
   },
   fieldLabel: {
-    fontSize: typography.bodySecondary.fontSize,
-    fontWeight: typography.weights.semibold,
-    color: "#191c1e",
-  },
-  forgotText: {
-    fontSize: typography.bodySecondary.fontSize,
-    fontWeight: typography.weights.semibold,
-    color: "#0061a5",
+    fontFamily: fontFamilies.body.bold,
+    fontSize: moderateScale(11),
+    letterSpacing: 1,
+    textTransform: "uppercase",
+    color: tokens.muted,
   },
   inputContainer: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#f2f4f6",
-    borderRadius: moderateScale(10),
-    height: moderateScale(50),
-    paddingHorizontal: 12,
+    backgroundColor: tokens.surface,
+    borderRadius: moderateScale(12),
+    borderWidth: 1,
+    borderColor: tokens.borderStrong,
+    minHeight: moderateScale(52),
+    paddingHorizontal: 14,
   },
-  inputIcon: {
-    marginRight: 8,
+  inputContainerAccent: {
+    borderWidth: 2,
+    borderColor: accent.accent,
   },
   input: {
     flex: 1,
-    fontSize: typography.body.fontSize,
-    color: "#191c1e",
+    fontFamily: fontFamilies.body.medium,
+    fontSize: moderateScale(15),
+    color: tokens.text,
     height: "100%",
   },
   eyeBtn: {
-    padding: 8,
+    padding: 6,
+  },
+  forgotRow: {
+    flexDirection: "row",
+    justifyContent: "flex-end",
+  },
+  forgotText: {
+    fontFamily: fontFamilies.body.semibold,
+    fontSize: moderateScale(13),
+    color: accent.accent,
+    paddingVertical: 4,
   },
   signInBtn: {
     height: moderateScale(52),
-    borderRadius: moderateScale(12),
-    backgroundColor: "#ffffff",
-    borderWidth: 2,
-    borderColor: "#002045",
+    borderRadius: moderateScale(14),
+    backgroundColor: accent.accent,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    marginTop: 8,
+    marginTop: 4,
   },
   signInBtnDisabled: {
-    borderColor: "#c4c6cf",
-    backgroundColor: "#f2f4f6",
+    opacity: 0.5,
   },
   signInBtnText: {
-    color: "#002045",
-    fontSize: typography.buttonText.fontSize,
-    fontWeight: typography.buttonText.fontWeight,
+    fontFamily: fontFamilies.body.bold,
+    color: accent.on,
+    fontSize: moderateScale(15),
+  },
+  dividerRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    marginTop: 24,
+  },
+  dividerLine: {
+    flex: 1,
+    height: 1,
+    backgroundColor: tokens.border,
+  },
+  dividerText: {
+    fontFamily: fontFamilies.body.medium,
+    fontSize: moderateScale(12),
+    color: tokens.muted,
+  },
+  otpBtn: {
+    marginTop: 16,
+    minHeight: moderateScale(52),
+    borderRadius: moderateScale(14),
+    borderWidth: 1,
+    borderColor: tokens.borderStrong,
+    backgroundColor: tokens.surface,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 15,
+  },
+  otpBtnText: {
+    fontFamily: fontFamilies.body.semibold,
+    fontSize: moderateScale(15),
+    color: tokens.text,
   },
   signUpLinkRow: {
-    marginTop: 24,
+    marginTop: 20,
     alignItems: "center",
   },
   signUpLinkText: {
-    fontSize: typography.body.fontSize,
-    color: "#43474e",
+    fontFamily: fontFamilies.body.regular,
+    fontSize: moderateScale(14),
+    color: tokens.sec,
   },
   signUpLinkHighlight: {
-    color: "#0061a5",
-    fontWeight: typography.weights.bold,
+    fontFamily: fontFamilies.body.semibold,
+    color: accent.accent,
   },
 });

@@ -1,37 +1,56 @@
-import React, { useState, useRef, useEffect } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   FlatList,
   KeyboardAvoidingView,
+  Linking,
   Platform,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
   View,
-  Linking,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Feather } from "@expo/vector-icons";
+import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { moderateScale } from "react-native-size-matters";
-import Colors from "@/constants/colors";
+import { designTokens, type ThemeTokens } from "@/constants/colors";
+import { fontFamilies } from "@/constants/typography";
+import { useThemeStore } from "@/contexts/themeStore";
 import { socketService } from "@/utils/socketService";
-import { useDeliveryStore } from "@/contexts/deliveryStore";
+import { useDeliveryStore, OrderStatus } from "@/contexts/deliveryStore";
 
-const QUICK_REPLIES = [
-  "Are you coming ❓",
-  "Waiting at pickup 📍",
-  "My location is as per map 🗺️",
-  "Message when reached 💬"
-];
+const RIDE_TYPES = ["bike", "auto", "cab", "cab_prime"];
+
+const QUICK_REPLIES = ["On my way", "Waiting at pickup", "My location is as per map", "Message when you're close"];
+
+const STATUS_LABEL: Partial<Record<OrderStatus, string>> = {
+  confirmed: "Order confirmed",
+  driver_assigned: "Assigned to you",
+  en_route_pickup: "Heading to pickup",
+  arrived_pickup: "Arrived at pickup",
+  picking_items: "Picking your order",
+  en_route_delivery: "On the way",
+  arrived_delivery: "Arrived",
+  delivered: "Completed",
+};
 
 export default function ChatScreen() {
   const insets = useSafeAreaInsets();
-  const { currentOrderId, driver, activeChat, addChatMessage, setUnreadCount, setIsChatActive, serviceType } = useDeliveryStore();
+  const { currentOrderId, driver, activeChat, addChatMessage, setUnreadCount, setIsChatActive, serviceType, status } = useDeliveryStore();
+  const { theme } = useThemeStore();
+  const tokens = designTokens[theme];
+
+  const isRide = RIDE_TYPES.includes(serviceType?.toLowerCase() || "");
+  const isHelper = serviceType?.toLowerCase() === "helper";
+  const accent = tokens.services[isRide ? "ride" : isHelper ? "task" : "food"];
+  const partnerLabel = isRide ? "Captain" : isHelper ? "Helper" : "Delivery partner";
+  const styles = useMemo(() => createStyles(tokens, accent), [theme, isRide, isHelper]);
+
   const [inputText, setInputText] = useState("");
   const flatListRef = useRef<FlatList>(null);
   const [taskAssigned, setTaskAssigned] = useState(false);
-  const [isQuickRepliesExpanded, setIsQuickRepliesExpanded] = useState(false);
 
   const handleAssignTask = () => {
     socketService.emit("assign_task_confirmed", { orderId: currentOrderId });
@@ -40,24 +59,17 @@ export default function ChatScreen() {
 
   useEffect(() => {
     if (!currentOrderId) return;
-
-    // Clear unread count when entering chat
     setUnreadCount(0);
     setIsChatActive(true);
-
-    // Ensure we are in the order room
     socketService.trackOrder(currentOrderId);
 
     const onMessage = (msg: any) => {
-      // Logic for incoming message
       const formattedMsg: any = {
         id: msg.id,
         text: msg.text,
         sender: msg.from === "driver" ? "driver" : "customer",
-        timestamp: msg.time || new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+        timestamp: msg.time || new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
       };
-      
-      // Use getState to get current messages and avoid stale closures
       const currentMessages = useDeliveryStore.getState().activeChat;
       if (!currentMessages.find((m: any) => m.id === formattedMsg.id)) {
         addChatMessage(formattedMsg);
@@ -65,9 +77,7 @@ export default function ChatScreen() {
       }
     };
 
-    const onTaskStarted = () => {
-      router.push("/tracking");
-    };
+    const onTaskStarted = () => router.push("/tracking");
 
     socketService.on("receive_message", onMessage);
     socketService.on("task_started", onTaskStarted);
@@ -81,159 +91,106 @@ export default function ChatScreen() {
 
   const sendMessage = (text: string) => {
     if (!text.trim() || !currentOrderId) return;
-
     const msgId = Date.now().toString();
     const newMsg: any = {
       id: msgId,
       text: text.trim(),
       sender: "customer",
-      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
     };
-
-    // Add to local store for instant UI
     addChatMessage(newMsg);
-
-    socketService.emit("send_message", {
-      orderId: currentOrderId,
-      senderId: "customer-123", // Ideally from auth
-      role: "USER",
-      text: text.trim(),
-      id: msgId
-    });
-
+    socketService.emit("send_message", { orderId: currentOrderId, role: "USER", text: text.trim(), id: msgId });
     setInputText("");
     setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100);
   };
 
-  const renderItem = ({ item }: { item: any }) => {
+  const renderItem = ({ item, index }: { item: any; index: number }) => {
     const isUser = item.sender === "customer";
+    const showDateDivider = index === 0;
     return (
-      <View
-        style={[
-          styles.messageRow,
-          isUser ? styles.messageRowUser : styles.messageRowDriver,
-        ]}
-      >
-        {!isUser && (
-          <View style={styles.driverAvatar}>
-            <Feather name="user" size={14} color={Colors.light.textSecondary} />
+      <>
+        {showDateDivider && <Text style={styles.dateDivider}>Today</Text>}
+        <View style={[styles.messageRow, isUser ? { justifyContent: "flex-end" } : { justifyContent: "flex-start" }]}>
+          {!isUser && (
+            <View style={styles.partnerAvatarSmall}>
+              <Ionicons name="person" size={13} color={tokens.sec} />
+            </View>
+          )}
+          <View style={[styles.bubble, isUser ? { backgroundColor: accent.accent, borderBottomRightRadius: 4 } : { backgroundColor: tokens.surface, borderWidth: 1, borderColor: tokens.border, borderBottomLeftRadius: 4 }]}>
+            <Text style={[styles.bubbleText, { color: isUser ? accent.on : tokens.text }]}>{item.text}</Text>
+            <Text style={[styles.bubbleTime, { color: isUser ? `${accent.on}B3` : tokens.sec, alignSelf: isUser ? "flex-end" : "flex-start" }]}>{item.timestamp}</Text>
           </View>
-        )}
-        <View
-          style={[
-            styles.bubble,
-            isUser ? styles.bubbleUser : styles.bubbleDriver,
-          ]}
-        >
-          <Text style={isUser ? styles.bubbleTextUser : styles.bubbleTextDriver}>
-            {item.text}
-          </Text>
-          <Text style={isUser ? styles.timeUser : styles.timeDriver}>
-            {item.timestamp}
-          </Text>
         </View>
-      </View>
+      </>
     );
   };
 
   return (
-    <KeyboardAvoidingView
-      style={styles.root}
-      behavior={Platform.OS === "ios" ? "padding" : "height"}
-      keyboardVerticalOffset={0}
-    >
-      {/* Header */}
-      {/* Header */}
+    <KeyboardAvoidingView style={styles.root} behavior={Platform.OS === "ios" ? "padding" : "height"} keyboardVerticalOffset={0}>
       <View style={[styles.header, { paddingTop: insets.top + (Platform.OS === "web" ? 67 : 0) + 12 }]}>
         <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
-          <Feather name="arrow-left" size={22} color={Colors.light.text} />
+          <Ionicons name="chevron-back" size={moderateScale(20)} color={tokens.text} />
         </TouchableOpacity>
-        <View style={styles.headerCenter}>
-          <View style={styles.headerAvatar}>
-            <Feather name="user" size={24} color={Colors.light.textSecondary} />
-            <View style={styles.onlineDot} />
-          </View>
-          <View>
-            <Text style={styles.headerName}>{driver?.name?.toUpperCase() || "DRIVER"}</Text>
-            <Text style={styles.headerStatus}>{driver?.vehicleNumber || driver?.vehicleModel || "Your Driver"}</Text>
-          </View>
+        <View style={styles.headerAvatar}>
+          <Ionicons name="person" size={20} color={tokens.sec} />
         </View>
-        <TouchableOpacity 
-          style={styles.callBtn}
-          onPress={() => Linking.openURL(`tel:${driver?.phone || "1234567890"}`)}
-        >
-          <Feather name="phone" size={20} color={Colors.light.textSecondary} />
+        <View style={{ flex: 1, minWidth: 0 }}>
+          <Text style={styles.headerName} numberOfLines={1}>{driver?.name || "Your partner"}</Text>
+          <Text style={[styles.headerStatus, { color: accent.accent }]} numberOfLines={1}>
+            {partnerLabel}{status && STATUS_LABEL[status] ? ` · ${STATUS_LABEL[status]}` : ""}
+          </Text>
+        </View>
+        <TouchableOpacity style={[styles.callBtn, { backgroundColor: accent.accent }]} onPress={() => Linking.openURL(`tel:${driver?.phone || ""}`)}>
+          <Ionicons name="call" size={17} color={accent.on} />
         </TouchableOpacity>
       </View>
 
-      {/* Warning Banner */}
-      <View style={styles.warningBanner}>
-        <View style={styles.warningIconContainer}>
-          <Feather name="alert-triangle" size={18} color="#EA580C" />
-        </View>
-        <Text style={styles.warningText}>Do not share your PIN with the captain before the ride starts</Text>
+      <View style={styles.safetyBanner}>
+        <Ionicons name="shield-checkmark-outline" size={16} color={tokens.warning} />
+        <Text style={styles.safetyText}>Keep the conversation in Flavour. Don't share your PIN with the {partnerLabel.toLowerCase()} before the {isHelper ? "task" : isRide ? "ride" : "order"} starts.</Text>
       </View>
 
-      {/* Helper Task Assignment Banner */}
-      {serviceType === "helper" && !taskAssigned && (
-        <View style={{ backgroundColor: '#F0FDF4', padding: 12, borderBottomWidth: 1, borderBottomColor: '#DCFCE7', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-          <View style={{ flex: 1, paddingRight: 10 }}>
-            <Text style={{ fontSize: 13, fontWeight: '700', color: '#166534' }}>Discuss Task Details</Text>
-            <Text style={{ fontSize: 11, color: '#15803D' }}>When you are ready, assign the task to start the clock.</Text>
-          </View>
-          <TouchableOpacity 
-            style={{ backgroundColor: '#16A34A', paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20 }}
-            onPress={handleAssignTask}
-          >
-            <Text style={{ color: '#fff', fontSize: 12, fontWeight: '700' }}>Assign Task</Text>
-          </TouchableOpacity>
-        </View>
-      )}
-      
-      {/* Messages */}
       <FlatList
         ref={flatListRef}
+        style={styles.messagesFlatList}
         data={activeChat}
         keyExtractor={(item) => item.id}
         renderItem={renderItem}
         contentContainerStyle={styles.messagesList}
         showsVerticalScrollIndicator={false}
         onLayout={() => flatListRef.current?.scrollToEnd({ animated: false })}
+        ListEmptyComponent={
+          <View style={styles.emptyState}>
+            <Ionicons name="chatbubbles-outline" size={32} color={tokens.muted} />
+            <Text style={styles.emptyStateText}>Messages with your {partnerLabel.toLowerCase()} will show up here.</Text>
+          </View>
+        }
       />
 
-      {/* Quick Replies Area */}
-      <View style={styles.quickRepliesCard}>
-        <TouchableOpacity 
-          style={[styles.quickRepliesHeaderRow, !isQuickRepliesExpanded && { marginBottom: 0 }]}
-          onPress={() => setIsQuickRepliesExpanded(!isQuickRepliesExpanded)}
-          activeOpacity={0.7}
-        >
-          <Text style={styles.quickRepliesTitle}>⚡ Quick Chat</Text>
-          <Feather name={isQuickRepliesExpanded ? "chevron-up" : "chevron-down"} size={16} color={Colors.light.textSecondary} />
-        </TouchableOpacity>
-        {isQuickRepliesExpanded && (
-          <View style={styles.quickRepliesList}>
-            {QUICK_REPLIES.map((item, index) => (
-              <TouchableOpacity
-                key={index}
-                style={styles.quickReplyActionBtn}
-                onPress={() => sendMessage(item)}
-              >
-                <Text style={styles.quickReplyActionText}>{item}</Text>
-                <Feather name="send" size={16} color="#0EA5E9" />
-              </TouchableOpacity>
-            ))}
+      {isHelper && !taskAssigned && (
+        <TouchableOpacity style={[styles.assignRow, { backgroundColor: accent.skin, borderColor: accent.accent }]} onPress={handleAssignTask} activeOpacity={0.85}>
+          <View style={[styles.assignIcon, { backgroundColor: accent.accent }]}>
+            <Ionicons name="construct" size={14} color={accent.on} />
           </View>
-        )}
-      </View>
+          <Text style={styles.assignText}>Assign task</Text>
+          <Text style={[styles.assignSend, { color: accent.accent }]}>SEND</Text>
+        </TouchableOpacity>
+      )}
 
-      {/* Input Bar */}
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.quickRepliesRow} contentContainerStyle={{ gap: 8, paddingHorizontal: 16 }}>
+        {QUICK_REPLIES.map((item) => (
+          <TouchableOpacity key={item} style={styles.quickReplyChip} onPress={() => sendMessage(item)}>
+            <Text style={styles.quickReplyChipText}>{item}</Text>
+          </TouchableOpacity>
+        ))}
+      </ScrollView>
+
       <View style={[styles.inputBar, { paddingBottom: Platform.OS === "ios" ? insets.bottom + 8 : 12 }]}>
         <View style={styles.inputContainer}>
           <TextInput
             style={styles.textInput}
-            placeholder="Type a message..."
-            placeholderTextColor={Colors.light.textMuted}
+            placeholder={`Message ${driver?.name?.split(" ")[0] || partnerLabel}…`}
+            placeholderTextColor={tokens.muted}
             value={inputText}
             onChangeText={setInputText}
             multiline
@@ -241,295 +198,59 @@ export default function ChatScreen() {
           />
         </View>
         <TouchableOpacity
-          style={[styles.sendBtn, !inputText.trim() && styles.sendBtnDisabled]}
+          style={[styles.sendBtn, { backgroundColor: accent.accent, opacity: inputText.trim() ? 1 : 0.5 }]}
           onPress={() => sendMessage(inputText)}
           disabled={!inputText.trim()}
         >
-          <View style={{ transform: [{ rotate: "45deg" }] }}>
-            <Feather name="send" size={20} color="#fff" />
-          </View>
+          <Ionicons name="send" size={18} color={accent.on} />
         </TouchableOpacity>
       </View>
     </KeyboardAvoidingView>
   );
 }
 
-const styles = StyleSheet.create({
-  root: {
-    flex: 1,
-    backgroundColor: "#F8FAFC",
-  },
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: 16,
-    paddingBottom: 16,
-    backgroundColor: "#FFFFFF",
-    borderBottomWidth: 1,
-    borderBottomColor: "#F1F5F9",
-    gap: 12,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.04,
-    shadowRadius: 8,
-    elevation: 3,
-  },
-  backBtn: {
-    width: moderateScale(30),
-    height: moderateScale(30),
-    borderRadius: moderateScale(8),
-    backgroundColor: "#F1F5F9",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  headerCenter: {
-    flex: 1,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-  },
-  headerAvatar: {
-    width: moderateScale(32),
-    height: moderateScale(32),
-    borderRadius: moderateScale(10),
-    backgroundColor: "#F1F5F9",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  onlineDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: "#22C55E",
-    borderWidth: 2,
-    borderColor: "#fff",
-    position: "absolute",
-    bottom: 0,
-    right: 0,
-  },
-  headerName: {
-    fontSize: moderateScale(13),
-    fontWeight: "700",
-    color: Colors.light.text,
-    letterSpacing: -0.3,
-  },
-  headerStatus: {
-    fontSize: moderateScale(10),
-    color: "#22C55E",
-    fontWeight: "600",
-  },
-  callBtn: {
-    width: moderateScale(30),
-    height: moderateScale(30),
-    borderRadius: moderateScale(8),
-    backgroundColor: "#F0F9FF",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  messagesList: {
-    paddingHorizontal: 16,
-    paddingTop: 20,
-    paddingBottom: 8,
-    gap: 12,
-  },
-  messageRow: {
-    flexDirection: "row",
-    alignItems: "flex-end",
-    gap: 8,
-    marginBottom: 4,
-  },
-  messageRowUser: {
-    justifyContent: "flex-end",
-  },
-  messageRowDriver: {
-    justifyContent: "flex-start",
-  },
-  driverAvatar: {
-    width: moderateScale(24),
-    height: moderateScale(24),
-    borderRadius: moderateScale(8),
-    backgroundColor: "#F1F5F9",
-    alignItems: "center",
-    justifyContent: "center",
-    marginBottom: 4,
-  },
-  bubble: {
-    maxWidth: "75%",
-    borderRadius: moderateScale(12),
-    paddingHorizontal: 10,
-    paddingVertical: 8,
-    gap: 3,
-  },
-  bubbleUser: {
-    backgroundColor: "#0EA5E9",
-    borderBottomRightRadius: moderateScale(6),
-  },
-  bubbleDriver: {
-    backgroundColor: "#FFFFFF",
-    borderBottomLeftRadius: moderateScale(6),
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.06,
-    shadowRadius: 6,
-    elevation: 2,
-  },
-  bubbleTextUser: {
-    fontSize: moderateScale(13),
-    color: "#fff",
-    fontWeight: "500",
-    lineHeight: moderateScale(18),
-  },
-  bubbleTextDriver: {
-    fontSize: moderateScale(13),
-    color: Colors.light.text,
-    fontWeight: "500",
-    lineHeight: moderateScale(18),
-  },
-  timeUser: {
-    fontSize: moderateScale(10),
-    color: "rgba(255,255,255,0.7)",
-    fontWeight: "500",
-    alignSelf: "flex-end",
-  },
-  timeDriver: {
-    fontSize: moderateScale(10),
-    color: Colors.light.textMuted,
-    fontWeight: "500",
-    alignSelf: "flex-end",
-  },
-  quickRepliesContainer: {
-    paddingVertical: 8,
-    backgroundColor: "#F8FAFC",
-    borderTopWidth: 1,
-    borderTopColor: "#F1F5F9",
-  },
-  quickRepliesList: {
-    paddingHorizontal: 16,
-    gap: 8,
-  },
-  quickReplyChip: {
-    backgroundColor: "#FFFFFF",
-    borderRadius: moderateScale(20),
-    paddingHorizontal: 12,
-    paddingVertical: 5,
-    borderWidth: 1.5,
-    borderColor: "#E2E8F0",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.04,
-    shadowRadius: 4,
-    elevation: 1,
-  },
-  quickReplyText: {
-    fontSize: moderateScale(11),
-    fontWeight: "600",
-    color: Colors.light.textSecondary,
-  },
-  inputBar: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-    paddingHorizontal: 16,
-    paddingTop: 12,
-    backgroundColor: "#FFFFFF",
-    borderTopWidth: 1,
-    borderTopColor: "#F1F5F9",
-  },
-  inputContainer: {
-    flex: 1,
-    backgroundColor: "#F1F5F9",
-    borderRadius: moderateScale(22),
-    height: moderateScale(44),
-    paddingHorizontal: 14,
-    justifyContent: "center",
-  },
-  textInput: {
-    flex: 1,
-    fontSize: moderateScale(15),
-    color: Colors.light.text,
-    fontWeight: "500",
-    paddingVertical: 0,
-    textAlignVertical: "center",
-  },
-  sendBtn: {
-    width: moderateScale(44),
-    height: moderateScale(44),
-    borderRadius: moderateScale(22),
-    backgroundColor: "#0EA5E9",
-    alignItems: "center",
-    justifyContent: "center",
-    shadowColor: "#0EA5E9",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.35,
-    shadowRadius: 10,
-    elevation: 6,
-  },
-  sendBtnDisabled: {
-    shadowOpacity: 0,
-  },
-  warningBanner: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#FFF7ED",
-    marginHorizontal: 16,
-    marginTop: 12,
-    paddingVertical: 12,
-    paddingHorizontal: 14,
-    borderRadius: 12,
-    gap: 12,
-    borderWidth: 1,
-    borderColor: "#FFEDD5",
-  },
-  warningIconContainer: {
-    backgroundColor: "#FFEDD5",
-    padding: 6,
-    borderRadius: 8,
-  },
-  warningText: {
-    flex: 1,
-    fontSize: 13,
-    color: "#431407",
-    fontWeight: "500",
-    lineHeight: 18,
-  },
-  quickRepliesCard: {
-    backgroundColor: "#FFFFFF",
-    marginHorizontal: 16,
-    marginBottom: 8,
-    borderRadius: 16,
-    borderWidth: 1,
-    borderColor: "#F1F5F9",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.04,
-    shadowRadius: 8,
-    elevation: 2,
-    padding: 16,
-  },
-  quickRepliesHeaderRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    marginBottom: 12,
-  },
-  quickRepliesTitle: {
-    fontSize: 14,
-    fontWeight: "700",
-    color: Colors.light.text,
-  },
-  quickReplyActionBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    borderWidth: 1,
-    borderColor: "#E2E8F0",
-    borderRadius: 20,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-  },
-  quickReplyActionText: {
-    fontSize: 14,
-    color: Colors.light.textSecondary,
-    fontWeight: "500",
-  },
-});
+const createStyles = (tokens: ThemeTokens, accent: ThemeTokens["services"]["food"]) =>
+  StyleSheet.create({
+    root: { flex: 1, backgroundColor: tokens.bg },
+    header: {
+      flexDirection: "row", alignItems: "center", paddingHorizontal: 16, paddingBottom: 14, gap: 12,
+      backgroundColor: tokens.surface, borderBottomWidth: 1, borderBottomColor: tokens.border,
+    },
+    backBtn: { width: moderateScale(38), height: moderateScale(38), borderRadius: moderateScale(19), backgroundColor: tokens.bg, borderWidth: 1, borderColor: tokens.border, alignItems: "center", justifyContent: "center" },
+    headerAvatar: { width: moderateScale(40), height: moderateScale(40), borderRadius: moderateScale(20), backgroundColor: tokens.sunken, borderWidth: 1, borderColor: tokens.border, alignItems: "center", justifyContent: "center" },
+    headerName: { fontFamily: fontFamilies.body.semibold, fontSize: moderateScale(15), color: tokens.text },
+    headerStatus: { fontFamily: fontFamilies.body.medium, fontSize: moderateScale(12), marginTop: 2 },
+    callBtn: { width: moderateScale(38), height: moderateScale(38), borderRadius: moderateScale(19), alignItems: "center", justifyContent: "center" },
+
+    safetyBanner: { flexDirection: "row", alignItems: "flex-start", gap: 10, backgroundColor: tokens.warningSkin, marginHorizontal: 16, marginTop: 12, padding: 12, borderRadius: 12 },
+    safetyText: { flex: 1, fontFamily: fontFamilies.body.regular, fontSize: moderateScale(12), lineHeight: moderateScale(17), color: tokens.sec },
+
+    // Without an explicit flex the FlatList sizes to its own content instead
+    // of the space left between the safety banner and the quick-reply row —
+    // as messages accumulate it pushes the chips and composer off-screen.
+    messagesFlatList: { flex: 1 },
+    messagesList: { paddingHorizontal: 16, paddingTop: 16, paddingBottom: 8 },
+    dateDivider: { textAlign: "center", fontFamily: fontFamilies.body.medium, fontSize: moderateScale(12), color: tokens.sec, marginBottom: 12 },
+    messageRow: { flexDirection: "row", alignItems: "flex-end", gap: 8, marginBottom: 10 },
+    partnerAvatarSmall: { width: moderateScale(24), height: moderateScale(24), borderRadius: moderateScale(12), backgroundColor: tokens.sunken, alignItems: "center", justifyContent: "center", marginBottom: 2 },
+    bubble: { maxWidth: "78%", borderRadius: 16, paddingHorizontal: 13, paddingVertical: 11, gap: 5 },
+    bubbleText: { fontFamily: fontFamilies.body.regular, fontSize: moderateScale(14), lineHeight: moderateScale(20) },
+    bubbleTime: { fontFamily: fontFamilies.body.medium, fontSize: moderateScale(11) },
+
+    emptyState: { alignItems: "center", justifyContent: "center", paddingVertical: 60, gap: 10 },
+    emptyStateText: { fontFamily: fontFamilies.body.regular, fontSize: moderateScale(13), color: tokens.sec, textAlign: "center", paddingHorizontal: 40 },
+
+    assignRow: { flexDirection: "row", alignItems: "center", gap: 11, marginHorizontal: 16, marginTop: 8, borderWidth: 1, borderRadius: 12, padding: 11, minHeight: 48 },
+    assignIcon: { width: 30, height: 30, borderRadius: 9, alignItems: "center", justifyContent: "center" },
+    assignText: { flex: 1, fontFamily: fontFamilies.body.semibold, fontSize: moderateScale(14), color: tokens.text },
+    assignSend: { fontFamily: fontFamilies.body.bold, fontSize: moderateScale(11), letterSpacing: 0.8 },
+
+    quickRepliesRow: { marginTop: 10 },
+    quickReplyChip: { borderWidth: 1, borderColor: tokens.borderStrong, backgroundColor: tokens.surface, borderRadius: 999, paddingHorizontal: 13, paddingVertical: 8, minHeight: 36, justifyContent: "center" },
+    quickReplyChipText: { fontFamily: fontFamilies.body.medium, fontSize: moderateScale(13), color: tokens.sec },
+
+    inputBar: { flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: 16, paddingTop: 12, backgroundColor: tokens.surface, borderTopWidth: 1, borderTopColor: tokens.border, marginTop: 10 },
+    inputContainer: { flex: 1, backgroundColor: tokens.bg, borderWidth: 1, borderColor: tokens.borderStrong, borderRadius: 22, minHeight: moderateScale(44), maxHeight: 100, paddingHorizontal: 16, justifyContent: "center" },
+    textInput: { fontFamily: fontFamilies.body.regular, fontSize: moderateScale(15), color: tokens.text, paddingVertical: 10 },
+    sendBtn: { width: moderateScale(44), height: moderateScale(44), borderRadius: moderateScale(22), alignItems: "center", justifyContent: "center" },
+  });

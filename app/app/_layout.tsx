@@ -5,6 +5,18 @@ import {
   Inter_700Bold,
   useFonts,
 } from "@expo-google-fonts/inter";
+import {
+  FamiljenGrotesk_400Regular,
+  FamiljenGrotesk_500Medium,
+  FamiljenGrotesk_600SemiBold,
+  FamiljenGrotesk_700Bold,
+} from "@expo-google-fonts/familjen-grotesk";
+import {
+  Figtree_400Regular,
+  Figtree_500Medium,
+  Figtree_600SemiBold,
+  Figtree_700Bold,
+} from "@expo-google-fonts/figtree";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Stack, router, useSegments } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
@@ -38,6 +50,7 @@ setAuthTokenGetter(() => {
 
 import { FloatingCart } from "@/components/FloatingCart";
 import UpdateModal from "@/components/UpdateModal";
+import { OfflineBanner } from "@/components/OfflineBanner";
 import { useState } from "react";
 import { GlobalSocketHandler } from "@/components/GlobalSocketHandler";
 import Colors from "@/constants/colors";
@@ -226,6 +239,14 @@ export default function RootLayout() {
     Inter_500Medium,
     Inter_600SemiBold,
     Inter_700Bold,
+    FamiljenGrotesk_400Regular,
+    FamiljenGrotesk_500Medium,
+    FamiljenGrotesk_600SemiBold,
+    FamiljenGrotesk_700Bold,
+    Figtree_400Regular,
+    Figtree_500Medium,
+    Figtree_600SemiBold,
+    Figtree_700Bold,
   });
 
   const initializeAuth = useAuthStore((s) => s.initializeAuth);
@@ -321,7 +342,8 @@ export default function RootLayout() {
               <RootLayoutNav />
               <FloatingCart />
               <GlobalSocketHandler />
-              <UpdateModal 
+              <OfflineBanner />
+              <UpdateModal
                 visible={showUpdate} 
                 forceUpdate={forceUpdate} 
                 storeUrl={storeUrl} 

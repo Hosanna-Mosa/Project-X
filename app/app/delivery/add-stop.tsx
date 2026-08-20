@@ -1,4 +1,4 @@
-import React, { useState, useRef, useCallback } from "react";
+import React, { useState, useRef, useCallback, useMemo, useEffect } from "react";
 import {
   KeyboardAvoidingView,
   Platform,
@@ -9,54 +9,63 @@ import {
   TouchableOpacity,
   View,
   Alert,
-  FlatList,
   ActivityIndicator,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Feather } from "@expo/vector-icons";
+import { Ionicons } from "@expo/vector-icons";
+import { moderateScale } from "react-native-size-matters";
 import { router } from "expo-router";
 import { useDeliveryStore, DeliveryItem } from "@/contexts/deliveryStore";
 import { useThemeStore } from "@/contexts/themeStore";
-import Colors from "@/constants/colors";
+import { designTokens, type ThemeTokens } from "@/constants/colors";
+import { fontFamilies } from "@/constants/typography";
 
 const BACKEND_URL = process.env.EXPO_PUBLIC_API_URL;
 
-const GOOGLE_MAPS_APIKEY = process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY;
+const getDistanceMeters = (lat1: number, lon1: number, lat2: number, lon2: number) => {
+  const R = 6371000;
+  const dLat = (lat2 - lat1) * (Math.PI / 180);
+  const dLon = (lon2 - lon1) * (Math.PI / 180);
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(lat1 * (Math.PI / 180)) * Math.cos(lat2 * (Math.PI / 180)) * Math.sin(dLon / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+};
 
-// Dynamic suggestions will be fetched from backend
+const formatDistance = (meters: number) => (meters < 1000 ? `${Math.round(meters)} m` : `${(meters / 1000).toFixed(1)} km`);
 
 export default function AddStopScreen() {
   const insets = useSafeAreaInsets();
+  const { theme } = useThemeStore();
+  const tokens = designTokens[theme];
+  const accent = tokens.services.delivery;
+  const styles = useMemo(() => createStyles(tokens, accent), [theme]);
+
   const [address, setAddress] = useState("");
   const [addressInput, setAddressInput] = useState("");
   const [storeName, setStoreName] = useState("");
   const [items, setItems] = useState<DeliveryItem[]>([]);
   const [newItemName, setNewItemName] = useState("");
+  const [newItemPrice, setNewItemPrice] = useState("");
   const [coords, setCoords] = useState<{ lat: number; lng: number } | undefined>(undefined);
   const [nearbySuggestions, setNearbySuggestions] = useState<any[]>([]);
   const [autocompleteSuggestions, setAutocompleteSuggestions] = useState<any[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [showDropdown, setShowDropdown] = useState(false);
-  const { addStop, currentCoords } = useDeliveryStore();
+  const [previewDelta, setPreviewDelta] = useState<{ distanceKm: number; newTotal: number } | null>(null);
+  const [isPreviewing, setIsPreviewing] = useState(false);
+  const { addStop, currentCoords, stops, route, price } = useDeliveryStore();
   const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const { theme } = useThemeStore();
-  const colors = Colors[theme];
-  const styles = React.useMemo(() => createStyles(colors), [theme]);
-
-  React.useEffect(() => {
-    if (currentCoords) {
-      fetchNearbySuggestions(currentCoords.lat, currentCoords.lng);
-    }
+  useEffect(() => {
+    if (currentCoords) fetchNearbySuggestions(currentCoords.lat, currentCoords.lng);
   }, [currentCoords]);
 
   const fetchNearbySuggestions = async (lat: number, lng: number) => {
     try {
       const response = await fetch(`${BACKEND_URL}/api/v1/places/nearby?lat=${lat}&lng=${lng}&radius=3000`);
       const data = await response.json();
-      if (Array.isArray(data)) {
-        setNearbySuggestions(data.slice(0, 8));
-      }
+      if (Array.isArray(data)) setNearbySuggestions(data.slice(0, 6));
     } catch (error) {
       console.error("Error fetching nearby suggestions:", error);
     }
@@ -69,14 +78,11 @@ export default function AddStopScreen() {
       setShowDropdown(false);
       return;
     }
-
     debounceTimer.current = setTimeout(async () => {
       setIsSearching(true);
       try {
         const latParam = currentCoords ? `&lat=${currentCoords.lat}&lng=${currentCoords.lng}` : "";
-        const response = await fetch(
-          `${BACKEND_URL}/api/v1/places/autocomplete?input=${encodeURIComponent(input)}${latParam}&radius=10000`
-        );
+        const response = await fetch(`${BACKEND_URL}/api/v1/places/autocomplete?input=${encodeURIComponent(input)}${latParam}&radius=10000`);
         const data = await response.json();
         if (Array.isArray(data)) {
           setAutocompleteSuggestions(data.slice(0, 6));
@@ -87,16 +93,12 @@ export default function AddStopScreen() {
       } finally {
         setIsSearching(false);
       }
-    }, 350); // 350ms debounce
+    }, 350);
   }, [currentCoords]);
 
   const handleAddressInput = (text: string) => {
     setAddressInput(text);
-    // Clear confirmed selection if user types again
-    if (address && text !== address) {
-      setAddress("");
-      setCoords(undefined);
-    }
+    if (address && text !== address) { setAddress(""); setCoords(undefined); }
     fetchAutocompleteSuggestions(text);
   };
 
@@ -104,27 +106,53 @@ export default function AddStopScreen() {
     const displayAddress = item.address || item.description || item.name;
     setAddress(displayAddress);
     setAddressInput(displayAddress);
-    
     if (item.lat && item.lng) {
       setCoords({ lat: item.lat, lng: item.lng });
     } else if (item.id) {
       try {
         const response = await fetch(`${BACKEND_URL}/api/v1/places/details/${item.id}`);
         const data = await response.json();
-        if (data.lat && data.lng) {
-          setCoords({ lat: data.lat, lng: data.lng });
-        }
+        if (data.lat && data.lng) setCoords({ lat: data.lat, lng: data.lng });
       } catch (error) {
         console.error("Error fetching place details:", error);
       }
     }
-
-    if (!storeName && item.name) {
-      setStoreName(item.name);
-    }
+    if (!storeName && item.name) setStoreName(item.name);
     setAutocompleteSuggestions([]);
     setShowDropdown(false);
   };
+
+  // Real fare-delta preview: asks the same routing endpoint what the trip
+  // would look like with this stop included, before it's committed.
+  useEffect(() => {
+    if (!coords || !currentCoords) { setPreviewDelta(null); return; }
+    let cancelled = false;
+    setIsPreviewing(true);
+    (async () => {
+      try {
+        const hypotheticalStops = [...stops, { id: "preview", address, lat: coords.lat, lng: coords.lng, type: "pickup" }];
+        const response = await fetch(`${BACKEND_URL}/api/v1/routing/optimize`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ origin: currentCoords, stops: hypotheticalStops }),
+        });
+        const data = await response.json();
+        if (!cancelled && data.totalDistance != null) {
+          const baseFee = 2.0;
+          const distanceCost = Math.round(data.totalDistance * 0.6 * 100) / 100;
+          const stopCharges = hypotheticalStops.length * 1.5;
+          const newTotal = Math.round((baseFee + distanceCost + stopCharges) * 100) / 100;
+          setPreviewDelta({ distanceKm: Math.round((data.totalDistance - (route?.totalDistance || 0)) * 10) / 10, newTotal });
+        }
+      } catch (error) {
+        console.error("Preview route failed:", error);
+      } finally {
+        if (!cancelled) setIsPreviewing(false);
+      }
+    })();
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [coords?.lat, coords?.lng]);
 
   const handleAddStop = () => {
     if (!address.trim()) {
@@ -132,7 +160,7 @@ export default function AddStopScreen() {
       return;
     }
     if (items.length === 0) {
-      Alert.alert("Items Needed", "Please add at least one item to pickup at this location.");
+      Alert.alert("Items needed", "Please add at least one item to pick up at this location.");
       return;
     }
     addStop(address, storeName || undefined, items, coords?.lat, coords?.lng);
@@ -144,423 +172,192 @@ export default function AddStopScreen() {
     const item: DeliveryItem = {
       id: Date.now().toString(),
       name: newItemName.trim(),
-      quantity: 1, // Defaulting to 1 for now
+      quantity: 1,
+      estimatedPrice: newItemPrice.trim() ? Number(newItemPrice) : undefined,
     };
     setItems([...items, item]);
     setNewItemName("");
+    setNewItemPrice("");
   };
 
-  const removeItemFromLocal = (id: string) => {
-    setItems(items.filter((i) => i.id !== id));
-  };
+  const removeItemFromLocal = (id: string) => setItems(items.filter((i) => i.id !== id));
 
   return (
-    <KeyboardAvoidingView
-      style={styles.root}
-      behavior={Platform.OS === "ios" ? "padding" : "height"}
-    >
-      <View
-        style={[
-          styles.header,
-          {
-            paddingTop: insets.top + (Platform.OS === "web" ? 67 : 16),
-          },
-        ]}
-      >
-        <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
-          <Feather name="arrow-left" size={20} color={colors.text} />
+    <KeyboardAvoidingView style={styles.root} behavior={Platform.OS === "ios" ? "padding" : "height"}>
+      <View style={[styles.header, { paddingTop: insets.top + 6 }]}>
+        <TouchableOpacity style={styles.iconBtn} onPress={() => router.back()}>
+          <Ionicons name="chevron-back" size={moderateScale(20)} color={tokens.text} />
         </TouchableOpacity>
-        <Text style={styles.title}>Add Pickup Location</Text>
-        <View style={{ width: 44 }} />
+        <Text style={styles.headerTitle}>Add stop {stops.length + 1}</Text>
       </View>
 
-      <ScrollView
-        contentContainerStyle={[
-          styles.content,
-          {
-            paddingBottom: insets.bottom + (Platform.OS === "web" ? 34 : 100),
-          },
-        ]}
-        keyboardShouldPersistTaps="handled"
-      >
-        <View style={styles.inputGroup}>
-          <Text style={styles.inputLabel}>Store Name (optional)</Text>
-          <View style={styles.inputRow}>
-            <Feather name="shopping-bag" size={16} color={colors.textMuted} />
-            <TextInput
-              style={styles.input}
-              placeholder="e.g. Artisan Bakery & Co."
-              placeholderTextColor={colors.textMuted}
-              value={storeName}
-              onChangeText={setStoreName}
-            />
+      <ScrollView contentContainerStyle={{ paddingBottom: 24 }} keyboardShouldPersistTaps="handled">
+        <View style={styles.section}>
+          <Text style={styles.fieldLabel}>Store name · optional</Text>
+          <View style={styles.fieldBox}>
+            <TextInput style={styles.fieldInput} placeholder="e.g. Karachi Bakery" placeholderTextColor={tokens.muted} value={storeName} onChangeText={setStoreName} />
           </View>
-        </View>
 
-        <View style={[styles.inputGroup, { zIndex: 100 }]}>
-          <Text style={styles.inputLabel}>Pickup Address</Text>
-          <View style={styles.autocompleteWrapper}>
-            <View style={[styles.placesInputContainer, showDropdown && styles.placesInputContainerActive]}>
-              <Feather name="map-pin" size={16} color={address ? colors.primary : colors.textMuted} />
-              <TextInput
-                style={styles.placesInput}
-                placeholder="Search nearby store or address"
-                placeholderTextColor={colors.textMuted}
-                value={addressInput}
-                onChangeText={handleAddressInput}
-                onFocus={() => autocompleteSuggestions.length > 0 && setShowDropdown(true)}
-                returnKeyType="search"
-              />
-              {isSearching && <ActivityIndicator size="small" color={colors.primary} />}
-              {address && !isSearching && (
-                <Feather name="check-circle" size={16} color={colors.primary} />
-              )}
+          <Text style={[styles.fieldLabel, { marginTop: 14 }]}>Pickup address</Text>
+          <View style={[styles.fieldBox, styles.fieldBoxFocused, showDropdown && { borderBottomLeftRadius: 0, borderBottomRightRadius: 0 }]}>
+            <TextInput
+              style={styles.fieldInput}
+              placeholder="Search nearby store or address"
+              placeholderTextColor={tokens.muted}
+              value={addressInput}
+              onChangeText={handleAddressInput}
+              onFocus={() => autocompleteSuggestions.length > 0 && setShowDropdown(true)}
+              returnKeyType="search"
+            />
+            {isSearching && <ActivityIndicator size="small" color={accent.accent} />}
+            {address && !isSearching && <Ionicons name="checkmark-circle" size={16} color={accent.accent} />}
+          </View>
+          {showDropdown && autocompleteSuggestions.length > 0 && (
+            <View style={styles.dropdown}>
+              {autocompleteSuggestions.map((item, idx) => (
+                <TouchableOpacity key={item.id || idx} style={[styles.dropdownRow, idx < autocompleteSuggestions.length - 1 && styles.dropdownRowDivider]} onPress={() => handleSelectSuggestion(item)}>
+                  <Ionicons name="location-outline" size={14} color={tokens.sec} />
+                  <View style={{ flex: 1, minWidth: 0 }}>
+                    <Text style={styles.dropdownMain} numberOfLines={1}>{item.name || item.main_text}</Text>
+                    <Text style={styles.dropdownSub} numberOfLines={1}>{item.address || item.secondary_text}</Text>
+                  </View>
+                </TouchableOpacity>
+              ))}
             </View>
+          )}
+        </View>
 
-            {showDropdown && autocompleteSuggestions.length > 0 && (
-              <View style={styles.dropdownContainer}>
-                {autocompleteSuggestions.map((item, idx) => (
-                  <TouchableOpacity
-                    key={item.id || idx}
-                    style={[styles.dropdownRow, idx < autocompleteSuggestions.length - 1 && styles.dropdownRowBorder]}
-                    onPress={() => handleSelectSuggestion(item)}
-                    activeOpacity={0.7}
-                  >
-                    <View style={styles.dropdownIcon}>
-                      <Feather name="map-pin" size={12} color={colors.primary} />
-                    </View>
-                    <View style={styles.dropdownTextContainer}>
-                      <Text style={styles.dropdownMainText} numberOfLines={1}>
-                        {item.name || item.main_text}
-                      </Text>
-                      <Text style={styles.dropdownSecondaryText} numberOfLines={1}>
-                        {item.address || item.secondary_text}
-                      </Text>
-                    </View>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            )}
+        <View style={styles.section}>
+          <View style={styles.itemsHeadRow}>
+            <Text style={styles.sectionLabel}>What to pick up?</Text>
+            <Text style={styles.itemsCount}>{items.length} {items.length === 1 ? "item" : "items"}</Text>
           </View>
-        </View>
-
-        <View style={styles.dividerRow}>
-          <View style={styles.divider} />
-          <Text style={styles.dividerText}>What to pickup?</Text>
-          <View style={styles.divider} />
-        </View>
-
-        <View style={styles.inputGroup}>
-          <Text style={styles.inputLabel}>Add Item</Text>
-          <View style={[styles.inputRow, newItemName ? styles.inputRowActive : null]}>
-            <TextInput
-              style={styles.input}
-              placeholder="e.g. 2x Milk, 1kg Flour..."
-              placeholderTextColor={colors.textMuted}
-              value={newItemName}
-              onChangeText={setNewItemName}
-              onSubmitEditing={addItemToLocal}
-              returnKeyType="done"
-            />
-            <TouchableOpacity onPress={addItemToLocal} disabled={!newItemName.trim()}>
-              <Feather 
-                name="plus-circle" 
-                size={24} 
-                color={newItemName.trim() ? colors.primary : colors.textMuted} 
-              />
-            </TouchableOpacity>
-          </View>
-        </View>
-
-        {items.length > 0 && (
-          <View style={styles.itemsList}>
-            {items.map((item) => (
-              <View key={item.id} style={styles.itemBadge}>
-                <Text style={styles.itemBadgeText}>{item.name}</Text>
-                <TouchableOpacity onPress={() => removeItemFromLocal(item.id)}>
-                  <Feather name="x" size={14} color={colors.primary} />
+          <View style={styles.itemsCard}>
+            {items.map((item, idx) => (
+              <View key={item.id} style={[styles.itemRow, idx < items.length && styles.itemRowDivider]}>
+                <View style={styles.itemQtyBadge}><Text style={styles.itemQtyBadgeText}>{item.quantity}</Text></View>
+                <Text style={styles.itemName} numberOfLines={1}>{item.name}</Text>
+                {item.estimatedPrice != null && <Text style={styles.itemPrice}>₹{item.estimatedPrice}</Text>}
+                <TouchableOpacity onPress={() => removeItemFromLocal(item.id)} hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}>
+                  <Ionicons name="close" size={15} color={tokens.sec} />
                 </TouchableOpacity>
               </View>
             ))}
+            <View style={styles.addItemRow}>
+              <TextInput
+                style={styles.addItemInput}
+                placeholder="Item name"
+                placeholderTextColor={tokens.muted}
+                value={newItemName}
+                onChangeText={setNewItemName}
+                onSubmitEditing={addItemToLocal}
+                returnKeyType="done"
+              />
+              <TextInput
+                style={styles.addItemPriceInput}
+                placeholder="₹ est."
+                placeholderTextColor={tokens.muted}
+                value={newItemPrice}
+                onChangeText={setNewItemPrice}
+                keyboardType="numeric"
+              />
+              <TouchableOpacity onPress={addItemToLocal} disabled={!newItemName.trim()}>
+                <Ionicons name="add-circle" size={26} color={newItemName.trim() ? accent.accent : tokens.muted} />
+              </TouchableOpacity>
+            </View>
           </View>
-        )}
-
-        <View style={styles.dividerRow}>
-          <View style={styles.divider} />
+          <Text style={styles.itemsHint}>Prices are your estimate. The rider pays the real amount at the counter and you settle the difference at checkout.</Text>
         </View>
 
-        <Text style={styles.quickLabel}>Nearby Suggestions</Text>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.horizontalQuick}>
-          {nearbySuggestions.map((item, i) => (
-            <TouchableOpacity
-              key={i}
-              style={styles.quickChip}
-              onPress={() => handleSelectSuggestion(item)}
-              activeOpacity={0.7}
-            >
-              <Feather name="map-pin" size={10} color={colors.primary} style={{ marginRight: 4 }} />
-              <Text style={styles.quickChipText}>{item.name}</Text>
-            </TouchableOpacity>
-          ))}
-          {nearbySuggestions.length === 0 && (
-            <View style={styles.quickChip}>
-              <ActivityIndicator size="small" color={colors.textMuted} />
-              <Text style={[styles.quickChipText, { marginLeft: 6, opacity: 0.6 }]}>
-                Loading nearby spots...
-              </Text>
+        {nearbySuggestions.length > 0 && (
+          <View style={styles.section}>
+            <Text style={styles.sectionLabel}>Nearby suggestions</Text>
+            <View style={{ gap: 8 }}>
+              {nearbySuggestions.map((item, i) => (
+                <TouchableOpacity key={i} style={styles.suggestionRow} onPress={() => handleSelectSuggestion(item)} activeOpacity={0.85}>
+                  <View style={styles.suggestionThumb} />
+                  <View style={{ flex: 1, minWidth: 0 }}>
+                    <Text style={styles.suggestionName} numberOfLines={1}>{item.name}</Text>
+                    {currentCoords && item.lat != null && item.lng != null && (
+                      <Text style={styles.suggestionMeta}>
+                        {formatDistance(getDistanceMeters(currentCoords.lat, currentCoords.lng, item.lat, item.lng))} from your start point
+                      </Text>
+                    )}
+                  </View>
+                  <Ionicons name="add" size={18} color={accent.accent} />
+                </TouchableOpacity>
+              ))}
             </View>
-          )}
-        </ScrollView>
+          </View>
+        )}
       </ScrollView>
 
-      <View style={[styles.footer, { paddingBottom: insets.bottom + 16 }]}>
-        <TouchableOpacity
-          style={[styles.addBtn, (!address || items.length === 0) && styles.addBtnDisabled]}
-          onPress={handleAddStop}
-          disabled={!address || items.length === 0}
-          activeOpacity={0.85}
-        >
-          <Text style={styles.addBtnText}>Add Stop to Route</Text>
-          <Feather name="check-circle" size={18} color="#fff" />
+      <View style={[styles.footer, { paddingBottom: insets.bottom + 14 }]}>
+        {address && (isPreviewing || previewDelta) && (
+          <View style={styles.previewBanner}>
+            {isPreviewing ? (
+              <Text style={styles.previewBannerText}>Calculating the fare impact of this stop…</Text>
+            ) : previewDelta ? (
+              <Text style={styles.previewBannerText}>
+                Adding this stop: <Text style={styles.previewBannerBold}>{previewDelta.distanceKm >= 0 ? "+" : ""}{previewDelta.distanceKm} km</Text>, delivery goes ₹{price?.total ?? "—"} → ₹{previewDelta.newTotal}.
+              </Text>
+            ) : null}
+          </View>
+        )}
+        <TouchableOpacity style={[styles.addBtn, (!address || items.length === 0) && { opacity: 0.5 }]} onPress={handleAddStop} disabled={!address || items.length === 0}>
+          <Text style={styles.addBtnText}>Add stop to route</Text>
         </TouchableOpacity>
       </View>
     </KeyboardAvoidingView>
   );
 }
 
-const createStyles = (colors: typeof Colors.light) => StyleSheet.create({
-  root: {
-    flex: 1,
-    backgroundColor: colors.background,
-  },
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: 20,
-    paddingBottom: 16,
-    gap: 10,
-    backgroundColor: colors.background,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-  },
-  backBtn: {
-    width: 32,
-    height: 32,
-    borderRadius: 8,
-    backgroundColor: colors.surface,
-    alignItems: "center",
-    justifyContent: "center",
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  title: {
-    flex: 1,
-    fontSize: 14,
-    fontWeight: "700",
-    color: colors.text,
-    textAlign: "center",
-  },
-  content: {
-    padding: 20,
-    gap: 20,
-  },
-  inputGroup: {
-    gap: 8,
-  },
-  inputLabel: {
-    fontSize: 11,
-    fontWeight: "600",
-    color: colors.textSecondary,
-    marginLeft: 4,
-  },
-  inputRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    backgroundColor: colors.surface,
-    borderRadius: 12,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    borderWidth: 1.5,
-    borderColor: colors.border,
-  },
-  inputRowActive: {
-    borderColor: colors.primary,
-  },
-  input: {
-    flex: 1,
-    fontSize: 13,
-    fontWeight: "500",
-    color: colors.text,
-  },
-  autocompleteWrapper: {
-    position: 'relative',
-    zIndex: 200,
-  },
-  placesInputContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    backgroundColor: colors.surface,
-    borderRadius: 12,
-    borderWidth: 1.5,
-    borderColor: colors.border,
-    paddingHorizontal: 12,
-    height: 40,
-  },
-  placesInputContainerActive: {
-    borderColor: colors.primary,
-    borderBottomLeftRadius: 0,
-    borderBottomRightRadius: 0,
-  },
-  placesInput: {
-    flex: 1,
-    color: colors.text,
-    fontSize: 13,
-    fontWeight: '500',
-  },
-  dropdownContainer: {
-    backgroundColor: colors.surface,
-    borderWidth: 1.5,
-    borderTopWidth: 0,
-    borderColor: colors.primary,
-    borderBottomLeftRadius: 16,
-    borderBottomRightRadius: 16,
-    overflow: 'hidden',
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.12,
-    shadowRadius: 16,
-    elevation: 8,
-  },
-  dropdownRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    gap: 10,
-  },
-  dropdownRowBorder: {
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-  },
-  dropdownIcon: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    backgroundColor: `${colors.primary}15`,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  dropdownTextContainer: {
-    flex: 1,
-  },
-  dropdownMainText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: colors.text,
-  },
-  dropdownSecondaryText: {
-    fontSize: 10,
-    color: colors.textMuted,
-    marginTop: 2,
-  },
-  dividerRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-    marginVertical: 4,
-  },
-  divider: {
-    flex: 1,
-    height: 1,
-    backgroundColor: colors.border,
-  },
-  dividerText: {
-    fontSize: 10,
-    fontWeight: "600",
-    color: colors.textMuted,
-    textTransform: 'uppercase',
-    letterSpacing: 1,
-  },
-  itemsList: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-    marginTop: -8,
-  },
-  itemBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    backgroundColor: `${colors.primary}10`,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: `${colors.primary}30`,
-  },
-  itemBadgeText: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: colors.primary,
-  },
-  quickLabel: {
-    fontSize: 14,
-    fontWeight: "700",
-    color: colors.text,
-    marginBottom: -4,
-  },
-  horizontalQuick: {
-    gap: 10,
-    paddingRight: 20,
-  },
-  quickChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: colors.surface,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 15,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  quickChipText: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: colors.textSecondary,
-  },
-  footer: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    padding: 20,
-    backgroundColor: colors.background,
-    borderTopWidth: 1,
-    borderTopColor: colors.border,
-  },
-  addBtn: {
-    backgroundColor: colors.primary,
-    borderRadius: 12,
-    paddingVertical: 12,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 10,
-    shadowColor: colors.primary,
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.3,
-    shadowRadius: 10,
-    elevation: 6,
-  },
-  addBtnDisabled: {
-    backgroundColor: colors.textMuted,
-    shadowOpacity: 0,
-  },
-  addBtnText: {
-    color: "#fff",
-    fontSize: 14,
-    fontWeight: "700",
-  },
-});
+const createStyles = (tokens: ThemeTokens, accent: ThemeTokens["services"]["delivery"]) =>
+  StyleSheet.create({
+    root: { flex: 1, backgroundColor: tokens.bg },
+    header: { flexDirection: "row", alignItems: "center", gap: 12, paddingHorizontal: 16, paddingBottom: 10 },
+    iconBtn: {
+      width: moderateScale(40), height: moderateScale(40), borderRadius: moderateScale(20),
+      backgroundColor: tokens.surface, borderWidth: 1, borderColor: tokens.border, alignItems: "center", justifyContent: "center",
+    },
+    headerTitle: { fontFamily: fontFamilies.body.semibold, fontSize: moderateScale(17), color: tokens.text },
+
+    section: { paddingHorizontal: 16, paddingTop: 20 },
+    fieldLabel: { fontFamily: fontFamilies.body.bold, fontSize: moderateScale(11), letterSpacing: 1, textTransform: "uppercase", color: tokens.muted, marginBottom: 6 },
+    fieldBox: { borderWidth: 1, borderColor: tokens.borderStrong, borderRadius: 12, backgroundColor: tokens.surface, paddingHorizontal: 14, minHeight: 48, flexDirection: "row", alignItems: "center", gap: 8 },
+    fieldBoxFocused: { borderWidth: 2, borderColor: accent.accent },
+    fieldInput: { flex: 1, fontFamily: fontFamilies.body.medium, fontSize: moderateScale(15), color: tokens.text },
+
+    dropdown: { backgroundColor: tokens.surface, borderWidth: 2, borderTopWidth: 0, borderColor: accent.accent, borderBottomLeftRadius: 12, borderBottomRightRadius: 12, overflow: "hidden" },
+    dropdownRow: { flexDirection: "row", alignItems: "center", gap: 10, paddingHorizontal: 14, paddingVertical: 12 },
+    dropdownRowDivider: { borderBottomWidth: 1, borderBottomColor: tokens.border },
+    dropdownMain: { fontFamily: fontFamilies.body.semibold, fontSize: moderateScale(13), color: tokens.text },
+    dropdownSub: { fontFamily: fontFamilies.body.regular, fontSize: moderateScale(11), color: tokens.sec, marginTop: 1 },
+
+    sectionLabel: { fontFamily: fontFamilies.body.bold, fontSize: moderateScale(11), letterSpacing: 1, textTransform: "uppercase", color: tokens.muted },
+    itemsHeadRow: { flexDirection: "row", alignItems: "baseline", justifyContent: "space-between", marginBottom: 12 },
+    itemsCount: { fontFamily: fontFamilies.body.medium, fontSize: moderateScale(13), color: tokens.sec },
+    itemsCard: { backgroundColor: tokens.surface, borderWidth: 1, borderColor: tokens.border, borderRadius: 18, paddingHorizontal: 14 },
+    itemRow: { flexDirection: "row", alignItems: "center", gap: 12, paddingVertical: 12 },
+    itemRowDivider: { borderBottomWidth: 1, borderBottomColor: tokens.border },
+    itemQtyBadge: { width: 26, height: 26, borderRadius: 8, backgroundColor: accent.skin, alignItems: "center", justifyContent: "center", flexShrink: 0 },
+    itemQtyBadgeText: { fontFamily: fontFamilies.body.bold, fontSize: moderateScale(12), color: accent.accent },
+    itemName: { flex: 1, fontFamily: fontFamilies.body.medium, fontSize: moderateScale(15), color: tokens.text },
+    itemPrice: { fontFamily: fontFamilies.body.medium, fontSize: moderateScale(14), color: tokens.sec },
+    addItemRow: { flexDirection: "row", alignItems: "center", gap: 10, paddingVertical: 12 },
+    addItemInput: { flex: 1, fontFamily: fontFamilies.body.medium, fontSize: moderateScale(15), color: tokens.text },
+    addItemPriceInput: { width: 64, fontFamily: fontFamilies.body.medium, fontSize: moderateScale(14), color: tokens.text, textAlign: "right" },
+    itemsHint: { fontFamily: fontFamilies.body.regular, fontSize: moderateScale(13), lineHeight: moderateScale(18), color: tokens.sec, marginTop: 10 },
+
+    suggestionRow: { flexDirection: "row", alignItems: "center", gap: 12, backgroundColor: tokens.surface, borderWidth: 1, borderColor: tokens.border, borderRadius: 14, padding: 12, minHeight: 56 },
+    suggestionThumb: { width: 34, height: 34, borderRadius: 11, backgroundColor: tokens.sunken, flexShrink: 0 },
+    suggestionName: { fontFamily: fontFamilies.body.semibold, fontSize: moderateScale(14), color: tokens.text },
+    suggestionMeta: { fontFamily: fontFamilies.body.regular, fontSize: moderateScale(12), color: tokens.sec, marginTop: 2 },
+
+    footer: { paddingHorizontal: 16, paddingTop: 12, borderTopWidth: 1, borderTopColor: tokens.border, backgroundColor: tokens.surface },
+    previewBanner: { backgroundColor: tokens.warningSkin, borderRadius: 12, padding: 11, marginBottom: 10 },
+    previewBannerText: { fontFamily: fontFamilies.body.regular, fontSize: moderateScale(13), lineHeight: moderateScale(18), color: tokens.sec },
+    previewBannerBold: { fontFamily: fontFamilies.body.bold, color: tokens.text },
+    addBtn: { backgroundColor: accent.accent, borderRadius: 14, minHeight: moderateScale(52), alignItems: "center", justifyContent: "center" },
+    addBtnText: { fontFamily: fontFamilies.body.bold, fontSize: moderateScale(15), color: accent.on },
+  });
