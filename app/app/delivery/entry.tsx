@@ -1,457 +1,214 @@
-import React, { useState, useRef } from "react";
-import {
-  Platform,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
-} from "react-native";
+import React, { useEffect, useMemo, useRef, useState } from "react";
+import { ActivityIndicator, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Feather } from "@expo/vector-icons";
+import { Ionicons } from "@expo/vector-icons";
 import { router } from "expo-router";
-import Colors from "@/constants/colors";
-import { MapBackground, MapBackgroundRef } from "@/components/MapBackground";
+import { moderateScale } from "react-native-size-matters";
 import * as Location from "expo-location";
-import { BottomSheet } from "@/components/BottomSheet";
+import { designTokens, type ThemeTokens } from "@/constants/colors";
+import { fontFamilies } from "@/constants/typography";
+import { useThemeStore } from "@/contexts/themeStore";
+import { MapBackground, MapBackgroundRef } from "@/components/MapBackground";
 import { StopCard } from "@/components/StopCard";
 import { useDeliveryStore } from "@/contexts/deliveryStore";
-import { useThemeStore } from "@/contexts/themeStore";
 
 export default function DeliveryEntryScreen() {
   const insets = useSafeAreaInsets();
-  const { 
-    stops, 
-    route,
-    currentLocation, 
-    currentCoords,
-    setCurrentLocation, 
-    setCurrentCoords, 
-    addStop, 
-    removeStop, 
-    setStops,
-    setRoute,
-    scheduling, 
-    loadType, 
-    setScheduling, 
-    setLoadType,
-    calculatePrice
-  } = useDeliveryStore();
-  const [showMapControls, setShowMapControls] = useState(false);
-  const mapType = "standard";
-  const [isCalculating, setIsCalculating] = useState(false);
-  const mapRef = useRef<MapBackgroundRef>(null);
-  
   const { theme } = useThemeStore();
-  const colors = Colors[theme];
-  const styles = React.useMemo(() => createStyles(colors), [theme]);
+  const tokens = designTokens[theme];
+  const accent = tokens.services.delivery;
+  const styles = useMemo(() => createStyles(tokens, accent), [theme]);
 
-  const handleRecenter = () => {
-    mapRef.current?.recenter();
-  };
+  const {
+    stops, route, price, currentLocation, currentCoords,
+    setCurrentLocation, setCurrentCoords, removeStop, setStops, setRoute, calculatePrice,
+  } = useDeliveryStore();
 
-  const handleAddStop = () => {
-    router.push("/delivery/add-stop");
-  };
+  const [isCalculating, setIsCalculating] = useState(false);
+  const [isLocating, setIsLocating] = useState(false);
+  const mapRef = useRef<MapBackgroundRef>(null);
 
   const handleLocationUpdate = async (coords: { lat: number; lng: number }) => {
     setCurrentCoords(coords);
     try {
-      const [place] = await Location.reverseGeocodeAsync({
-        latitude: coords.lat,
-        longitude: coords.lng,
-      });
-
+      const [place] = await Location.reverseGeocodeAsync({ latitude: coords.lat, longitude: coords.lng });
       if (place) {
-        const address = `${place.name || place.streetNumber || ""} ${place.street || ""}, ${place.city || ""}, ${place.region || ""} ${place.postalCode || ""}`.trim();
-        setCurrentLocation(address || "Current Location Found");
+        const address = `${place.name || place.streetNumber || ""} ${place.street || ""}, ${place.city || ""}`.trim();
+        setCurrentLocation(address || "Current location");
       }
     } catch (error) {
       console.error("Error reverse geocoding:", error);
     }
   };
 
-  const handleStopPress = (stop: any) => {
-    if (stop.lat && stop.lng) {
-      mapRef.current?.panTo(stop.lat, stop.lng);
-    }
-  };
-
-  const handleCalculateRoute = async () => {
-    if (stops.length === 0 || !currentCoords) return;
-
-    setIsCalculating(true);
+  const handleRecenter = async () => {
+    setIsLocating(true);
     try {
-      const response = await fetch(`${process.env.EXPO_PUBLIC_API_URL}/api/v1/routing/optimize`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          origin: currentCoords,
-          stops: stops,
-        }),
-      });
-
-      const data = await response.json();
-      if (data.optimizedStops && data.polyline) {
-        setStops(data.optimizedStops);
-        setRoute({
-          totalDistance: data.totalDistance,
-          estimatedTime: data.estimatedTime,
-          polyline: data.polyline,
-        });
-        calculatePrice();
-        
-        // After getting the route, show checkout
-        router.push("/delivery/checkout");
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status === "granted") {
+        const loc = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
+        await handleLocationUpdate({ lat: loc.coords.latitude, lng: loc.coords.longitude });
+        mapRef.current?.recenter();
       }
     } catch (error) {
-      console.error("Optimization failed:", error);
+      console.error("Recenter failed:", error);
     } finally {
-      setIsCalculating(false);
+      setIsLocating(false);
     }
   };
 
-  const schedulingLabel = scheduling === "asap" ? "ASAP Delivery" : "Scheduled";
-  const loadTypeLabel = loadType === "mixed" ? "Parcel/Mixed" : loadType.charAt(0).toUpperCase() + loadType.slice(1);
+  const handleStopPress = (stop: any) => {
+    if (stop.lat && stop.lng) mapRef.current?.panTo(stop.lat, stop.lng);
+  };
+
+  // Live route + fee estimate, recomputed as stops change, so the price is
+  // never a reveal at checkout — matches the real /routing/optimize call
+  // that used to only fire once, on the final button press.
+  useEffect(() => {
+    if (stops.length === 0 || !currentCoords) {
+      setRoute(null as any);
+      return;
+    }
+    let cancelled = false;
+    const t = setTimeout(async () => {
+      setIsCalculating(true);
+      try {
+        const response = await fetch(`${process.env.EXPO_PUBLIC_API_URL}/api/v1/routing/optimize`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ origin: currentCoords, stops }),
+        });
+        const data = await response.json();
+        if (!cancelled && data.optimizedStops && data.polyline) {
+          setStops(data.optimizedStops);
+          setRoute({ totalDistance: data.totalDistance, estimatedTime: data.estimatedTime, polyline: data.polyline });
+          calculatePrice();
+        }
+      } catch (error) {
+        console.error("Optimization failed:", error);
+      } finally {
+        if (!cancelled) setIsCalculating(false);
+      }
+    }, 500);
+    return () => { cancelled = true; clearTimeout(t); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [stops.length, currentCoords?.lat, currentCoords?.lng]);
+
+  const handleReview = () => {
+    if (stops.length === 0) return;
+    router.push("/delivery/checkout");
+  };
 
   return (
     <View style={styles.root}>
-      <MapBackground 
-        ref={mapRef}
-        mapType={mapType}
-        stops={stops}
-        polyline={route?.polyline}
-        onLocationUpdate={handleLocationUpdate}
-        style={StyleSheet.absoluteFill} 
-      />
+      <MapBackground ref={mapRef} stops={stops} polyline={route?.polyline} onLocationUpdate={handleLocationUpdate} style={StyleSheet.absoluteFill} />
 
-      <View
-        style={[
-          styles.topBar,
-          {
-            paddingTop: insets.top + (Platform.OS === "web" ? 67 : 0) + 12,
-          },
-        ]}
-      >
-        <TouchableOpacity style={styles.closeBtn} onPress={() => router.back()}>
-          <Feather name="x" size={20} color={colors.text} />
+      <View style={[styles.header, { paddingTop: insets.top + 6 }]}>
+        <TouchableOpacity style={styles.iconBtn} onPress={() => router.back()}>
+          <Ionicons name="chevron-back" size={moderateScale(20)} color={tokens.text} />
         </TouchableOpacity>
-        <View style={styles.topTitleCol}>
-          <Text style={styles.topTitle}>Create Multi-Stop Delivery</Text>
-        </View>
-        <View style={styles.betaBadge}>
-          <Text style={styles.betaText}>BETA</Text>
-        </View>
-        <TouchableOpacity style={styles.avatarSm}>
-          <Feather name="user" size={18} color={colors.primary} />
-        </TouchableOpacity>
+        <Text style={styles.headerTitle}>Package delivery</Text>
+        <View style={styles.betaBadge}><Text style={styles.betaBadgeText}>Beta</Text></View>
       </View>
 
-      <View style={styles.mapControls}>
-        <TouchableOpacity style={styles.mapControlBtn} onPress={handleRecenter}>
-          <Feather name="crosshair" size={20} color={colors.text} />
-        </TouchableOpacity>
-      </View>
+      <View style={styles.sheet}>
+        <View style={styles.sheetHandle} />
+        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 16 }}>
+          <Text style={styles.headline}>Create multi-stop{"\n"}delivery</Text>
+          <Text style={styles.subhead}>Pick up from several places on one run. We'll pay at the store and you settle here.</Text>
 
-      <BottomSheet style={styles.bottomSheet}>
-        <ScrollView showsVerticalScrollIndicator={false}>
-          <Text style={styles.sheetTitle}>Route Optimization</Text>
-          <Text style={styles.sheetSubtitle}>
-            Add up to 10 stops for automated sequence planning.
-          </Text>
-
-          <View style={styles.currentLocationCard}>
-            <Feather name="map-pin" size={16} color={colors.primary} />
-            <View style={styles.currentLocationText}>
-              <Text style={styles.currentLocationLabel}>CURRENT LOCATION</Text>
-              <Text style={styles.currentLocationValue}>{currentLocation}</Text>
+          <TouchableOpacity style={styles.startCard} activeOpacity={0.85} onPress={handleRecenter}>
+            <View style={styles.startIcon}>
+              {isLocating ? <ActivityIndicator size="small" color={accent.accent} /> : <Ionicons name="locate" size={moderateScale(17)} color={accent.accent} />}
             </View>
-          </View>
+            <View style={{ flex: 1, minWidth: 0 }}>
+              <Text style={styles.startLabel}>Starting from</Text>
+              <Text style={styles.startValue} numberOfLines={1}>{currentLocation}</Text>
+            </View>
+            <Text style={styles.changeLink}>Change</Text>
+          </TouchableOpacity>
 
+          <View style={styles.routeSection}>
+            <Text style={styles.sectionLabel}>Route · {stops.length} {stops.length === 1 ? "stop" : "stops"}</Text>
+            {stops.length > 0 && (
+              <View style={{ gap: 8, marginBottom: 10 }}>
+                {stops.map((stop, i) => (
+                  <StopCard key={stop.id} stop={stop} index={i} onRemove={removeStop} onPress={handleStopPress} />
+                ))}
+              </View>
+            )}
+            <TouchableOpacity style={styles.addStopBtn} onPress={() => router.push("/delivery/add-stop")} activeOpacity={0.85}>
+              <Text style={styles.addStopBtnText}>+ Add pickup location</Text>
+            </TouchableOpacity>
+          </View>
+        </ScrollView>
+
+        <View style={[styles.footer, { paddingBottom: insets.bottom + 14 }]}>
           {stops.length > 0 && (
-            <View style={styles.stopsList}>
-              {stops.map((stop, i) => (
-                <StopCard
-                  key={stop.id}
-                  stop={stop}
-                  index={i}
-                  onRemove={removeStop}
-                  onPress={handleStopPress}
-                />
-              ))}
+            <View style={styles.footerRow}>
+              {isCalculating ? (
+                <Text style={styles.footerMeta}>Calculating route…</Text>
+              ) : route ? (
+                <Text style={styles.footerMeta}>{route.totalDistance} km · about {route.estimatedTime} min</Text>
+              ) : (
+                <Text style={styles.footerMeta}>Add a pickup to see distance</Text>
+              )}
+              {price != null && <Text style={styles.footerPrice}>₹{price.total} delivery</Text>}
             </View>
           )}
-
           <TouchableOpacity
-            style={styles.addStopBtn}
-            onPress={handleAddStop}
-            activeOpacity={0.85}
-          >
-            <View style={styles.addStopIcon}>
-              <Feather name="plus" size={20} color="#fff" />
-            </View>
-            <View style={styles.addStopText}>
-              <Text style={styles.addStopTitle}>Add Pickup Location</Text>
-              <Text style={styles.addStopSubtitle}>Scan QR or enter address manually</Text>
-            </View>
-            <Feather name="chevron-right" size={18} color={colors.textMuted} />
-          </TouchableOpacity>
-
-          {/* <View style={styles.optionsRow}>
-            <TouchableOpacity
-              style={styles.optionCard}
-              onPress={() => setScheduling(scheduling === "asap" ? "scheduled" : "asap")}
-              activeOpacity={0.8}
-            >
-              <Feather name="clock" size={18} color={Colors.light.primary} />
-              <View>
-                <Text style={styles.optionLabel}>SCHEDULING</Text>
-                <Text style={styles.optionValue}>{schedulingLabel}</Text>
-              </View>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.optionCard}
-              onPress={() => setLoadType(loadType === "mixed" ? "parcel" : "mixed")}
-              activeOpacity={0.8}
-            >
-              <Feather name="archive" size={18} color={Colors.light.primary} />
-              <View>
-                <Text style={styles.optionLabel}>LOAD TYPE</Text>
-                <Text style={styles.optionValue}>{loadTypeLabel}</Text>
-              </View>
-            </TouchableOpacity>
-          </View> */}
-
-          <TouchableOpacity
-            style={[
-              styles.calculateBtn,
-              (stops.length === 0 || isCalculating) && styles.calculateBtnDisabled,
-            ]}
-            onPress={handleCalculateRoute}
+            style={[styles.reviewBtn, (stops.length === 0 || isCalculating) && { opacity: 0.5 }]}
             disabled={stops.length === 0 || isCalculating}
-            activeOpacity={0.85}
+            onPress={handleReview}
           >
-            <Text style={styles.calculateBtnText}>
-              {isCalculating ? "Optimizing..." : "Calculate Optimized Route"}
-            </Text>
-            {isCalculating ? (
-              <Feather name="loader" size={18} color="#fff" />
-            ) : (
-              <Feather name="zap" size={18} color="#fff" />
-            )}
+            <Text style={styles.reviewBtnText}>Review route</Text>
           </TouchableOpacity>
-
-          <View style={{ height: 20 }} />
-        </ScrollView>
-      </BottomSheet>
+        </View>
+      </View>
     </View>
   );
 }
 
-const createStyles = (colors: typeof Colors.light) => StyleSheet.create({
-  root: {
-    flex: 1,
-    backgroundColor: colors.background,
-  },
-  topBar: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: 16,
-    gap: 10,
-    zIndex: 10,
-  },
-  closeBtn: {
-    width: 30,
-    height: 30,
-    borderRadius: 8,
-    backgroundColor: colors.surface,
-    alignItems: "center",
-    justifyContent: "center",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 6,
-    elevation: 3,
-  },
-  topTitleCol: {
-    flex: 1,
-  },
-  topTitle: {
-    fontSize: 13,
-    fontWeight: "700",
-    color: colors.text,
-  },
-  betaBadge: {
-    backgroundColor: colors.primary,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 6,
-  },
-  betaText: {
-    color: "#fff",
-    fontSize: 10,
-    fontWeight: "800",
-    letterSpacing: 0.5,
-  },
-  avatarSm: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: `${colors.primary}15`,
-    alignItems: "center",
-    justifyContent: "center",
-    borderWidth: 2,
-    borderColor: colors.primary,
-  },
-  mapControls: {
-    position: "absolute",
-    right: 16,
-    top: "35%",
-    zIndex: 10,
-    gap: 8,
-  },
-  mapControlBtn: {
-    width: 34,
-    height: 34,
-    borderRadius: 8,
-    backgroundColor: colors.surface,
-    alignItems: "center",
-    justifyContent: "center",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 6,
-    elevation: 3,
-  },
-  bottomSheet: {
-    paddingBottom: 0,
-  },
-  sheetTitle: {
-    fontSize: 18,
-    fontWeight: "800",
-    color: colors.text,
-    marginBottom: 4,
-    letterSpacing: -0.3,
-  },
-  sheetSubtitle: {
-    fontSize: 11,
-    color: colors.textSecondary,
-    marginBottom: 16,
-    lineHeight: 15,
-  },
-  currentLocationCard: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    gap: 8,
-    backgroundColor: colors.surface,
-    borderRadius: 10,
-    padding: 10,
-    borderWidth: 1,
-    borderColor: colors.border,
-    marginBottom: 12,
-  },
-  currentLocationText: {
-    flex: 1,
-    gap: 3,
-  },
-  currentLocationLabel: {
-    fontSize: 10,
-    fontWeight: "600",
-    color: colors.textMuted,
-    letterSpacing: 0.5,
-  },
-  currentLocationValue: {
-    fontSize: 12,
-    fontWeight: "600",
-    color: colors.text,
-  },
-  stopsList: {
-    marginBottom: 8,
-  },
-  addStopBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-    borderWidth: 1.5,
-    borderStyle: "dashed",
-    borderColor: colors.primary,
-    borderRadius: 12,
-    padding: 10,
-    marginBottom: 14,
-    backgroundColor: `${colors.primary}06`,
-  },
-  addStopIcon: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: colors.primary,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  addStopText: {
-    flex: 1,
-    gap: 2,
-  },
-  addStopTitle: {
-    fontSize: 13,
-    fontWeight: "700",
-    color: colors.primary,
-  },
-  addStopSubtitle: {
-    fontSize: 10,
-    color: colors.textSecondary,
-  },
-  optionsRow: {
-    flexDirection: "row",
-    gap: 10,
-    marginBottom: 16,
-  },
-  optionCard: {
-    flex: 1,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-    backgroundColor: colors.surface,
-    borderRadius: 14,
-    padding: 14,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: colors.surface === "#FFFFFF" ? 0.06 : 0.2,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  optionLabel: {
-    fontSize: 10,
-    fontWeight: "600",
-    color: colors.textMuted,
-    letterSpacing: 0.5,
-  },
-  optionValue: {
-    fontSize: 13,
-    fontWeight: "600",
-    color: colors.text,
-  },
-  calculateBtn: {
-    backgroundColor: colors.textSecondary,
-    borderRadius: 12,
-    paddingVertical: 12,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 8,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 12,
-    elevation: 6,
-  },
-  calculateBtnDisabled: {
-    backgroundColor: colors.textMuted,
-    shadowOpacity: 0,
-  },
-  calculateBtnText: {
-    color: "#fff",
-    fontSize: 14,
-    fontWeight: "700",
-  },
-});
+const createStyles = (tokens: ThemeTokens, accent: ThemeTokens["services"]["delivery"]) =>
+  StyleSheet.create({
+    root: { flex: 1, backgroundColor: tokens.bg },
+    header: { position: "absolute", left: 16, right: 16, zIndex: 10, flexDirection: "row", alignItems: "center", gap: 10 },
+    iconBtn: {
+      width: moderateScale(40), height: moderateScale(40), borderRadius: moderateScale(20),
+      backgroundColor: tokens.surface, borderWidth: 1, borderColor: tokens.border, alignItems: "center", justifyContent: "center",
+    },
+    headerTitle: { fontFamily: fontFamilies.body.semibold, fontSize: moderateScale(15), color: tokens.text, backgroundColor: tokens.surface, borderWidth: 1, borderColor: tokens.border, borderRadius: 14, paddingHorizontal: 13, paddingVertical: 9, overflow: "hidden" },
+    betaBadge: { backgroundColor: tokens.sunken, borderRadius: 5, paddingHorizontal: 7, paddingVertical: 4 },
+    betaBadgeText: { fontFamily: fontFamilies.body.bold, fontSize: moderateScale(10), letterSpacing: 1, textTransform: "uppercase", color: tokens.sec },
+
+    sheet: {
+      position: "absolute", left: 0, right: 0, bottom: 0, maxHeight: "72%",
+      backgroundColor: tokens.surface, borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingHorizontal: 16, paddingTop: 12,
+      borderTopWidth: 1, borderColor: tokens.border,
+    },
+    sheetHandle: { width: 38, height: 4, borderRadius: 2, backgroundColor: tokens.borderStrong, alignSelf: "center", marginBottom: 16 },
+
+    headline: { fontFamily: fontFamilies.heading.bold, fontSize: moderateScale(24), lineHeight: moderateScale(27), letterSpacing: -0.4, color: tokens.text },
+    subhead: { fontFamily: fontFamilies.body.regular, fontSize: moderateScale(14), lineHeight: moderateScale(20), color: tokens.sec, marginTop: 8 },
+
+    startCard: {
+      flexDirection: "row", alignItems: "center", gap: 12, backgroundColor: tokens.bg, borderWidth: 1, borderColor: tokens.border,
+      borderRadius: 16, padding: 14, minHeight: 64, marginTop: 16,
+    },
+    startIcon: { width: 36, height: 36, borderRadius: 11, backgroundColor: accent.skin, alignItems: "center", justifyContent: "center", flexShrink: 0 },
+    startLabel: { fontFamily: fontFamilies.body.bold, fontSize: moderateScale(10), letterSpacing: 1, textTransform: "uppercase", color: tokens.muted },
+    startValue: { fontFamily: fontFamilies.body.medium, fontSize: moderateScale(15), color: tokens.text, marginTop: 3 },
+    changeLink: { fontFamily: fontFamilies.body.bold, fontSize: moderateScale(12), letterSpacing: 0.5, textTransform: "uppercase", color: accent.accent },
+
+    routeSection: { marginTop: 20 },
+    sectionLabel: { fontFamily: fontFamilies.body.bold, fontSize: moderateScale(11), letterSpacing: 1, textTransform: "uppercase", color: tokens.muted, marginBottom: 10 },
+    addStopBtn: { borderWidth: 1, borderStyle: "dashed", borderColor: accent.accent, backgroundColor: tokens.bg, borderRadius: 14, minHeight: moderateScale(48), alignItems: "center", justifyContent: "center" },
+    addStopBtnText: { fontFamily: fontFamilies.body.semibold, fontSize: moderateScale(14), color: accent.accent },
+
+    footer: { paddingTop: 4, paddingBottom: 14 },
+    footerRow: { flexDirection: "row", justifyContent: "space-between", marginBottom: 10 },
+    footerMeta: { fontFamily: fontFamilies.body.medium, fontSize: moderateScale(14), color: tokens.sec },
+    footerPrice: { fontFamily: fontFamilies.body.semibold, fontSize: moderateScale(15), color: tokens.text },
+    reviewBtn: { backgroundColor: accent.accent, borderRadius: 14, minHeight: moderateScale(52), alignItems: "center", justifyContent: "center" },
+    reviewBtnText: { fontFamily: fontFamilies.body.bold, fontSize: moderateScale(15), color: accent.on },
+  });

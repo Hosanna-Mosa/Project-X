@@ -1,75 +1,53 @@
-import React, { useEffect, useRef, useState } from "react";
-import { View, Text, StyleSheet, Animated, Alert, TouchableOpacity, Dimensions } from "react-native";
+import React, { useEffect, useRef, useState, useMemo } from "react";
+import { View, Text, StyleSheet, Animated, Alert, TouchableOpacity, Modal } from "react-native";
 import { useLocalSearchParams, router } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import Colors from "@/constants/colors";
+import { Ionicons } from "@expo/vector-icons";
+import { moderateScale } from "react-native-size-matters";
+import { designTokens, type ThemeTokens } from "@/constants/colors";
+import { fontFamilies } from "@/constants/typography";
 import { useThemeStore } from "@/contexts/themeStore";
 import { socketService } from "@/utils/socketService";
-import { Ionicons, Feather } from "@expo/vector-icons";
 import { useDeliveryStore } from "@/contexts/deliveryStore";
 import { customFetch } from "@/utils/api/custom-fetch";
 import { MapBackground } from "@/components/MapBackground";
+
+const TIER_LABEL: Record<string, string> = {
+  bike: "Bike",
+  auto: "Auto",
+  cab: "Cab Economy",
+  cab_prime: "Cab Prime",
+};
+
+const CANCEL_REASONS = ["Waiting too long", "Booked by mistake", "Fare is too high", "Found another ride", "Other"];
 
 export default function FindingDriverScreen() {
   const insets = useSafeAreaInsets();
   const { orderId, isReserved, dateTimeStr } = useLocalSearchParams<{ orderId: string; isReserved?: string; dateTimeStr?: string }>();
   const { theme } = useThemeStore();
-  const colors = Colors[theme];
-  
+  const tokens = designTokens[theme];
+  const accent = tokens.services.ride;
+  const styles = useMemo(() => createStyles(tokens, accent), [theme]);
+
   const [bookingConfirmed, setBookingConfirmed] = useState(false);
   const [confirmedDriver, setConfirmedDriver] = useState<any>(null);
   const [stops, setStops] = useState<any[]>([]);
   const [onlineDrivers, setOnlineDrivers] = useState<any[]>([]);
+  const [orderSummary, setOrderSummary] = useState<{ totalPrice?: number; totalDistance?: number; duration?: number; serviceType?: string }>({});
 
-  const pulse1 = useRef(new Animated.Value(0)).current;
-  const pulse2 = useRef(new Animated.Value(0)).current;
-  const pulse3 = useRef(new Animated.Value(0)).current;
-  const animatedProgress = useRef(new Animated.Value(0)).current;
+  const sweep = useRef(new Animated.Value(0)).current;
+  const ring1 = useRef(new Animated.Value(0)).current;
+  const ring2 = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    const createPulse = (value: Animated.Value, delay: number) => {
-      return Animated.loop(
-        Animated.sequence([
-          Animated.delay(delay),
-          Animated.timing(value, {
-            toValue: 1,
-            duration: 2000,
-            useNativeDriver: true,
-          }),
-        ])
-      );
-    };
-
-    const anim1 = createPulse(pulse1, 0);
-    const anim2 = createPulse(pulse2, 600);
-    const anim3 = createPulse(pulse3, 1200);
-
-    const animProgress = Animated.loop(
-      Animated.timing(animatedProgress, {
-        toValue: 1,
-        duration: 2000,
-        useNativeDriver: true,
-      })
-    );
-
-    anim1.start();
-    anim2.start();
-    anim3.start();
-    animProgress.start();
-
-    return () => {
-      anim1.stop();
-      anim2.stop();
-      anim3.stop();
-      animProgress.stop();
-    };
+    const spin = Animated.loop(Animated.timing(sweep, { toValue: 1, duration: 1000, useNativeDriver: true, isInteraction: false }));
+    const pulse = (value: Animated.Value, delay: number) =>
+      Animated.loop(Animated.sequence([Animated.delay(delay), Animated.timing(value, { toValue: 1, duration: 2600, useNativeDriver: true })]));
+    const p1 = pulse(ring1, 0);
+    const p2 = pulse(ring2, 800);
+    spin.start(); p1.start(); p2.start();
+    return () => { spin.stop(); p1.stop(); p2.stop(); };
   }, []);
-
-  const screenWidth = Dimensions.get("window").width;
-  const translateX = animatedProgress.interpolate({
-    inputRange: [0, 1],
-    outputRange: [-120, screenWidth],
-  });
 
   useEffect(() => {
     if (!orderId) {
@@ -78,10 +56,7 @@ export default function FindingDriverScreen() {
     }
 
     const isReservedVal = isReserved === "true";
-
-    // Hydrate the store with the active order ID
-    const { setOrderId } = useDeliveryStore.getState();
-    setOrderId(orderId);
+    useDeliveryStore.getState().setOrderId(orderId);
 
     socketService.connect();
     socketService.trackOrder(orderId);
@@ -89,7 +64,7 @@ export default function FindingDriverScreen() {
     let pollIntervalId: any;
     let isTransitioned = false;
 
-    const handleTransition = (driverData: any, reservedAtVal?: any) => {
+    const handleTransition = (driverData: any) => {
       if (isTransitioned) return;
       isTransitioned = true;
 
@@ -97,82 +72,37 @@ export default function FindingDriverScreen() {
       if (timeoutTimer) clearTimeout(timeoutTimer);
 
       const { setDriver, setStatus } = useDeliveryStore.getState();
-      
-      const driverInfo = driverData ? (
-        typeof driverData === "object" ? {
-          id: driverData.id || driverData._id || "unknown",
-          name: driverData.name || driverData.user?.name || "Driver",
-          phone: driverData.phone || driverData.user?.phone || "",
-          vehicle: driverData.vehicle || driverData.vehicleType || "unknown",
-        } : {
-          id: driverData,
-          name: "Driver",
-          phone: "",
-          vehicle: "unknown",
-        }
-      ) : {
-        id: "unknown",
-        name: "Driver",
-        phone: "",
-        vehicle: "unknown",
-      };
+
+      const driverInfo = driverData
+        ? typeof driverData === "object"
+          ? {
+              id: driverData.id || driverData._id || "unknown",
+              name: driverData.name || driverData.user?.name || "Driver",
+              phone: driverData.phone || driverData.user?.phone || "",
+              vehicle: driverData.vehicle || driverData.vehicleType || "unknown",
+            }
+          : { id: driverData, name: "Driver", phone: "", vehicle: "unknown" }
+        : { id: "unknown", name: "Driver", phone: "", vehicle: "unknown" };
 
       setDriver(driverInfo);
       setStatus("driver_assigned");
 
       if (isReservedVal) {
-        let formattedDate = "scheduled time";
-        if (dateTimeStr) {
-          formattedDate = dateTimeStr;
-        } else {
-          const dateSource = reservedAtVal || driverData?.reservedAt;
-          if (dateSource) {
-            try {
-              formattedDate = new Date(dateSource).toLocaleString([], {
-                weekday: 'short',
-                month: 'short',
-                day: 'numeric',
-                hour: '2-digit',
-                minute: '2-digit'
-              });
-            } catch (e) {
-              formattedDate = String(dateSource);
-            }
-          }
-        }
-
         setConfirmedDriver(driverInfo);
         setBookingConfirmed(true);
       } else {
-        router.push({
-          pathname: "/tracking",
-          params: { orderId }
-        });
+        router.push({ pathname: "/tracking", params: { orderId } });
       }
     };
 
     const handleOrderCancelled = () => {
       if (isTransitioned) return;
       isTransitioned = true;
-
       if (pollIntervalId) clearInterval(pollIntervalId);
       if (timeoutTimer) clearTimeout(timeoutTimer);
-
-      // Redirect immediately to clear the stuck screen
       router.replace("/(tabs)");
-
       setTimeout(() => {
-        Alert.alert(
-          "Order Cancelled",
-          "Driver is unavailable.",
-          [
-            {
-              text: "OK",
-              onPress: () => {}
-            }
-          ],
-          { cancelable: true }
-        );
+        Alert.alert("Order cancelled", "Driver is unavailable.", [{ text: "OK", onPress: () => {} }], { cancelable: true });
       }, 500);
     };
 
@@ -181,9 +111,13 @@ export default function FindingDriverScreen() {
       try {
         const orderData = await customFetch<any>(`/api/v1/orders/${orderId}`, { responseType: "json" });
         if (orderData) {
-          if (orderData.serviceType) {
-            useDeliveryStore.getState().setServiceType(orderData.serviceType);
-          }
+          if (orderData.serviceType) useDeliveryStore.getState().setServiceType(orderData.serviceType);
+          setOrderSummary({
+            totalPrice: orderData.totalPrice,
+            totalDistance: orderData.totalDistance,
+            duration: orderData.duration,
+            serviceType: orderData.serviceType,
+          });
           if (orderData.stops && orderData.stops.length > 0) {
             const mappedStops = orderData.stops.map((s: any) => ({
               id: s._id,
@@ -193,11 +127,8 @@ export default function FindingDriverScreen() {
               type: s.type,
               items: s.items?.lines || [],
             }));
-            setStops(prev => {
-              if (prev && prev.length === mappedStops.length) {
-                const isSame = prev.every((val, idx) => val.id === mappedStops[idx].id);
-                if (isSame) return prev;
-              }
+            setStops((prev) => {
+              if (prev && prev.length === mappedStops.length && prev.every((v, i) => v.id === mappedStops[i].id)) return prev;
               return mappedStops;
             });
           }
@@ -206,8 +137,7 @@ export default function FindingDriverScreen() {
             return;
           }
           if (orderData.status && orderData.status.toUpperCase() === "DRIVER_ASSIGNED") {
-            console.log("Order was accepted:", orderData);
-            handleTransition(orderData.driver, orderData.reservedAt);
+            handleTransition(orderData.driver);
           }
         }
       } catch (err) {
@@ -215,26 +145,14 @@ export default function FindingDriverScreen() {
       }
     };
 
-    // Run immediately on mount
     checkOrderStatus();
-
-    // Poll status every 2 seconds
     pollIntervalId = setInterval(checkOrderStatus, 2000);
 
     const handleOrderAccepted = (data: any) => {
-      console.log("Order accepted socket event:", data);
-      if (data && (data.orderId === orderId || String(data.orderId) === String(orderId))) {
-        handleTransition(data.driver, data.reservedAt);
-      }
+      if (data && String(data.orderId) === String(orderId)) handleTransition(data.driver);
     };
-
     const handleStatusUpdate = (data: any) => {
-      console.log("Order status update socket event:", data);
-      if (data && (data.orderId === orderId || String(data.orderId) === String(orderId))) {
-        if (data.status && data.status.toUpperCase() === "CANCELLED") {
-          handleOrderCancelled();
-        }
-      }
+      if (data && String(data.orderId) === String(orderId) && data.status?.toUpperCase() === "CANCELLED") handleOrderCancelled();
     };
 
     socketService.on("order_accepted", handleOrderAccepted);
@@ -245,32 +163,25 @@ export default function FindingDriverScreen() {
       timeoutTimer = setTimeout(async () => {
         if (isTransitioned) return;
         isTransitioned = true;
-        
         if (pollIntervalId) clearInterval(pollIntervalId);
-
         Alert.alert(
-          "No Captain Found",
-          "Sorry, no captains are available to accept your reservation request at this time. Please try scheduling again later.",
-          [
-            {
-              text: "OK",
-              onPress: async () => {
-                router.replace("/(tabs)");
-                if (orderId) {
-                  try {
-                    await customFetch(`/api/v1/orders/${orderId}/status`, {
-                      method: "PATCH",
-                      body: JSON.stringify({ status: "CANCELLED" }),
-                    });
-                  } catch (error) {
-                    console.error("Failed to cancel order on backend:", error);
-                  }
+          "No captain found",
+          "Sorry, no captains are available to accept your reservation request right now. Please try scheduling again later.",
+          [{
+            text: "OK",
+            onPress: async () => {
+              router.replace("/(tabs)");
+              if (orderId) {
+                try {
+                  await customFetch(`/api/v1/orders/${orderId}/status`, { method: "PATCH", body: JSON.stringify({ status: "CANCELLED" }) });
+                } catch (error) {
+                  console.error("Failed to cancel order on backend:", error);
                 }
               }
-            }
-          ]
+            },
+          }]
         );
-      }, 60000); // 1 minute
+      }, 60000);
     }
 
     return () => {
@@ -281,14 +192,15 @@ export default function FindingDriverScreen() {
     };
   }, [orderId, isReserved, dateTimeStr]);
 
+  const [showCancelSheet, setShowCancelSheet] = useState(false);
+  const [cancelReason, setCancelReason] = useState(CANCEL_REASONS[0]);
+
   const handleCancel = async () => {
+    setShowCancelSheet(false);
     router.push("/(tabs)");
     if (orderId) {
       try {
-        await customFetch(`/api/v1/orders/${orderId}/status`, {
-          method: "PATCH",
-          body: JSON.stringify({ status: "CANCELLED" }),
-        });
+        await customFetch(`/api/v1/orders/${orderId}/status`, { method: "PATCH", body: JSON.stringify({ status: "CANCELLED" }) });
       } catch (error) {
         console.error("Failed to cancel order on backend:", error);
       }
@@ -297,31 +209,24 @@ export default function FindingDriverScreen() {
 
   useEffect(() => {
     if (!stops || stops.length === 0) return;
-    const pickupStop = stops.find(s => s.type === "pickup") || stops[0];
-    if (!pickupStop || !pickupStop.lat || !pickupStop.lng) return;
+    const pickupStop = stops.find((s) => s.type === "pickup") || stops[0];
+    if (!pickupStop?.lat || !pickupStop?.lng) return;
 
     let active = true;
     const fetchOnlineDrivers = async () => {
       try {
-        const queryParams = new URLSearchParams({
-          latitude: String(pickupStop.lat),
-          longitude: String(pickupStop.lng),
-          radius: "50000",
-        });
+        const queryParams = new URLSearchParams({ latitude: String(pickupStop.lat), longitude: String(pickupStop.lng), radius: "50000" });
         const res = await customFetch<any[]>(`/api/v1/drivers/nearby?${queryParams.toString()}`);
-        console.log(`[CLIENT DRIVER SEARCH RESPONSE] Returned count: ${res ? res.length : 0}`);
         if (active && Array.isArray(res)) {
-          const mapped = res.map(drv => {
-            const lat = drv.currentLocation?.coordinates?.[1] || drv.user?.addresses?.[0]?.location?.coordinates?.[1] || pickupStop.lat;
-            const lng = drv.currentLocation?.coordinates?.[0] || drv.user?.addresses?.[0]?.location?.coordinates?.[0] || pickupStop.lng;
-            return {
+          const mapped = res
+            .map((drv) => ({
               id: drv._id,
-              lat,
-              lng,
+              lat: drv.currentLocation?.coordinates?.[1] || drv.user?.addresses?.[0]?.location?.coordinates?.[1] || pickupStop.lat,
+              lng: drv.currentLocation?.coordinates?.[0] || drv.user?.addresses?.[0]?.location?.coordinates?.[0] || pickupStop.lng,
               vehicleType: drv.vehicleType || "bike",
               name: drv.user?.name || "Driver",
-            };
-          }).filter(d => d.lat && d.lng);
+            }))
+            .filter((d) => d.lat && d.lng);
           setOnlineDrivers(mapped);
         }
       } catch (error) {
@@ -331,39 +236,31 @@ export default function FindingDriverScreen() {
 
     fetchOnlineDrivers();
     const interval = setInterval(fetchOnlineDrivers, 10000);
-
-    return () => {
-      active = false;
-      clearInterval(interval);
-    };
+    return () => { active = false; clearInterval(interval); };
   }, [stops]);
 
+  const pickupStop = stops.find((s) => s.type === "pickup");
+  const dropStop = stops.find((s) => s.type === "drop");
+  const tierLabel = orderSummary.serviceType ? TIER_LABEL[orderSummary.serviceType] || orderSummary.serviceType : null;
+  const spin = sweep.interpolate({ inputRange: [0, 1], outputRange: ["0deg", "360deg"] });
+
   if (bookingConfirmed && confirmedDriver) {
-    let formattedDate = "scheduled time";
-    if (dateTimeStr) {
-      formattedDate = dateTimeStr;
-    }
-
     return (
-      <View style={[styles.container, { backgroundColor: colors.background, paddingTop: insets.top, paddingBottom: insets.bottom }]}>
-        <Ionicons name="checkmark-circle" size={100} color={colors.primary} style={{ marginBottom: 20 }} />
-        <Text style={{ color: colors.text, fontSize: 26, fontWeight: "bold" }}>Booking Confirmed!</Text>
-        <Text style={{ color: colors.textSecondary, textAlign: "center", marginHorizontal: 30, marginBottom: 40, marginTop: 15, fontSize: 16, lineHeight: 24 }}>
-          Driver has accepted your reserved ride request for {formattedDate}! We will notify you 15 minutes before the ride time.
-        </Text>
-        
-        <View style={{ backgroundColor: colors.surface, padding: 25, borderRadius: 16, width: '85%', alignItems: 'center', elevation: 3, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4 }}>
-          <Text style={{ color: colors.text, fontSize: 22, fontWeight: "bold", marginBottom: 15 }}>Driver Details</Text>
-          <Text style={{ color: colors.text, fontSize: 18, marginBottom: 8 }}>Name: {confirmedDriver.name}</Text>
-          <Text style={{ color: colors.text, fontSize: 18, marginBottom: 8 }}>Vehicle: {confirmedDriver.vehicle}</Text>
-          <Text style={{ color: colors.text, fontSize: 18, marginBottom: 8 }}>Phone: {confirmedDriver.phone || "N/A"}</Text>
+      <View style={[styles.root, { paddingTop: insets.top + 24, paddingBottom: insets.bottom + 24, alignItems: "center", justifyContent: "center", paddingHorizontal: 24 }]}>
+        <View style={styles.confirmedIcon}>
+          <Ionicons name="checkmark" size={moderateScale(32)} color="#fff" />
         </View>
-
-        <TouchableOpacity 
-          style={{ marginTop: 50, backgroundColor: colors.primary, paddingVertical: 15, paddingHorizontal: 40, borderRadius: 30 }}
-          onPress={() => router.replace("/(tabs)/orders")}
-        >
-          <Text style={{ color: '#fff', fontSize: 18, fontWeight: 'bold' }}>Done</Text>
+        <Text style={styles.confirmedTitle}>Booking confirmed</Text>
+        <Text style={styles.confirmedSub}>
+          A captain has accepted your reserved ride for {dateTimeStr || "the scheduled time"}. We'll notify you 15 minutes before pickup.
+        </Text>
+        <View style={styles.confirmedCard}>
+          <Text style={styles.confirmedCardTitle}>Captain</Text>
+          <Text style={styles.confirmedCardRow}>{confirmedDriver.name}</Text>
+          <Text style={styles.confirmedCardRowMuted}>{confirmedDriver.vehicle}{confirmedDriver.phone ? ` · ${confirmedDriver.phone}` : ""}</Text>
+        </View>
+        <TouchableOpacity style={styles.confirmedDoneBtn} onPress={() => router.replace("/(tabs)/orders")}>
+          <Text style={styles.confirmedDoneBtnText}>Done</Text>
         </TouchableOpacity>
       </View>
     );
@@ -371,154 +268,176 @@ export default function FindingDriverScreen() {
 
   return (
     <View style={styles.root}>
-      <MapBackground 
-        stops={stops}
-        driverMarkers={onlineDrivers}
-        style={StyleSheet.absoluteFill}
-      />
+      <MapBackground stops={stops} driverMarkers={onlineDrivers} style={StyleSheet.absoluteFill} />
 
-      <View style={styles.floatingPanelContainer} pointerEvents="box-none">
-        <View style={[styles.floatingCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-          <View style={styles.headerInfo}>
-            <View style={styles.statusDotRow}>
-              <Animated.View style={[styles.pulseDot, { opacity: pulse1.interpolate({ inputRange: [0, 1], outputRange: [1, 0.3] }), backgroundColor: colors.success }]} />
-              <Text style={[styles.title, { color: colors.text }]}>
-                {isReserved === "true" ? "Booking Reservation..." : "Finding your driver..."}
-              </Text>
-            </View>
-            <Text style={[styles.subtitle, { color: colors.textSecondary }]}>
-              Scanning nearby partners in your surroundings
-            </Text>
+      <View style={styles.radarWrap} pointerEvents="none">
+        <Animated.View style={[styles.radarRing, { opacity: ring1.interpolate({ inputRange: [0, 1], outputRange: [0.18, 0] }), transform: [{ scale: ring1.interpolate({ inputRange: [0, 1], outputRange: [0.3, 1] }) }] }]} />
+        <Animated.View style={[styles.radarRing, { opacity: ring2.interpolate({ inputRange: [0, 1], outputRange: [0.22, 0] }), transform: [{ scale: ring2.interpolate({ inputRange: [0, 1], outputRange: [0.3, 1] }) }] }]} />
+        <View style={styles.radarDot} />
+      </View>
+
+      <TouchableOpacity style={[styles.backBtn, { top: insets.top + 10 }]} onPress={() => setShowCancelSheet(true)}>
+        <Ionicons name="chevron-back" size={moderateScale(20)} color={tokens.text} />
+      </TouchableOpacity>
+
+      <View style={styles.sheet}>
+        <View style={styles.sheetHandle} />
+        <View style={styles.titleRow}>
+          <Animated.View style={[styles.spinner, { transform: [{ rotate: spin }] }]} />
+          <Text style={styles.title}>Finding your captain</Text>
+        </View>
+        <Text style={styles.subtitle}>
+          {tierLabel ? `Searching ${tierLabel} nearby. ` : "Searching nearby captains. "}Usually under a minute.
+        </Text>
+
+        {(orderSummary.totalPrice != null || pickupStop || dropStop) && (
+          <View style={styles.routeCard}>
+            {orderSummary.totalPrice != null && (
+              <View style={styles.routeCardHead}>
+                <Text style={styles.routeCardHeadLabel}>Total fare</Text>
+                <Text style={styles.routeCardHeadValue}>₹{Math.round(orderSummary.totalPrice)}</Text>
+              </View>
+            )}
+            {(pickupStop || dropStop) && (
+              <View style={styles.routeRow}>
+                <View style={styles.routeRail}>
+                  <View style={styles.routePickupDot} />
+                  <View style={styles.routeLine} />
+                  <View style={styles.routeDropSquare} />
+                </View>
+                <View style={{ flex: 1, minWidth: 0, gap: 10 }}>
+                  <Text style={styles.routeAddr} numberOfLines={1}>{pickupStop?.address || ""}</Text>
+                  <Text style={styles.routeAddr} numberOfLines={1}>{dropStop?.address || ""}</Text>
+                </View>
+                {(orderSummary.totalDistance != null || orderSummary.duration != null) && (
+                  <View style={{ alignItems: "flex-end" }}>
+                    {orderSummary.totalDistance != null && <Text style={styles.routeMeta}>{orderSummary.totalDistance.toFixed(1)} km</Text>}
+                    {orderSummary.duration != null && <Text style={[styles.routeMeta, { marginTop: 12 }]}>{Math.round(orderSummary.duration)} min</Text>}
+                  </View>
+                )}
+              </View>
+            )}
           </View>
+        )}
 
-          {/* Glowing Continuous Progress Bar */}
-          <View style={styles.progressTrack}>
-            <Animated.View
-              style={[
-                styles.progressBarActive,
-                {
-                  transform: [{ translateX }],
-                  backgroundColor: colors.primary,
-                },
-              ]}
-            />
+        {tierLabel && (
+          <View style={styles.searchingChip}>
+            <Text style={styles.searchingLabel}>Searching</Text>
+            <Text style={styles.searchingValue}>{tierLabel}</Text>
           </View>
+        )}
 
-          {/* Simple Info Row showing Proximity/Fare */}
-          <View style={[styles.infoRow, { backgroundColor: colors.surfaceSecondary }]}>
-            <View style={styles.infoBadge}>
-              <Feather name="truck" size={18} color={colors.text} />
-            </View>
-            <Text style={[styles.infoText, { color: colors.textSecondary }]}>
-              Connecting you with the best available delivery partner
-            </Text>
-          </View>
-
-          <TouchableOpacity 
-            style={[styles.cancelBtn, { borderColor: colors.border }]} 
-            onPress={handleCancel}
-            activeOpacity={0.8}
-          >
-            <Text style={[styles.cancelText, { color: colors.error }]}>Cancel Request</Text>
+        <View style={{ marginTop: "auto" }}>
+          <TouchableOpacity style={styles.cancelBtn} onPress={() => setShowCancelSheet(true)} activeOpacity={0.85}>
+            <Text style={styles.cancelBtnText}>Cancel ride</Text>
           </TouchableOpacity>
         </View>
       </View>
+
+      <Modal visible={showCancelSheet} transparent animationType="slide" onRequestClose={() => setShowCancelSheet(false)}>
+        <View style={styles.sheetOverlay}>
+          <TouchableOpacity activeOpacity={1} style={styles.sheetScrim} onPress={() => setShowCancelSheet(false)} />
+          <View style={[styles.cancelSheet, { paddingBottom: insets.bottom + 16 }]}>
+            <View style={styles.sheetHandle} />
+            <Text style={styles.cancelSheetTitle}>Why do you want to cancel?</Text>
+            <Text style={styles.cancelSheetSub}>No cancellation fee — we haven't assigned a captain yet.</Text>
+
+            <View style={{ gap: 8, marginBottom: 18 }}>
+              {CANCEL_REASONS.map((reason) => {
+                const isSelected = cancelReason === reason;
+                return (
+                  <TouchableOpacity
+                    key={reason}
+                    style={[styles.reasonRow, isSelected && { borderColor: accent.accent, backgroundColor: accent.skin }]}
+                    onPress={() => setCancelReason(reason)}
+                    activeOpacity={0.85}
+                  >
+                    <View style={[styles.radioOuter, isSelected && { borderColor: accent.accent }]}>
+                      {isSelected && <View style={[styles.radioInner, { backgroundColor: accent.accent }]} />}
+                    </View>
+                    <Text style={styles.reasonText}>{reason}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+
+            <View style={{ flexDirection: "row", gap: 10 }}>
+              <TouchableOpacity style={styles.cancelSheetCancelBtn} onPress={handleCancel} activeOpacity={0.85}>
+                <Text style={styles.cancelSheetCancelBtnText}>Cancel my ride</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={[styles.cancelSheetKeepBtn, { backgroundColor: accent.accent }]} onPress={() => setShowCancelSheet(false)} activeOpacity={0.9}>
+                <Text style={[styles.cancelSheetKeepBtnText, { color: accent.on }]}>Keep searching</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
 
-const styles = StyleSheet.create({
-  root: {
-    flex: 1,
-  },
-  container: { flex: 1, alignItems: "center", justifyContent: "center", paddingHorizontal: 24 },
-  floatingPanelContainer: {
-    position: "absolute",
-    left: 0,
-    right: 0,
-    bottom: 0,
-    paddingHorizontal: 16,
-    paddingBottom: 34,
-    justifyContent: "flex-end",
-  },
-  floatingCard: {
-    borderRadius: 24,
-    borderWidth: 1,
-    padding: 24,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.15,
-    shadowRadius: 16,
-    elevation: 8,
-    gap: 16,
-  },
-  headerInfo: {
-    marginBottom: 4,
-  },
-  statusDotRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginBottom: 4,
-  },
-  pulseDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    marginRight: 8,
-  },
-  title: {
-    fontSize: 18,
-    fontWeight: "800",
-  },
-  subtitle: {
-    fontSize: 13,
-    marginLeft: 16, // aligns with title text indent
-  },
-  progressTrack: {
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: "rgba(0, 0, 0, 0.05)",
-    overflow: "hidden",
-    position: "relative",
-    marginBottom: 4,
-  },
-  progressBarActive: {
-    position: "absolute",
-    left: 0,
-    top: 0,
-    bottom: 0,
-    width: 120,
-    borderRadius: 2,
-  },
-  infoRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    padding: 14,
-    borderRadius: 14,
-    gap: 12,
-  },
-  infoBadge: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: "rgba(0, 0, 0, 0.03)",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  infoText: {
-    fontSize: 13,
-    flex: 1,
-    lineHeight: 18,
-  },
-  cancelBtn: {
-    borderWidth: 1,
-    paddingVertical: 14,
-    borderRadius: 24,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  cancelText: {
-    fontSize: 15,
-    fontWeight: "700",
-  }
-});
+const createStyles = (tokens: ThemeTokens, accent: ThemeTokens["services"]["ride"]) =>
+  StyleSheet.create({
+    root: { flex: 1, backgroundColor: tokens.bg },
+    backBtn: {
+      position: "absolute", left: 16, zIndex: 10, width: moderateScale(40), height: moderateScale(40), borderRadius: moderateScale(20),
+      backgroundColor: tokens.surface, borderWidth: 1, borderColor: tokens.border, alignItems: "center", justifyContent: "center",
+    },
+    radarWrap: { position: "absolute", left: "50%", top: "26%", marginLeft: -110, marginTop: -110, width: 220, height: 220, alignItems: "center", justifyContent: "center" },
+    radarRing: { position: "absolute", width: 220, height: 220, borderRadius: 999, backgroundColor: accent.accent },
+    radarDot: { width: 26, height: 26, borderRadius: 999, backgroundColor: accent.accent, borderWidth: 4, borderColor: tokens.surface },
+
+    sheet: {
+      position: "absolute", left: 0, right: 0, bottom: 0, height: "52%",
+      backgroundColor: tokens.surface, borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingHorizontal: 20, paddingTop: 12,
+      borderTopWidth: 1, borderColor: tokens.border,
+    },
+    sheetHandle: { width: 38, height: 4, borderRadius: 2, backgroundColor: tokens.borderStrong, alignSelf: "center", marginBottom: 16 },
+    titleRow: { flexDirection: "row", alignItems: "center", gap: 12, marginBottom: 6 },
+    spinner: { width: 22, height: 22, borderRadius: 11, borderWidth: 2.5, borderColor: accent.accent, borderTopColor: "transparent" },
+    title: { fontFamily: fontFamilies.heading.semibold, fontSize: moderateScale(24), letterSpacing: -0.2, color: tokens.text },
+    subtitle: { fontFamily: fontFamilies.body.regular, fontSize: moderateScale(15), lineHeight: moderateScale(21), color: tokens.sec, marginBottom: 16 },
+
+    routeCard: { backgroundColor: tokens.bg, borderWidth: 1, borderColor: tokens.border, borderRadius: 16, padding: 14, marginBottom: 12 },
+    routeCardHead: { flexDirection: "row", justifyContent: "space-between", alignItems: "baseline", paddingBottom: 12, borderBottomWidth: 1, borderBottomColor: tokens.border },
+    routeCardHeadLabel: { fontFamily: fontFamilies.body.semibold, fontSize: moderateScale(15), color: tokens.text },
+    routeCardHeadValue: { fontFamily: fontFamilies.heading.semibold, fontSize: moderateScale(22), letterSpacing: -0.3, color: tokens.text },
+    routeRow: { flexDirection: "row", gap: 12, paddingTop: 12 },
+    routeRail: { width: 12, alignItems: "center", paddingTop: 5 },
+    routePickupDot: { width: 9, height: 9, borderRadius: 5, borderWidth: 2.5, borderColor: accent.accent },
+    routeDropSquare: { width: 9, height: 9, borderRadius: 2, backgroundColor: tokens.text },
+    routeLine: { width: 2, flex: 1, minHeight: 18, backgroundColor: tokens.borderStrong, marginVertical: 3 },
+    routeAddr: { fontFamily: fontFamilies.body.medium, fontSize: moderateScale(14), color: tokens.text },
+    routeMeta: { fontFamily: fontFamilies.body.medium, fontSize: moderateScale(13), color: tokens.sec },
+
+    searchingChip: { backgroundColor: accent.skin, borderRadius: 12, padding: 12, marginBottom: 14, alignSelf: "flex-start" },
+    searchingLabel: { fontFamily: fontFamilies.body.bold, fontSize: moderateScale(10), letterSpacing: 1, textTransform: "uppercase", color: accent.accent },
+    searchingValue: { fontFamily: fontFamilies.body.semibold, fontSize: moderateScale(14), color: tokens.text, marginTop: 4 },
+
+    cancelBtn: { borderWidth: 1, borderColor: tokens.error, borderRadius: 14, minHeight: moderateScale(52), alignItems: "center", justifyContent: "center" },
+    cancelBtnText: { fontFamily: fontFamilies.body.semibold, fontSize: moderateScale(15), color: tokens.error },
+
+    sheetOverlay: { flex: 1, justifyContent: "flex-end" },
+    sheetScrim: { ...StyleSheet.absoluteFillObject, backgroundColor: "rgba(0,0,0,0.5)" },
+    cancelSheet: { backgroundColor: tokens.surface, borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingTop: 12, paddingHorizontal: 20 },
+    cancelSheetTitle: { fontFamily: fontFamilies.heading.semibold, fontSize: moderateScale(22), letterSpacing: -0.2, color: tokens.text, marginBottom: 6 },
+    cancelSheetSub: { fontFamily: fontFamilies.body.regular, fontSize: moderateScale(14), lineHeight: moderateScale(20), color: tokens.sec, marginBottom: 16 },
+    reasonRow: { flexDirection: "row", alignItems: "center", gap: 12, borderWidth: 1, borderColor: tokens.borderStrong, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 13, minHeight: 48 },
+    radioOuter: { width: 20, height: 20, borderRadius: 10, borderWidth: 2, borderColor: tokens.borderStrong, alignItems: "center", justifyContent: "center", flexShrink: 0 },
+    radioInner: { width: 10, height: 10, borderRadius: 5 },
+    reasonText: { fontFamily: fontFamilies.body.medium, fontSize: moderateScale(15), color: tokens.text },
+    cancelSheetCancelBtn: { flex: 1, borderWidth: 1, borderColor: tokens.error, borderRadius: 14, minHeight: moderateScale(52), alignItems: "center", justifyContent: "center" },
+    cancelSheetCancelBtnText: { fontFamily: fontFamilies.body.semibold, fontSize: moderateScale(15), color: tokens.error },
+    cancelSheetKeepBtn: { flex: 1, borderRadius: 14, minHeight: moderateScale(52), alignItems: "center", justifyContent: "center" },
+    cancelSheetKeepBtnText: { fontFamily: fontFamilies.body.bold, fontSize: moderateScale(15) },
+
+    confirmedIcon: { width: 76, height: 76, borderRadius: 999, backgroundColor: tokens.success, alignItems: "center", justifyContent: "center", marginBottom: 22 },
+    confirmedTitle: { fontFamily: fontFamilies.heading.bold, fontSize: moderateScale(26), letterSpacing: -0.3, color: tokens.text, textAlign: "center" },
+    confirmedSub: { fontFamily: fontFamilies.body.regular, fontSize: moderateScale(15), lineHeight: moderateScale(21), color: tokens.sec, textAlign: "center", marginTop: 12, marginBottom: 24 },
+    confirmedCard: { backgroundColor: tokens.surface, borderWidth: 1, borderColor: tokens.border, borderRadius: 18, padding: 20, width: "100%", alignItems: "center", marginBottom: 30 },
+    confirmedCardTitle: { fontFamily: fontFamilies.body.bold, fontSize: moderateScale(11), letterSpacing: 1, textTransform: "uppercase", color: tokens.muted, marginBottom: 10 },
+    confirmedCardRow: { fontFamily: fontFamilies.body.semibold, fontSize: moderateScale(17), color: tokens.text },
+    confirmedCardRowMuted: { fontFamily: fontFamilies.body.medium, fontSize: moderateScale(14), color: tokens.sec, marginTop: 4 },
+    confirmedDoneBtn: { backgroundColor: accent.accent, borderRadius: 14, paddingHorizontal: 40, paddingVertical: 15, width: "100%", alignItems: "center" },
+    confirmedDoneBtnText: { fontFamily: fontFamilies.body.bold, fontSize: moderateScale(15), color: accent.on },
+  });

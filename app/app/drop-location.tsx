@@ -18,7 +18,8 @@ import { moderateScale } from "react-native-size-matters";
 import { GooglePlacesAutocomplete } from "react-native-google-places-autocomplete";
 import * as Location from "expo-location";
 import { Alert } from "react-native";
-import Colors from "@/constants/colors";
+import { designTokens, type ThemeTokens } from "@/constants/colors";
+import { fontFamilies } from "@/constants/typography";
 import { useThemeStore } from "@/contexts/themeStore";
 import { customFetch } from "@/utils/api/custom-fetch";
 import { useAuthStore } from "@/contexts/authStore";
@@ -44,10 +45,11 @@ const toRecentPlace = (place: Partial<RecentPlace> & { description?: string }) =
   lat: Number(place.lat),
   lng: Number(place.lng),
 });
+
 export default function LocationSelectionScreen() {
   const insets = useSafeAreaInsets();
-  const params = useLocalSearchParams<{ 
-    serviceId: string; 
+  const params = useLocalSearchParams<{
+    serviceId: string;
     name: string;
     pickupName?: string;
     pickupLat?: string;
@@ -61,8 +63,9 @@ export default function LocationSelectionScreen() {
   const { serviceId, name } = params;
 
   const { theme } = useThemeStore();
-  const colors = Colors[theme];
-  const styles = React.useMemo(() => createStyles(colors), [theme]);
+  const tokens = designTokens[theme];
+  const accent = tokens.services.ride;
+  const styles = React.useMemo(() => createStyles(tokens, accent), [theme]);
   const { user } = useAuthStore();
   const setServiceType = useDeliveryStore((state) => state.setServiceType);
 
@@ -79,6 +82,7 @@ export default function LocationSelectionScreen() {
   const [bookingFor, setBookingFor] = useState<"myself" | "someone_else">("myself");
   const [someoneContact, setSomeoneContact] = useState("");
   const [recentPlaces, setRecentPlaces] = useState<RecentPlace[]>([]);
+  const [savedAddresses, setSavedAddresses] = useState<any[]>([]);
   const [savingPreference, setSavingPreference] = useState(false);
   const [isNavigating, setIsNavigating] = useState(false);
 
@@ -103,6 +107,12 @@ export default function LocationSelectionScreen() {
         // Profile preference is optional
       }
     })();
+  }, [user?.id]);
+
+  useEffect(() => {
+    customFetch<any[]>("/api/v1/users/addresses")
+      .then((data) => setSavedAddresses(Array.isArray(data) ? data.slice(0, 3) : []))
+      .catch(() => {});
   }, [user?.id]);
 
   useEffect(() => {
@@ -134,6 +144,7 @@ export default function LocationSelectionScreen() {
       mounted = false;
     };
   }, [user?.id]);
+
   useEffect(() => {
     // Handle initial state from params
     if (params.pickupName && params.pickupLat) {
@@ -163,7 +174,7 @@ export default function LocationSelectionScreen() {
 
     if (params.triggerAddStop === "true") {
       handleAddStop();
-      // Clear the trigger by setting params to empty would be ideal, 
+      // Clear the trigger by setting params to empty would be ideal,
       // but since params are reactive, we just rely on state.
     }
 
@@ -330,10 +341,10 @@ export default function LocationSelectionScreen() {
 
     if (currentPickup && currentDrop && currentPickup.lat && currentDrop.lat) {
         setIsNavigating(true);
-        router.push({ 
-            pathname: "/ride-confirmation", 
-            params: { 
-                serviceId, 
+        router.push({
+            pathname: "/ride-confirmation",
+            params: {
+                serviceId,
                 pickupName: currentPickup.name,
                 dropName: currentDrop.name,
                 pickupLat: currentPickup.lat.toString(),
@@ -343,7 +354,7 @@ export default function LocationSelectionScreen() {
                 stops: JSON.stringify(stops),
                 bookingForType: bookingFor,
                 riderContact: someoneContact,
-            } 
+            }
         });
     }
   };
@@ -374,6 +385,20 @@ export default function LocationSelectionScreen() {
     setStops(prev => prev.map(s => s.id === id ? { ...s, name: addrName, lat, lng } : s));
   };
 
+  const selectSavedAddress = (addr: any) => {
+    const lat = addr.coordinates?.lat ?? addr.location?.coordinates?.[1];
+    const lng = addr.coordinates?.lng ?? addr.location?.coordinates?.[0];
+    if (lat == null || lng == null) return;
+    const data = { id: addr._id, name: addr.label, description: addr.addressLine, lat, lng };
+    if (!pickup) {
+      pickupRef.current?.setAddressText(addr.addressLine);
+      handleSelection('pickup', data, null);
+    } else {
+      dropRef.current?.setAddressText(addr.addressLine);
+      handleSelection('drop', data, null);
+    }
+  };
+
   const handleCurrentLocation = async () => {
     try {
       setFetchingLocation(true);
@@ -384,7 +409,7 @@ export default function LocationSelectionScreen() {
         return;
       }
       const location = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.High });
-      
+
       // Check zone for current location
       try {
         const checkRes = await customFetch<any>(`/api/v1/zones/check?lat=${location.coords.latitude}&lng=${location.coords.longitude}`);
@@ -407,10 +432,10 @@ export default function LocationSelectionScreen() {
         const addr = geocode[0];
         const displayAddr = `${addr.name || ''} ${addr.street || ''}, ${addr.city || ''}`.trim();
         pickupRef.current?.setAddressText(displayAddr);
-        const newPickup = { 
-          name: displayAddr, 
-          lat: location.coords.latitude, 
-          lng: location.coords.longitude 
+        const newPickup = {
+          name: displayAddr,
+          lat: location.coords.latitude,
+          lng: location.coords.longitude
         };
         setPickup(newPickup);
 
@@ -441,90 +466,75 @@ export default function LocationSelectionScreen() {
 
   return (
     <>
-    <KeyboardAvoidingView 
+    <KeyboardAvoidingView
         behavior={Platform.OS === "ios" ? "padding" : "height"}
         style={styles.root}
     >
-      <View style={[styles.header, { paddingTop: insets.top + 10 }]}>
-        <View style={styles.headerLeft}>
-          <TouchableOpacity onPress={() => router.back()}>
-            <Ionicons name="arrow-back" size={24} color={colors.text} />
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>Drop</Text>
-        </View>
+      <View style={[styles.header, { paddingTop: insets.top + 6 }]}>
+        <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
+          <Ionicons name="chevron-back" size={moderateScale(20)} color={tokens.text} />
+        </TouchableOpacity>
+        <Text style={styles.headerTitle}>Where to?</Text>
         <TouchableOpacity style={styles.forMeSelector} onPress={() => setShowBookingForSheet(true)}>
           <Text style={styles.forMeText}>{bookingFor === "myself" ? "For me" : "Someone else"}</Text>
-          <Ionicons name="chevron-down" size={18} color={colors.text} />
+          <Ionicons name="chevron-down" size={14} color={tokens.sec} />
         </TouchableOpacity>
       </View>
 
-      <View style={styles.locationContainer}>
+      <View style={styles.inputCard}>
         <View style={styles.dotsContainer}>
-          <View style={styles.markerSlot}>
-            <Ionicons name="location" size={20} color="#16A34A" />
-          </View>
+          <View style={styles.pickupDot} />
           <View style={styles.dashLine} />
-          {stops.map((stop, index) => (
+          {stops.map((stop) => (
              <React.Fragment key={stop.id}>
                 <View style={styles.markerSlot}>
-                   <View style={styles.stopDiamond}>
-                      <Text style={styles.stopDiamondText}>{index + 1}</Text>
-                   </View>
+                   <View style={styles.stopDiamond} />
                 </View>
                 <View style={styles.dashLine} />
              </React.Fragment>
           ))}
-          <View style={styles.markerSlot}>
-            <Ionicons name="location" size={20} color="#EF4444" />
-          </View>
+          <View style={styles.dropSquare} />
         </View>
-        
+
         <View style={styles.inputsContainer}>
-          <GooglePlacesAutocomplete
-            ref={pickupRef}
-            placeholder="Pickup location"
-            onPress={(data, details = null) => handleSelection('pickup', data, details)}
-            fetchDetails={true}
-            query={{
-              key: process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY,
-              language: "en",
-            }}
-            textInputProps={{
-              onChangeText: (text) => handleSearch(text, 'pickup'),
-              onFocus: () => setFocusedInput({ type: 'pickup' }),
-              placeholderTextColor: colors.textSecondary,
-            }}
-            styles={{
-              container: { flex: 0, zIndex: 2000 },
-              textInput: styles.locationInput,
-              listView: { display: 'none' }, // Hide default list
-            }}
-            enablePoweredByContainer={false}
-            debounce={200}
-            renderRightButton={() => (
-              <TouchableOpacity style={styles.currentLocBtn} onPress={handleCurrentLocation} disabled={fetchingLocation}>
-                 {fetchingLocation ? (
-                   <ActivityIndicator size="small" color={colors.primary} />
-                 ) : (
-                   <MaterialCommunityIcons name="crosshairs-gps" size={20} color={colors.primary} />
-                 )}
-              </TouchableOpacity>
-            )}
-          />
-          
+          <View style={styles.fieldSlot}>
+            <Text style={styles.fieldLabel}>Pickup</Text>
+            <GooglePlacesAutocomplete
+              ref={pickupRef}
+              placeholder="Pickup location"
+              onPress={(data, details = null) => handleSelection('pickup', data, details)}
+              fetchDetails={true}
+              query={{ key: process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY, language: "en" }}
+              textInputProps={{
+                onChangeText: (text) => handleSearch(text, 'pickup'),
+                onFocus: () => setFocusedInput({ type: 'pickup' }),
+                placeholderTextColor: tokens.muted,
+              }}
+              styles={{ container: { flex: 0, zIndex: 2000 }, textInput: styles.locationInput, listView: { display: 'none' } }}
+              enablePoweredByContainer={false}
+              debounce={200}
+              renderRightButton={() => (
+                <TouchableOpacity style={styles.currentLocBtn} onPress={handleCurrentLocation} disabled={fetchingLocation}>
+                   {fetchingLocation ? (
+                     <ActivityIndicator size="small" color={accent.accent} />
+                   ) : (
+                     <MaterialCommunityIcons name="crosshairs-gps" size={18} color={accent.accent} />
+                   )}
+                </TouchableOpacity>
+              )}
+            />
+          </View>
+
           <View style={styles.divider} />
 
           {stops.map((stop, index) => (
             <View key={stop.id}>
               <View style={styles.stopInputRow}>
                 <GooglePlacesAutocomplete
-                  placeholder="Add Stop"
+                  placeholder="Add stop"
                   onPress={(data, details = null) => handleStopSelection(stop.id, data, details)}
                   fetchDetails={true}
-                  query={{
-                    key: process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY,
-                    language: "en",
-                  }}
+                  query={{ key: process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY, language: "en" }}
                   predefinedPlaces={stop.name ? [{
                     description: stop.name,
                     geometry: { location: { lat: stop.lat, lng: stop.lng, latitude: stop.lat, longitude: stop.lng } },
@@ -532,62 +542,58 @@ export default function LocationSelectionScreen() {
                   textInputProps={{
                     onChangeText: (text) => handleSearch(text, 'stop', stop.id),
                     onFocus: () => setFocusedInput({ type: 'stop', id: stop.id }),
-                    placeholderTextColor: colors.textSecondary,
+                    placeholderTextColor: tokens.muted,
                   }}
-                  styles={{
-                    container: { flex: 1, zIndex: 1500 - index },
-                    textInput: styles.locationInput,
-                    listView: { display: 'none' },
-                  }}
+                  styles={{ container: { flex: 1, zIndex: 1500 - index }, textInput: styles.locationInput, listView: { display: 'none' } }}
                   enablePoweredByContainer={false}
                   debounce={200}
                 />
                 <View style={styles.stopActions}>
                   <TouchableOpacity style={styles.dragBtn}>
-                    <Ionicons name="reorder-two-outline" size={20} color={colors.textMuted} />
+                    <Ionicons name="reorder-two-outline" size={18} color={tokens.muted} />
                   </TouchableOpacity>
                   <TouchableOpacity style={styles.removeBtn} onPress={() => handleRemoveStop(stop.id)}>
-                    <Ionicons name="close-outline" size={20} color={colors.textMuted} />
+                    <Ionicons name="close-outline" size={18} color={tokens.muted} />
                   </TouchableOpacity>
                 </View>
               </View>
               <View style={styles.divider} />
             </View>
           ))}
-          
-          <GooglePlacesAutocomplete
-            ref={dropRef}
-            placeholder="Drop location"
-            onPress={(data, details = null) => handleSelection('drop', data, details)}
-            fetchDetails={true}
-            query={{
-              key: process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY,
-              language: "en",
-            }}
-            textInputProps={{
-              onChangeText: (text) => handleSearch(text, 'drop'),
-              onFocus: () => setFocusedInput({ type: 'drop' }),
-              placeholderTextColor: colors.textSecondary,
-            }}
-            styles={{
-              container: { flex: 0, zIndex: 1000 },
-              textInput: styles.locationInput,
-              listView: { display: 'none' },
-            }}
-            enablePoweredByContainer={false}
-            debounce={200}
-          />
+
+          <View style={[styles.fieldSlot, styles.dropFieldSlot]}>
+            <Text style={[styles.fieldLabel, { color: accent.accent }]}>Drop</Text>
+            <GooglePlacesAutocomplete
+              ref={dropRef}
+              placeholder="Search destination"
+              onPress={(data, details = null) => handleSelection('drop', data, details)}
+              fetchDetails={true}
+              query={{ key: process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY, language: "en" }}
+              textInputProps={{
+                onChangeText: (text) => handleSearch(text, 'drop'),
+                onFocus: () => setFocusedInput({ type: 'drop' }),
+                placeholderTextColor: tokens.muted,
+              }}
+              styles={{ container: { flex: 0 }, textInput: styles.locationInput, listView: { display: 'none' } }}
+              enablePoweredByContainer={false}
+              debounce={200}
+            />
+          </View>
         </View>
       </View>
 
-      <View style={styles.bottomSeparatorLine} />
-
       <View style={styles.actionRow}>
-        <TouchableOpacity 
+        <TouchableOpacity
           style={styles.actionBtn}
-          onPress={() => router.push({ 
-            pathname: "/map-picker", 
-            params: { 
+          onPress={handleAddStop}
+        >
+          <Text style={styles.actionBtnText}>+ Add stop</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.actionBtn}
+          onPress={() => router.push({
+            pathname: "/map-picker",
+            params: {
               serviceId,
               type: !pickup ? 'pickup' : 'drop',
               pickupName: pickup?.name,
@@ -596,21 +602,40 @@ export default function LocationSelectionScreen() {
               dropName: drop?.name,
               dropLat: drop?.lat,
               dropLng: drop?.lng,
-            } 
+            }
           })}
         >
-          <Ionicons name="location-outline" size={20} color={colors.text} />
+          <Ionicons name="locate-outline" size={15} color={tokens.sec} />
           <Text style={styles.actionBtnText}>Select on map</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.actionBtn} onPress={handleAddStop}>
-          <Ionicons name="add-circle-outline" size={20} color={colors.text} />
-          <Text style={styles.actionBtnText}>Add stops</Text>
         </TouchableOpacity>
       </View>
 
       <ScrollView style={styles.placesScroll} keyboardShouldPersistTaps="handled">
+        {!isSearching && savedAddresses.length > 0 && (
+          <View style={styles.savedSection}>
+            <Text style={styles.sectionTitle}>Saved places</Text>
+            <View style={styles.savedCard}>
+              {savedAddresses.map((addr, idx) => (
+                <TouchableOpacity
+                  key={addr._id}
+                  style={[styles.savedRow, idx < savedAddresses.length - 1 && styles.savedRowDivider]}
+                  onPress={() => selectSavedAddress(addr)}
+                >
+                  <View style={styles.savedAvatar}>
+                    <Text style={styles.savedAvatarText}>{(addr.label || "?")[0].toUpperCase()}</Text>
+                  </View>
+                  <View style={{ flex: 1, minWidth: 0 }}>
+                    <Text style={styles.savedLabel}>{addr.label || "Address"}</Text>
+                    <Text style={styles.savedAddress} numberOfLines={1}>{addr.addressLine}</Text>
+                  </View>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+        )}
+
         <Text style={styles.sectionTitle}>
-          {isSearching ? "Search Results" : "Recent Places"}
+          {isSearching ? "Search results" : "Recent"}
         </Text>
 
         {isSearching && searchText.trim().length >= 2 && searchResults.length === 0 ? (
@@ -626,8 +651,8 @@ export default function LocationSelectionScreen() {
             <Text style={styles.emptyRecentsText}>Your searched places will appear here.</Text>
           </View>
         ) : (isSearching ? searchResults : recentPlaces).map((place) => (
-          <TouchableOpacity 
-            key={place.id} 
+          <TouchableOpacity
+            key={place.id}
             style={styles.placeItem}
             onPress={() => {
               if (isSearching) {
@@ -644,17 +669,16 @@ export default function LocationSelectionScreen() {
             }}
           >
             <View style={styles.placeIconBox}>
-              <MaterialCommunityIcons 
-                name={isSearching ? "magnify" : "history"} 
-                size={22} 
-                color={colors.textSecondary} 
+              <Ionicons
+                name={isSearching ? "search" : "time-outline"}
+                size={17}
+                color={tokens.sec}
               />
             </View>
             <View style={styles.placeInfo}>
               <Text style={styles.placeName}>{place.name}</Text>
               <Text style={styles.placeAddress} numberOfLines={1}>{place.address}</Text>
             </View>
-            
           </TouchableOpacity>
         ))}
       </ScrollView>
@@ -662,7 +686,7 @@ export default function LocationSelectionScreen() {
       {isNavigating && (
         <View style={styles.loadingOverlay}>
           <View style={styles.loadingCard}>
-            <ActivityIndicator size="large" color={colors.primary} />
+            <ActivityIndicator size="large" color={accent.accent} />
             <Text style={styles.loadingText}>Fetching route & calculating fare...</Text>
           </View>
         </View>
@@ -681,34 +705,27 @@ export default function LocationSelectionScreen() {
           style={styles.sheetScrim}
           onPress={() => setShowBookingForSheet(false)}
         />
-        <TouchableOpacity
-          style={styles.sheetBackButton}
-          onPress={() => setShowBookingForSheet(false)}
-          activeOpacity={0.85}
-        >
-          <Ionicons name="arrow-back" size={24} color="#0F172A" />
-        </TouchableOpacity>
         <View style={[styles.bookingSheet, { paddingBottom: Math.max(insets.bottom, 18) + 6 }]}>
           <View style={styles.sheetHandle} />
           <Text style={styles.sheetTitle}>Booking ride for</Text>
 
-            <TouchableOpacity style={styles.bookingOption} onPress={() => setBookingFor("myself")} activeOpacity={0.85}>
-              <View style={styles.optionLeft}>
-                <MaterialCommunityIcons name="account-circle-outline" size={23} color="#0F172A" />
-                <Text style={styles.optionText}>Myself</Text>
-              </View>
-              <View style={styles.radioOuter}>
-                {bookingFor === "myself" && <View style={styles.radioInner} />}
-              </View>
-            </TouchableOpacity>
+          <TouchableOpacity style={styles.bookingOption} onPress={() => setBookingFor("myself")} activeOpacity={0.85}>
+            <View style={styles.optionLeft}>
+              <MaterialCommunityIcons name="account-circle-outline" size={22} color={tokens.text} />
+              <Text style={styles.optionText}>Myself</Text>
+            </View>
+            <View style={[styles.radioOuter, { borderColor: accent.accent }]}>
+              {bookingFor === "myself" && <View style={[styles.radioInner, { backgroundColor: accent.accent }]} />}
+            </View>
+          </TouchableOpacity>
 
           <TouchableOpacity style={styles.bookingOption} onPress={() => setBookingFor("someone_else")} activeOpacity={0.85}>
             <View style={styles.optionLeft}>
-              <MaterialCommunityIcons name="account-plus" size={24} color="#0F172A" />
+              <MaterialCommunityIcons name="account-plus" size={22} color={tokens.text} />
               <Text style={styles.optionText}>Someone else</Text>
             </View>
-            <View style={styles.radioOuter}>
-              {bookingFor === "someone_else" && <View style={styles.radioInner} />}
+            <View style={[styles.radioOuter, { borderColor: accent.accent }]}>
+              {bookingFor === "someone_else" && <View style={[styles.radioInner, { backgroundColor: accent.accent }]} />}
             </View>
           </TouchableOpacity>
 
@@ -721,18 +738,18 @@ export default function LocationSelectionScreen() {
                 onChangeText={(value) => setSomeoneContact(value.replace(/[^0-9+]/g, ""))}
                 keyboardType="phone-pad"
                 placeholder="Enter rider contact number"
-                placeholderTextColor="#94A3B8"
+                placeholderTextColor={tokens.muted}
               />
             </View>
           )}
 
           <View style={styles.infoBox}>
-            <Ionicons name="information-circle" size={18} color="#64748B" />
+            <Ionicons name="information-circle-outline" size={16} color={tokens.sec} />
             <Text style={styles.infoText}>Contact name won't be shared with driver</Text>
           </View>
 
           <TouchableOpacity
-            style={[styles.doneButton, savingPreference && { opacity: 0.7 }]}
+            style={[styles.doneButton, { backgroundColor: accent.accent }, savingPreference && { opacity: 0.7 }]}
             onPress={async () => {
               if (bookingFor === "someone_else" && someoneContact.trim().length < 10) {
                 Alert.alert("Contact required", "Please enter a valid contact number for the rider.");
@@ -761,9 +778,9 @@ export default function LocationSelectionScreen() {
             activeOpacity={0.9}
           >
             {savingPreference ? (
-              <ActivityIndicator size="small" color="#fff" />
+              <ActivityIndicator size="small" color={accent.on} />
             ) : (
-              <Text style={styles.doneButtonText}>Done</Text>
+              <Text style={[styles.doneButtonText, { color: accent.on }]}>Done</Text>
             )}
           </TouchableOpacity>
         </View>
@@ -773,393 +790,108 @@ export default function LocationSelectionScreen() {
   );
 }
 
-const createStyles = (colors: typeof Colors.light) =>
+const createStyles = (tokens: ThemeTokens, accent: ThemeTokens["services"]["ride"]) =>
   StyleSheet.create({
-    root: {
-      flex: 1,
-      backgroundColor: colors.background,
+    root: { flex: 1, backgroundColor: tokens.bg },
+    header: { flexDirection: "row", alignItems: "center", gap: 12, paddingHorizontal: 16, paddingBottom: 8 },
+    backBtn: {
+      width: moderateScale(40), height: moderateScale(40), borderRadius: moderateScale(20),
+      backgroundColor: tokens.surface, borderWidth: 1, borderColor: tokens.border, alignItems: "center", justifyContent: "center",
     },
-    header: {
-      flexDirection: "row",
-      alignItems: "center",
-      justifyContent: "space-between",
-      paddingHorizontal: 20,
-      paddingBottom: 20,
-    },
-    headerLeft: {
-      flexDirection: "row",
-      alignItems: "center",
-      gap: 15,
-    },
-    headerTitle: {
-      fontSize: moderateScale(22),
-      fontWeight: "900",
-      color: colors.text,
-    },
+    headerTitle: { flex: 1, fontFamily: fontFamilies.body.semibold, fontSize: moderateScale(17), color: tokens.text },
     forMeSelector: {
-      flexDirection: "row",
-      alignItems: "center",
-      gap: 4,
-      paddingHorizontal: 12,
-      paddingVertical: 6,
-      borderRadius: moderateScale(20),
-      borderWidth: 1,
-      borderColor: colors.border,
-      backgroundColor: colors.surface,
+      flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 12, paddingVertical: 8,
+      borderRadius: 999, borderWidth: 1, borderColor: tokens.border, backgroundColor: tokens.surface,
     },
-    forMeText: {
-      fontSize: moderateScale(14),
-      fontWeight: "600",
-      color: colors.text,
+    forMeText: { fontFamily: fontFamilies.body.semibold, fontSize: moderateScale(13), color: tokens.text },
+
+    inputCard: {
+      flexDirection: "row", gap: 12, marginHorizontal: 16, marginTop: 14, padding: 14,
+      backgroundColor: tokens.surface, borderWidth: 1, borderColor: tokens.border, borderRadius: 18, zIndex: 100,
     },
-    locationContainer: {
-      paddingHorizontal: 20,
-      paddingVertical: 4,
-      flexDirection: "row",
-      zIndex: 100,
-    },
-    dotsContainer: {
-      alignItems: "center",
-      width: 24,
-      justifyContent: "space-between",
-    },
-    markerSlot: {
-      height: moderateScale(40),
-      alignItems: "center",
-      justifyContent: "center",
-    },
-    dashLine: {
-      width: 1,
-      flex: 1,
-      minHeight: 12,
-      backgroundColor: colors.border,
-      marginVertical: 2,
-      borderStyle: 'dashed',
-      borderWidth: 1,
-      borderRadius: 1,
-    },
-    stopDiamond: {
-      width: 14,
-      height: 14,
-      backgroundColor: "#000",
-      transform: [{ rotate: "45deg" }],
-      alignItems: "center",
-      justifyContent: "center",
-    },
-    stopDiamondText: {
-      color: "#fff",
-      fontSize: moderateScale(8),
-      fontWeight: "bold",
-      transform: [{ rotate: "-45deg" }],
-    },
-    inputsContainer: {
-      flex: 1,
-      marginLeft: 12,
-      gap: 4,
-    },
-    divider: {
-      height: 1,
-      backgroundColor: colors.borderLight,
-      marginVertical: 2,
-    },
-    bottomSeparatorLine: {
-      height: 1,
-      backgroundColor: colors.borderLight,
-      marginHorizontal: 20,
-      marginTop: 8,
-    },
+    dotsContainer: { alignItems: "center", width: 14, paddingTop: 14 },
+    pickupDot: { width: 10, height: 10, borderRadius: 5, borderWidth: 2.5, borderColor: accent.accent },
+    dropSquare: { width: 10, height: 10, borderRadius: 2, backgroundColor: tokens.text },
+    markerSlot: { alignItems: "center", justifyContent: "center" },
+    stopDiamond: { width: 10, height: 10, backgroundColor: tokens.text, transform: [{ rotate: "45deg" }] },
+    dashLine: { width: 2, flex: 1, minHeight: 24, backgroundColor: tokens.borderStrong, marginVertical: 4 },
+
+    inputsContainer: { flex: 1, minWidth: 0, gap: 2 },
+    fieldSlot: { minHeight: 44, justifyContent: "center" },
+    dropFieldSlot: { borderWidth: 2, borderColor: accent.accent, borderRadius: 12, paddingHorizontal: 10, marginHorizontal: -2 },
+    fieldLabel: { fontFamily: fontFamilies.body.bold, fontSize: moderateScale(10), letterSpacing: 1, textTransform: "uppercase", color: tokens.muted },
+    divider: { height: 1, backgroundColor: tokens.border, marginVertical: 4 },
     locationInput: {
-      flex: 1,
-      width: "100%",
-      height: moderateScale(40),
-      fontSize: moderateScale(15),
-      fontWeight: "600",
-      color: colors.text,
-      backgroundColor: "transparent",
-      paddingHorizontal: 0,
+      flex: 1, width: "100%", height: moderateScale(28), fontFamily: fontFamilies.body.medium, fontSize: moderateScale(15),
+      color: tokens.text, backgroundColor: "transparent", paddingHorizontal: 0, marginTop: 2,
     },
-    currentLocBtn: {
-      justifyContent: 'center',
-      paddingLeft: 8,
-    },
-    resultsList: {
-      position: "absolute",
-      top: 45,
-      left: -40,
-      right: -20,
-      backgroundColor: colors.surface,
-      zIndex: 5000,
-      borderRadius: moderateScale(10),
-      elevation: 10,
-      borderWidth: 1,
-      borderColor: colors.border,
-    },
-    actionRow: {
-      flexDirection: "row",
-      paddingHorizontal: 20,
-      marginTop: 20,
-      gap: 12,
-    },
+    currentLocBtn: { justifyContent: "center", paddingLeft: 8 },
+
+    actionRow: { flexDirection: "row", paddingHorizontal: 16, marginTop: 12, gap: 8 },
     actionBtn: {
-      flexDirection: "row",
-      alignItems: "center",
-      gap: 8,
-      paddingHorizontal: 16,
-      paddingVertical: 10,
-      borderRadius: moderateScale(25),
-      borderWidth: 1,
-      borderColor: colors.border,
-      backgroundColor: colors.surface,
+      flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6,
+      paddingVertical: 10, borderRadius: 999, borderWidth: 1, borderColor: tokens.borderStrong,
+      backgroundColor: tokens.surface, minHeight: 44,
     },
-    actionBtnText: {
-      fontSize: moderateScale(14),
-      fontWeight: "700",
-      color: colors.text,
-    },
-    stopInputRow: {
-      flexDirection: "row",
-      alignItems: "center",
-    },
-    stopActions: {
-      flexDirection: "row",
-      alignItems: "center",
-      gap: 4,
-    },
-    dragBtn: {
-      padding: 4,
-    },
-    removeBtn: {
-      padding: 4,
-    },
-    placesScroll: {
-      flex: 1,
-      marginTop: 20,
-    },
+    actionBtnText: { fontFamily: fontFamilies.body.semibold, fontSize: moderateScale(13), color: tokens.sec },
+
+    stopInputRow: { flexDirection: "row", alignItems: "center" },
+    stopActions: { flexDirection: "row", alignItems: "center", gap: 4 },
+    dragBtn: { padding: 4 },
+    removeBtn: { padding: 4 },
+
+    placesScroll: { flex: 1, marginTop: 22 },
     sectionTitle: {
-      fontSize: moderateScale(16),
-      fontWeight: "800",
-      color: colors.text,
-      paddingHorizontal: 20,
-      marginBottom: 10,
+      fontFamily: fontFamilies.body.bold, fontSize: moderateScale(11), letterSpacing: 1, textTransform: "uppercase",
+      color: tokens.muted, paddingHorizontal: 16, marginBottom: 10,
     },
-    placeItem: {
-      flexDirection: "row",
-      alignItems: "center",
-      paddingHorizontal: 20,
-      paddingVertical: 15,
-      borderBottomWidth: 1,
-      borderBottomColor: colors.borderLight,
-    },
-    placeIconBox: {
-      width: moderateScale(40),
-      height: moderateScale(40),
-      borderRadius: moderateScale(20),
-      backgroundColor: colors.surfaceSecondary,
-      alignItems: "center",
-      justifyContent: "center",
-      marginRight: 15,
-    },
-    placeInfo: {
-      flex: 1,
-    },
-    placeName: {
-      fontSize: moderateScale(16),
-      fontWeight: "800",
-      color: colors.text,
-    },
-    placeAddress: {
-      fontSize: moderateScale(13),
-      color: colors.textSecondary,
-      fontWeight: "500",
-      marginTop: 2,
-    },
-    emptyRecents: {
-      paddingHorizontal: 20,
-      paddingVertical: 18,
-    },
-    emptyRecentsText: {
-      fontSize: moderateScale(14),
-      fontWeight: "600",
-      color: colors.textSecondary,
-    },
-    sheetOverlay: {
-      flex: 1,
-      justifyContent: "flex-end",
-    },
-    sheetScrim: {
-      ...StyleSheet.absoluteFillObject,
-      backgroundColor: "rgba(15, 23, 42, 0.68)",
-    },
-    sheetBackButton: {
-      position: "absolute",
-      left: 18,
-      bottom: 410,
-      width: moderateScale(38),
-      height: moderateScale(38),
-      borderRadius: moderateScale(19),
-      backgroundColor: "#FFFFFF",
-      alignItems: "center",
-      justifyContent: "center",
-      shadowColor: "#000",
-      shadowOffset: { width: 0, height: 2 },
-      shadowOpacity: 0.15,
-      shadowRadius: 8,
-      elevation: 6,
-    },
+    savedSection: { marginBottom: 18 },
+    savedCard: { marginHorizontal: 16, backgroundColor: tokens.surface, borderWidth: 1, borderColor: tokens.border, borderRadius: 16, overflow: "hidden" },
+    savedRow: { flexDirection: "row", alignItems: "center", gap: 12, paddingHorizontal: 14, paddingVertical: 13, minHeight: 56 },
+    savedRowDivider: { borderBottomWidth: 1, borderBottomColor: tokens.border },
+    savedAvatar: { width: 36, height: 36, borderRadius: 11, backgroundColor: accent.skin, alignItems: "center", justifyContent: "center", flexShrink: 0 },
+    savedAvatarText: { fontFamily: fontFamilies.body.bold, fontSize: moderateScale(13), color: accent.accent },
+    savedLabel: { fontFamily: fontFamilies.body.semibold, fontSize: moderateScale(15), color: tokens.text },
+    savedAddress: { fontFamily: fontFamilies.body.regular, fontSize: moderateScale(13), color: tokens.sec, marginTop: 2 },
+
+    placeItem: { flexDirection: "row", alignItems: "center", paddingHorizontal: 16, paddingVertical: 11, gap: 12, borderBottomWidth: 1, borderBottomColor: tokens.border },
+    placeIconBox: { width: moderateScale(36), height: moderateScale(36), borderRadius: moderateScale(18), backgroundColor: tokens.sunken, alignItems: "center", justifyContent: "center" },
+    placeInfo: { flex: 1, minWidth: 0 },
+    placeName: { fontFamily: fontFamilies.body.medium, fontSize: moderateScale(15), color: tokens.text },
+    placeAddress: { fontFamily: fontFamilies.body.regular, fontSize: moderateScale(13), color: tokens.sec, marginTop: 2 },
+    emptyRecents: { paddingHorizontal: 16, paddingVertical: 14 },
+    emptyRecentsText: { fontFamily: fontFamilies.body.medium, fontSize: moderateScale(14), color: tokens.sec },
+
+    sheetOverlay: { flex: 1, justifyContent: "flex-end" },
+    sheetScrim: { ...StyleSheet.absoluteFillObject, backgroundColor: "rgba(0,0,0,0.5)" },
     bookingSheet: {
-      backgroundColor: "#FFFFFF",
-      borderTopLeftRadius: moderateScale(26),
-      borderTopRightRadius: moderateScale(26),
-      paddingTop: 11,
-      paddingHorizontal: 19,
-      minHeight: 382,
-      shadowColor: "#000",
-      shadowOffset: { width: 0, height: -4 },
-      shadowOpacity: 0.12,
-      shadowRadius: 16,
-      elevation: 16,
+      backgroundColor: tokens.bg, borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingTop: 12, paddingHorizontal: 20, minHeight: 382,
     },
-    sheetHandle: {
-      alignSelf: "center",
-      width: moderateScale(46),
-      height: 4,
-      borderRadius: 2,
-      backgroundColor: "#E2E8F0",
-      marginBottom: 25,
-    },
-    sheetTitle: {
-      fontSize: moderateScale(18),
-      fontWeight: "900",
-      color: "#0F172A",
-      marginBottom: 20,
-    },
-    bookingOption: {
-      height: moderateScale(36),
-      flexDirection: "row",
-      alignItems: "center",
-      justifyContent: "space-between",
-      marginBottom: 11,
-    },
-    optionLeft: {
-      flexDirection: "row",
-      alignItems: "center",
-      gap: 18,
-    },
-    optionText: {
-      fontSize: moderateScale(18),
-      fontWeight: "700",
-      color: "#0F172A",
-    },
-    radioOuter: {
-      width: moderateScale(22),
-      height: moderateScale(22),
-      borderRadius: moderateScale(11),
-      borderWidth: 2,
-      borderColor: "#0057A8",
-      alignItems: "center",
-      justifyContent: "center",
-    },
-    radioInner: {
-      width: moderateScale(14),
-      height: moderateScale(14),
-      borderRadius: moderateScale(7),
-      backgroundColor: "#0057A8",
-    },
-    contactInputWrap: {
-      marginBottom: 14,
-      gap: 7,
-    },
-    contactInputLabel: {
-      fontSize: moderateScale(12),
-      fontWeight: "800",
-      color: "#475569",
-    },
+    sheetHandle: { alignSelf: "center", width: 38, height: 4, borderRadius: 2, backgroundColor: tokens.borderStrong, marginBottom: 20 },
+    sheetTitle: { fontFamily: fontFamilies.heading.semibold, fontSize: moderateScale(19), letterSpacing: -0.2, color: tokens.text, marginBottom: 18 },
+    bookingOption: { minHeight: moderateScale(44), flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 6 },
+    optionLeft: { flexDirection: "row", alignItems: "center", gap: 14 },
+    optionText: { fontFamily: fontFamilies.body.semibold, fontSize: moderateScale(16), color: tokens.text },
+    radioOuter: { width: moderateScale(22), height: moderateScale(22), borderRadius: moderateScale(11), borderWidth: 2, alignItems: "center", justifyContent: "center" },
+    radioInner: { width: moderateScale(12), height: moderateScale(12), borderRadius: moderateScale(6) },
+    contactInputWrap: { marginBottom: 12, gap: 7, marginTop: 6 },
+    contactInputLabel: { fontFamily: fontFamilies.body.bold, fontSize: moderateScale(11), letterSpacing: 0.5, textTransform: "uppercase", color: tokens.muted },
     contactInput: {
-      height: moderateScale(46),
-      borderRadius: moderateScale(12),
-      borderWidth: 1,
-      borderColor: "#CBD5E1",
-      backgroundColor: "#F8FAFC",
-      paddingHorizontal: 12,
-      fontSize: moderateScale(15),
-      fontWeight: "700",
-      color: "#0F172A",
-    },
-    addRiderOption: {
-      height: moderateScale(38),
-      flexDirection: "row",
-      alignItems: "center",
-      gap: 17,
-      marginBottom: 16,
-    },
-    addRiderText: {
-      fontSize: moderateScale(17),
-      fontWeight: "700",
-      color: "#0057B8",
-      textDecorationLine: "underline",
+      height: moderateScale(46), borderRadius: 12, borderWidth: 1, borderColor: tokens.border, backgroundColor: tokens.surface,
+      paddingHorizontal: 14, fontFamily: fontFamilies.body.medium, fontSize: moderateScale(15), color: tokens.text,
     },
     infoBox: {
-      minHeight: 64,
-      borderRadius: moderateScale(13),
-      backgroundColor: "#F8FAFC",
-      flexDirection: "row",
-      alignItems: "flex-start",
-      gap: 10,
-      paddingHorizontal: 13,
-      paddingVertical: 14,
-      marginBottom: 38,
+      minHeight: 56, borderRadius: 13, backgroundColor: tokens.sunken, flexDirection: "row", alignItems: "flex-start", gap: 10,
+      paddingHorizontal: 13, paddingVertical: 13, marginTop: 4, marginBottom: 20,
     },
-    infoText: {
-      flex: 1,
-      fontSize: moderateScale(15),
-      lineHeight: moderateScale(19),
-      fontWeight: "500",
-      color: "#334155",
-    },
-    doneButton: {
-      height: moderateScale(45),
-      borderRadius: moderateScale(23),
-      backgroundColor: "#000000",
-      alignItems: "center",
-      justifyContent: "center",
-    },
-    doneButtonText: {
-      fontSize: moderateScale(16),
-      fontWeight: "700",
-      color: "#FFFFFF",
-    },
-    loadingOverlay: {
-      ...StyleSheet.absoluteFillObject,
-      backgroundColor: "rgba(0, 0, 0, 0.45)",
-      justifyContent: "center",
-      alignItems: "center",
-      zIndex: 99999,
-    },
+    infoText: { flex: 1, fontFamily: fontFamilies.body.regular, fontSize: moderateScale(13), lineHeight: moderateScale(18), color: tokens.sec },
+    doneButton: { minHeight: moderateScale(50), borderRadius: 14, alignItems: "center", justifyContent: "center" },
+    doneButtonText: { fontFamily: fontFamilies.body.bold, fontSize: moderateScale(15) },
+
+    loadingOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor: "rgba(0,0,0,0.45)", justifyContent: "center", alignItems: "center", zIndex: 99999 },
     loadingCard: {
-      backgroundColor: colors.surface,
-      paddingHorizontal: 28,
-      paddingVertical: 22,
-      borderRadius: moderateScale(16),
-      alignItems: "center",
-      gap: 12,
-      shadowColor: "#000",
-      shadowOffset: { width: 0, height: 4 },
-      shadowOpacity: 0.2,
-      shadowRadius: 10,
-      elevation: 10,
+      backgroundColor: tokens.surface, paddingHorizontal: 26, paddingVertical: 20, borderRadius: 16, alignItems: "center", gap: 12,
+      borderWidth: 1, borderColor: tokens.border,
     },
-    loadingText: {
-      fontSize: moderateScale(15),
-      fontWeight: "700",
-      color: colors.text,
-    },
+    loadingText: { fontFamily: fontFamilies.body.semibold, fontSize: moderateScale(14), color: tokens.text },
   });
-
-
-
-
-
-
-
-
-

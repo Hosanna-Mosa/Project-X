@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   KeyboardAvoidingView,
   Platform,
@@ -15,10 +15,23 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
 import { moderateScale } from "react-native-size-matters";
-import Colors from "@/constants/colors";
-import { typography } from "@/constants/typography";
+import { designTokens, type ThemeTokens, type ServiceTokens } from "@/constants/colors";
+import { fontFamilies } from "@/constants/typography";
 import { useAuthStore } from "@/contexts/authStore";
 import { useThemeStore } from "@/contexts/themeStore";
+
+type PasswordStrength = "empty" | "weak" | "fair" | "good";
+
+function getPasswordStrength(password: string): PasswordStrength {
+  if (!password) return "empty";
+  let score = 0;
+  if (password.length >= 8) score++;
+  if (password.length >= 12) score++;
+  if (/[0-9]/.test(password) && /[a-zA-Z]/.test(password)) score++;
+  if (score <= 1) return "weak";
+  if (score === 2) return "fair";
+  return "good";
+}
 
 export default function SignupScreen() {
   const insets = useSafeAreaInsets();
@@ -29,13 +42,16 @@ export default function SignupScreen() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [isPasswordVisible, setIsPasswordVisible] = useState(false);
+  const [agreedToTerms, setAgreedToTerms] = useState(false);
 
-  const { register, loading, token, isInitialized } = useAuthStore();
+  const { requestOTP, loading, token, isInitialized } = useAuthStore();
   const { theme } = useThemeStore();
-  const colors = Colors[theme];
-  const styles = React.useMemo(() => createStyles(colors), [theme]);
+  const tokens = designTokens[theme];
+  const accent = tokens.services.food;
+  const styles = useMemo(() => createStyles(tokens, accent), [theme]);
 
   const isPhoneDisabled = !!prefillPhone;
+  const passwordStrength = useMemo(() => getPasswordStrength(password), [password]);
 
   // Guard: already logged-in users should not see signup
   useEffect(() => {
@@ -62,295 +78,387 @@ export default function SignupScreen() {
       Alert.alert("Invalid Password", "Password must be at least 8 characters long.");
       return;
     }
+    if (!agreedToTerms) {
+      Alert.alert("Terms & Privacy Policy", "Please agree to the Terms and Privacy Policy to continue.");
+      return;
+    }
 
     try {
-      // Uses the dedicated register action which saves the token in AsyncStorage
-      const result = await register(name.trim(), phoneNumber.trim(), email.trim(), password);
-      if (result.success) {
-        // Token is now persisted — go into the app
-        router.replace("/(tabs)");
-      }
+      // The account isn't created here — a real OTP has to verify the phone
+      // first. verifyOTP on the next screen carries name/email/password
+      // through and creates the account once the code checks out.
+      const trimmedPhone = phoneNumber.trim();
+      await requestOTP(trimmedPhone);
+      router.push({
+        pathname: "/otp",
+        params: { phone: trimmedPhone, name: name.trim(), email: email.trim(), password },
+      });
     } catch (error: any) {
-      Alert.alert("Registration Failed", error.message || "Something went wrong during sign up.");
+      Alert.alert("Couldn't send code", error.message || "Something went wrong. Please try again.");
     }
   };
+
+  const canSubmit = !!name && !!phoneNumber && !!email && !!password && agreedToTerms && !loading;
 
   return (
     <KeyboardAvoidingView
       style={styles.root}
       behavior={Platform.OS === "ios" ? "padding" : "height"}
     >
-      {/* Top Header */}
-      <View style={[styles.headerRow, { paddingTop: insets.top + 12 }]}>
+      {/* Back button */}
+      <View style={[styles.headerRow, { paddingTop: insets.top + 4 }]}>
         <TouchableOpacity
           style={styles.backBtn}
           onPress={() => {
             if (router.canGoBack()) router.back();
-            else router.replace("/login");
+            else router.replace("/");
           }}
           activeOpacity={0.7}
         >
-          <Ionicons name="arrow-back" size={moderateScale(24)} color="#002045" />
+          <Ionicons name="chevron-back" size={moderateScale(22)} color={tokens.text} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Create Account</Text>
-        <View style={{ width: moderateScale(40) }} />
       </View>
 
       <ScrollView
-        contentContainerStyle={styles.scrollContainer}
+        contentContainerStyle={[styles.scrollContainer, { minHeight: "100%" }]}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>Join Flavor</Text>
-          <Text style={styles.cardSubtitle}>
-            Fill in your details to get started.
+        {/* Centered like the sign-in screen's hero — same treatment, not a one-off */}
+        <View style={styles.heroBlock}>
+          <Text style={styles.headline} numberOfLines={1}>Create your account</Text>
+          <Text style={styles.subhead}>
+            Takes about a minute. We'll verify your phone with an OTP.
           </Text>
+        </View>
 
-          <View style={styles.form}>
-            {/* Name Input */}
-            <View style={styles.fieldWrapper}>
-              <Text style={styles.fieldLabel}>Full Name</Text>
-              <View style={styles.inputContainer}>
-                <Ionicons name="person-outline" size={moderateScale(18)} color="#43474e" style={styles.inputIcon} />
-                <TextInput
-                  style={styles.input}
-                  placeholder="Enter your full name"
-                  placeholderTextColor="#74777f"
-                  value={name}
-                  onChangeText={setName}
-                  autoCapitalize="words"
-                />
-              </View>
+        <View style={styles.form}>
+          <View style={styles.fieldWrapper}>
+            <Text style={styles.fieldLabel}>Full name</Text>
+            <View style={styles.inputContainer}>
+              <TextInput
+                style={styles.input}
+                placeholder="Rahul Verma"
+                placeholderTextColor={tokens.muted}
+                value={name}
+                onChangeText={setName}
+                autoCapitalize="words"
+              />
             </View>
-
-            {/* Phone Input */}
-            <View style={styles.fieldWrapper}>
-              <Text style={styles.fieldLabel}>Phone Number</Text>
-              <View style={[styles.inputContainer, isPhoneDisabled && styles.inputContainerDisabled]}>
-                <Ionicons name="phone-portrait-outline" size={moderateScale(18)} color="#43474e" style={styles.inputIcon} />
-                <TextInput
-                  style={[styles.input, isPhoneDisabled && styles.inputDisabled]}
-                  placeholder="e.g. 9876543210"
-                  placeholderTextColor="#74777f"
-                  value={phoneNumber}
-                  onChangeText={setPhoneNumber}
-                  keyboardType="phone-pad"
-                  editable={!isPhoneDisabled}
-                />
-              </View>
-            </View>
-
-            {/* Email Input */}
-            <View style={styles.fieldWrapper}>
-              <Text style={styles.fieldLabel}>Email Address</Text>
-              <View style={styles.inputContainer}>
-                <Ionicons name="mail-outline" size={moderateScale(18)} color="#43474e" style={styles.inputIcon} />
-                <TextInput
-                  style={styles.input}
-                  placeholder="name@example.com"
-                  placeholderTextColor="#74777f"
-                  value={email}
-                  onChangeText={setEmail}
-                  keyboardType="email-address"
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                />
-              </View>
-            </View>
-
-            {/* Password Input */}
-            <View style={styles.fieldWrapper}>
-              <Text style={styles.fieldLabel}>Password</Text>
-              <View style={styles.inputContainer}>
-                <Ionicons name="lock-closed-outline" size={moderateScale(18)} color="#43474e" style={styles.inputIcon} />
-                <TextInput
-                  style={styles.input}
-                  placeholder="Min. 8 characters"
-                  placeholderTextColor="#74777f"
-                  value={password}
-                  onChangeText={setPassword}
-                  secureTextEntry={!isPasswordVisible}
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                />
-                <TouchableOpacity
-                  onPress={() => setIsPasswordVisible(!isPasswordVisible)}
-                  style={styles.eyeBtn}
-                  activeOpacity={0.7}
-                >
-                  <Ionicons
-                    name={isPasswordVisible ? "eye-off-outline" : "eye-outline"}
-                    size={moderateScale(20)}
-                    color="#43474e"
-                  />
-                </TouchableOpacity>
-              </View>
-            </View>
-
-            {/* Sign Up button */}
-            <TouchableOpacity
-              style={[
-                styles.signUpBtn,
-                (!name || !phoneNumber || !email || !password || loading) && styles.signUpBtnDisabled
-              ]}
-              onPress={handleRegister}
-              disabled={!name || !phoneNumber || !email || !password || loading}
-              activeOpacity={0.85}
-            >
-              {loading ? (
-                <ActivityIndicator size="small" color="#ffffff" />
-              ) : (
-                <>
-                  <Text style={styles.signUpBtnText}>Create Account</Text>
-                  <Ionicons name="arrow-forward" size={moderateScale(18)} color="#ffffff" style={{ marginLeft: 8 }} />
-                </>
-              )}
-            </TouchableOpacity>
           </View>
 
-          {/* Already have account row */}
-          <TouchableOpacity
-            style={styles.loginLinkRow}
-            onPress={() => router.replace("/login")}
-            activeOpacity={0.7}
-          >
-            <Text style={styles.loginLinkText}>
-              Already have an account? <Text style={styles.loginLinkHighlight}>Sign In</Text>
-            </Text>
-          </TouchableOpacity>
+          <View style={styles.fieldWrapper}>
+            <Text style={styles.fieldLabel}>Phone number</Text>
+            <View
+              style={[
+                styles.inputContainer,
+                styles.inputContainerAccent,
+                isPhoneDisabled && styles.inputContainerDisabled,
+              ]}
+            >
+              <Text style={styles.inputPrefix}>+91</Text>
+              <TextInput
+                style={styles.input}
+                placeholder="98490 21734"
+                placeholderTextColor={tokens.muted}
+                value={phoneNumber}
+                onChangeText={setPhoneNumber}
+                keyboardType="phone-pad"
+                editable={!isPhoneDisabled}
+              />
+            </View>
+          </View>
+
+          <View style={styles.fieldWrapper}>
+            <Text style={styles.fieldLabel}>Email</Text>
+            <View style={styles.inputContainer}>
+              <TextInput
+                style={styles.input}
+                placeholder="rahul.verma@gmail.com"
+                placeholderTextColor={tokens.muted}
+                value={email}
+                onChangeText={setEmail}
+                keyboardType="email-address"
+                autoCapitalize="none"
+                autoCorrect={false}
+              />
+            </View>
+          </View>
+
+          <View style={styles.fieldWrapper}>
+            <Text style={styles.fieldLabel}>Password</Text>
+            <View style={styles.inputContainer}>
+              <TextInput
+                style={styles.input}
+                placeholder="Min. 8 characters"
+                placeholderTextColor={tokens.muted}
+                value={password}
+                onChangeText={setPassword}
+                secureTextEntry={!isPasswordVisible}
+                autoCapitalize="none"
+                autoCorrect={false}
+              />
+              <TouchableOpacity
+                onPress={() => setIsPasswordVisible(!isPasswordVisible)}
+                style={styles.eyeBtn}
+                activeOpacity={0.7}
+              >
+                <Ionicons
+                  name={isPasswordVisible ? "eye-off-outline" : "eye-outline"}
+                  size={moderateScale(18)}
+                  color={tokens.sec}
+                />
+              </TouchableOpacity>
+            </View>
+            {password.length > 0 && (
+              <View style={styles.strengthRow}>
+                {[0, 1, 2].map((i) => (
+                  <View
+                    key={i}
+                    style={[
+                      styles.strengthBar,
+                      barFillFor(passwordStrength, i, tokens),
+                    ]}
+                  />
+                ))}
+                <Text style={[styles.strengthLabel, strengthLabelColor(passwordStrength, tokens)]}>
+                  {strengthLabelText(passwordStrength)}
+                </Text>
+              </View>
+            )}
+          </View>
         </View>
+
+        <TouchableOpacity
+          style={styles.termsRow}
+          onPress={() => setAgreedToTerms(!agreedToTerms)}
+          activeOpacity={0.7}
+        >
+          <View style={[styles.checkbox, agreedToTerms && styles.checkboxChecked]}>
+            {agreedToTerms && <Ionicons name="checkmark" size={moderateScale(14)} color={accent.on} />}
+          </View>
+          <Text style={styles.termsText}>
+            I agree to the <Text style={styles.legalHighlight}>Terms</Text> and{" "}
+            <Text style={styles.legalHighlight}>Privacy Policy</Text>.
+          </Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[styles.signUpBtn, !canSubmit && styles.signUpBtnDisabled]}
+          onPress={handleRegister}
+          disabled={!canSubmit}
+          activeOpacity={0.85}
+        >
+          {loading ? (
+            <ActivityIndicator size="small" color={accent.on} />
+          ) : (
+            <Text style={styles.signUpBtnText}>Create account</Text>
+          )}
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.loginLinkRow}
+          onPress={() => router.replace("/login")}
+          activeOpacity={0.7}
+        >
+          <Text style={styles.loginLinkText}>
+            Already have one? <Text style={styles.loginLinkHighlight}>Sign in</Text>
+          </Text>
+        </TouchableOpacity>
       </ScrollView>
     </KeyboardAvoidingView>
   );
 }
 
-const createStyles = (colors: typeof Colors.light) => StyleSheet.create({
+function barFillFor(strength: PasswordStrength, index: number, tokens: ThemeTokens) {
+  const filled =
+    (strength === "weak" && index === 0) ||
+    (strength === "fair" && index <= 1) ||
+    (strength === "good" && index <= 2);
+  return { backgroundColor: filled ? (strength === "weak" ? tokens.error : tokens.success) : tokens.sunken };
+}
+
+function strengthLabelColor(strength: PasswordStrength, tokens: ThemeTokens) {
+  return { color: strength === "weak" ? tokens.error : tokens.success };
+}
+
+function strengthLabelText(strength: PasswordStrength) {
+  if (strength === "weak") return "Weak";
+  if (strength === "fair") return "Fair";
+  if (strength === "good") return "Good";
+  return "";
+}
+
+const createStyles = (tokens: ThemeTokens, accent: ServiceTokens) => StyleSheet.create({
   root: {
     flex: 1,
-    backgroundColor: "#f7f9fb",
+    backgroundColor: tokens.bg,
   },
   headerRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
     paddingHorizontal: 16,
-    paddingBottom: 12,
-    backgroundColor: "#f7f9fb",
+    paddingBottom: 4,
   },
   backBtn: {
     width: moderateScale(40),
     height: moderateScale(40),
     borderRadius: moderateScale(20),
-    backgroundColor: "#ffffff",
+    backgroundColor: tokens.surface,
     borderWidth: 1,
-    borderColor: "#e6e8ea",
+    borderColor: tokens.border,
     alignItems: "center",
     justifyContent: "center",
   },
-  headerTitle: {
-    fontSize: typography.heading2.fontSize,
-    fontWeight: typography.heading2.fontWeight,
-    color: "#191c1e",
-  },
   scrollContainer: {
     flexGrow: 1,
-    justifyContent: "center",
     paddingHorizontal: 24,
-    paddingTop: 8,
-    paddingBottom: 32,
+    paddingBottom: 40,
   },
-  card: {
-    backgroundColor: "#ffffff",
-    borderRadius: moderateScale(20),
-    borderWidth: 1,
-    borderColor: "#e6e8ea",
-    padding: 24,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.06,
-    shadowRadius: 12,
-    elevation: 4,
-    width: "100%",
+  heroBlock: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    // Same cap as the sign-in screen's hero block — centered, not a huge gap.
+    maxHeight: moderateScale(200),
+    minHeight: moderateScale(120),
   },
-  cardTitle: {
-    fontSize: typography.heading1.fontSize,
-    fontWeight: typography.weights.bold,
-    color: "#191c1e",
+  headline: {
+    // Same size as the sign-in screen's headline — kept identical on purpose.
+    fontFamily: fontFamilies.heading.bold,
+    fontSize: moderateScale(38),
+    lineHeight: moderateScale(40),
+    letterSpacing: -1.4,
+    color: tokens.text,
     textAlign: "center",
-    marginBottom: 8,
   },
-  cardSubtitle: {
-    fontSize: typography.body.fontSize,
-    color: "#43474e",
+  subhead: {
+    fontFamily: fontFamilies.body.regular,
+    marginTop: 12,
+    fontSize: moderateScale(15),
+    lineHeight: moderateScale(21),
+    color: tokens.sec,
     textAlign: "center",
-    lineHeight: moderateScale(20),
-    marginBottom: 24,
   },
   form: {
-    gap: 16,
+    gap: 12,
   },
   fieldWrapper: {
-    gap: 8,
+    gap: 7,
   },
   fieldLabel: {
-    fontSize: typography.bodySecondary.fontSize,
-    fontWeight: typography.weights.semibold,
-    color: "#191c1e",
+    fontFamily: fontFamilies.body.bold,
+    fontSize: moderateScale(11),
+    letterSpacing: 1,
+    textTransform: "uppercase",
+    color: tokens.muted,
   },
   inputContainer: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#f2f4f6",
-    borderRadius: moderateScale(10),
-    height: moderateScale(50),
-    paddingHorizontal: 12,
+    gap: 9,
+    backgroundColor: tokens.surface,
+    borderRadius: moderateScale(12),
+    borderWidth: 1,
+    borderColor: tokens.borderStrong,
+    minHeight: moderateScale(52),
+    paddingHorizontal: 14,
+  },
+  inputContainerAccent: {
+    borderWidth: 2,
+    borderColor: accent.accent,
   },
   inputContainerDisabled: {
-    backgroundColor: "#eceef0",
+    opacity: 0.6,
   },
-  inputIcon: {
-    marginRight: 8,
+  inputPrefix: {
+    fontFamily: fontFamilies.body.medium,
+    fontSize: moderateScale(15),
+    color: tokens.sec,
   },
   input: {
     flex: 1,
-    fontSize: typography.body.fontSize,
-    color: "#191c1e",
+    fontFamily: fontFamilies.body.medium,
+    fontSize: moderateScale(15),
+    color: tokens.text,
     height: "100%",
   },
-  inputDisabled: {
-    color: "#74777f",
-  },
   eyeBtn: {
-    padding: 8,
+    padding: 4,
+  },
+  strengthRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginTop: 4,
+  },
+  strengthBar: {
+    flex: 1,
+    height: 4,
+    borderRadius: 999,
+  },
+  strengthLabel: {
+    fontFamily: fontFamilies.body.semibold,
+    fontSize: moderateScale(12),
+  },
+  termsRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 10,
+    marginTop: 24,
+  },
+  checkbox: {
+    width: moderateScale(20),
+    height: moderateScale(20),
+    borderRadius: moderateScale(6),
+    borderWidth: 1.5,
+    borderColor: tokens.borderStrong,
+    backgroundColor: tokens.surface,
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: 1,
+  },
+  checkboxChecked: {
+    backgroundColor: accent.accent,
+    borderColor: accent.accent,
+  },
+  termsText: {
+    flex: 1,
+    fontFamily: fontFamilies.body.regular,
+    fontSize: moderateScale(13),
+    lineHeight: moderateScale(19),
+    color: tokens.sec,
+  },
+  legalHighlight: {
+    fontFamily: fontFamilies.body.semibold,
+    color: accent.accent,
   },
   signUpBtn: {
+    marginTop: 14,
     height: moderateScale(52),
-    borderRadius: moderateScale(12),
-    backgroundColor: "#002045",
+    borderRadius: moderateScale(14),
+    backgroundColor: accent.accent,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    marginTop: 8,
   },
   signUpBtnDisabled: {
-    backgroundColor: "#c4c6cf",
+    opacity: 0.5,
   },
   signUpBtnText: {
-    color: "#ffffff",
-    fontSize: typography.buttonText.fontSize,
-    fontWeight: typography.buttonText.fontWeight,
+    fontFamily: fontFamilies.body.bold,
+    color: accent.on,
+    fontSize: moderateScale(15),
   },
   loginLinkRow: {
-    marginTop: 24,
+    marginTop: 16,
     alignItems: "center",
   },
   loginLinkText: {
-    fontSize: typography.body.fontSize,
-    color: "#43474e",
+    fontFamily: fontFamilies.body.regular,
+    fontSize: moderateScale(14),
+    color: tokens.sec,
   },
   loginLinkHighlight: {
-    color: "#0061a5",
-    fontWeight: typography.weights.bold,
+    fontFamily: fontFamilies.body.semibold,
+    color: accent.accent,
   },
 });

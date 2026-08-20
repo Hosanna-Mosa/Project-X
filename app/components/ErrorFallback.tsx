@@ -1,38 +1,38 @@
-import { Feather } from "@expo/vector-icons";
+import { Feather, Ionicons } from "@expo/vector-icons";
 import { reloadAppAsync } from "expo";
-import React, { useState } from "react";
-import {
-  Modal,
-  Platform,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-  useColorScheme,
-} from "react-native";
+import React, { useMemo, useState } from "react";
+import { Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { moderateScale } from "react-native-size-matters";
+import { designTokens, type ThemeTokens } from "@/constants/colors";
+import { fontFamilies } from "@/constants/typography";
+import { useThemeStore } from "@/contexts/themeStore";
+import { customFetch } from "@/utils/api/custom-fetch";
 
 export type ErrorFallbackProps = {
   error: Error;
   resetError: () => void;
 };
 
+/** A short local reference so a user has something to quote to support —
+ * there's no crash-reporting service (Sentry etc.) wired into this app, so
+ * this is a timestamp-derived tag generated on-device, not a lookup key
+ * into any real server-side crash log. */
+function localCrashRef(): string {
+  return Date.now().toString(36).slice(-6);
+}
+
 export function ErrorFallback({ error, resetError }: ErrorFallbackProps) {
-  const colorScheme = useColorScheme();
-  const isDark = colorScheme === "dark";
+  const { theme } = useThemeStore();
+  const tokens = designTokens[theme];
+  const accent = tokens.services.food;
+  const styles = useMemo(() => createStyles(tokens, accent), [theme]);
   const insets = useSafeAreaInsets();
 
-  const theme = {
-    background: isDark ? "#000000" : "#FFFFFF",
-    backgroundSecondary: isDark ? "#1C1C1E" : "#F2F2F7",
-    text: isDark ? "#FFFFFF" : "#000000",
-    textSecondary: isDark ? "rgba(255, 255, 255, 0.7)" : "rgba(0, 0, 0, 0.7)",
-    link: "#007AFF",
-    buttonText: "#FFFFFF",
-  };
-
   const [isModalVisible, setIsModalVisible] = useState(false);
+  const [reporting, setReporting] = useState(false);
+  const [reported, setReported] = useState(false);
+  const [crashRef] = useState(localCrashRef);
 
   const handleRestart = async () => {
     try {
@@ -43,132 +43,78 @@ export function ErrorFallback({ error, resetError }: ErrorFallbackProps) {
     }
   };
 
+  const handleReport = async () => {
+    if (reported) return;
+    setReporting(true);
+    try {
+      await customFetch("/api/v1/support/tickets", {
+        method: "POST",
+        body: JSON.stringify({
+          title: `App crash · ref ${crashRef}`,
+          category: "OPERATIONAL ISSUE",
+          message: `The app crashed with: "${error.message}". Local reference ${crashRef}.`,
+        }),
+      });
+      setReported(true);
+    } catch (reportError) {
+      console.error("Failed to file crash report:", reportError);
+    } finally {
+      setReporting(false);
+    }
+  };
+
   const formatErrorDetails = (): string => {
     let details = `Error: ${error.message}\n\n`;
-    if (error.stack) {
-      details += `Stack Trace:\n${error.stack}`;
-    }
+    if (error.stack) details += `Stack Trace:\n${error.stack}`;
     return details;
   };
 
-  const monoFont = Platform.select({
-    ios: "Menlo",
-    android: "monospace",
-    default: "monospace",
-  });
+  const monoFont = Platform.select({ ios: "Menlo", android: "monospace", default: "monospace" });
 
   return (
-    <View style={[styles.container, { backgroundColor: theme.background }]}>
+    <View style={styles.container}>
       {__DEV__ ? (
         <Pressable
           onPress={() => setIsModalVisible(true)}
           accessibilityLabel="View error details"
           accessibilityRole="button"
-          style={({ pressed }) => [
-            styles.topButton,
-            {
-              top: insets.top + 16,
-              backgroundColor: theme.backgroundSecondary,
-              opacity: pressed ? 0.8 : 1,
-            },
-          ]}
+          style={({ pressed }) => [styles.topButton, { top: insets.top + 16, opacity: pressed ? 0.8 : 1 }]}
         >
-          <Feather name="alert-circle" size={20} color={theme.text} />
+          <Feather name="alert-circle" size={20} color={tokens.text} />
         </Pressable>
       ) : null}
 
       <View style={styles.content}>
-        <Text style={[styles.title, { color: theme.text }]}>
-          Something went wrong
-        </Text>
+        <View style={styles.icon}>
+          <Ionicons name="warning" size={20} color={tokens.error} />
+        </View>
+        <Text style={styles.title}>Something broke</Text>
+        <Text style={styles.message}>This screen crashed. Your cart and orders are safe.</Text>
 
-        <Text style={[styles.message, { color: theme.textSecondary }]}>
-          Please reload the app to continue.
-        </Text>
-
-        <Pressable
-          onPress={handleRestart}
-          style={({ pressed }) => [
-            styles.button,
-            {
-              backgroundColor: theme.link,
-              opacity: pressed ? 0.9 : 1,
-              transform: [{ scale: pressed ? 0.98 : 1 }],
-            },
-          ]}
-        >
-          <Text style={[styles.buttonText, { color: theme.buttonText }]}>
-            Try Again
-          </Text>
+        <Pressable onPress={handleRestart} style={({ pressed }) => [styles.button, { opacity: pressed ? 0.9 : 1 }]}>
+          <Text style={styles.buttonText}>Reload screen</Text>
         </Pressable>
+
+        <TouchableOpacity onPress={handleReport} disabled={reporting || reported} style={styles.reportButton} activeOpacity={0.8}>
+          <Text style={styles.reportButtonText}>{reported ? "Reported — thank you" : reporting ? "Sending…" : "Report this"}</Text>
+        </TouchableOpacity>
+
+        <Text style={styles.refText}>ref {crashRef}</Text>
       </View>
 
       {__DEV__ ? (
-        <Modal
-          visible={isModalVisible}
-          animationType="slide"
-          transparent={true}
-          onRequestClose={() => setIsModalVisible(false)}
-        >
+        <Modal visible={isModalVisible} animationType="slide" transparent onRequestClose={() => setIsModalVisible(false)}>
           <View style={styles.modalOverlay}>
-            <View
-              style={[
-                styles.modalContainer,
-                { backgroundColor: theme.background },
-              ]}
-            >
-              <View
-                style={[
-                  styles.modalHeader,
-                  {
-                    borderBottomColor: isDark
-                      ? "rgba(255, 255, 255, 0.1)"
-                      : "rgba(0, 0, 0, 0.1)",
-                  },
-                ]}
-              >
-                <Text style={[styles.modalTitle, { color: theme.text }]}>
-                  Error Details
-                </Text>
-                <Pressable
-                  onPress={() => setIsModalVisible(false)}
-                  accessibilityLabel="Close error details"
-                  accessibilityRole="button"
-                  style={({ pressed }) => [
-                    styles.closeButton,
-                    { opacity: pressed ? 0.6 : 1 },
-                  ]}
-                >
-                  <Feather name="x" size={24} color={theme.text} />
+            <View style={styles.modalContainer}>
+              <View style={styles.modalHeader}>
+                <Text style={styles.modalTitle}>Error details</Text>
+                <Pressable onPress={() => setIsModalVisible(false)} accessibilityLabel="Close error details" accessibilityRole="button" style={({ pressed }) => [styles.closeButton, { opacity: pressed ? 0.6 : 1 }]}>
+                  <Feather name="x" size={24} color={tokens.text} />
                 </Pressable>
               </View>
-
-              <ScrollView
-                style={styles.modalScrollView}
-                contentContainerStyle={[
-                  styles.modalScrollContent,
-                  { paddingBottom: insets.bottom + 16 },
-                ]}
-                showsVerticalScrollIndicator
-              >
-                <View
-                  style={[
-                    styles.errorContainer,
-                    { backgroundColor: theme.backgroundSecondary },
-                  ]}
-                >
-                  <Text
-                    style={[
-                      styles.errorText,
-                      {
-                        color: theme.text,
-                        fontFamily: monoFont,
-                      },
-                    ]}
-                    selectable
-                  >
-                    {formatErrorDetails()}
-                  </Text>
+              <ScrollView style={{ flex: 1 }} contentContainerStyle={{ padding: 16, paddingBottom: insets.bottom + 16 }} showsVerticalScrollIndicator>
+                <View style={styles.errorContainer}>
+                  <Text style={[styles.errorText, { fontFamily: monoFont }]} selectable>{formatErrorDetails()}</Text>
                 </View>
               </ScrollView>
             </View>
@@ -179,108 +125,25 @@ export function ErrorFallback({ error, resetError }: ErrorFallbackProps) {
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    width: "100%",
-    height: "100%",
-    justifyContent: "center",
-    alignItems: "center",
-    padding: 24,
-  },
-  content: {
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 16,
-    width: "100%",
-    maxWidth: 600,
-  },
-  title: {
-    fontSize: 28,
-    fontWeight: "700",
-    textAlign: "center",
-    lineHeight: 40,
-  },
-  message: {
-    fontSize: 16,
-    textAlign: "center",
-    lineHeight: 24,
-  },
-  topButton: {
-    position: "absolute",
-    right: 16,
-    width: 44,
-    height: 44,
-    borderRadius: 8,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    zIndex: 10,
-  },
-  button: {
-    paddingVertical: 16,
-    borderRadius: 8,
-    paddingHorizontal: 24,
-    minWidth: 200,
-    shadowColor: "#000",
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  buttonText: {
-    fontWeight: "600",
-    textAlign: "center",
-    fontSize: 16,
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: "rgba(0, 0, 0, 0.5)",
-    justifyContent: "flex-end",
-  },
-  modalContainer: {
-    width: "100%",
-    height: "90%",
-    borderTopLeftRadius: 16,
-    borderTopRightRadius: 16,
-  },
-  modalHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    paddingHorizontal: 16,
-    paddingTop: 16,
-    paddingBottom: 12,
-    borderBottomWidth: 1,
-  },
-  modalTitle: {
-    fontSize: 20,
-    fontWeight: "600",
-  },
-  closeButton: {
-    width: 44,
-    height: 44,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  modalScrollView: {
-    flex: 1,
-  },
-  modalScrollContent: {
-    padding: 16,
-  },
-  errorContainer: {
-    width: "100%",
-    borderRadius: 8,
-    overflow: "hidden",
-    padding: 16,
-  },
-  errorText: {
-    fontSize: 12,
-    lineHeight: 18,
-    width: "100%",
-  },
-});
+const createStyles = (tokens: ThemeTokens, accent: ThemeTokens["services"]["food"]) =>
+  StyleSheet.create({
+    container: { flex: 1, width: "100%", height: "100%", alignItems: "center", justifyContent: "center", padding: 24, backgroundColor: tokens.bg },
+    content: { alignItems: "center", justifyContent: "center", width: "100%", maxWidth: 340 },
+    icon: { width: 48, height: 48, borderRadius: 16, backgroundColor: tokens.errorSkin, alignItems: "center", justifyContent: "center", marginBottom: 14 },
+    title: { fontFamily: fontFamilies.body.semibold, fontSize: moderateScale(17), color: tokens.text, textAlign: "center" },
+    message: { fontFamily: fontFamilies.body.regular, fontSize: moderateScale(14), lineHeight: moderateScale(20), color: tokens.sec, textAlign: "center", marginTop: 8, marginBottom: 20 },
+    topButton: { position: "absolute", right: 16, width: 44, height: 44, borderRadius: 8, backgroundColor: tokens.sunken, alignItems: "center", justifyContent: "center", zIndex: 10 },
+    button: { width: "100%", minHeight: moderateScale(48), borderRadius: 14, backgroundColor: accent.accent, alignItems: "center", justifyContent: "center" },
+    buttonText: { fontFamily: fontFamilies.body.bold, fontSize: moderateScale(14), color: accent.on },
+    reportButton: { width: "100%", minHeight: moderateScale(44), borderRadius: 14, borderWidth: 1, borderColor: tokens.borderStrong, alignItems: "center", justifyContent: "center", marginTop: 8 },
+    reportButtonText: { fontFamily: fontFamilies.body.semibold, fontSize: moderateScale(13), color: tokens.sec },
+    refText: { fontFamily: Platform.select({ ios: "Menlo", android: "monospace", default: "monospace" }), fontSize: moderateScale(10), color: tokens.muted, marginTop: 12 },
+
+    modalOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.5)", justifyContent: "flex-end" },
+    modalContainer: { width: "100%", height: "90%", backgroundColor: tokens.surface, borderTopLeftRadius: 20, borderTopRightRadius: 20 },
+    modalHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingHorizontal: 16, paddingTop: 16, paddingBottom: 12, borderBottomWidth: 1, borderBottomColor: tokens.border },
+    modalTitle: { fontFamily: fontFamilies.body.semibold, fontSize: moderateScale(18), color: tokens.text },
+    closeButton: { width: 44, height: 44, alignItems: "center", justifyContent: "center" },
+    errorContainer: { width: "100%", borderRadius: 12, overflow: "hidden", padding: 16, backgroundColor: tokens.sunken },
+    errorText: { fontSize: 12, lineHeight: 18, width: "100%", color: tokens.text },
+  });

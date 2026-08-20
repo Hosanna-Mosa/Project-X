@@ -1,85 +1,65 @@
-import React from "react";
+import React, { useMemo, useState } from "react";
 import {
+  ActivityIndicator,
   Alert,
-  Platform,
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
   View,
-  StatusBar,
-  ActivityIndicator,
-  TextInput,
 } from "react-native";
-import { Feather, Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
+import { Ionicons } from "@expo/vector-icons";
 import { router, useLocalSearchParams, useFocusEffect } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { moderateScale } from "react-native-size-matters";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { designTokens, type ThemeTokens } from "@/constants/colors";
+import { fontFamilies } from "@/constants/typography";
+import { useThemeStore } from "@/contexts/themeStore";
 import { useCartStore } from "@/contexts/cartStore";
 import { useDeliveryStore } from "@/contexts/deliveryStore";
-import { useThemeStore } from "@/contexts/themeStore";
 import { useAuthStore } from "@/contexts/authStore";
 import { customFetch } from "@/utils/api/custom-fetch";
-import AsyncStorage from "@react-native-async-storage/async-storage";
-import { socketService } from "@/utils/socketService";
 import { RazorpayIntegration } from "@/utils/razorpay";
+
+const TIP_OPTIONS = [0, 20, 30, 50];
 
 export default function FoodCheckoutScreen() {
   const insets = useSafeAreaInsets();
   const params = useLocalSearchParams();
-  const styles = React.useMemo(() => createStyles(), []);
+  const { theme } = useThemeStore();
+  const tokens = designTokens[theme];
+  const accent = tokens.services.food;
+  const styles = useMemo(() => createStyles(tokens, accent), [theme]);
+
   const { getItemCount, vendorId, items, clearCart } = useCartStore();
   const { user, token } = useAuthStore();
   const { setOrderId, setStatus, setServiceType } = useDeliveryStore();
-  
-  const [isPlacingOrder, setIsPlacingOrder] = React.useState(false);
-  const [selectedAddress, setSelectedAddress] = React.useState<any>(null);
-  
-  const [paymentMethod, setPaymentMethod] = React.useState<"razorpay" | "visa">("razorpay");
-  const [showPromoInput, setShowPromoInput] = React.useState(false);
-  const [promoCodeText, setPromoCodeText] = React.useState("");
-  const [appliedPromo, setAppliedPromo] = React.useState<any>(null);
-  const [isApplyingPromo, setIsApplyingPromo] = React.useState(false);
-  const [promoError, setPromoError] = React.useState<string | null>(null);
-  const [vendorName, setVendorName] = React.useState<string>("Restaurant");
-  
-  // Tip options
-  const tipOptions = [0, 50, 100, 150];
-  const [tipAmount, setTipAmount] = React.useState<number>(100);
-  const [isOtherTip, setIsOtherTip] = React.useState(false);
-  const [otherTipText, setOtherTipText] = React.useState("");
-  const [cartSummaryExpanded, setCartSummaryExpanded] = React.useState(true);
 
-  const userId = React.useMemo(() => String(user?.id || user?._id || ""), [user?.id, user?._id]);
+  const [isPlacingOrder, setIsPlacingOrder] = useState(false);
+  const [selectedAddress, setSelectedAddress] = useState<any>(null);
 
-  React.useEffect(() => {
-    if (vendorId) {
-      customFetch<any>(`/api/v1/vendors/${vendorId}`)
-        .then(v => { if (v && v.name) setVendorName(v.name); })
-        .catch(() => {});
-    }
-  }, [vendorId]);
+  const [showPromoInput, setShowPromoInput] = useState(false);
+  const [promoCodeText, setPromoCodeText] = useState("");
+  const [appliedPromo, setAppliedPromo] = useState<{ code: string; discountAmount: number } | null>(
+    params.couponCode && Number(params.discount) > 0
+      ? { code: String(params.couponCode), discountAmount: Number(params.discount) }
+      : null
+  );
+  const [isApplyingPromo, setIsApplyingPromo] = useState(false);
+  const [promoError, setPromoError] = useState<string | null>(null);
+  const vendorName = params.vendorName ? String(params.vendorName) : "your vendor";
 
-  const subtotal = items.reduce((acc, item) => acc + (item.price * item.quantity), 0) || Number(params.subtotal || 0);
-  const deliveryFee = Number(params.deliveryFee || 39.00);
-  const taxes = Number(params.taxes || 85.00);
-  const serviceFee = 49.00; 
-  
-  let discountAmount = 0;
-  if (appliedPromo) {
-    if (appliedPromo.discountType === "PERCENTAGE") {
-      discountAmount = (subtotal * appliedPromo.discountValue) / 100;
-      if (appliedPromo.maxDiscount && discountAmount > appliedPromo.maxDiscount) {
-        discountAmount = appliedPromo.maxDiscount;
-      }
-    } else if (appliedPromo.discountType === "FLAT") {
-      discountAmount = appliedPromo.discountValue;
-    }
-  }
+  const [tipAmount, setTipAmount] = useState(0);
+  const [isOtherTip, setIsOtherTip] = useState(false);
+  const [otherTipText, setOtherTipText] = useState("");
 
-  const activeTip = isOtherTip ? (Number(otherTipText) || 0) : tipAmount;
-  const total = subtotal + deliveryFee + taxes + serviceFee + activeTip - discountAmount;
-  const originalTotal = subtotal + 199.00 + taxes + serviceFee + activeTip; // Mock original total with 199 delivery fee and no discount
+  const subtotal = items.reduce((acc, item) => acc + item.price * item.quantity, 0) || Number(params.subtotal || 0);
+  const deliveryFee = params.deliveryFee ? Number(params.deliveryFee) : null;
+  const activeTip = isOtherTip ? Number(otherTipText) || 0 : tipAmount;
+  const discount = appliedPromo?.discountAmount || 0;
+  const total = Math.max(0, Math.round((subtotal + (deliveryFee || 0) + activeTip - discount) * 100) / 100);
 
   const handleApplyPromo = async () => {
     if (!promoCodeText.trim()) return;
@@ -90,13 +70,18 @@ export default function FoodCheckoutScreen() {
         method: "POST",
         body: JSON.stringify({ code: promoCodeText.trim(), cartTotal: subtotal }),
       });
-      if (response.code) {
-        setAppliedPromo(response);
-        setShowPromoInput(false);
+      let amount = 0;
+      if (response.discountType === "PERCENTAGE") {
+        amount = (subtotal * response.discountValue) / 100;
+        if (response.maxDiscount) amount = Math.min(amount, response.maxDiscount);
+      } else {
+        amount = response.discountValue;
       }
+      setAppliedPromo({ code: response.code, discountAmount: Math.round(amount) });
+      setShowPromoInput(false);
+      setPromoCodeText("");
     } catch (error: any) {
-      const msg = error.message || "Invalid promo code";
-      setPromoError(msg.replace(/^HTTP \d+.*?: /, "").trim());
+      setPromoError((error?.message || "Invalid promo code").replace(/^HTTP \d+.*?: /, "").trim());
     } finally {
       setIsApplyingPromo(false);
     }
@@ -107,9 +92,7 @@ export default function FoodCheckoutScreen() {
       (async () => {
         try {
           const activeStr = await AsyncStorage.getItem("active_address");
-          if (activeStr) {
-            setSelectedAddress(JSON.parse(activeStr));
-          }
+          if (activeStr) setSelectedAddress(JSON.parse(activeStr));
         } catch (e) {
           console.error("Failed to load active address:", e);
         }
@@ -128,7 +111,8 @@ export default function FoodCheckoutScreen() {
       return;
     }
     if (!selectedAddress || !selectedAddress.addressLine || !selectedAddress.phone) {
-      Alert.alert("Address required", "Please select a delivery address with a contact number from the saved addresses.");
+      Alert.alert("Address required", "Please select a delivery address with a contact number.");
+      router.push("/delivery/saved-addresses");
       return;
     }
     if (!vendorId) {
@@ -154,12 +138,16 @@ export default function FoodCheckoutScreen() {
         quantity: item.quantity,
         price: item.price,
         total: item.price * item.quantity,
+        // Kept so "order again" can rebuild the cart with thumbnails.
+        image: item.images?.[0],
+        isVeg: item.isVeg,
+        category: item.category,
       }));
 
       const orderDataPayload = {
         serviceType: "delivery",
         vendorId,
-        totals: { subtotal, taxes, deliveryFee, serviceFee, tip: activeTip, discount: discountAmount, total },
+        totals: { subtotal, deliveryFee: deliveryFee || 0, tip: activeTip, discount, total },
         stops: [
           {
             id: "vendor-pickup",
@@ -184,53 +172,42 @@ export default function FoodCheckoutScreen() {
 
       let finalOrderId: string;
 
-      if (paymentMethod === "razorpay") {
-        const rzpOrderResponse = await customFetch<any>("/api/v1/payments/create-order", {
-          method: "POST",
-          body: JSON.stringify({ amount: total }),
-        });
+      const rzpOrderResponse = await customFetch<any>("/api/v1/payments/create-order", {
+        method: "POST",
+        body: JSON.stringify({ amount: total }),
+      });
 
-        const rzpResult = await RazorpayIntegration.open({
-          order_id: rzpOrderResponse.id,
-          key: rzpOrderResponse.key,
-          amount: rzpOrderResponse.amount,
-          currency: rzpOrderResponse.currency,
-          name: rzpOrderResponse.name,
-          prefill: rzpOrderResponse.prefill,
-          theme: rzpOrderResponse.theme,
-        });
+      const rzpResult = await RazorpayIntegration.open({
+        order_id: rzpOrderResponse.id,
+        key: rzpOrderResponse.key,
+        amount: rzpOrderResponse.amount,
+        currency: rzpOrderResponse.currency,
+        name: rzpOrderResponse.name,
+        prefill: rzpOrderResponse.prefill,
+        theme: rzpOrderResponse.theme,
+      });
 
-        const verifyResponse = await customFetch<any>("/api/v1/payments/verify", {
-          method: "POST",
-          body: JSON.stringify({
-            razorpay_payment_id: rzpResult.razorpay_payment_id,
-            razorpay_order_id: rzpResult.razorpay_order_id,
-            razorpay_signature: rzpResult.razorpay_signature,
-            orderData: orderDataPayload,
-          }),
-        });
+      const verifyResponse = await customFetch<any>("/api/v1/payments/verify", {
+        method: "POST",
+        body: JSON.stringify({
+          razorpay_payment_id: rzpResult.razorpay_payment_id,
+          razorpay_order_id: rzpResult.razorpay_order_id,
+          razorpay_signature: rzpResult.razorpay_signature,
+          orderData: orderDataPayload,
+        }),
+      });
 
-        finalOrderId = verifyResponse.order._id || verifyResponse.order.id;
-      } else {
-        const order = await customFetch<{ _id?: string; id?: string }>("/api/v1/orders", {
-          method: "POST",
-          body: JSON.stringify(orderDataPayload),
-        });
-        finalOrderId = order._id || order.id || "";
-      }
+      finalOrderId = verifyResponse.order._id || verifyResponse.order.id;
 
       setOrderId(finalOrderId);
       setServiceType("delivery");
       setStatus("pending");
       clearCart();
 
-      router.replace({
-        pathname: "/finding-driver",
-        params: { orderId: finalOrderId },
-      });
+      router.replace({ pathname: "/finding-driver", params: { orderId: finalOrderId } });
     } catch (error: any) {
       console.error("Place order failed", error);
-      Alert.alert("Order failed", error.message || "Unable to place your order.");
+      Alert.alert("Order failed", error?.message || "Unable to place your order.");
     } finally {
       setIsPlacingOrder(false);
     }
@@ -238,222 +215,166 @@ export default function FoodCheckoutScreen() {
 
   return (
     <View style={styles.root}>
-      <StatusBar barStyle="dark-content" translucent backgroundColor="transparent" />
-      
-      {/* Header */}
-      <View style={[styles.header, { paddingTop: insets.top + 10 }]}>
-        <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
-          <Feather name="arrow-left" size={moderateScale(24)} color="#000" />
+      <View style={[styles.header, { paddingTop: insets.top + 6 }]}>
+        <TouchableOpacity style={styles.iconBtn} onPress={() => router.back()}>
+          <Ionicons name="chevron-back" size={moderateScale(20)} color={tokens.text} />
         </TouchableOpacity>
-        <View style={styles.headerTitles}>
-          <Text style={styles.headerSubtitle}>Checkout</Text>
-          <Text style={styles.headerTitle} numberOfLines={1} ellipsizeMode="tail">{vendorName}</Text>
-        </View>
+        <Text style={styles.headerTitleSolo}>Checkout</Text>
       </View>
 
-      <ScrollView 
-        contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 120 }]}
-        showsVerticalScrollIndicator={false}
-      >
-        {/* Delivery Address Card */}
-        <TouchableOpacity style={styles.addressCard} onPress={() => router.push("/delivery/saved-addresses")} activeOpacity={0.8}>
-          <View style={styles.addressIconWrapper}>
-            <Ionicons name="home" size={moderateScale(20)} color="#fff" />
-          </View>
-          <View style={styles.addressInfo}>
-            <Text style={styles.addressLabel}>{selectedAddress ? selectedAddress.label || "Work" : "Work"}</Text>
-            <Text style={styles.addressText} numberOfLines={2}>
-              {selectedAddress ? selectedAddress.addressLine : "Rajamahendravaram, Andhra Pradesh, India [Apt: 2RWR+P33]"}
-            </Text>
-          </View>
-          <Feather name="edit-2" size={moderateScale(18)} color="#000" />
-        </TouchableOpacity>
-
-        {/* Cart Summary Section */}
-        <View style={styles.divider} />
+      <ScrollView contentContainerStyle={{ paddingBottom: insets.bottom + 150 }} showsVerticalScrollIndicator={false}>
         <View style={styles.section}>
-          <TouchableOpacity 
-            style={styles.sectionHeaderRow}
-            onPress={() => setCartSummaryExpanded(!cartSummaryExpanded)}
-            activeOpacity={0.7}
-          >
-            <Feather name="shopping-cart" size={moderateScale(20)} color="#000" />
-            <Text style={styles.sectionTitle}>Cart Summary</Text>
-            <View style={{ flex: 1 }} />
-            <Feather name={cartSummaryExpanded ? "chevron-up" : "chevron-down"} size={moderateScale(20)} color="#000" />
+          <TouchableOpacity style={styles.addressCard} activeOpacity={0.85} onPress={() => router.push("/delivery/saved-addresses")}>
+            <View style={styles.addressAvatar}>
+              <Text style={styles.addressAvatarText}>{(selectedAddress?.label || "H")[0].toUpperCase()}</Text>
+            </View>
+            <View style={{ flex: 1, minWidth: 0 }}>
+              <Text style={styles.addressTitle}>Deliver to {selectedAddress?.label || "…"}</Text>
+              <Text style={styles.addressLine} numberOfLines={2}>
+                {selectedAddress?.addressLine || "Select a delivery address"}
+              </Text>
+              {!!selectedAddress?.receiverName && (
+                <Text style={styles.addressContact}>{selectedAddress.receiverName} · {selectedAddress.phone}</Text>
+              )}
+            </View>
+            <Text style={styles.changeLink}>Change</Text>
           </TouchableOpacity>
-          <Text style={styles.cartSub}>{vendorName} • {getItemCount()} items</Text>
-          
-          {cartSummaryExpanded && (
-            <View style={styles.itemsList}>
-              {items.map(item => (
-              <View key={item._id} style={styles.itemRow}>
-                <View style={styles.itemLeft}>
-                  <Text style={styles.itemQuantity}>{item.quantity} x</Text>
-                  <View style={styles.itemDetails}>
-                    <Text style={styles.itemName}>{item.name}</Text>
-                    <Text style={styles.itemDesc}>Standard preparation</Text>
-                  </View>
-                </View>
-                <Text style={styles.itemPrice}>₹{(item.price * item.quantity).toFixed(2)}</Text>
+        </View>
+
+        <View style={styles.section}>
+          <View style={styles.orderCard}>
+            <View style={styles.orderCardHead}>
+              <Text style={styles.orderCardTitle}>Your order · {getItemCount()} items</Text>
+              <TouchableOpacity onPress={() => router.back()}>
+                <Text style={styles.changeLink}>Edit</Text>
+              </TouchableOpacity>
+            </View>
+            {items.map((item) => (
+              <View key={item._id} style={styles.orderLine}>
+                <Text style={styles.orderLineLabel} numberOfLines={1}>{item.quantity} × {item.name}</Text>
+                <Text style={styles.orderLineValue}>₹{item.price * item.quantity}</Text>
               </View>
             ))}
           </View>
-          )} 
         </View>
 
-        {/* Summary Section */}
-        <View style={styles.divider} />
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Summary</Text>
-          
-          {/* Deals Row */}
-          {!appliedPromo ? (
-            showPromoInput ? (
-              <View style={styles.promoInputRow}>
-                <View style={styles.promoInputWrapper}>
-                  <Feather name="tag" size={18} color="#000" />
-                  <TextInput
-                    style={styles.promoTextInput}
-                    placeholder="Enter Promo Code"
-                    value={promoCodeText}
-                    onChangeText={setPromoCodeText}
-                    autoCapitalize="characters"
-                  />
-                </View>
-                <TouchableOpacity style={styles.promoApplyBtn} onPress={handleApplyPromo} disabled={isApplyingPromo}>
-                  {isApplyingPromo ? <ActivityIndicator size="small" color="#fff" /> : <Text style={styles.promoApplyText}>Apply</Text>}
-                </TouchableOpacity>
-              </View>
-            ) : (
-              <TouchableOpacity style={styles.dealRow} onPress={() => setShowPromoInput(true)}>
-                <View style={styles.dealLeft}>
-                  <Feather name="tag" size={18} color="#000" />
-                  <Text style={styles.dealText}>Deals</Text>
-                </View>
-                <Feather name="chevron-right" size={20} color="#000" />
-              </TouchableOpacity>
-            )
-          ) : (
-            <View style={styles.dealRow}>
-              <View style={styles.dealLeft}>
-                <Feather name="check-circle" size={18} color="#16A34A" />
-                <Text style={[styles.dealText, { color: '#16A34A' }]}>{appliedPromo.code} Applied!</Text>
+          <Text style={styles.sectionLabel}>Offers &amp; coupons</Text>
+          {appliedPromo ? (
+            <View style={[styles.couponOptionRow, { borderColor: accent.accent, backgroundColor: accent.skin }]}>
+              <View style={styles.radioSelected}><View style={[styles.radioDot, { backgroundColor: accent.accent }]} /></View>
+              <View style={{ flex: 1, minWidth: 0 }}>
+                <Text style={styles.couponCode}>{appliedPromo.code}</Text>
+                <Text style={styles.couponDesc}>You saved ₹{appliedPromo.discountAmount}</Text>
               </View>
               <TouchableOpacity onPress={() => setAppliedPromo(null)}>
-                <Text style={{ color: '#E53E3E', fontWeight: 'bold' }}>Remove</Text>
+                <Text style={styles.changeLink}>Remove</Text>
               </TouchableOpacity>
             </View>
+          ) : showPromoInput ? (
+            <View style={styles.promoInputRow}>
+              <TextInput
+                style={styles.promoInput}
+                placeholder="Enter promo code"
+                placeholderTextColor={tokens.muted}
+                autoCapitalize="characters"
+                value={promoCodeText}
+                onChangeText={setPromoCodeText}
+              />
+              <TouchableOpacity style={styles.promoApplyBtn} onPress={handleApplyPromo} disabled={isApplyingPromo}>
+                {isApplyingPromo ? <ActivityIndicator size="small" color={accent.on} /> : <Text style={styles.promoApplyBtnText}>Apply</Text>}
+              </TouchableOpacity>
+            </View>
+          ) : (
+            <TouchableOpacity style={styles.couponOptionRow} activeOpacity={0.85} onPress={() => setShowPromoInput(true)}>
+              <Ionicons name="pricetag-outline" size={moderateScale(18)} color={tokens.sec} />
+              <Text style={[styles.couponCode, { flex: 1 }]}>Have a promo code?</Text>
+              <Text style={styles.changeLink}>Add</Text>
+            </TouchableOpacity>
           )}
-
-          {/* Pricing breakdown */}
-          <View style={styles.priceList}>
-            <View style={styles.priceRow}>
-              <Text style={styles.priceLabel}>Subtotal</Text>
-              <Text style={styles.priceValue}>₹{subtotal.toFixed(2)}</Text>
-            </View>
-            <View style={styles.priceRow}>
-              <View style={styles.labelWithIcon}>
-                <Text style={styles.priceLabel}>Estimated Tax</Text>
-                <Feather name="info" size={12} color="#888" style={{ marginLeft: 4 }} />
-              </View>
-              <Text style={styles.priceValue}>₹{taxes.toFixed(2)}</Text>
-            </View>
-            <View style={styles.priceRow}>
-              <View style={styles.labelWithIcon}>
-                <Text style={styles.priceLabel}>Delivery fee</Text>
-                <Feather name="info" size={12} color="#888" style={{ marginLeft: 4 }} />
-              </View>
-              <View style={styles.deliveryFeeValues}>
-                <Text style={styles.struckPrice}>₹199.00</Text>
-                <Text style={styles.priceValue}>₹{deliveryFee.toFixed(2)}</Text>
-              </View>
-            </View>
-            <View style={styles.priceRow}>
-              <View style={styles.labelWithIcon}>
-                <Text style={styles.priceLabel}>Service Fee</Text>
-                <Feather name="info" size={12} color="#888" style={{ marginLeft: 4 }} />
-              </View>
-              <Text style={styles.priceValue}>₹{serviceFee.toFixed(2)}</Text>
-            </View>
-          </View>
+          {!!promoError && <Text style={styles.promoError}>{promoError}</Text>}
         </View>
 
-        {/* Dasher Tip Section */}
-        <View style={styles.divider} />
         <View style={styles.section}>
-          <View style={styles.priceRow}>
-            <View style={styles.labelWithIcon}>
-              <Text style={styles.sectionTitle}>Dasher Tip</Text>
-              <Feather name="info" size={12} color="#888" style={{ marginLeft: 4 }} />
-            </View>
-            <Text style={styles.sectionTitle}>₹{activeTip.toFixed(2)}</Text>
-          </View>
-          
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tipOptionsList}>
-            {tipOptions.map(opt => {
+          <Text style={styles.sectionLabel}>Tip your delivery partner</Text>
+          <Text style={styles.tipSub}>100% of the tip goes to the partner.</Text>
+          <View style={styles.tipRow}>
+            {TIP_OPTIONS.map((opt) => {
               const isSelected = !isOtherTip && tipAmount === opt;
               return (
-                <TouchableOpacity 
-                  key={opt} 
-                  style={[styles.tipPill, isSelected && styles.tipPillSelected]}
+                <TouchableOpacity
+                  key={opt}
+                  style={[styles.tipPill, isSelected && { backgroundColor: accent.accent, borderColor: accent.accent }]}
                   onPress={() => { setIsOtherTip(false); setTipAmount(opt); }}
                 >
-                  <Text style={[styles.tipPillText, isSelected && styles.tipPillTextSelected]}>
-                    {opt === 0 ? "None" : `₹${opt.toFixed(2)}`}
-                  </Text>
+                  <Text style={[styles.tipPillText, isSelected && { color: accent.on }]}>{opt === 0 ? "None" : `₹${opt}`}</Text>
                 </TouchableOpacity>
-              )
+              );
             })}
-            <TouchableOpacity 
-              style={[styles.tipPill, isOtherTip && styles.tipPillSelected]}
+            <TouchableOpacity
+              style={[styles.tipPill, isOtherTip && { backgroundColor: accent.accent, borderColor: accent.accent }]}
               onPress={() => setIsOtherTip(true)}
             >
-              <Text style={[styles.tipPillText, isOtherTip && styles.tipPillTextSelected]}>Other</Text>
+              <Text style={[styles.tipPillText, isOtherTip && { color: accent.on }]}>Other</Text>
             </TouchableOpacity>
-          </ScrollView>
-          
+          </View>
           {isOtherTip && (
             <TextInput
               style={styles.otherTipInput}
-              placeholder="Enter tip amount"
+              placeholder="Enter amount"
+              placeholderTextColor={tokens.muted}
               keyboardType="numeric"
               value={otherTipText}
               onChangeText={setOtherTipText}
             />
           )}
-
-          <Text style={styles.tipFooterText}>100% of the tip goes to your Dasher.</Text>
         </View>
 
-        <View style={styles.divider} />
-        
-        {/* Total Section */}
-        <View style={styles.totalSection}>
-          <Text style={styles.totalTitle}>Total</Text>
-          <View style={styles.totalValues}>
-            {(discountAmount > 0 || deliveryFee < 199) && (
-              <Text style={styles.struckTotal}>₹{originalTotal.toFixed(2)}</Text>
+        <View style={styles.section}>
+          <Text style={styles.sectionLabel}>Bill details</Text>
+          <View style={styles.billCard}>
+            <View style={styles.billRow}>
+              <Text style={styles.billLabel}>Item total</Text>
+              <Text style={styles.billValue}>₹{subtotal}</Text>
+            </View>
+            {deliveryFee != null ? (
+              <View style={styles.billRow}>
+                <Text style={styles.billLabel}>Delivery fee</Text>
+                <Text style={styles.billValue}>{deliveryFee === 0 ? "Free" : `₹${deliveryFee}`}</Text>
+              </View>
+            ) : (
+              <Text style={styles.billNote}>Delivery fee is confirmed with your order.</Text>
             )}
-            <Text style={styles.finalTotal}>₹{total.toFixed(2)}</Text>
+            {activeTip > 0 && (
+              <View style={styles.billRow}>
+                <Text style={styles.billLabel}>Delivery tip</Text>
+                <Text style={styles.billValue}>₹{activeTip}</Text>
+              </View>
+            )}
+            {appliedPromo && (
+              <View style={styles.billRow}>
+                <Text style={[styles.billLabel, { color: tokens.success }]}>Coupon {appliedPromo.code}</Text>
+                <Text style={[styles.billValue, { color: tokens.success }]}>−₹{appliedPromo.discountAmount}</Text>
+              </View>
+            )}
+            <View style={styles.billDivider} />
+            <View style={styles.billRow}>
+              <Text style={styles.billTotalLabel}>To pay</Text>
+              <Text style={styles.billTotalValue}>₹{total}</Text>
+            </View>
           </View>
         </View>
-
       </ScrollView>
 
-      {/* Sticky Footer */}
-      <View style={[styles.footer, { paddingBottom: 12 }]}>
-        {discountAmount > 0 && (
-          <View style={styles.savingsRow}>
-            <Feather name="tag" size={16} color="#000" />
-            <Text style={styles.savingsText}>Saving ₹{discountAmount.toFixed(2)} with Deals</Text>
-          </View>
-        )}
-        <TouchableOpacity style={styles.placeOrderBtn} onPress={placeOrder} disabled={isPlacingOrder}>
+      <View style={[styles.footer, { paddingBottom: insets.bottom + 14 }]}>
+        <TouchableOpacity style={styles.placeOrderBtn} activeOpacity={0.9} onPress={placeOrder} disabled={isPlacingOrder}>
           {isPlacingOrder ? (
-            <ActivityIndicator size="small" color="#fff" />
+            <ActivityIndicator size="small" color={accent.on} />
           ) : (
-            <Text style={styles.placeOrderBtnText}>Place order</Text>
+            <>
+              <Text style={styles.placeOrderBtnText}>Place order</Text>
+              <Text style={styles.placeOrderBtnPrice}>· ₹{total}</Text>
+            </>
           )}
         </TouchableOpacity>
       </View>
@@ -461,319 +382,74 @@ export default function FoodCheckoutScreen() {
   );
 }
 
-const createStyles = () => StyleSheet.create({
-  root: {
-    flex: 1,
-    backgroundColor: "#fff",
-  },
-  header: {
-    paddingHorizontal: 16,
-    paddingBottom: 16,
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#fff",
-  },
-  backBtn: {
-    padding: 8,
-    marginRight: 8,
-    marginLeft: -8,
-  },
-  headerTitles: {
-    flex: 1,
-  },
-  headerSubtitle: {
-    fontSize: moderateScale(10),
-    color: "#666",
-    fontWeight: "600",
-  },
-  headerTitle: {
-    fontSize: moderateScale(13),
-    fontWeight: "800",
-    color: "#000",
-  },
-  content: {
-    paddingHorizontal: 0,
-  },
-  addressCard: {
-    marginHorizontal: 16,
-    marginVertical: 16,
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#FAFAFA",
-    borderWidth: 1,
-    borderColor: "#F0F0F0",
-    borderRadius: moderateScale(16),
-    padding: 16,
-  },
-  addressIconWrapper: {
-    width: moderateScale(40),
-    height: moderateScale(40),
-    borderRadius: moderateScale(20),
-    backgroundColor: "#000",
-    justifyContent: "center",
-    alignItems: "center",
-    marginRight: 12,
-  },
-  addressInfo: {
-    flex: 1,
-  },
-  addressLabel: {
-    fontSize: moderateScale(15),
-    fontWeight: "bold",
-    color: "#000",
-    marginBottom: 2,
-  },
-  addressText: {
-    fontSize: moderateScale(13),
-    color: "#888",
-  },
-  divider: {
-    height: 6,
-    backgroundColor: "#F5F5F5",
-    width: "100%",
-  },
-  section: {
-    padding: 16,
-  },
-  sectionHeaderRow: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
-  sectionTitle: {
-    fontSize: moderateScale(18),
-    fontWeight: "bold",
-    color: "#000",
-    marginLeft: 8,
-  },
-  cartSub: {
-    fontSize: moderateScale(13),
-    color: "#888",
-    marginTop: 4,
-    marginBottom: 16,
-  },
-  itemsList: {
-    gap: 16,
-  },
-  itemRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "flex-start",
-  },
-  itemLeft: {
-    flexDirection: "row",
-    flex: 1,
-    paddingRight: 16,
-  },
-  itemQuantity: {
-    fontSize: moderateScale(14),
-    fontWeight: "bold",
-    color: "#000",
-    marginRight: 12,
-    marginTop: 2,
-  },
-  itemDetails: {
-    flex: 1,
-  },
-  itemName: {
-    fontSize: moderateScale(15),
-    fontWeight: "bold",
-    color: "#000",
-    marginBottom: 4,
-  },
-  itemDesc: {
-    fontSize: moderateScale(13),
-    color: "#888",
-  },
-  itemPrice: {
-    fontSize: moderateScale(15),
-    fontWeight: "bold",
-    color: "#000",
-  },
-  dealRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingVertical: 12,
-    marginBottom: 12,
-  },
-  dealLeft: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
-  dealText: {
-    fontSize: moderateScale(15),
-    fontWeight: "bold",
-    color: "#000",
-    marginLeft: 12,
-  },
-  promoInputRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    marginBottom: 16,
-  },
-  promoInputWrapper: {
-    flex: 1,
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#F5F5F5",
-    borderRadius: moderateScale(8),
-    paddingHorizontal: 12,
-    height: moderateScale(48),
-  },
-  promoTextInput: {
-    flex: 1,
-    marginLeft: 8,
-    fontSize: moderateScale(15),
-    color: "#000",
-  },
-  promoApplyBtn: {
-    backgroundColor: "#000",
-    borderRadius: moderateScale(8),
-    height: moderateScale(48),
-    paddingHorizontal: 20,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  promoApplyText: {
-    color: "#fff",
-    fontWeight: "bold",
-    fontSize: moderateScale(15),
-  },
-  priceList: {
-    gap: 12,
-    marginTop: 8,
-  },
-  priceRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-  },
-  labelWithIcon: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
-  priceLabel: {
-    fontSize: moderateScale(14),
-    color: "#444",
-    fontWeight: "600",
-  },
-  priceValue: {
-    fontSize: moderateScale(14),
-    color: "#000",
-    fontWeight: "bold",
-  },
-  deliveryFeeValues: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-  },
-  struckPrice: {
-    fontSize: moderateScale(14),
-    color: "#999",
-    textDecorationLine: "line-through",
-  },
-  tipOptionsList: {
-    flexDirection: "row",
-    gap: 8,
-    marginTop: 16,
-    marginBottom: 8,
-  },
-  tipPill: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: moderateScale(20),
-    backgroundColor: "#F5F5F5",
-    borderWidth: 1,
-    borderColor: "#E5E5E5",
-  },
-  tipPillSelected: {
-    backgroundColor: "#000",
-    borderColor: "#000",
-  },
-  tipPillText: {
-    fontSize: moderateScale(14),
-    fontWeight: "bold",
-    color: "#000",
-  },
-  tipPillTextSelected: {
-    color: "#fff",
-  },
-  otherTipInput: {
-    backgroundColor: "#F5F5F5",
-    borderRadius: moderateScale(8),
-    padding: 12,
-    fontSize: moderateScale(15),
-    fontWeight: "bold",
-    marginTop: 8,
-    marginBottom: 8,
-  },
-  tipFooterText: {
-    fontSize: moderateScale(12),
-    color: "#888",
-    marginTop: 8,
-  },
-  totalSection: {
-    padding: 16,
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-  },
-  totalTitle: {
-    fontSize: moderateScale(22),
-    fontWeight: "900",
-    color: "#000",
-  },
-  totalValues: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-  },
-  struckTotal: {
-    fontSize: moderateScale(18),
-    color: "#999",
-    textDecorationLine: "line-through",
-    fontWeight: "600",
-  },
-  finalTotal: {
-    fontSize: moderateScale(24),
-    fontWeight: "900",
-    color: "#000",
-  },
-  footer: {
-    position: "absolute",
-    bottom: 0,
-    left: 0,
-    right: 0,
-    backgroundColor: "#fff",
-    borderTopWidth: 1,
-    borderTopColor: "#EEE",
-    paddingHorizontal: 16,
-    paddingTop: 12,
-    alignItems: "flex-start",
-  },
-  savingsRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginBottom: 12,
-    gap: 6,
-  },
-  savingsText: {
-    fontSize: moderateScale(14),
-    fontWeight: "bold",
-    color: "#000",
-  },
-  placeOrderBtn: {
-    backgroundColor: "#000",
-    width: "100%",
-    height: moderateScale(54),
-    borderRadius: moderateScale(12),
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  placeOrderBtnText: {
-    color: "#fff",
-    fontSize: moderateScale(16),
-    fontWeight: "bold",
-  },
-});
+const createStyles = (tokens: ThemeTokens, accent: ThemeTokens["services"]["food"]) =>
+  StyleSheet.create({
+    root: { flex: 1, backgroundColor: tokens.bg },
+    header: { flexDirection: "row", alignItems: "center", gap: 12, paddingHorizontal: 16, paddingBottom: 12 },
+    iconBtn: {
+      width: moderateScale(40), height: moderateScale(40), borderRadius: moderateScale(20),
+      backgroundColor: tokens.surface, borderWidth: 1, borderColor: tokens.border, alignItems: "center", justifyContent: "center",
+    },
+    headerTitleSolo: { fontFamily: fontFamilies.body.semibold, fontSize: moderateScale(17), color: tokens.text },
+
+    section: { paddingHorizontal: 16, paddingTop: 18 },
+    sectionLabel: { fontFamily: fontFamilies.body.bold, fontSize: moderateScale(11), letterSpacing: 1, textTransform: "uppercase", color: tokens.muted, marginBottom: 12 },
+
+    addressCard: { flexDirection: "row", alignItems: "flex-start", gap: 12, backgroundColor: tokens.surface, borderWidth: 1, borderColor: tokens.border, borderRadius: 18, padding: 14 },
+    addressAvatar: { width: 34, height: 34, borderRadius: 11, backgroundColor: accent.skin, alignItems: "center", justifyContent: "center", flexShrink: 0 },
+    addressAvatarText: { fontFamily: fontFamilies.body.bold, fontSize: moderateScale(14), color: accent.accent },
+    addressTitle: { fontFamily: fontFamilies.body.semibold, fontSize: moderateScale(15), color: tokens.text },
+    addressLine: { fontFamily: fontFamilies.body.regular, fontSize: moderateScale(14), lineHeight: moderateScale(20), color: tokens.sec, marginTop: 3 },
+    addressContact: { fontFamily: fontFamilies.body.medium, fontSize: moderateScale(13), color: tokens.sec, marginTop: 5 },
+    changeLink: { fontFamily: fontFamilies.body.bold, fontSize: moderateScale(12), letterSpacing: 0.5, textTransform: "uppercase", color: accent.accent, flexShrink: 0 },
+
+    orderCard: { backgroundColor: tokens.surface, borderWidth: 1, borderColor: tokens.border, borderRadius: 18, padding: 14 },
+    orderCardHead: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 12 },
+    orderCardTitle: { fontFamily: fontFamilies.body.semibold, fontSize: moderateScale(15), color: tokens.text },
+    orderLine: { flexDirection: "row", justifyContent: "space-between", paddingVertical: 5 },
+    orderLineLabel: { flex: 1, fontFamily: fontFamilies.body.regular, fontSize: moderateScale(14), color: tokens.sec, marginRight: 10 },
+    orderLineValue: { fontFamily: fontFamilies.body.medium, fontSize: moderateScale(14), color: tokens.text },
+
+    couponOptionRow: { flexDirection: "row", alignItems: "center", gap: 12, borderWidth: 1, borderColor: tokens.border, borderRadius: 14, padding: 13, minHeight: 56 },
+    radioSelected: { width: 20, height: 20, borderRadius: 10, borderWidth: 2, borderColor: accent.accent, alignItems: "center", justifyContent: "center", flexShrink: 0 },
+    radioDot: { width: 10, height: 10, borderRadius: 5 },
+    couponCode: { fontFamily: fontFamilies.body.semibold, fontSize: moderateScale(15), color: tokens.text },
+    couponDesc: { fontFamily: fontFamilies.body.medium, fontSize: moderateScale(13), color: tokens.sec, marginTop: 2 },
+    promoInputRow: { flexDirection: "row", gap: 10 },
+    promoInput: {
+      flex: 1, backgroundColor: tokens.surface, borderWidth: 1, borderColor: tokens.border, borderRadius: 12,
+      paddingHorizontal: 14, height: moderateScale(44), fontFamily: fontFamilies.body.medium, fontSize: moderateScale(14), color: tokens.text,
+    },
+    promoApplyBtn: { backgroundColor: accent.accent, borderRadius: 12, paddingHorizontal: 18, alignItems: "center", justifyContent: "center" },
+    promoApplyBtnText: { fontFamily: fontFamilies.body.bold, fontSize: moderateScale(13), color: accent.on },
+    promoError: { fontFamily: fontFamilies.body.medium, fontSize: moderateScale(12), color: tokens.error, marginTop: 8 },
+
+    tipSub: { fontFamily: fontFamilies.body.regular, fontSize: moderateScale(13), lineHeight: moderateScale(19), color: tokens.sec, marginTop: -6, marginBottom: 12 },
+    tipRow: { flexDirection: "row", gap: 8 },
+    tipPill: { flex: 1, borderWidth: 1, borderColor: tokens.borderStrong, backgroundColor: tokens.surface, borderRadius: 12, paddingVertical: 12, alignItems: "center", minHeight: 44 },
+    tipPillText: { fontFamily: fontFamilies.body.semibold, fontSize: moderateScale(14), color: tokens.text },
+    otherTipInput: {
+      marginTop: 10, backgroundColor: tokens.surface, borderWidth: 1, borderColor: tokens.border, borderRadius: 12,
+      paddingHorizontal: 14, height: moderateScale(44), fontFamily: fontFamilies.body.medium, fontSize: moderateScale(14), color: tokens.text,
+    },
+
+    billCard: { backgroundColor: tokens.surface, borderWidth: 1, borderColor: tokens.border, borderRadius: 18, padding: 16, gap: 11 },
+    billRow: { flexDirection: "row", justifyContent: "space-between" },
+    billLabel: { fontFamily: fontFamilies.body.regular, fontSize: moderateScale(15), color: tokens.sec },
+    billValue: { fontFamily: fontFamilies.body.medium, fontSize: moderateScale(15), color: tokens.text },
+    billNote: { fontFamily: fontFamilies.body.regular, fontSize: moderateScale(13), color: tokens.muted },
+    billDivider: { borderTopWidth: 1, borderTopColor: tokens.borderStrong, borderStyle: "dashed", marginTop: 3, paddingTop: 1 },
+    billTotalLabel: { fontFamily: fontFamilies.body.semibold, fontSize: moderateScale(17), color: tokens.text },
+    billTotalValue: { fontFamily: fontFamilies.heading.semibold, fontSize: moderateScale(24), letterSpacing: -0.3, color: tokens.text },
+
+    footer: {
+      position: "absolute", left: 0, right: 0, bottom: 0, backgroundColor: tokens.surface,
+      borderTopWidth: 1, borderTopColor: tokens.border, borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingHorizontal: 16, paddingTop: 14,
+    },
+    placeOrderBtn: {
+      backgroundColor: accent.accent, borderRadius: 14, minHeight: moderateScale(52),
+      flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8,
+    },
+    placeOrderBtnText: { fontFamily: fontFamilies.body.bold, fontSize: moderateScale(15), color: accent.on },
+    placeOrderBtnPrice: { fontFamily: fontFamilies.body.bold, fontSize: moderateScale(15), color: accent.on, opacity: 0.85 },
+  });

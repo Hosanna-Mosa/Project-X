@@ -1,78 +1,81 @@
-import React, { useEffect, useState, useRef } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Image, Dimensions, SafeAreaView, Platform, StatusBar, ActivityIndicator, Animated, Easing, Modal } from 'react-native';
-import { Ionicons, Feather } from '@expo/vector-icons';
-import { router } from 'expo-router';
-import { LinearGradient } from 'expo-linear-gradient';
-import { moderateScale } from 'react-native-size-matters';
-import { customFetch } from '@/utils/api/custom-fetch';
-import { useDeliveryStore } from '@/contexts/deliveryStore';
-import { useCartStore } from '@/contexts/cartStore';
+import React, { useEffect, useMemo, useState } from "react";
+import {
+  ActivityIndicator,
+  Image,
+  Modal,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { Ionicons, Feather } from "@expo/vector-icons";
+import { router } from "expo-router";
+import { moderateScale } from "react-native-size-matters";
+import { customFetch } from "@/utils/api/custom-fetch";
+import { useDeliveryStore } from "@/contexts/deliveryStore";
+import { useCartStore } from "@/contexts/cartStore";
+import { designTokens, type ThemeTokens, type ServiceTokens } from "@/constants/colors";
+import { fontFamilies } from "@/constants/typography";
+import { useThemeStore } from "@/contexts/themeStore";
+import { AppTabBar, useAppTabBarHeight } from "@/components/AppTabBar";
 
-const { width } = Dimensions.get('window');
-const COLUMN_WIDTH = width / 3;
+// Standard Indian food-labeling convention: a circle for veg, a triangle
+// for non-veg, both inside a small squared-off border — not just two dot
+// shapes with a color swap.
+function DietMarker({ isVeg, color, style }: { isVeg: boolean; color: string; style?: any }) {
+  return (
+    <View style={[{ width: moderateScale(14), height: moderateScale(14), borderWidth: 1.5, borderColor: color, borderRadius: 3, alignItems: "center", justifyContent: "center" }, style]}>
+      {isVeg ? (
+        <View style={{ width: moderateScale(6), height: moderateScale(6), borderRadius: 999, backgroundColor: color }} />
+      ) : (
+        <View
+          style={{
+            width: 0, height: 0,
+            borderLeftWidth: moderateScale(3.5), borderRightWidth: moderateScale(3.5), borderBottomWidth: moderateScale(6),
+            borderLeftColor: "transparent", borderRightColor: "transparent", borderBottomColor: color,
+          }}
+        />
+      )}
+    </View>
+  );
+}
+
+function buildFoodItem(item: any) {
+  return {
+    _id: item._id,
+    name: item.name,
+    description: item.description || "",
+    price: item.price,
+    category: item.category || "149 Store",
+    isVeg: item.isVeg,
+    images: item.images && item.images.length > 0 ? item.images : ["https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=400"],
+  };
+}
 
 export default function Store149Screen() {
+  const insets = useSafeAreaInsets();
+  const tabBarHeight = useAppTabBarHeight();
   const { currentCoords } = useDeliveryStore();
   const { items: cartItems, addItem: addCartItem, updateQuantity: updateCartQuantity } = useCartStore();
   const [store149Items, setStore149Items] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedItem, setSelectedItem] = useState<any>(null);
   const [isSheetVisible, setIsSheetVisible] = useState(false);
+  const [activeCategory, setActiveCategory] = useState("All");
 
-  const floatAnim = useRef(new Animated.Value(0)).current;
-  const floatAnim2 = useRef(new Animated.Value(0)).current;
-  const floatAnim3 = useRef(new Animated.Value(0)).current;
-  const pulseAnim = useRef(new Animated.Value(1)).current;
-  const rotateAnim = useRef(new Animated.Value(0)).current;
-  const rotateAnimFast = useRef(new Animated.Value(0)).current;
-
-  useEffect(() => {
-    const createFloat = (anim: Animated.Value, duration: number) => {
-      Animated.loop(
-        Animated.sequence([
-          Animated.timing(anim, { toValue: 1, duration, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
-          Animated.timing(anim, { toValue: 0, duration, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
-        ])
-      ).start();
-    };
-    createFloat(floatAnim, 2000);
-    createFloat(floatAnim2, 3000);
-    createFloat(floatAnim3, 2500);
-
-    Animated.loop(
-      Animated.sequence([
-        Animated.timing(pulseAnim, { toValue: 1.3, duration: 1500, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
-        Animated.timing(pulseAnim, { toValue: 1, duration: 1500, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
-      ])
-    ).start();
-
-    Animated.loop(Animated.timing(rotateAnim, { toValue: 1, duration: 8000, easing: Easing.linear, useNativeDriver: true })).start();
-    Animated.loop(Animated.timing(rotateAnimFast, { toValue: 1, duration: 4000, easing: Easing.linear, useNativeDriver: true })).start();
-  }, []);
-
-  const getFloatStyle = (anim: Animated.Value, range: number) => ({
-    transform: [{ translateY: anim.interpolate({ inputRange: [0, 1], outputRange: [0, -range] }) }],
-  });
-
-  const pulsingStyle = {
-    transform: [{ scale: pulseAnim }],
-    opacity: pulseAnim.interpolate({ inputRange: [1, 1.3], outputRange: [0.8, 0.0] }),
-  };
-
-  const getRotateStyle = (anim: Animated.Value, reverse = false) => ({
-    transform: [{
-      rotate: anim.interpolate({ inputRange: [0, 1], outputRange: reverse ? ['360deg', '0deg'] : ['0deg', '360deg'] })
-    }],
-  });
+  const { theme } = useThemeStore();
+  const tokens = designTokens[theme];
+  const accent = tokens.services.food;
+  const styles = useMemo(() => createStyles(tokens, accent), [theme]);
 
   useEffect(() => {
     const fetchItems = async () => {
       try {
         if (currentCoords?.lat && currentCoords?.lng) {
           const data = await customFetch<any>(`/api/v1/food/store-149?lat=${currentCoords.lat}&lng=${currentCoords.lng}`);
-          if (Array.isArray(data)) {
-            setStore149Items(data);
-          }
+          if (Array.isArray(data)) setStore149Items(data);
         }
       } catch (error) {
         console.error("Error fetching 149 store items:", error);
@@ -83,290 +86,156 @@ export default function Store149Screen() {
     fetchItems();
   }, [currentCoords]);
 
+  const outletCount = useMemo(() => new Set(store149Items.map((i) => i.vendorId)).size, [store149Items]);
+  const categories = useMemo(() => {
+    const set = new Set<string>();
+    store149Items.forEach((i) => { if (i.category) set.add(i.category); });
+    return ["All", ...Array.from(set).slice(0, 6)];
+  }, [store149Items]);
+  const visibleItems = activeCategory === "All" ? store149Items : store149Items.filter((i) => i.category === activeCategory);
+
   return (
-    <View style={styles.container}>
-      <StatusBar barStyle="light-content" />
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 24 }}>
+    <View style={styles.root}>
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: tabBarHeight + 24 }}>
+        {/* Full-bleed accent header — the one screen that floods the accent
+            color, so the ₹149 promo gets its own identity before the
+            neutral system resumes below. */}
+        <View style={[styles.heroHeader, { paddingTop: insets.top + 4 }]}>
+          <TouchableOpacity style={styles.backBtn} onPress={() => (router.canGoBack() ? router.back() : router.replace("/(tabs)"))}>
+            <Ionicons name="chevron-back" size={moderateScale(20)} color={accent.on} />
+          </TouchableOpacity>
+          <Text style={styles.heroEyebrow}>Craving? Any dish</Text>
+          <Text style={styles.heroHeadline}>Everything{"\n"}at ₹149</Text>
+          <Text style={styles.heroSubtext}>
+            {store149Items.length} dishes{outletCount > 0 ? ` · ${outletCount} outlets` : ""}
+          </Text>
+        </View>
 
-        {/* Dynamic Purple Header */}
-        <LinearGradient
-          colors={['#7E3AF2', '#6025C0', '#4C1D95']}
-          style={styles.headerGradient}
-        >
-          <SafeAreaView>
-            {/* Top Bar Navigation */}
-            <View style={styles.topNav}>
-              <TouchableOpacity style={styles.navButton} onPress={() => router.back()}>
-                <Ionicons name="arrow-back" size={moderateScale(24)} color="#FFFFFF" />
+        <View style={styles.sheet}>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.categoryScrollContent}>
+            {categories.map((cat) => (
+              <TouchableOpacity
+                key={cat}
+                style={[styles.categoryChip, activeCategory === cat && styles.categoryChipActive]}
+                onPress={() => setActiveCategory(cat)}
+              >
+                <Text style={[styles.categoryChipText, activeCategory === cat && styles.categoryChipTextActive]}>{cat}</Text>
               </TouchableOpacity>
+            ))}
+          </ScrollView>
+
+          {loading ? (
+            <View style={{ paddingVertical: 60, alignItems: "center" }}>
+              <ActivityIndicator size="large" color={accent.accent} />
             </View>
+          ) : (
+            <View style={styles.grid}>
+              {visibleItems.map((item) => {
+                const cartItem = cartItems.find((i) => i._id === item._id);
+                const handleAdd = () => addCartItem(buildFoodItem(item), item.vendorId);
 
-            {/* Header Branding */}
-            <View style={styles.brandContainer}>
-              <View style={styles.logoBadge}>
-                <Text style={styles.logoBadgeText}>149</Text>
-              </View>
-              <Text style={styles.brandText}>Store</Text>
-            </View>
-
-            <Text style={styles.headerTitle}>Meals at ₹149</Text>
-            <Text style={styles.headerSubtitle}>from top restaurants near you</Text>
-
-            {/* Highly Animated Custom Banner Design */}
-            <View style={styles.bannerDesignContainer}>
-
-              {/* Multiple Pulsing Rings */}
-              <Animated.View style={[styles.glowRing, pulsingStyle, { width: 220, height: 220, borderRadius: 110, backgroundColor: 'rgba(237, 233, 254, 0.3)' }]} />
-              <Animated.View style={[styles.glowRing, pulsingStyle, { width: 160, height: 160, borderRadius: 80, backgroundColor: 'rgba(167, 139, 250, 0.4)' }]} />
-
-              {/* Particle System (Food Icons and Stars) */}
-              <Animated.View style={[styles.floatingElement, { top: -10, left: 30 }, getFloatStyle(floatAnim2, 20), getRotateStyle(rotateAnimFast)]}>
-                <Ionicons name="fast-food" size={moderateScale(32)} color="#C4B5FD" />
-              </Animated.View>
-              <Animated.View style={[styles.floatingElement, { bottom: 15, left: 15 }, getFloatStyle(floatAnim3, 15), getRotateStyle(rotateAnim)]}>
-                <Ionicons name="pizza" size={moderateScale(38)} color="#A78BFA" />
-              </Animated.View>
-              <Animated.View style={[styles.floatingElement, { top: 15, right: 30 }, getFloatStyle(floatAnim2, 25), getRotateStyle(rotateAnim, true)]}>
-                <Ionicons name="restaurant" size={moderateScale(28)} color="#C4B5FD" />
-              </Animated.View>
-              <Animated.View style={[styles.floatingElement, { bottom: 25, right: 15 }, getFloatStyle(floatAnim3, 20), getRotateStyle(rotateAnimFast, true)]}>
-                <Ionicons name="ice-cream" size={moderateScale(36)} color="#A78BFA" />
-              </Animated.View>
-
-              <Animated.View style={[styles.floatingElement, { top: 50, left: -5 }, getFloatStyle(floatAnim, 10)]}>
-                <Ionicons name="star" size={moderateScale(20)} color="#FFFFFF" />
-              </Animated.View>
-              <Animated.View style={[styles.floatingElement, { top: 65, right: -5 }, getFloatStyle(floatAnim, 15)]}>
-                <Ionicons name="sparkles" size={moderateScale(24)} color="#FFFFFF" />
-              </Animated.View>
-
-              {/* Center 3D-like Badge */}
-              <Animated.View style={[styles.centerBadgeContainer, getFloatStyle(floatAnim, 12)]}>
-                <LinearGradient colors={['#F5F3FF', '#C4B5FD', '#A78BFA']} style={styles.centerBadge} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}>
-                  <View style={styles.centerBadgeInner}>
-                    <Text style={styles.badgeTextTop}>CRAVING?</Text>
-                    <Text style={styles.badgeTextMain}>₹149</Text>
-                    <Text style={styles.badgeTextBottom}>ANY DISH</Text>
-                  </View>
-                </LinearGradient>
-              </Animated.View>
-            </View>
-          </SafeAreaView>
-        </LinearGradient>
-
-        {/* Product Grid Layout */}
-        {loading ? (
-          <View style={{ padding: 40, alignItems: 'center' }}>
-            <ActivityIndicator size="large" color="#7E3AF2" />
-          </View>
-        ) : (
-          <View style={styles.gridContainer}>
-            {store149Items.map((item, index) => {
-              const cartItem = cartItems.find((i) => i._id === item._id);
-
-              const handleAdd = () => {
-                const foodItem = {
-                  _id: item._id,
-                  name: item.name,
-                  description: item.description || "",
-                  price: item.price,
-                  category: item.category || "149 Store",
-                  isVeg: item.isVeg,
-                  images: item.images && item.images.length > 0 ? item.images : ["https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=400"]
-                };
-                addCartItem(foodItem, item.vendorId);
-              };
-
-              return (
-                <TouchableOpacity
-                  key={item._id}
-                  style={styles.productCard}
-                  activeOpacity={0.95}
-                  onPress={() => {
-                    setSelectedItem(item);
-                    setIsSheetVisible(true);
-                  }}
-                >
-
-                  {/* Product Image & Select Button */}
-                  <View style={styles.imageContainer}>
-                    <Image source={{ uri: item.images && item.images.length > 0 ? item.images[0] : "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=400" }} style={styles.productImage} />
-
-                    {/* Diet overlay (top-left) */}
-                    <View style={styles.dietOverlay}>
-                      <View style={[styles.dietIcon, { borderColor: item.isVeg ? "#16A34A" : "#E11D48" }]}>
-                        <View style={[styles.dietDot, { backgroundColor: item.isVeg ? "#16A34A" : "#E11D48" }]} />
+                return (
+                  <TouchableOpacity
+                    key={item._id}
+                    style={styles.card}
+                    activeOpacity={0.9}
+                    onPress={() => { setSelectedItem(item); setIsSheetVisible(true); }}
+                  >
+                    <View style={styles.cardImageWrap}>
+                      <Image
+                        source={{ uri: item.images && item.images.length > 0 ? item.images[0] : "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=400" }}
+                        style={styles.cardImage}
+                      />
+                    </View>
+                    <View style={styles.cardBody}>
+                      <View style={styles.cardMetaRow}>
+                        <DietMarker isVeg={!!item.isVeg} color={item.isVeg ? tokens.veg : tokens.nonveg} />
+                        <Text style={styles.cardRating}>{item.rating || "4.2"} ★</Text>
+                      </View>
+                      <Text style={styles.cardName} numberOfLines={1}>{item.name}</Text>
+                      <Text style={styles.cardBrand} numberOfLines={1}>{item.brand || "Restaurant"}</Text>
+                      <View style={styles.cardPriceRow}>
+                        <View style={{ flexDirection: "row", alignItems: "baseline", gap: 6 }}>
+                          <Text style={styles.cardPrice}>₹{item.price}</Text>
+                          {!!item.originalPrice && <Text style={styles.cardOriginalPrice}>₹{item.originalPrice}</Text>}
+                        </View>
+                        {cartItem ? (
+                          <View style={styles.qtyPill}>
+                            <TouchableOpacity onPress={() => updateCartQuantity(item._id, cartItem.quantity - 1)} style={styles.qtyBtn}>
+                              <Feather name="minus" size={moderateScale(12)} color={accent.accent} />
+                            </TouchableOpacity>
+                            <Text style={styles.qtyText}>{cartItem.quantity}</Text>
+                            <TouchableOpacity onPress={handleAdd} style={styles.qtyBtn}>
+                              <Feather name="plus" size={moderateScale(12)} color={accent.accent} />
+                            </TouchableOpacity>
+                          </View>
+                        ) : (
+                          <TouchableOpacity style={styles.addBtn} onPress={handleAdd}>
+                            <Feather name="plus" size={moderateScale(16)} color={accent.on} />
+                          </TouchableOpacity>
+                        )}
                       </View>
                     </View>
-
-                    {/* Rating overlay (top-right) */}
-                    <View style={styles.ratingOverlay}>
-                      <Ionicons name="star" size={moderateScale(9)} color="#F59E0B" />
-                      <Text style={styles.ratingOverlayText}>{item.rating || "4.2"}</Text>
-                    </View>
-
-                    {/* Add Button */}
-                    {cartItem ? (
-                      <View style={styles.qtyPill}>
-                        <TouchableOpacity
-                          onPress={() => updateCartQuantity(item._id, cartItem.quantity - 1)}
-                          style={styles.qtyBtn}
-                          activeOpacity={0.7}
-                        >
-                          <Feather name="minus" size={moderateScale(11)} color="#002045" />
-                        </TouchableOpacity>
-                        <Text style={styles.qtyText}>{cartItem.quantity}</Text>
-                        <TouchableOpacity
-                          onPress={handleAdd}
-                          style={styles.qtyBtn}
-                          activeOpacity={0.7}
-                        >
-                          <Feather name="plus" size={moderateScale(11)} color="#002045" />
-                        </TouchableOpacity>
-                      </View>
-                    ) : (
-                      <TouchableOpacity style={styles.selectButton} onPress={handleAdd}>
-                        <Text style={styles.selectButtonText}>ADD</Text>
-                      </TouchableOpacity>
-                    )}
-                  </View>
-
-                  {/* Quantity Pill equivalent (Brand) */}
-                  <View style={styles.quantityPill}>
-                    <Text style={styles.quantityText} numberOfLines={1}>{item.brand || "Restaurant"}</Text>
-                  </View>
-
-                  {/* Product Title */}
-                  <Text style={styles.productName} numberOfLines={2}>
-                    {item.name}
-                  </Text>
-
-                  {/* Pricing */}
-                  <View style={styles.priceRow}>
-                    <Text style={styles.discountPrice}>₹{item.price}</Text>
-                    {item.originalPrice && (
-                      <Text style={styles.originalPrice}>₹{item.originalPrice}</Text>
-                    )}
-                  </View>
-
-                </TouchableOpacity>
-              );
-            })}
-          </View>
-        )}
-
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          )}
+        </View>
       </ScrollView>
 
-      {/* Bottom Sheet Modal */}
-      <Modal
-        visible={isSheetVisible}
-        transparent={true}
-        animationType="slide"
-        onRequestClose={() => setIsSheetVisible(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <TouchableOpacity
-            style={styles.modalCloseBackdrop}
-            activeOpacity={1}
-            onPress={() => setIsSheetVisible(false)}
-          />
+      <AppTabBar accent="food" />
 
-          <View style={styles.sheetContainer}>
-            {/* Close Button overlapping the top center */}
-            <TouchableOpacity
-              style={styles.sheetCloseButton}
-              onPress={() => setIsSheetVisible(false)}
-            >
-              <Ionicons name="close" size={24} color="#FFF" />
+      {/* Item detail sheet */}
+      <Modal visible={isSheetVisible} transparent animationType="slide" onRequestClose={() => setIsSheetVisible(false)}>
+        <View style={styles.modalOverlay}>
+          <TouchableOpacity style={StyleSheet.absoluteFill} activeOpacity={1} onPress={() => setIsSheetVisible(false)} />
+          <View style={[styles.sheetModal, { paddingBottom: insets.bottom + 32 }]}>
+            <TouchableOpacity style={styles.sheetCloseBtn} onPress={() => setIsSheetVisible(false)}>
+              <Ionicons name="close" size={moderateScale(20)} color={tokens.bg} />
             </TouchableOpacity>
 
             {selectedItem && (
-              <View style={styles.sheetContent}>
-                {/* Image */}
+              <View>
                 <Image
                   source={{ uri: selectedItem.images && selectedItem.images.length > 0 ? selectedItem.images[0] : "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=400" }}
                   style={styles.sheetImage}
                   resizeMode="cover"
                 />
-
-                {/* Info Container */}
-                <View style={styles.sheetInfoContainer}>
-                  {/* First row: Veg/Bestseller and ADD button */}
+                <View style={styles.sheetInfo}>
                   <View style={styles.sheetRow}>
-                    <View style={styles.sheetBadgeContainer}>
-                      <View style={[styles.dietIcon, { borderColor: selectedItem.isVeg ? "#16A34A" : "#E11D48", marginRight: 6 }]}>
-                        <View style={[styles.dietDot, { backgroundColor: selectedItem.isVeg ? "#16A34A" : "#E11D48" }]} />
-                      </View>
-                      <Ionicons name="star" size={14} color="#E11D48" style={{ marginRight: 2 }} />
-                      <Text style={styles.bestsellerText}>Bestseller</Text>
+                    <View style={{ flexDirection: "row", alignItems: "center" }}>
+                      <DietMarker isVeg={!!selectedItem.isVeg} color={selectedItem.isVeg ? tokens.veg : tokens.nonveg} style={{ marginRight: 8 }} />
+                      <Text style={styles.sheetVegLabel}>{selectedItem.isVeg ? "Veg" : "Non-veg"}</Text>
                     </View>
-
-                    {/* Add button inside sheet */}
-                    <View>
-                      {cartItems.find((i) => i._id === selectedItem._id) ? (
+                    {(() => {
+                      const cartItem = cartItems.find((i) => i._id === selectedItem._id);
+                      return cartItem ? (
                         <View style={styles.sheetQtyPill}>
-                          <TouchableOpacity
-                            onPress={() => updateCartQuantity(selectedItem._id, cartItems.find((i) => i._id === selectedItem._id)!.quantity - 1)}
-                            style={styles.sheetQtyBtn}
-                          >
-                            <Feather name="minus" size={16} color="#7E3AF2" />
+                          <TouchableOpacity onPress={() => updateCartQuantity(selectedItem._id, cartItem.quantity - 1)} style={styles.qtyBtn}>
+                            <Feather name="minus" size={moderateScale(15)} color={accent.accent} />
                           </TouchableOpacity>
-                          <Text style={styles.sheetQtyText}>{cartItems.find((i) => i._id === selectedItem._id)!.quantity}</Text>
-                          <TouchableOpacity
-                            onPress={() => {
-                              const foodItem = {
-                                _id: selectedItem._id,
-                                name: selectedItem.name,
-                                description: selectedItem.description || "",
-                                price: selectedItem.price,
-                                category: selectedItem.category || "149 Store",
-                                isVeg: selectedItem.isVeg,
-                                images: selectedItem.images && selectedItem.images.length > 0 ? selectedItem.images : ["https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=400"]
-                              };
-                              addCartItem(foodItem, selectedItem.vendorId);
-                            }}
-                            style={styles.sheetQtyBtn}
-                          >
-                            <Feather name="plus" size={16} color="#7E3AF2" />
+                          <Text style={styles.sheetQtyText}>{cartItem.quantity}</Text>
+                          <TouchableOpacity onPress={() => addCartItem(buildFoodItem(selectedItem), selectedItem.vendorId)} style={styles.qtyBtn}>
+                            <Feather name="plus" size={moderateScale(15)} color={accent.accent} />
                           </TouchableOpacity>
                         </View>
                       ) : (
-                        <TouchableOpacity
-                          style={styles.sheetAddButton}
-                          onPress={() => {
-                            const foodItem = {
-                              _id: selectedItem._id,
-                              name: selectedItem.name,
-                              description: selectedItem.description || "",
-                              price: selectedItem.price,
-                              category: selectedItem.category || "149 Store",
-                              isVeg: selectedItem.isVeg,
-                              images: selectedItem.images && selectedItem.images.length > 0 ? selectedItem.images : ["https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=400"]
-                            };
-                            addCartItem(foodItem, selectedItem.vendorId);
-                          }}
-                        >
-                          <Text style={styles.sheetAddButtonText}>ADD</Text>
+                        <TouchableOpacity style={styles.sheetAddBtn} onPress={() => addCartItem(buildFoodItem(selectedItem), selectedItem.vendorId)}>
+                          <Text style={styles.sheetAddBtnText}>Add</Text>
                         </TouchableOpacity>
-                      )}
-                    </View>
+                      );
+                    })()}
                   </View>
 
-                  {/* Title */}
                   <Text style={styles.sheetTitle}>{selectedItem.name}</Text>
-
-                  {/* Price */}
-                  <Text style={styles.sheetPrice}>₹{selectedItem.price}</Text>
-
-                  {/* Rating */}
-                  <View style={styles.sheetRatingRow}>
-                    <Ionicons name="star" size={14} color="#16A34A" />
-                    <Text style={styles.sheetRatingText}> {selectedItem.rating || "4.2"} ({selectedItem.ratingCount || "34"})</Text>
+                  <View style={{ flexDirection: "row", alignItems: "baseline", gap: 8 }}>
+                    <Text style={styles.sheetPrice}>₹{selectedItem.price}</Text>
+                    {!!selectedItem.originalPrice && <Text style={styles.cardOriginalPrice}>₹{selectedItem.originalPrice}</Text>}
                   </View>
-
-                  {/* Description */}
+                  <Text style={styles.sheetRating}>{selectedItem.rating || "4.2"} ★ ({selectedItem.ratingCount || "34"} ratings)</Text>
                   <Text style={styles.sheetDescription}>
-                    {selectedItem.description || "Fresh and delicious meal prepared with the best ingredients by our top partners."}
+                    {selectedItem.description || "Fresh and delicious, prepared by our top partners."}
                   </Text>
                 </View>
               </View>
@@ -378,406 +247,58 @@ export default function Store149Screen() {
   );
 }
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#FFFFFF',
+const createStyles = (tokens: ThemeTokens, accent: ServiceTokens) => StyleSheet.create({
+  root: { flex: 1, backgroundColor: tokens.bg },
+
+  heroHeader: { backgroundColor: accent.accent, paddingHorizontal: 16, paddingBottom: 22 },
+  backBtn: {
+    width: moderateScale(40), height: moderateScale(40), borderRadius: moderateScale(20),
+    backgroundColor: "rgba(255,255,255,0.18)", alignItems: "center", justifyContent: "center", marginBottom: 16,
   },
-  headerGradient: {
-    paddingTop: Platform.OS === 'android' ? 20 : 0,
-    borderBottomLeftRadius: moderateScale(24),
-    borderBottomRightRadius: moderateScale(24),
-    overflow: 'hidden',
-    paddingBottom: 20,
+  heroEyebrow: { fontFamily: fontFamilies.body.bold, fontSize: moderateScale(11), letterSpacing: 1.4, textTransform: "uppercase", color: accent.on, opacity: 0.8 },
+  heroHeadline: { fontFamily: fontFamilies.heading.bold, fontSize: moderateScale(40), lineHeight: moderateScale(40), letterSpacing: -1.4, color: accent.on, marginTop: 10 },
+  heroSubtext: { fontFamily: fontFamilies.body.medium, fontSize: moderateScale(14), color: accent.on, opacity: 0.85, marginTop: 12 },
+
+  sheet: { backgroundColor: tokens.bg, borderRadius: 24, marginTop: -14, paddingTop: 16, paddingHorizontal: 16 },
+  categoryScrollContent: { gap: 8, paddingBottom: 16 },
+  categoryChip: { backgroundColor: tokens.surface, borderWidth: 1, borderColor: tokens.borderStrong, borderRadius: 999, paddingHorizontal: 14, paddingVertical: 9 },
+  categoryChipActive: { backgroundColor: accent.accent, borderColor: accent.accent },
+  categoryChipText: { fontFamily: fontFamilies.body.medium, fontSize: moderateScale(13), color: tokens.sec },
+  categoryChipTextActive: { color: accent.on, fontFamily: fontFamilies.body.semibold },
+
+  grid: { flexDirection: "row", flexWrap: "wrap", gap: 12 },
+  card: { width: "47.5%", backgroundColor: tokens.surface, borderWidth: 1, borderColor: tokens.border, borderRadius: moderateScale(18), overflow: "hidden" },
+  cardImageWrap: { height: 104, backgroundColor: tokens.sunken },
+  cardImage: { width: "100%", height: "100%" },
+  cardBody: { padding: 12 },
+  cardMetaRow: { flexDirection: "row", alignItems: "center", gap: 6 },
+  cardRating: { fontFamily: fontFamilies.body.medium, fontSize: moderateScale(12), color: tokens.sec },
+  cardName: { fontFamily: fontFamilies.body.semibold, fontSize: moderateScale(15), color: tokens.text, marginTop: 5 },
+  cardBrand: { fontFamily: fontFamilies.body.medium, fontSize: moderateScale(13), color: tokens.sec, marginTop: 3 },
+  cardPriceRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginTop: 10 },
+  cardPrice: { fontFamily: fontFamilies.body.bold, fontSize: moderateScale(15), color: tokens.text },
+  cardOriginalPrice: { fontFamily: fontFamilies.body.medium, fontSize: moderateScale(12), color: tokens.sec, textDecorationLine: "line-through" },
+  addBtn: { width: moderateScale(32), height: moderateScale(32), borderRadius: moderateScale(10), backgroundColor: accent.accent, alignItems: "center", justifyContent: "center" },
+  qtyPill: { flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: tokens.sunken, borderRadius: moderateScale(10), paddingHorizontal: 6, paddingVertical: 4 },
+  qtyBtn: { padding: 3 },
+  qtyText: { fontFamily: fontFamilies.body.bold, fontSize: moderateScale(12), color: tokens.text },
+
+  modalOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.6)", justifyContent: "flex-end" },
+  sheetModal: { backgroundColor: tokens.surface, borderTopLeftRadius: moderateScale(24), borderTopRightRadius: moderateScale(24), paddingBottom: 32 },
+  sheetCloseBtn: {
+    position: "absolute", top: -22, alignSelf: "center", width: moderateScale(44), height: moderateScale(44), borderRadius: moderateScale(22),
+    backgroundColor: tokens.text, alignItems: "center", justifyContent: "center", zIndex: 10,
   },
-  topNav: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingTop: 10,
-    marginBottom: 20,
-  },
-  navButton: {
-    width: moderateScale(36),
-    height: moderateScale(36),
-    borderRadius: moderateScale(18),
-    backgroundColor: 'rgba(255, 255, 255, 0.4)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginLeft: 8,
-  },
-  headerActions: {
-    flexDirection: 'row',
-  },
-  brandContainer: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 20,
-  },
-  logoBadge: {
-    borderWidth: 2,
-    borderColor: '#FFFFFF',
-    borderRadius: moderateScale(12),
-    paddingHorizontal: 12,
-    paddingVertical: 4,
-    marginRight: 8,
-  },
-  logoBadgeText: {
-    color: '#FFFFFF',
-    fontSize: moderateScale(24),
-    fontWeight: '900',
-  },
-  brandText: {
-    color: '#FFFFFF',
-    fontSize: moderateScale(28),
-    fontWeight: '800',
-  },
-  headerTitle: {
-    textAlign: 'center',
-    color: '#FFFFFF',
-    fontSize: moderateScale(22),
-    fontWeight: '800',
-    marginBottom: 4,
-  },
-  headerSubtitle: {
-    textAlign: 'center',
-    color: '#E5E7EB',
-    fontSize: moderateScale(14),
-    fontWeight: '500',
-    marginBottom: 20,
-  },
-  bannerDesignContainer: {
-    height: 180,
-    width: '100%',
-    alignItems: 'center',
-    justifyContent: 'center',
-    position: 'relative',
-    marginTop: 10,
-    marginBottom: 20,
-  },
-  glowRing: {
-    position: 'absolute',
-    zIndex: -1,
-  },
-  floatingElement: {
-    position: 'absolute',
-    zIndex: 10,
-    shadowColor: '#A78BFA',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.5,
-    shadowRadius: 8,
-    elevation: 5,
-  },
-  centerBadgeContainer: {
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.3,
-    shadowRadius: 15,
-    elevation: 10,
-  },
-  centerBadge: {
-    width: moderateScale(140),
-    height: moderateScale(140),
-    borderRadius: moderateScale(70),
-    padding: 6,
-  },
-  centerBadgeInner: {
-    flex: 1,
-    backgroundColor: '#7E3AF2',
-    borderRadius: moderateScale(64),
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 2,
-    borderColor: '#FFFFFF',
-    borderStyle: 'dashed',
-  },
-  badgeTextTop: {
-    color: '#C4B5FD',
-    fontSize: moderateScale(12),
-    fontWeight: '800',
-    letterSpacing: 1.5,
-    marginBottom: 2,
-  },
-  badgeTextMain: {
-    color: '#FFFFFF',
-    fontSize: moderateScale(42),
-    fontWeight: '900',
-    textShadowColor: 'rgba(0, 0, 0, 0.3)',
-    textShadowOffset: { width: 0, height: 3 },
-    textShadowRadius: 5,
-  },
-  badgeTextBottom: {
-    color: '#C4B5FD',
-    fontSize: moderateScale(14),
-    fontWeight: '800',
-    letterSpacing: 1,
-    marginTop: 2,
-  },
-  gridContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    padding: 8,
-  },
-  productCard: {
-    width: (width - 16) / 3, // 3 columns
-    padding: 8,
-    marginBottom: 16,
-  },
-  imageContainer: {
-    width: '100%',
-    aspectRatio: 1,
-    backgroundColor: '#F3F4F6',
-    borderRadius: moderateScale(8),
-    marginBottom: 8,
-    position: 'relative',
-    overflow: 'hidden',
-  },
-  productImage: {
-    width: '100%',
-    height: '100%',
-  },
-  selectButton: {
-    position: 'absolute',
-    top: 4,
-    right: 4,
-    backgroundColor: '#FFFFFF',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: moderateScale(6),
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 2,
-  },
-  selectButtonText: {
-    color: '#7E3AF2',
-    fontSize: moderateScale(10),
-    fontWeight: '700',
-  },
-  quantityPill: {
-    backgroundColor: '#F3F4F6',
-    alignSelf: 'center',
-    paddingHorizontal: 12,
-    paddingVertical: 4,
-    borderRadius: moderateScale(12),
-    marginBottom: 8,
-  },
-  quantityText: {
-    fontSize: moderateScale(10),
-    color: '#4B5563',
-    fontWeight: '600',
-  },
-  productName: {
-    fontSize: moderateScale(12),
-    fontWeight: '600',
-    color: '#1F2937',
-    marginBottom: 8,
-    minHeight: 32, // Ensures uniform height for 2 lines
-  },
-  priceRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  discountPrice: {
-    fontSize: moderateScale(14),
-    fontWeight: '800',
-    color: '#1F2937',
-    marginRight: 6,
-  },
-  originalPrice: {
-    fontSize: moderateScale(12),
-    color: '#9CA3AF',
-    textDecorationLine: 'line-through',
-    fontWeight: '500',
-  },
-  dietOverlay: {
-    position: 'absolute',
-    top: 4,
-    left: 4,
-    backgroundColor: 'rgba(255,255,255,0.9)',
-    borderRadius: moderateScale(4),
-    padding: 2,
-  },
-  dietIcon: {
-    width: moderateScale(10),
-    height: moderateScale(10),
-    borderWidth: 1,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  dietDot: {
-    width: moderateScale(4),
-    height: moderateScale(4),
-    borderRadius: moderateScale(2),
-  },
-  ratingOverlay: {
-    position: 'absolute',
-    top: 4,
-    right: 4,
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.9)',
-    paddingHorizontal: 4,
-    paddingVertical: 2,
-    borderRadius: moderateScale(4),
-  },
-  ratingOverlayText: {
-    fontSize: moderateScale(9),
-    fontWeight: '700',
-    color: '#1F2937',
-    marginLeft: 2,
-  },
-  qtyPill: {
-    position: 'absolute',
-    bottom: 4,
-    right: 4,
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    borderRadius: moderateScale(6),
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 2,
-  },
-  qtyBtn: {
-    padding: 4,
-  },
-  qtyText: {
-    fontSize: moderateScale(10),
-    fontWeight: '700',
-    color: '#1F2937',
-    paddingHorizontal: 4,
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.6)',
-    justifyContent: 'flex-end',
-  },
-  modalCloseBackdrop: {
-    ...StyleSheet.absoluteFillObject,
-  },
-  sheetContainer: {
-    backgroundColor: '#FFFFFF',
-    borderTopLeftRadius: moderateScale(24),
-    borderTopRightRadius: moderateScale(24),
-    paddingBottom: Platform.OS === 'ios' ? 40 : 24,
-    position: 'relative',
-    overflow: 'visible',
-  },
-  sheetCloseButton: {
-    position: 'absolute',
-    top: -22,
-    alignSelf: 'center',
-    width: moderateScale(44),
-    height: moderateScale(44),
-    borderRadius: moderateScale(22),
-    backgroundColor: '#111827',
-    alignItems: 'center',
-    justifyContent: 'center',
-    zIndex: 999,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
-    elevation: 5,
-  },
-  sheetContent: {
-    width: '100%',
-  },
-  sheetImage: {
-    width: '100%',
-    height: moderateScale(240),
-    borderTopLeftRadius: moderateScale(24),
-    borderTopRightRadius: moderateScale(24),
-  },
-  sheetInfoContainer: {
-    padding: 20,
-  },
-  sheetRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  sheetBadgeContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  bestsellerText: {
-    color: '#E11D48',
-    fontSize: moderateScale(12),
-    fontWeight: '700',
-  },
-  sheetAddButton: {
-    backgroundColor: '#FFFFFF',
-    borderWidth: 1.5,
-    borderColor: '#7E3AF2',
-    paddingHorizontal: 28,
-    paddingVertical: 8,
-    borderRadius: moderateScale(20),
-    shadowColor: '#7E3AF2',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  sheetAddButtonText: {
-    color: '#7E3AF2',
-    fontWeight: '800',
-    fontSize: moderateScale(14),
-  },
-  sheetQtyPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    borderRadius: moderateScale(20),
-    borderWidth: 1.5,
-    borderColor: '#7E3AF2',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-  },
-  sheetQtyBtn: {
-    padding: 4,
-  },
-  sheetQtyText: {
-    fontSize: moderateScale(14),
-    fontWeight: '800',
-    color: '#7E3AF2',
-    paddingHorizontal: 12,
-  },
-  sheetTitle: {
-    fontSize: moderateScale(20),
-    fontWeight: '800',
-    color: '#1F2937',
-    marginBottom: 8,
-  },
-  sheetPrice: {
-    fontSize: moderateScale(18),
-    fontWeight: '800',
-    color: '#1F2937',
-    marginBottom: 8,
-  },
-  sheetRatingRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  sheetRatingText: {
-    fontSize: moderateScale(13),
-    fontWeight: '600',
-    color: '#4B5563',
-  },
-  sheetDescription: {
-    fontSize: moderateScale(14),
-    color: '#6B7280',
-    lineHeight: moderateScale(20),
-  },
+  sheetImage: { width: "100%", height: moderateScale(220), borderTopLeftRadius: moderateScale(24), borderTopRightRadius: moderateScale(24) },
+  sheetInfo: { padding: 20 },
+  sheetRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 16 },
+  sheetVegLabel: { fontFamily: fontFamilies.body.semibold, fontSize: moderateScale(13), color: tokens.sec },
+  sheetAddBtn: { backgroundColor: accent.accent, borderRadius: 999, paddingHorizontal: 24, paddingVertical: 10 },
+  sheetAddBtnText: { fontFamily: fontFamilies.body.bold, fontSize: moderateScale(14), color: accent.on },
+  sheetQtyPill: { flexDirection: "row", alignItems: "center", gap: 10, borderWidth: 1.5, borderColor: accent.accent, borderRadius: 999, paddingHorizontal: 10, paddingVertical: 6 },
+  sheetQtyText: { fontFamily: fontFamilies.body.bold, fontSize: moderateScale(14), color: accent.accent },
+  sheetTitle: { fontFamily: fontFamilies.heading.semibold, fontSize: moderateScale(20), color: tokens.text, marginBottom: 6 },
+  sheetPrice: { fontFamily: fontFamilies.body.bold, fontSize: moderateScale(18), color: tokens.text },
+  sheetRating: { fontFamily: fontFamilies.body.medium, fontSize: moderateScale(13), color: tokens.sec, marginTop: 8 },
+  sheetDescription: { fontFamily: fontFamilies.body.regular, fontSize: moderateScale(14), lineHeight: moderateScale(20), color: tokens.sec, marginTop: 10 },
 });

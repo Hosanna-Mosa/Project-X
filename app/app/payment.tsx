@@ -1,142 +1,123 @@
-import React from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
-  Platform,
   ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
 } from "react-native";
-import { Feather } from "@expo/vector-icons";
-import { router, useLocalSearchParams } from "expo-router";
+import { Ionicons } from "@expo/vector-icons";
+import { router, useFocusEffect, useLocalSearchParams } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import Colors from "@/constants/colors";
+import { moderateScale } from "react-native-size-matters";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { designTokens, type ThemeTokens } from "@/constants/colors";
+import { fontFamilies } from "@/constants/typography";
+import { useThemeStore } from "@/contexts/themeStore";
 import { useAuthStore } from "@/contexts/authStore";
 import { useCartStore } from "@/contexts/cartStore";
 import { useDeliveryStore } from "@/contexts/deliveryStore";
-import { useThemeStore } from "@/contexts/themeStore";
+import { customFetch } from "@/utils/api/custom-fetch";
 import { RazorpayIntegration } from "@/utils/razorpay";
 
-const apiUrl = process.env.EXPO_PUBLIC_API_URL;
-
-type VendorDetails = {
-  _id: string;
-  name: string;
-  address: string;
-  location?: { coordinates?: number[] };
-};
+type VendorDetails = { _id: string; name: string; address: string; location?: { coordinates?: number[] } };
 
 export default function PaymentScreen() {
   const insets = useSafeAreaInsets();
   const params = useLocalSearchParams();
   const { theme } = useThemeStore();
-  const colors = Colors[theme];
-  const styles = React.useMemo(() => createStyles(colors), [colors]);
+  const tokens = designTokens[theme];
+  const accent = tokens.services.food;
+  const styles = useMemo(() => createStyles(tokens, accent), [theme]);
+
   const { items, vendorId, clearCart, getItemCount } = useCartStore();
   const { setOrderId, setStatus, setServiceType } = useDeliveryStore();
   const { user, token } = useAuthStore();
-  const [processing, setProcessing] = React.useState(false);
-  const [vendor, setVendor] = React.useState<VendorDetails | null>(null);
 
-  const total = Number(params.total || 0);
-  const subtotal = Number(params.subtotal || 0);
-  const taxes = Number(params.taxes || 0);
-  const deliveryFee = Number(params.deliveryFee || 0);
-  const address = String(params.address || "");
-  const deliveryTiming = String(params.deliveryTiming || "now");
-  const scheduledFor = params.scheduledFor ? String(params.scheduledFor) : "";
-  const deliveryAddress = React.useMemo(() => {
-    try {
-      return params.deliveryAddress ? JSON.parse(String(params.deliveryAddress)) : null;
-    } catch {
-      return null;
-    }
-  }, [params.deliveryAddress]);
-  const dropLat = Number(params.lat || 17.0005);
-  const dropLng = Number(params.lng || 81.804);
+  const [processing, setProcessing] = useState(false);
+  const [vendor, setVendor] = useState<VendorDetails | null>(null);
+  const [selectedAddress, setSelectedAddress] = useState<any>(null);
 
-  React.useEffect(() => {
-    const loadVendor = async () => {
-      if (!vendorId || !apiUrl) return;
-      try {
-        const response = await fetch(`${apiUrl}/api/v1/vendors/${vendorId}`);
-        if (response.ok) setVendor(await response.json());
-      } catch (error) {
-        console.warn("Unable to load vendor details", error);
-      }
-    };
-    loadVendor();
+  const subtotal = items.reduce((acc, item) => acc + item.price * item.quantity, 0) || Number(params.subtotal || 0);
+  const deliveryFee = params.deliveryFee ? Number(params.deliveryFee) : null;
+  const tip = Number(params.tip || 0);
+  const discount = Number(params.discount || 0);
+  const couponCode = params.couponCode ? String(params.couponCode) : "";
+  const total = Math.max(0, Math.round((subtotal + (deliveryFee || 0) + tip - discount) * 100) / 100);
+  const vendorName = params.vendorName ? String(params.vendorName) : vendor?.name || "your vendor";
+
+  useEffect(() => {
+    if (!vendorId) return;
+    customFetch<VendorDetails>(`/api/v1/vendors/${vendorId}`).then(setVendor).catch(() => {});
   }, [vendorId]);
+
+  useFocusEffect(
+    React.useCallback(() => {
+      (async () => {
+        try {
+          const activeStr = await AsyncStorage.getItem("active_address");
+          if (activeStr) setSelectedAddress(JSON.parse(activeStr));
+        } catch (e) {
+          console.error("Failed to load active address:", e);
+        }
+      })();
+    }, [])
+  );
 
   const handlePayment = async () => {
     if (!user || !token) {
-      Alert.alert("Login required", "Please login before placing your order.");
+      Alert.alert("Login required", "Please log in before placing your order.");
       return;
     }
     if (!vendorId || items.length === 0) {
       Alert.alert("Cart is empty", "Please add items before paying.");
       return;
     }
+    if (!selectedAddress?.addressLine) {
+      Alert.alert("Address required", "Please select a delivery address.");
+      router.push("/delivery/saved-addresses");
+      return;
+    }
 
     setProcessing(true);
     try {
-      const orderResponse = await fetch(`${apiUrl}/api/v1/payments/create-order`, {
+      const rzpOrderResponse = await customFetch<any>("/api/v1/payments/create-order", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ amount: total }),
       });
-      const paymentOrder = await orderResponse.json();
-      if (!orderResponse.ok) throw new Error(paymentOrder.message || "Failed to start payment");
 
       const paymentResult = await RazorpayIntegration.open({
-        key: paymentOrder.key,
-        amount: paymentOrder.amount,
-        currency: paymentOrder.currency,
-        name: paymentOrder.name || "Precision Logistics",
-        order_id: paymentOrder.id,
-        prefill: {
-          email: user?.email || paymentOrder.prefill?.email || "customer@example.com",
-          contact: user?.phone || "",
-        },
-        theme: paymentOrder.theme || { color: colors.primary },
+        order_id: rzpOrderResponse.id,
+        key: rzpOrderResponse.key,
+        amount: rzpOrderResponse.amount,
+        currency: rzpOrderResponse.currency,
+        name: rzpOrderResponse.name,
+        prefill: { email: user?.email || rzpOrderResponse.prefill?.email, contact: user?.phone || "" },
+        theme: rzpOrderResponse.theme,
       });
 
+      const dropLat = Number(selectedAddress.coordinates?.lat ?? selectedAddress.location?.coordinates?.[1] ?? 17.0005);
+      const dropLng = Number(selectedAddress.coordinates?.lng ?? selectedAddress.location?.coordinates?.[0] ?? 81.804);
       const vendorCoords = vendor?.location?.coordinates;
-      const pickupLng = Number(vendorCoords?.[0] ?? dropLng + 0.004);
       const pickupLat = Number(vendorCoords?.[1] ?? dropLat + 0.004);
-      const orderItems = items.map((item) => ({
-        id: item._id,
-        name: item.name,
-        quantity: item.quantity,
-        price: item.price,
-        total: item.price * item.quantity,
-      }));
+      const pickupLng = Number(vendorCoords?.[0] ?? dropLng + 0.004);
+      const orderItems = items.map((item) => ({ id: item._id, name: item.name, quantity: item.quantity, price: item.price, total: item.price * item.quantity }));
 
-      const verifyResponse = await fetch(`${apiUrl}/api/v1/payments/verify`, {
+      const verifyResponse = await customFetch<any>("/api/v1/payments/verify", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
         body: JSON.stringify({
           ...paymentResult,
           orderData: {
             serviceType: "delivery",
             vendorId,
-            totals: { subtotal, taxes, deliveryFee, total },
-            scheduledDelivery: {
-              type: deliveryTiming === "later" ? "later" : "now",
-              requestedAt: deliveryTiming === "later" && scheduledFor ? scheduledFor : undefined,
-              restaurantAccepted: deliveryTiming !== "later" || Boolean(scheduledFor),
-              acceptedAt: deliveryTiming === "later" ? new Date().toISOString() : undefined,
-            },
+            totals: { subtotal, deliveryFee: deliveryFee || 0, tip, discount, total },
             stops: [
               {
                 id: "vendor-pickup",
                 address: vendor?.address || "Restaurant pickup",
-                storeName: vendor?.name || "Restaurant",
+                storeName: vendorName,
                 latitude: pickupLat,
                 longitude: pickupLng,
                 type: "pickup",
@@ -144,12 +125,17 @@ export default function PaymentScreen() {
               },
               {
                 id: "customer-drop",
-                address,
-                deliveryAddress,
+                address: selectedAddress.addressLine,
+                deliveryAddress: {
+                  label: selectedAddress.label || "",
+                  addressLine: selectedAddress.addressLine,
+                  phone: selectedAddress.phone || "",
+                  receiverName: selectedAddress.receiverName || "",
+                  formattedAddress: selectedAddress.addressLine,
+                },
                 latitude: dropLat,
                 longitude: dropLng,
                 type: "drop",
-                instructions: params.instructions || "",
                 items: orderItems,
               },
             ],
@@ -157,21 +143,15 @@ export default function PaymentScreen() {
         }),
       });
 
-      const verifyData = await verifyResponse.json();
-      if (!verifyResponse.ok) throw new Error(verifyData.message || "Payment verification failed");
-
-      const finalOrder = verifyData.order;
+      const finalOrder = verifyResponse.order;
       setOrderId(finalOrder._id || finalOrder.id);
       setServiceType("delivery");
       setStatus("confirmed");
-      Alert.alert("Order placed", "Payment successful. Your order is now being assigned.");
-      router.replace({
-        pathname: "/finding-driver",
-        params: { orderId: finalOrder._id || finalOrder.id }
-      });
+      clearCart();
+      router.replace({ pathname: "/finding-driver", params: { orderId: finalOrder._id || finalOrder.id } });
     } catch (error: any) {
-      console.error("Food payment failed", error);
-      Alert.alert("Payment failed", error.message || "Please try again.");
+      console.error("Payment failed", error);
+      Alert.alert("Payment failed", error?.message || "Please try again.");
     } finally {
       setProcessing(false);
     }
@@ -179,77 +159,154 @@ export default function PaymentScreen() {
 
   return (
     <View style={styles.root}>
-      <View style={[styles.header, { paddingTop: insets.top + (Platform.OS === "web" ? 42 : 14) }]}>
-        <TouchableOpacity style={styles.iconButton} onPress={() => router.back()}>
-          <Feather name="arrow-left" size={20} color={colors.text} />
+      <View style={[styles.header, { paddingTop: insets.top + 6 }]}>
+        <TouchableOpacity style={styles.iconBtn} onPress={() => router.back()}>
+          <Ionicons name="chevron-back" size={moderateScale(20)} color={tokens.text} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Payment</Text>
+        <Text style={styles.headerTitleSolo}>Payment</Text>
       </View>
 
-      <ScrollView contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 130 }]}>
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>Pay Securely</Text>
-          <Text style={styles.amount}>Rs.{total}</Text>
-          <Text style={styles.mutedText}>Razorpay payment will create your order after verification.</Text>
+      <ScrollView contentContainerStyle={{ paddingBottom: insets.bottom + 150 }} showsVerticalScrollIndicator={false}>
+        <View style={styles.payingBlock}>
+          <Text style={styles.payingEyebrow}>Paying</Text>
+          <Text style={styles.payingAmount}>₹{total}</Text>
+          <Text style={styles.payingSub}>{vendorName} · {getItemCount()} items</Text>
         </View>
 
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>Payment Method</Text>
-          <View style={styles.methodRow}>
-            <Feather name="credit-card" size={18} color={colors.primary} />
-            <View style={styles.methodText}>
-              <Text style={styles.detailText}>Razorpay</Text>
-              <Text style={styles.mutedText}>Cards, UPI, wallets and net banking</Text>
+        <View style={styles.section}>
+          <View style={styles.billCard}>
+            <View style={styles.billRow}>
+              <Text style={styles.billLabel}>Item total</Text>
+              <Text style={styles.billValue}>₹{subtotal}</Text>
             </View>
-            <Feather name="check-circle" size={18} color={colors.success} />
+            {deliveryFee != null ? (
+              <View style={styles.billRow}>
+                <Text style={styles.billLabel}>Delivery fee</Text>
+                <Text style={styles.billValue}>{deliveryFee === 0 ? "Free" : `₹${deliveryFee}`}</Text>
+              </View>
+            ) : (
+              <Text style={styles.billNote}>Delivery fee is confirmed with your order.</Text>
+            )}
+            {tip > 0 && (
+              <View style={styles.billRow}>
+                <Text style={styles.billLabel}>Delivery tip</Text>
+                <Text style={styles.billValue}>₹{tip}</Text>
+              </View>
+            )}
+            {discount > 0 && (
+              <View style={styles.billRow}>
+                <Text style={[styles.billLabel, { color: tokens.success }]}>Coupon {couponCode}</Text>
+                <Text style={[styles.billValue, { color: tokens.success }]}>−₹{discount}</Text>
+              </View>
+            )}
+            <View style={styles.billDivider} />
+            <View style={styles.billRow}>
+              <Text style={styles.billTotalLabel}>To pay</Text>
+              <Text style={styles.billTotalValue}>₹{total}</Text>
+            </View>
           </View>
         </View>
 
-        <View style={styles.card}>
-          <Text style={styles.cardTitle}>Final Summary</Text>
-          <View style={styles.row}><Text style={styles.label}>Items</Text><Text style={styles.value}>{getItemCount()}</Text></View>
-          <View style={styles.row}><Text style={styles.label}>Subtotal</Text><Text style={styles.value}>Rs.{subtotal}</Text></View>
-          <View style={styles.row}><Text style={styles.label}>Delivery</Text><Text style={styles.value}>{deliveryFee === 0 ? "Free" : `Rs.${deliveryFee}`}</Text></View>
-          <View style={styles.row}><Text style={styles.label}>Taxes</Text><Text style={styles.value}>Rs.{taxes}</Text></View>
+        <View style={styles.section}>
+          <View style={styles.addressCard}>
+            <View style={styles.addressAvatar}>
+              <Text style={styles.addressAvatarText}>{(selectedAddress?.label || "A")[0].toUpperCase()}</Text>
+            </View>
+            <View style={{ flex: 1, minWidth: 0 }}>
+              <Text style={styles.addressTitle}>Deliver to {selectedAddress?.label || "…"}</Text>
+              <Text style={styles.addressLine} numberOfLines={2}>{selectedAddress?.addressLine || "No address selected"}</Text>
+            </View>
+          </View>
+        </View>
+
+        <View style={styles.section}>
+          <Text style={styles.sectionLabel}>Payment</Text>
+          <View style={styles.methodRow}>
+            <View style={styles.methodIcon}>
+              <Ionicons name="card-outline" size={moderateScale(18)} color={tokens.sec} />
+            </View>
+            <View style={{ flex: 1, minWidth: 0 }}>
+              <Text style={styles.methodTitle}>Razorpay</Text>
+              <Text style={styles.methodSub}>UPI, cards, wallets and net banking — choose on the next step</Text>
+            </View>
+          </View>
+        </View>
+
+        <View style={styles.section}>
+          <View style={styles.trustRow}>
+            <Ionicons name="lock-closed" size={moderateScale(14)} color={tokens.success} />
+            <Text style={styles.trustText}>
+              Encrypted and secure transaction. Flavour never sees or stores your card, UPI PIN or bank credentials.
+            </Text>
+          </View>
         </View>
       </ScrollView>
 
-      <View style={[styles.footer, { paddingBottom: insets.bottom + 16 }]}>
-        <TouchableOpacity style={[styles.payButton, processing && styles.disabledButton]} onPress={handlePayment} disabled={processing}>
+      <View style={[styles.footer, { paddingBottom: insets.bottom + 14 }]}>
+        <TouchableOpacity style={styles.payBtn} activeOpacity={0.9} onPress={handlePayment} disabled={processing}>
           {processing ? (
-            <ActivityIndicator color="#fff" />
+            <ActivityIndicator size="small" color={accent.on} />
           ) : (
             <>
-              <Text style={styles.payButtonText}>Pay Rs.{total}</Text>
-              <Feather name="shield" size={18} color="#fff" />
+              <Text style={styles.payBtnText}>Pay securely</Text>
+              <Text style={styles.payBtnPrice}>· ₹{total}</Text>
             </>
           )}
         </TouchableOpacity>
-        <Text style={styles.secureText}>ENCRYPTED AND SECURE TRANSACTION</Text>
       </View>
     </View>
   );
 }
 
-const createStyles = (colors: typeof Colors.light) => StyleSheet.create({
-  root: { flex: 1, backgroundColor: colors.background },
-  header: { flexDirection: "row", alignItems: "center", gap: 12, paddingHorizontal: 16, paddingBottom: 14, backgroundColor: colors.surface, borderBottomWidth: 1, borderBottomColor: colors.border },
-  iconButton: { width: 38, height: 38, borderRadius: 10, borderWidth: 1, borderColor: colors.border, alignItems: "center", justifyContent: "center" },
-  headerTitle: { fontSize: 18, fontWeight: "800", color: colors.text },
-  content: { padding: 16, gap: 14 },
-  card: { backgroundColor: colors.surface, borderRadius: 8, borderWidth: 1, borderColor: colors.border, padding: 14, gap: 12 },
-  cardTitle: { fontSize: 16, fontWeight: "800", color: colors.text },
-  amount: { fontSize: 34, fontWeight: "900", color: colors.text },
-  mutedText: { fontSize: 12, color: colors.textSecondary, lineHeight: 18 },
-  methodRow: { flexDirection: "row", alignItems: "center", gap: 12 },
-  methodText: { flex: 1 },
-  detailText: { fontSize: 14, fontWeight: "800", color: colors.text },
-  row: { flexDirection: "row", justifyContent: "space-between" },
-  label: { fontSize: 13, color: colors.textSecondary },
-  value: { fontSize: 13, fontWeight: "700", color: colors.text },
-  footer: { position: "absolute", bottom: 0, left: 0, right: 0, paddingHorizontal: 16, paddingTop: 14, backgroundColor: colors.surface, borderTopWidth: 1, borderTopColor: colors.border, gap: 8 },
-  payButton: { backgroundColor: colors.primary, borderRadius: 12, paddingVertical: 15, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8 },
-  disabledButton: { opacity: 0.55 },
-  payButtonText: { color: "#fff", fontSize: 15, fontWeight: "800" },
-  secureText: { textAlign: "center", fontSize: 9, fontWeight: "700", color: colors.textMuted, letterSpacing: 1 },
-});
+const createStyles = (tokens: ThemeTokens, accent: ThemeTokens["services"]["food"]) =>
+  StyleSheet.create({
+    root: { flex: 1, backgroundColor: tokens.bg },
+    header: { flexDirection: "row", alignItems: "center", gap: 12, paddingHorizontal: 16, paddingBottom: 12 },
+    iconBtn: {
+      width: moderateScale(40), height: moderateScale(40), borderRadius: moderateScale(20),
+      backgroundColor: tokens.surface, borderWidth: 1, borderColor: tokens.border, alignItems: "center", justifyContent: "center",
+    },
+    headerTitleSolo: { fontFamily: fontFamilies.body.semibold, fontSize: moderateScale(17), color: tokens.text },
+
+    payingBlock: { alignItems: "center", paddingHorizontal: 16, paddingTop: 18 },
+    payingEyebrow: { fontFamily: fontFamilies.body.bold, fontSize: moderateScale(11), letterSpacing: 1, textTransform: "uppercase", color: tokens.muted },
+    payingAmount: { fontFamily: fontFamilies.heading.bold, fontSize: moderateScale(44), lineHeight: moderateScale(46), letterSpacing: -0.8, color: tokens.text, marginTop: 8 },
+    payingSub: { fontFamily: fontFamilies.body.medium, fontSize: moderateScale(13), color: tokens.sec, marginTop: 8 },
+
+    section: { paddingHorizontal: 16, paddingTop: 18 },
+    sectionLabel: { fontFamily: fontFamilies.body.bold, fontSize: moderateScale(11), letterSpacing: 1, textTransform: "uppercase", color: tokens.muted, marginBottom: 10 },
+
+    billCard: { backgroundColor: tokens.surface, borderWidth: 1, borderColor: tokens.border, borderRadius: 18, padding: 16, gap: 11 },
+    billRow: { flexDirection: "row", justifyContent: "space-between" },
+    billLabel: { fontFamily: fontFamilies.body.regular, fontSize: moderateScale(15), color: tokens.sec },
+    billValue: { fontFamily: fontFamilies.body.medium, fontSize: moderateScale(15), color: tokens.text },
+    billNote: { fontFamily: fontFamilies.body.regular, fontSize: moderateScale(13), color: tokens.muted },
+    billDivider: { borderTopWidth: 1, borderTopColor: tokens.borderStrong, borderStyle: "dashed", marginTop: 3, paddingTop: 1 },
+    billTotalLabel: { fontFamily: fontFamilies.body.semibold, fontSize: moderateScale(17), color: tokens.text },
+    billTotalValue: { fontFamily: fontFamilies.body.bold, fontSize: moderateScale(17), color: tokens.text },
+
+    addressCard: { flexDirection: "row", alignItems: "flex-start", gap: 12, backgroundColor: tokens.surface, borderWidth: 1, borderColor: tokens.border, borderRadius: 16, padding: 14 },
+    addressAvatar: { width: 34, height: 34, borderRadius: 11, backgroundColor: accent.skin, alignItems: "center", justifyContent: "center", flexShrink: 0 },
+    addressAvatarText: { fontFamily: fontFamilies.body.bold, fontSize: moderateScale(14), color: accent.accent },
+    addressTitle: { fontFamily: fontFamilies.body.semibold, fontSize: moderateScale(15), color: tokens.text },
+    addressLine: { fontFamily: fontFamilies.body.regular, fontSize: moderateScale(13), lineHeight: moderateScale(18), color: tokens.sec, marginTop: 3 },
+
+    methodRow: { flexDirection: "row", alignItems: "center", gap: 12, backgroundColor: tokens.surface, borderWidth: 1, borderColor: tokens.border, borderRadius: 16, padding: 14, minHeight: 64 },
+    methodIcon: { width: 40, height: 40, borderRadius: 12, backgroundColor: tokens.sunken, borderWidth: 1, borderColor: tokens.border, alignItems: "center", justifyContent: "center" },
+    methodTitle: { fontFamily: fontFamilies.body.semibold, fontSize: moderateScale(15), color: tokens.text },
+    methodSub: { fontFamily: fontFamilies.body.regular, fontSize: moderateScale(13), lineHeight: moderateScale(18), color: tokens.sec, marginTop: 2 },
+
+    trustRow: { flexDirection: "row", alignItems: "flex-start", gap: 10, backgroundColor: tokens.successSkin, borderRadius: 14, padding: 13 },
+    trustText: { flex: 1, fontFamily: fontFamilies.body.regular, fontSize: moderateScale(13), lineHeight: moderateScale(19), color: tokens.sec },
+
+    footer: {
+      position: "absolute", left: 0, right: 0, bottom: 0, backgroundColor: tokens.surface,
+      borderTopWidth: 1, borderTopColor: tokens.border, borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingHorizontal: 16, paddingTop: 14,
+    },
+    payBtn: {
+      backgroundColor: accent.accent, borderRadius: 14, minHeight: moderateScale(52),
+      flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8,
+    },
+    payBtnText: { fontFamily: fontFamilies.body.bold, fontSize: moderateScale(15), color: accent.on },
+    payBtnPrice: { fontFamily: fontFamilies.body.bold, fontSize: moderateScale(15), color: accent.on, opacity: 0.85 },
+  });
