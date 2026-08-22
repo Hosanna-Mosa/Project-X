@@ -23,6 +23,7 @@ import { useCartStore } from "@/contexts/cartStore";
 import { useAuthStore } from "@/contexts/authStore";
 import { AppTabBar, useAppTabBarHeight } from "@/components/AppTabBar";
 import { shareRestaurant } from "@/utils/shareLink";
+import { addToCartWithConfirm } from "@/utils/addToCart";
 
 interface FoodItem {
   _id: string;
@@ -49,7 +50,7 @@ export default function RestaurantMenu() {
   const styles = useMemo(() => createStyles(tokens, accent), [theme, isMeat]);
 
   const { setVendorId } = useDeliveryStore();
-  const { items, addItem, updateQuantity, getItemCount } = useCartStore();
+  const { items, updateQuantity, getItemCount } = useCartStore();
   const user = useAuthStore((s) => s.user);
   const toggleFavorite = useAuthStore((s) => s.toggleFavorite);
   const isFavorite = useMemo(() => user?.favorites?.includes(id as string) || false, [user?.favorites, id]);
@@ -58,6 +59,11 @@ export default function RestaurantMenu() {
   const [menu, setMenu] = useState<FoodItem[]>([]);
   const [activeCategory, setActiveCategory] = useState("");
   const [scrolledPast, setScrolledPast] = useState(false);
+  // Real measured height of the solid header, used to dock the category
+  // tabs bar right against its bottom edge — the previous hardcoded
+  // `insets.top + moderateScale(52)` guess didn't always match the header's
+  // actual rendered height, leaving a visible gap (or overlap) between them.
+  const [solidHeaderHeight, setSolidHeaderHeight] = useState(0);
   const [searchQuery, setSearchQuery] = useState("");
   const [vegOnly, setVegOnly] = useState(false);
   const [highlightedItemId, setHighlightedItemId] = useState("");
@@ -69,7 +75,7 @@ export default function RestaurantMenu() {
     if (loadingItems[item._id] || item.isAvailable === false) return;
     setLoadingItems((prev) => ({ ...prev, [item._id]: true }));
     setTimeout(() => {
-      addItem(item as any, id as string);
+      addToCartWithConfirm(item as any, id as string, name as string);
       setLoadingItems((prev) => ({ ...prev, [item._id]: false }));
     }, 450);
   };
@@ -204,7 +210,7 @@ export default function RestaurantMenu() {
     <View style={styles.container}>
       {/* Overlay header — icons over the hero until scrolled, solid bar after */}
       {!scrolledPast ? (
-        <View style={[styles.heroOverlay, { top: insets.top + 10 }]}>
+        <View style={[styles.heroOverlay, { top: Math.max(insets.top, 24) + 10 }]}>
           <TouchableOpacity style={styles.circleBtn} onPress={() => router.back()}>
             <Ionicons name="chevron-back" size={moderateScale(20)} color="#fff" />
           </TouchableOpacity>
@@ -212,13 +218,13 @@ export default function RestaurantMenu() {
             <TouchableOpacity style={styles.circleBtn} onPress={() => toggleFavorite(id as string)}>
               <Ionicons name={isFavorite ? "heart" : "heart-outline"} size={moderateScale(18)} color={isFavorite ? accent.accent : "#fff"} />
             </TouchableOpacity>
-            <TouchableOpacity style={styles.circleBtn} onPress={() => setScrolledPast(true)}>
-              <Ionicons name="search" size={moderateScale(18)} color="#fff" />
-            </TouchableOpacity>
           </View>
         </View>
       ) : (
-        <View style={[styles.solidHeader, { paddingTop: insets.top }]}>
+        <View
+          style={[styles.solidHeader, { paddingTop: Math.max(insets.top, 24) }]}
+          onLayout={(e) => setSolidHeaderHeight(e.nativeEvent.layout.height)}
+        >
           <TouchableOpacity style={styles.solidHeaderBtn} onPress={() => router.back()}>
             <Ionicons name="chevron-back" size={moderateScale(20)} color={tokens.text} />
           </TouchableOpacity>
@@ -230,7 +236,7 @@ export default function RestaurantMenu() {
       )}
 
       {scrolledPast && categoryTabs.length > 0 && (
-        <View style={[styles.fixedTabsBar, { top: insets.top + moderateScale(52) }]}>
+        <View style={[styles.fixedTabsBar, { top: solidHeaderHeight || Math.max(insets.top, 24) + moderateScale(52) }]}>
           <CategoryTabs categoryTabs={categoryTabs} activeCategory={activeCategory} onPress={handleCategoryPress} styles={styles} />
         </View>
       )}
@@ -290,11 +296,11 @@ export default function RestaurantMenu() {
           )}
 
           <View style={styles.searchRow}>
-            <Ionicons name="search" size={moderateScale(15)} color={tokens.sec} />
+            <Ionicons name="search" size={moderateScale(17)} color={accent.accent} />
             <TextInput
               style={styles.searchInput}
-              placeholder={`Search in ${name}`}
-              placeholderTextColor={tokens.muted}
+              placeholder="Search dishes"
+              placeholderTextColor={tokens.sec}
               value={searchQuery}
               onChangeText={setSearchQuery}
             />
@@ -523,10 +529,10 @@ const createStyles = (tokens: ThemeTokens, accent: ThemeTokens["services"]["food
 
     searchRow: {
       flexDirection: "row", alignItems: "center", gap: 10, marginTop: 16,
-      backgroundColor: tokens.surface, borderWidth: 1, borderColor: tokens.border,
-      borderRadius: 14, height: moderateScale(46), paddingHorizontal: 14,
+      backgroundColor: tokens.surface, borderWidth: 1.5, borderColor: tokens.borderStrong,
+      borderRadius: 14, height: moderateScale(48), paddingHorizontal: 14,
     },
-    searchInput: { flex: 1, fontFamily: fontFamilies.body.regular, fontSize: moderateScale(14), color: tokens.text },
+    searchInput: { flex: 1, fontFamily: fontFamilies.body.medium, fontSize: moderateScale(15), color: tokens.text },
 
     tabsScrollContent: { paddingHorizontal: 16, gap: 20, alignItems: "center" },
     tabItem: { paddingVertical: 12, alignItems: "center" },

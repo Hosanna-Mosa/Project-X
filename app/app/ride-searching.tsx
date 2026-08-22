@@ -664,7 +664,7 @@ const createStyles = (colors: typeof Colors.light, insets: any) =>
     },
     screenBackButton: {
       position: "absolute",
-      top: insets.top + 12,
+      top: Math.max(insets.top, 24) + 12,
       left: 16,
       width: 44,
       height: 44,

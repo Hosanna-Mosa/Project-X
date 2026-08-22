@@ -248,7 +248,7 @@ export default function PickupConfirmationScreen() {
         </View>
 
         <TouchableOpacity
-          style={[styles.backButton, { top: insets.top + 16 }]}
+          style={[styles.backButton, { top: Math.max(insets.top, 24) + 16 }]}
           onPress={() => router.back()}
         >
           <Ionicons name="arrow-back" size={22} color={colors.text} />

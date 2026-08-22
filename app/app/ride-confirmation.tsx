@@ -445,8 +445,16 @@ export default function RideConfirmationScreen() {
 
           {pickupIsValid && (
             <Marker coordinate={pickupCoords} anchor={{ x: 0.5, y: 1 }} tracksViewChanges>
-              <View collapsable={false} style={styles.mapPinContainer}>
-                <View style={styles.pickupDotMarker} />
+              {/* A hollow ring in the ride accent color read as an unstyled
+                  "blue dot" rather than a pickup pin. Proper pin shape
+                  (solid head + pointed tail), bottom-aligned in its box to
+                  match anchor: {y: 1} so the tail tip actually lands on the
+                  coordinate instead of floating above it. */}
+              <View collapsable={false} style={styles.pickupPinWrap}>
+                <View style={styles.pickupPinHead}>
+                  <View style={styles.pickupPinDot} />
+                </View>
+                <View style={styles.pickupPinTail} />
               </View>
               <Callout tooltip onPress={() => router.back()}>
                 <View style={styles.locationBubble}>
@@ -486,7 +494,7 @@ export default function RideConfirmationScreen() {
           )}
         </MapView>
 
-        <View style={[styles.mapOverlay, { top: insets.top + 10 }]}>
+        <View style={[styles.mapOverlay, { top: Math.max(insets.top, 24) + 10 }]}>
           <TouchableOpacity style={styles.circleBtn} onPress={() => router.back()}>
             <Ionicons name="chevron-back" size={moderateScale(20)} color={tokens.text} />
           </TouchableOpacity>
@@ -520,7 +528,7 @@ export default function RideConfirmationScreen() {
           </TouchableOpacity>
         </View>
 
-        <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingHorizontal: 20 }} showsVerticalScrollIndicator={false}>
+        <ScrollView contentContainerStyle={{ paddingHorizontal: 20 }} showsVerticalScrollIndicator={false}>
           <View style={{ gap: 8 }}>
             {ENABLED_TIERS.map((tier) => {
               const isSelected = selectedTier === tier.id;
@@ -703,8 +711,20 @@ const createStyles = (tokens: ThemeTokens, accent: ThemeTokens["services"]["ride
     routeChipSub: { fontFamily: fontFamilies.body.medium, fontSize: moderateScale(12), color: tokens.sec, marginTop: 2 },
 
     mapPinContainer: { width: 40, height: 40, alignItems: "center", justifyContent: "center" },
-    pickupDotMarker: { width: 22, height: 22, borderRadius: 11, backgroundColor: tokens.surface, borderWidth: 4, borderColor: accent.accent },
     dropSquareMarker: { width: 22, height: 22, borderRadius: 6, backgroundColor: tokens.text, borderWidth: 3, borderColor: tokens.surface },
+
+    pickupPinWrap: { width: 40, height: 44, alignItems: "center", justifyContent: "flex-end" },
+    pickupPinHead: {
+      width: 26, height: 26, borderRadius: 13, backgroundColor: accent.accent,
+      borderWidth: 3, borderColor: "#fff", alignItems: "center", justifyContent: "center",
+      shadowColor: "#000", shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.25, shadowRadius: 3, elevation: 4,
+    },
+    pickupPinDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: "#fff" },
+    pickupPinTail: {
+      width: 0, height: 0, marginTop: -2,
+      borderLeftWidth: 6, borderRightWidth: 6, borderTopWidth: 9,
+      borderLeftColor: "transparent", borderRightColor: "transparent", borderTopColor: accent.accent,
+    },
     userPin: { width: 22, height: 22, borderRadius: 11, backgroundColor: accent.accent, borderWidth: 3, borderColor: "#fff", alignItems: "center", justifyContent: "center" },
     pinInnerDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: "#fff" },
     stopPin: { width: 18, height: 18, backgroundColor: tokens.text, transform: [{ rotate: "45deg" }], borderWidth: 2, borderColor: tokens.surface },
@@ -716,9 +736,13 @@ const createStyles = (tokens: ThemeTokens, accent: ThemeTokens["services"]["ride
     locationBubbleText: { flex: 1, fontFamily: fontFamilies.body.bold, fontSize: moderateScale(12), color: tokens.text },
     editBubbleBtn: { width: 22, height: 22, borderRadius: 11, backgroundColor: accent.skin, alignItems: "center", justifyContent: "center", marginLeft: 6 },
 
+    // Was a fixed height: "63%" regardless of how much the trip-options
+    // list actually needed — with just Bike/Auto/Schedule, that left a big
+    // empty gap between the content and the Book button, and hid more of
+    // the map than necessary. Sized to content instead.
     sheet: {
-      height: "63%", backgroundColor: tokens.surface, borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingTop: 12,
-      borderTopWidth: 1, borderColor: tokens.border,
+      backgroundColor: tokens.surface, borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingTop: 12,
+      borderTopWidth: 1, borderColor: tokens.border, maxHeight: "63%",
     },
     sheetHandle: { width: 38, height: 4, borderRadius: 2, backgroundColor: tokens.borderStrong, alignSelf: "center", marginBottom: 14 },
     sheetHeadRow: { flexDirection: "row", alignItems: "baseline", justifyContent: "space-between", paddingHorizontal: 20, marginBottom: 12 },

@@ -103,7 +103,7 @@ export default function DeliveryEntryScreen() {
     <View style={styles.root}>
       <MapBackground ref={mapRef} stops={stops} polyline={route?.polyline} onLocationUpdate={handleLocationUpdate} style={StyleSheet.absoluteFill} />
 
-      <View style={[styles.header, { paddingTop: insets.top + 6 }]}>
+      <View style={[styles.header, { paddingTop: Math.max(insets.top, 24) + 6 }]}>
         <TouchableOpacity style={styles.iconBtn} onPress={() => router.back()}>
           <Ionicons name="chevron-back" size={moderateScale(20)} color={tokens.text} />
         </TouchableOpacity>

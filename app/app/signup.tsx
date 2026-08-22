@@ -106,7 +106,7 @@ export default function SignupScreen() {
       behavior={Platform.OS === "ios" ? "padding" : "height"}
     >
       {/* Back button */}
-      <View style={[styles.headerRow, { paddingTop: insets.top + 4 }]}>
+      <View style={[styles.headerRow, { paddingTop: Math.max(insets.top, 24) + 4 }]}>
         <TouchableOpacity
           style={styles.backBtn}
           onPress={() => {

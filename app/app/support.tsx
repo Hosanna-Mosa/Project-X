@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { Linking, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { Alert, Platform, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { router, useFocusEffect } from "expo-router";
@@ -96,7 +96,7 @@ export default function SupportScreen() {
   const toggleFAQ = (index: number) => setExpandedFAQ(expandedFAQ === index ? null : index);
 
   return (
-    <View style={[styles.root, { paddingTop: insets.top + (Platform.OS === "web" ? 67 : 0) }]}>
+    <View style={[styles.root, { paddingTop: Math.max(insets.top, 24) + (Platform.OS === "web" ? 67 : 0) }]}>
       <View style={styles.header}>
         <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
           <Ionicons name="chevron-back" size={moderateScale(20)} color={tokens.text} />
@@ -139,24 +139,34 @@ export default function SupportScreen() {
             <Ionicons name="chevron-forward" size={18} color={tokens.muted} />
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.contactRow} onPress={() => Linking.openURL("tel:18002024477")}>
+          {/* Real helpline number isn't configured yet — showing a fake one
+              that dials nowhere real is worse than saying so. Swap this back
+              to a direct Linking.openURL("tel:...") once we have the real
+              number. */}
+          <TouchableOpacity
+            style={styles.contactRow}
+            onPress={() => Alert.alert("Not set up yet", "Our call helpline isn't configured yet — please use Live chat above for the fastest response.")}
+          >
             <View style={[styles.contactIcon, { backgroundColor: tokens.sunken }]}>
               <Ionicons name="call" size={16} color={tokens.sec} />
             </View>
             <View style={{ flex: 1, minWidth: 0 }}>
               <Text style={styles.contactLabel}>Call helpline</Text>
-              <Text style={styles.contactDesc}>1800 202 4477 · 7 AM – 1 AM</Text>
+              <Text style={styles.contactDesc}>Coming soon — use Live chat for now</Text>
             </View>
             <Ionicons name="chevron-forward" size={18} color={tokens.muted} />
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.contactRow} onPress={() => Linking.openURL("mailto:care@flavour.in")}>
+          <TouchableOpacity
+            style={styles.contactRow}
+            onPress={() => Alert.alert("Not set up yet", "Our support email isn't configured yet — please use Live chat above for the fastest response.")}
+          >
             <View style={[styles.contactIcon, { backgroundColor: tokens.sunken }]}>
               <Ionicons name="mail" size={16} color={tokens.sec} />
             </View>
             <View style={{ flex: 1, minWidth: 0 }}>
               <Text style={styles.contactLabel}>Email us</Text>
-              <Text style={styles.contactDesc}>care@flavour.in · within 24 hours</Text>
+              <Text style={styles.contactDesc}>Coming soon — use Live chat for now</Text>
             </View>
             <Ionicons name="chevron-forward" size={18} color={tokens.muted} />
           </TouchableOpacity>

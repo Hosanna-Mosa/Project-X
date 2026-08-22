@@ -87,7 +87,7 @@ export default function NotificationsScreen() {
   const unreadCount = items.filter((n) => !n.isRead).length;
 
   return (
-    <View style={[styles.root, { paddingTop: insets.top }]}>
+    <View style={[styles.root, { paddingTop: Math.max(insets.top, 24) }]}>
       <View style={styles.header}>
         <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
           <Ionicons name="chevron-back" size={moderateScale(20)} color={tokens.text} />

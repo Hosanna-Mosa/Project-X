@@ -217,7 +217,7 @@ export default function MeatCentersScreen() {
 
   return (
     <View style={styles.root}>
-      <View style={[styles.topRow, { paddingTop: insets.top + 6 }]}>
+      <View style={[styles.topRow, { paddingTop: Math.max(insets.top, 24) + 6 }]}>
         <TouchableOpacity style={styles.backBtn} onPress={() => (router.canGoBack() ? router.back() : router.replace("/(tabs)"))}>
           <Ionicons name="chevron-back" size={moderateScale(20)} color={tokens.text} />
         </TouchableOpacity>

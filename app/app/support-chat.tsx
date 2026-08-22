@@ -3,7 +3,6 @@ import {
   ActivityIndicator,
   Alert,
   FlatList,
-  KeyboardAvoidingView,
   Modal,
   Platform,
   ScrollView,
@@ -13,6 +12,14 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+// react-native's own KeyboardAvoidingView (behavior="height" on Android) can
+// leave a residual gap the size of the keyboard after it closes — e.g. right
+// after sending a message. The app already wraps everything in
+// react-native-keyboard-controller's KeyboardProvider (_layout.tsx), and that
+// package ships its own KeyboardAvoidingView that stays in sync with it via
+// the native module's real animated keyboard height instead of RN's older JS
+// heuristic — same props, safe drop-in.
+import { KeyboardAvoidingView } from "react-native-keyboard-controller";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
@@ -234,7 +241,7 @@ export default function SupportChatScreen() {
 
   if (loading) {
     return (
-      <View style={[styles.center, { paddingTop: insets.top }]}>
+      <View style={[styles.center, { paddingTop: Math.max(insets.top, 24) }]}>
         <ActivityIndicator size="large" color={accent.accent} />
         <Text style={styles.loadingText}>Loading your cases…</Text>
       </View>
@@ -248,7 +255,7 @@ export default function SupportChatScreen() {
     const isResolved = ticket.status === "RESOLVED";
     return (
       <KeyboardAvoidingView style={styles.root} behavior={Platform.OS === "ios" ? "padding" : "height"} keyboardVerticalOffset={0}>
-        <View style={[styles.header, { paddingTop: insets.top + (Platform.OS === "web" ? 67 : 0) + 12 }]}>
+        <View style={[styles.header, { paddingTop: Math.max(insets.top, 24) + (Platform.OS === "web" ? 67 : 0) + 12 }]}>
           <TouchableOpacity style={styles.backBtn} onPress={() => setViewMode("cases")}>
             <Ionicons name="chevron-back" size={moderateScale(20)} color={tokens.text} />
           </TouchableOpacity>
@@ -333,7 +340,7 @@ export default function SupportChatScreen() {
   // -----------------------------------------------------------------------
   return (
     <KeyboardAvoidingView style={styles.root} behavior={Platform.OS === "ios" ? "padding" : "height"} keyboardVerticalOffset={0}>
-      <View style={[styles.header, { paddingTop: insets.top + (Platform.OS === "web" ? 67 : 0) + 12 }]}>
+      <View style={[styles.header, { paddingTop: Math.max(insets.top, 24) + (Platform.OS === "web" ? 67 : 0) + 12 }]}>
         <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
           <Ionicons name="chevron-back" size={moderateScale(20)} color={tokens.text} />
         </TouchableOpacity>

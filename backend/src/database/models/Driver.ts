@@ -24,6 +24,14 @@ export interface IDriver extends Document {
   onboardingStatus: OnboardingStatus;
   gender?: "male" | "female";
   vehicleType?: "bike" | "auto" | "car";
+  // Which work the driver toggled on in their "Go online" sheet (defaults to
+  // both — see driver/components/GoOnlineModal.tsx). Previously this only
+  // lived in the driver app's local state and was never sent to the backend,
+  // so dispatch had no way to skip offering, say, a food order to a
+  // ride-only driver — it just relied on the driver app silently discarding
+  // the offer client-side after the fact, wasting a full 15s dispatch cycle
+  // (or looking like the request never arrived at all).
+  activeServices?: ("food" | "ride")[];
   preferredZone?: mongoose.Types.ObjectId;
   preferredZones?: mongoose.Types.ObjectId[];
   aadhaarNumber?: string;
@@ -79,6 +87,7 @@ const DriverSchema: Schema = new Schema(
     },
     gender: { type: String, enum: ["male", "female"] },
     vehicleType: { type: String, enum: ["bike", "auto", "car"] },
+    activeServices: { type: [String], enum: ["food", "ride"], default: undefined },
     preferredZone: { type: Schema.Types.ObjectId, ref: "Zone" },
     preferredZones: [{ type: Schema.Types.ObjectId, ref: "Zone" }],
     aadhaarNumber: { type: String },

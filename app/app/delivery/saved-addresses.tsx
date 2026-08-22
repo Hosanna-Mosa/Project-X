@@ -30,7 +30,10 @@ export default function SavedAddressesScreen() {
   const insets = useSafeAreaInsets();
   const { theme } = useThemeStore();
   const tokens = designTokens[theme];
-  const accent = tokens.services.delivery;
+  // Same reasoning as add-address.tsx: this screen only serves food/meat
+  // delivery addresses today, so it should use the food accent rather than
+  // the unrelated package-delivery service color.
+  const accent = tokens.services.food;
   const styles = useMemo(() => createStyles(tokens, accent), [theme]);
 
   const { user, setUser } = useAuthStore();
@@ -189,7 +192,7 @@ export default function SavedAddressesScreen() {
 
   return (
     <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} style={styles.root}>
-      <View style={[styles.header, { paddingTop: insets.top + 6 }]}>
+      <View style={[styles.header, { paddingTop: Math.max(insets.top, 24) + 6 }]}>
         <TouchableOpacity style={styles.iconBtn} onPress={() => router.back()} disabled={selectingId !== null}>
           <Ionicons name="chevron-back" size={moderateScale(20)} color={tokens.text} />
         </TouchableOpacity>

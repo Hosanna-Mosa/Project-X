@@ -105,7 +105,7 @@ export default function RestaurantDetails() {
 
   return (
     <View style={styles.root}>
-      <View style={[styles.header, { paddingTop: insets.top + 6 }]}>
+      <View style={[styles.header, { paddingTop: Math.max(insets.top, 24) + 6 }]}>
         <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
           <Ionicons name="chevron-back" size={moderateScale(20)} color={tokens.text} />
         </TouchableOpacity>
@@ -183,7 +183,11 @@ export default function RestaurantDetails() {
               {vendor?.phone && (
                 <TouchableOpacity style={styles.contactCard} activeOpacity={0.85} onPress={() => handleCall(vendor.phone)}>
                   <Feather name="phone" size={15} color={tokens.sec} />
-                  <View style={{ minWidth: 0 }}>
+                  {/* flex: 1 (not just minWidth: 0) is what actually bounds
+                      this to the card's available width — without it,
+                      numberOfLines had nothing to truncate against and long
+                      values could render past the card's edge. */}
+                  <View style={{ flex: 1, minWidth: 0 }}>
                     <Text style={styles.contactLabel}>Phone</Text>
                     <Text style={styles.contactValue} numberOfLines={1}>{vendor.phone}</Text>
                   </View>
@@ -192,7 +196,7 @@ export default function RestaurantDetails() {
               {vendor?.email && (
                 <TouchableOpacity style={styles.contactCard} activeOpacity={0.85} onPress={() => handleEmail(vendor.email!)}>
                   <Feather name="mail" size={15} color={tokens.sec} />
-                  <View style={{ minWidth: 0 }}>
+                  <View style={{ flex: 1, minWidth: 0 }}>
                     <Text style={styles.contactLabel}>Email</Text>
                     <Text style={styles.contactValue} numberOfLines={1}>{vendor.email}</Text>
                   </View>

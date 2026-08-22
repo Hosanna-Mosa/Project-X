@@ -219,13 +219,18 @@ export const useDriverStore = create<DriverState>()(
         const { token, driverUserId } = get();
         if (token) {
           try {
+            // activeServices previously only lived in this store's local
+            // state — the backend never knew which of Ride/Food the driver
+            // had toggled on, so dispatch would offer orders of either type
+            // to this driver regardless, relying on the client-side filter
+            // below to silently drop the mismatched ones after the fact.
             await fetch(`${apiUrl}/api/v1/drivers/status`, {
               method: "PATCH",
               headers: {
                 "Content-Type": "application/json",
                 Authorization: `Bearer ${token}`
               },
-              body: JSON.stringify({ status: "ONLINE" })
+              body: JSON.stringify({ status: "ONLINE", activeServices: services })
             });
           } catch (e) {
             console.error("Failed to set online status:", e);

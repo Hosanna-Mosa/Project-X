@@ -470,7 +470,7 @@ export default function LocationSelectionScreen() {
         behavior={Platform.OS === "ios" ? "padding" : "height"}
         style={styles.root}
     >
-      <View style={[styles.header, { paddingTop: insets.top + 6 }]}>
+      <View style={[styles.header, { paddingTop: Math.max(insets.top, 24) + 6 }]}>
         <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
           <Ionicons name="chevron-back" size={moderateScale(20)} color={tokens.text} />
         </TouchableOpacity>
@@ -561,7 +561,7 @@ export default function LocationSelectionScreen() {
             </View>
           ))}
 
-          <View style={[styles.fieldSlot, styles.dropFieldSlot]}>
+          <View style={styles.fieldSlot}>
             <Text style={[styles.fieldLabel, { color: accent.accent }]}>Drop</Text>
             <GooglePlacesAutocomplete
               ref={dropRef}
@@ -818,7 +818,6 @@ const createStyles = (tokens: ThemeTokens, accent: ThemeTokens["services"]["ride
 
     inputsContainer: { flex: 1, minWidth: 0, gap: 2 },
     fieldSlot: { minHeight: 44, justifyContent: "center" },
-    dropFieldSlot: { borderWidth: 2, borderColor: accent.accent, borderRadius: 12, paddingHorizontal: 10, marginHorizontal: -2 },
     fieldLabel: { fontFamily: fontFamilies.body.bold, fontSize: moderateScale(10), letterSpacing: 1, textTransform: "uppercase", color: tokens.muted },
     divider: { height: 1, backgroundColor: tokens.border, marginVertical: 4 },
     locationInput: {

@@ -235,10 +235,18 @@ export class DriverService {
     }
 
     try {
+      // Was only-set-once ("if not already set"), so a driver's zone got
+      // permanently locked in on their very first location ping and was
+      // never re-evaluated again — a driver who genuinely moved to a
+      // different zone (or a different city entirely) stayed matched
+      // against their original zone forever, silently breaking dispatch for
+      // every order placed anywhere near their *actual* current location
+      // since it no longer matched preferredZone. Re-resolve on every
+      // update instead so it tracks where the driver really is.
       const { ZonesService } = require("../zones/zones.service");
       const zonesService = new ZonesService();
       const activeZone = await zonesService.getZoneForCoordinates(lat, lng);
-      if (activeZone && !driver.preferredZone) {
+      if (activeZone && (!driver.preferredZone || driver.preferredZone.toString() !== activeZone._id.toString())) {
         driver.preferredZone = activeZone._id;
       }
     } catch (zoneErr) {
@@ -266,13 +274,19 @@ export class DriverService {
     return savedDriver;
   }
 
-  async updateStatus(driverId: string, status: DriverStatus) {
+  async updateStatus(driverId: string, status: DriverStatus, activeServices?: ("food" | "ride")[]) {
     const driver = await Driver.findById(driverId);
     if (!driver) throw new Error("Driver not found");
 
     driver.status = status;
     if (status === DriverStatus.ONLINE) {
       driver.isAvailable = true;
+      // Only overwrite when the client actually sent a selection (the "Go
+      // online" sheet always sends one) — never clear it out from some other
+      // status update that doesn't know about it.
+      if (Array.isArray(activeServices) && activeServices.length > 0) {
+        driver.activeServices = activeServices.filter((s) => s === "food" || s === "ride");
+      }
     }
     return driver.save();
   }

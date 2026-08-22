@@ -20,6 +20,7 @@ import { designTokens, type ThemeTokens, type ServiceTokens } from "@/constants/
 import { fontFamilies } from "@/constants/typography";
 import { useThemeStore } from "@/contexts/themeStore";
 import { AppTabBar, useAppTabBarHeight } from "@/components/AppTabBar";
+import { addToCartWithConfirm } from "@/utils/addToCart";
 
 // Standard Indian food-labeling convention: a circle for veg, a triangle
 // for non-veg, both inside a small squared-off border — not just two dot
@@ -58,7 +59,7 @@ export default function Store149Screen() {
   const insets = useSafeAreaInsets();
   const tabBarHeight = useAppTabBarHeight();
   const { currentCoords } = useDeliveryStore();
-  const { items: cartItems, addItem: addCartItem, updateQuantity: updateCartQuantity } = useCartStore();
+  const { items: cartItems, updateQuantity: updateCartQuantity } = useCartStore();
   const [store149Items, setStore149Items] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedItem, setSelectedItem] = useState<any>(null);
@@ -100,7 +101,7 @@ export default function Store149Screen() {
         {/* Full-bleed accent header — the one screen that floods the accent
             color, so the ₹149 promo gets its own identity before the
             neutral system resumes below. */}
-        <View style={[styles.heroHeader, { paddingTop: insets.top + 4 }]}>
+        <View style={[styles.heroHeader, { paddingTop: Math.max(insets.top, 24) + 4 }]}>
           <TouchableOpacity style={styles.backBtn} onPress={() => (router.canGoBack() ? router.back() : router.replace("/(tabs)"))}>
             <Ionicons name="chevron-back" size={moderateScale(20)} color={accent.on} />
           </TouchableOpacity>
@@ -132,7 +133,7 @@ export default function Store149Screen() {
             <View style={styles.grid}>
               {visibleItems.map((item) => {
                 const cartItem = cartItems.find((i) => i._id === item._id);
-                const handleAdd = () => addCartItem(buildFoodItem(item), item.vendorId);
+                const handleAdd = () => addToCartWithConfirm(buildFoodItem(item), item.vendorId, item.brand || item.name);
 
                 return (
                   <TouchableOpacity
@@ -216,12 +217,12 @@ export default function Store149Screen() {
                             <Feather name="minus" size={moderateScale(15)} color={accent.accent} />
                           </TouchableOpacity>
                           <Text style={styles.sheetQtyText}>{cartItem.quantity}</Text>
-                          <TouchableOpacity onPress={() => addCartItem(buildFoodItem(selectedItem), selectedItem.vendorId)} style={styles.qtyBtn}>
+                          <TouchableOpacity onPress={() => addToCartWithConfirm(buildFoodItem(selectedItem), selectedItem.vendorId, selectedItem.brand || selectedItem.name)} style={styles.qtyBtn}>
                             <Feather name="plus" size={moderateScale(15)} color={accent.accent} />
                           </TouchableOpacity>
                         </View>
                       ) : (
-                        <TouchableOpacity style={styles.sheetAddBtn} onPress={() => addCartItem(buildFoodItem(selectedItem), selectedItem.vendorId)}>
+                        <TouchableOpacity style={styles.sheetAddBtn} onPress={() => addToCartWithConfirm(buildFoodItem(selectedItem), selectedItem.vendorId, selectedItem.brand || selectedItem.name)}>
                           <Text style={styles.sheetAddBtnText}>Add</Text>
                         </TouchableOpacity>
                       );

@@ -43,7 +43,7 @@ export default function AllServicesScreen() {
 
   return (
     <View style={styles.root}>
-      <View style={[styles.headerRow, { paddingTop: insets.top + 4 }]}>
+      <View style={[styles.headerRow, { paddingTop: Math.max(insets.top, 24) + 4 }]}>
         <TouchableOpacity style={styles.backBtn} onPress={() => (router.canGoBack() ? router.back() : router.replace("/(tabs)"))} activeOpacity={0.7}>
           <Ionicons name="chevron-back" size={moderateScale(22)} color={tokens.text} />
         </TouchableOpacity>

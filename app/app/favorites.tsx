@@ -22,7 +22,7 @@ import { useAuthStore } from "@/contexts/authStore";
 import { useHomeStore } from "@/contexts/homeStore";
 import { AppTabBar, useAppTabBarHeight } from "@/components/AppTabBar";
 
-function FavoriteCard({ item, tokens, styles }: { item: any; tokens: ThemeTokens; styles: any }) {
+function FavoriteCard({ item, tokens, styles, onToggleFavorite }: { item: any; tokens: ThemeTokens; styles: any; onToggleFavorite: (id: string) => void }) {
   const isMeat = item.partnerType === "meat";
   const accent = tokens.services[isMeat ? "meat" : "food"];
   const categoryLabel = Array.isArray(item.categories) ? item.categories.slice(0, 2).join(", ") : item.categories;
@@ -39,7 +39,9 @@ function FavoriteCard({ item, tokens, styles }: { item: any; tokens: ThemeTokens
       <View style={styles.cardBody}>
         <View style={styles.cardTitleRow}>
           <Text style={styles.cardName} numberOfLines={1}>{item.name}</Text>
-          <Ionicons name="heart" size={moderateScale(16)} color={accent.accent} />
+          <TouchableOpacity hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }} onPress={() => onToggleFavorite(item._id)}>
+            <Ionicons name="heart" size={moderateScale(16)} color={accent.accent} />
+          </TouchableOpacity>
         </View>
         {isMeat && (
           <View style={[styles.serviceTag, { backgroundColor: accent.skin }]}>
@@ -69,10 +71,10 @@ export default function FavoritesScreen() {
   const accent = tokens.services.food;
   const styles = useMemo(() => createStyles(tokens, accent), [theme]);
   const user = useAuthStore((s) => s.user);
+  const toggleFavorite = useAuthStore((s) => s.toggleFavorite);
 
   const [loading, setLoading] = useState(false);
   const [favorites, setFavorites] = useState<any[]>([]);
-  const [activeTab, setActiveTab] = useState<"outlets" | "items">("outlets");
 
   const fetchFavorites = async () => {
     try {
@@ -109,34 +111,14 @@ export default function FavoritesScreen() {
 
   return (
     <View style={styles.root}>
-      <View style={[styles.headerRow, { paddingTop: insets.top + 4 }]}>
+      <View style={[styles.headerRow, { paddingTop: Math.max(insets.top, 24) + 4 }]}>
         <TouchableOpacity style={styles.backBtn} onPress={() => (router.canGoBack() ? router.back() : router.replace("/(tabs)/profile"))}>
           <Ionicons name="chevron-back" size={moderateScale(22)} color={tokens.text} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Favorites</Text>
       </View>
 
-      <View style={styles.segmentWrap}>
-        <View style={styles.segmentTrack}>
-          <View style={[styles.segmentThumb, activeTab === "items" && { left: "50%" }]} />
-          <TouchableOpacity style={styles.segmentCell} onPress={() => setActiveTab("outlets")}>
-            <Text style={[styles.segmentLabel, activeTab === "outlets" && styles.segmentLabelActive]}>Outlets · {activeFavorites.length}</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.segmentCell} onPress={() => setActiveTab("items")}>
-            <Text style={[styles.segmentLabel, activeTab === "items" && styles.segmentLabelActive]}>Items · 0</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-
-      {activeTab === "items" ? (
-        <View style={styles.emptyContainer}>
-          <View style={styles.heartCircle}>
-            <Ionicons name="heart-outline" size={moderateScale(28)} color={accent.accent} />
-          </View>
-          <Text style={styles.emptyTitle}>No favorite dishes yet</Text>
-          <Text style={styles.emptySubtitle}>Favoriting individual dishes is coming soon — for now, tap the heart on an outlet.</Text>
-        </View>
-      ) : loading && activeFavorites.length === 0 ? (
+      {loading && activeFavorites.length === 0 ? (
         <View style={styles.centerContainer}>
           <ActivityIndicator size="large" color={accent.accent} />
         </View>
@@ -144,7 +126,7 @@ export default function FavoritesScreen() {
         <FlatList
           data={activeFavorites}
           keyExtractor={(item) => item._id}
-          renderItem={({ item }) => <FavoriteCard item={item} tokens={tokens} styles={styles} />}
+          renderItem={({ item }) => <FavoriteCard item={item} tokens={tokens} styles={styles} onToggleFavorite={toggleFavorite} />}
           refreshControl={<RefreshControl refreshing={loading} onRefresh={fetchFavorites} tintColor={accent.accent} />}
           ListEmptyComponent={() => (
             <View style={styles.emptyContainer}>
@@ -201,13 +183,6 @@ const createStyles = (tokens: ThemeTokens, accent: ServiceTokens) =>
       backgroundColor: tokens.surface, borderWidth: 1, borderColor: tokens.border, alignItems: "center", justifyContent: "center",
     },
     headerTitle: { fontFamily: fontFamilies.body.semibold, fontSize: moderateScale(17), color: tokens.text },
-
-    segmentWrap: { paddingHorizontal: 16, paddingTop: 18, paddingBottom: 4 },
-    segmentTrack: { position: "relative", backgroundColor: tokens.sunken, borderRadius: 999, padding: 4, flexDirection: "row" },
-    segmentThumb: { position: "absolute", top: 4, bottom: 4, left: 4, width: "calc(50% - 4px)" as any, backgroundColor: tokens.surface, borderRadius: 999 },
-    segmentCell: { flex: 1, alignItems: "center", paddingVertical: 10 },
-    segmentLabel: { fontFamily: fontFamilies.body.semibold, fontSize: moderateScale(13), color: tokens.sec },
-    segmentLabelActive: { color: tokens.text },
 
     listContent: { paddingHorizontal: 16, paddingTop: 14, paddingBottom: 160 },
     centerContainer: { flex: 1, alignItems: "center", justifyContent: "center", paddingTop: 100 },
