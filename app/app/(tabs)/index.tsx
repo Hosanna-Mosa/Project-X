@@ -36,6 +36,7 @@ import { AppTabBar, useAppTabBarHeight } from "@/components/AppTabBar";
 import { useAuthStore } from "@/contexts/authStore";
 import { useCartStore } from "@/contexts/cartStore";
 import { customFetch } from "@/utils/api/custom-fetch";
+import { addToCartWithConfirm } from "@/utils/addToCart";
 
 // Maps the short quick-search tags to the actual query terms the backend
 // dish-search endpoint expects.
@@ -283,8 +284,17 @@ export default function HomeScreen() {
             setBanners(response.data);
             const startupAds = response.data.filter((b: any) => b.itemType === "ad" && b.position === "startup");
             if (startupAds.length > 0 && !hasShownStartupAd) {
-              setActiveStartupAd(startupAds[0]);
-              setHasShownStartupAd(true);
+              // `hasShownStartupAd` alone only guards against re-showing
+              // within this mount — Home remounting (returning from a pushed
+              // screen, cold start, etc.) reset it to false every time, so
+              // the ad kept replaying. Persist which ad was last dismissed
+              // so "seen" survives remounts.
+              const ad = startupAds[0];
+              const lastSeenId = await AsyncStorage.getItem("last_seen_startup_ad").catch(() => null);
+              if (lastSeenId !== ad._id) {
+                setActiveStartupAd(ad);
+                setHasShownStartupAd(true);
+              }
             }
           }
         } catch (e) {
@@ -293,6 +303,13 @@ export default function HomeScreen() {
       })();
     }, [])
   );
+
+  const dismissStartupAd = () => {
+    if (activeStartupAd?._id) {
+      AsyncStorage.setItem("last_seen_startup_ad", activeStartupAd._id).catch(() => {});
+    }
+    setActiveStartupAd(null);
+  };
 
   const getCoords = async () => {
     if (selectedAddress) {
@@ -419,7 +436,8 @@ export default function HomeScreen() {
   const fetch149StoreItems = async (lat: number, lng: number) => {
     try {
       setLoading149(true);
-      const data = await customFetch<any>(`/api/v1/food/store-149?lat=${lat}&lng=${lng}`);
+      const radiusParam = appliedDistanceKm ? `&radius=${Math.round(appliedDistanceKm * 1000)}` : "";
+      const data = await customFetch<any>(`/api/v1/food/store-149?lat=${lat}&lng=${lng}${radiusParam}`);
       setStore149Items(data);
     } catch (error) {
       console.error("Error fetching 149 store items:", error);
@@ -439,7 +457,8 @@ export default function HomeScreen() {
       const baseUrl = process.env.EXPO_PUBLIC_API_URL;
       const headers: any = {};
       if (token) headers["Authorization"] = `Bearer ${token}`;
-      const response = await fetch(`${baseUrl}/api/v1/drivers/nearby?latitude=${lat}&longitude=${lng}&radius=5000`, { headers });
+      const driversRadius = appliedDistanceKm ? Math.round(appliedDistanceKm * 1000) : 5000;
+      const response = await fetch(`${baseUrl}/api/v1/drivers/nearby?latitude=${lat}&longitude=${lng}&radius=${driversRadius}`, { headers });
       if (response.ok) {
         const data = await response.json();
         if (Array.isArray(data)) setNearbyDriversCount(data.length);
@@ -666,7 +685,7 @@ export default function HomeScreen() {
   }, [promoCards.length]);
 
   const Store149Card = ({ item }: { item: any }) => {
-    const { items: cItems, addItem: addCartItem, updateQuantity: updateCartQuantity } = useCartStore();
+    const { items: cItems, updateQuantity: updateCartQuantity } = useCartStore();
     const cartItem = cItems.find((i) => i._id === item._id);
 
     const handleAdd = () => {
@@ -679,7 +698,7 @@ export default function HomeScreen() {
         isVeg: item.isVeg,
         images: item.images && item.images.length > 0 ? item.images : ["https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=400"],
       };
-      addCartItem(foodItem, item.vendorId);
+      addToCartWithConfirm(foodItem, item.vendorId, item.brand || item.name);
     };
 
     return (
@@ -706,11 +725,26 @@ export default function HomeScreen() {
     );
   };
 
+  // [scroll-animate-1] Morph-and-dock category bar: the real tiles row (in
+  // the scrollable header) fades out as it scrolls past, while a compact
+  // "docked" copy fades/settles in at a fixed spot right under the
+  // always-pinned address bar, continuously driven by scroll position
+  // (not a threshold toggle) so it reads as one thing shrinking into place
+  // rather than a hard swap. It only ever occupies space *below* the
+  // always-pinned address bar, so however imprecise the interpolation range
+  // is, it can't expose the status bar the way the old sticky-header attempt
+  // did — worst case it just visually cross-fades a little early/late.
   const scrollY = useRef(new Animated.Value(0)).current;
-  const [isStickyVisible, setIsStickyVisible] = useState(false);
+  const [tilesRowTop, setTilesRowTop] = useState(0);
+  const [tilesRowBottom, setTilesRowBottom] = useState(0);
+  const [addressBarHeight, setAddressBarHeight] = useState(0);
+  const [isCategoryBarInteractive, setIsCategoryBarInteractive] = useState(false);
 
-  const stickyHeaderTranslateY = scrollY.interpolate({ inputRange: [330, 360], outputRange: [-120, 0], extrapolate: "clamp" });
-  const stickyHeaderOpacity = scrollY.interpolate({ inputRange: [330, 350], outputRange: [0, 1], extrapolate: "clamp" });
+  const collapseStart = tilesRowTop > 0 ? tilesRowTop : 300;
+  const collapseEnd = tilesRowBottom > 0 ? tilesRowBottom : 360;
+  const realTilesOpacity = scrollY.interpolate({ inputRange: [collapseStart, collapseEnd], outputRange: [1, 0], extrapolate: "clamp" });
+  const dockedBarOpacity = scrollY.interpolate({ inputRange: [collapseStart, collapseEnd], outputRange: [0, 1], extrapolate: "clamp" });
+  const dockedBarTranslateY = scrollY.interpolate({ inputRange: [collapseStart, collapseEnd], outputRange: [-14, 0], extrapolate: "clamp" });
 
   const listData = useMemo(() => {
     if (showHomeSkeleton) return HOME_SKELETON_ITEMS.map((item) => ({ ...item, isSkeleton: true }));
@@ -801,29 +835,6 @@ export default function HomeScreen() {
 
     return (
       <View>
-        {/* Top row: delivery address + avatar. Needs the safe-area inset since
-            this now scrolls under the status bar/notch with no hero banner
-            behind it to absorb that space (the old gradient carousel had its
-            own insets.top padding baked in). */}
-        <View style={[styles.topRow, { paddingTop: insets.top + 6 }]}>
-          <TouchableOpacity style={styles.addressBlock} activeOpacity={0.7} onPress={() => router.push("/delivery/saved-addresses")}>
-            <Text style={styles.addressEyebrow}>Delivery to</Text>
-            <View style={styles.addressLabelRow}>
-              <Text style={styles.addressLabel} numberOfLines={1}>{areaLabel}</Text>
-              <Ionicons name="chevron-down" size={moderateScale(12)} color={tokens.sec} />
-            </View>
-            <Text style={styles.addressLine} numberOfLines={1}>{areaLine}</Text>
-          </TouchableOpacity>
-          <View style={styles.topRowActions}>
-            <TouchableOpacity style={styles.iconBtnCircle} onPress={() => setIsDistanceSheetOpen(true)}>
-              <MaterialCommunityIcons name="radius-outline" size={moderateScale(18)} color={tokens.sec} />
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.avatarBtn} onPress={() => router.push("/(tabs)/profile")}>
-              <Ionicons name="person-outline" size={moderateScale(18)} color={tokens.sec} />
-            </TouchableOpacity>
-          </View>
-        </View>
-
         {/* Headline */}
         <Text style={styles.headline}>
           {activeService === "Meat" ? "Fresh Meat Daily!" : "Craving something\ndelicious?"}
@@ -839,8 +850,16 @@ export default function HomeScreen() {
           </TouchableOpacity>
         </Animated.View>
 
-        {/* Service tiles: Food/Meat toggle + Ride/Task launchers */}
-        <View style={styles.tilesRow}>
+        {/* [scroll-animate-1] Service tiles: Food/Meat toggle + Ride/Task
+            launchers. Fades out (via realTilesOpacity) as the docked copy
+            below fades in, over the same scroll range. */}
+        <Animated.View
+          style={[styles.tilesRow, { opacity: realTilesOpacity }]}
+          onLayout={(e) => {
+            setTilesRowTop(e.nativeEvent.layout.y);
+            setTilesRowBottom(e.nativeEvent.layout.y + e.nativeEvent.layout.height);
+          }}
+        >
           <View style={styles.togglePill}>
             <TouchableOpacity
               style={[styles.toggleCell, activeService === "Food" && { backgroundColor: tokens.services.food.skin, borderColor: tokens.services.food.accent }]}
@@ -878,7 +897,7 @@ export default function HomeScreen() {
             </View>
             <Text style={styles.toggleLabel}>Task</Text>
           </TouchableOpacity>
-        </View>
+        </Animated.View>
 
         {hasRidersButNoVendors ? null : (
           <>
@@ -1033,37 +1052,75 @@ export default function HomeScreen() {
 
   return (
     <View style={styles.root}>
-      {isStickyVisible && (
-        <Animated.View
-          style={[styles.stickyHeader, { paddingTop: insets.top + 8, transform: [{ translateY: stickyHeaderTranslateY }], opacity: stickyHeaderOpacity }]}
-        >
-          <View style={styles.stickyRow}>
-            <Text style={styles.stickyAddress} numberOfLines={1}>{areaLabel}</Text>
-            <View style={styles.stickyActions}>
-              <View style={styles.stickyTogglePill}>
-                <TouchableOpacity
-                  style={[styles.stickyToggleCell, activeService === "Food" && { backgroundColor: tokens.services.food.skin }]}
-                  onPress={() => handleServiceSwitch("Food")}
-                >
-                  <Text style={styles.stickyToggleEmoji}>🍛</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[styles.stickyToggleCell, activeService === "Meat" && { backgroundColor: tokens.services.meat.skin }]}
-                  onPress={() => handleServiceSwitch("Meat")}
-                >
-                  <Text style={styles.stickyToggleEmoji}>🍖</Text>
-                </TouchableOpacity>
-              </View>
-              <TouchableOpacity style={styles.stickyIconBtn} onPress={() => router.push("/all-services")}>
-                <Text style={styles.stickyToggleEmoji}>🛺</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.stickyIconBtn} onPress={() => router.push("/helper-task")}>
-                <Text style={styles.stickyToggleEmoji}>🧰</Text>
-              </TouchableOpacity>
-            </View>
+      {/* Pinned outside the FlatList (not part of scrollable content, not a
+          scroll-triggered "sticky" swap-in) so it always reserves the
+          safe-area inset and can never be scrolled underneath the status
+          bar, even for a single frame during the scroll gesture itself —
+          which a scroll-position-triggered header can't guarantee no matter
+          where its threshold is set. */}
+      <View
+        style={[styles.topRow, { paddingTop: Math.max(insets.top, 24) + 6 }]}
+        onLayout={(e) => setAddressBarHeight(e.nativeEvent.layout.height)}
+      >
+        <TouchableOpacity style={styles.addressBlock} activeOpacity={0.7} onPress={() => router.push("/delivery/saved-addresses")}>
+          <Text style={styles.addressEyebrow}>Delivery to</Text>
+          <View style={styles.addressLabelRow}>
+            <Text style={styles.addressLabel} numberOfLines={1}>{areaLabel}</Text>
+            <Ionicons name="chevron-down" size={moderateScale(12)} color={tokens.sec} />
           </View>
-        </Animated.View>
-      )}
+          <Text style={styles.addressLine} numberOfLines={1}>{areaLine}</Text>
+        </TouchableOpacity>
+        <View style={styles.topRowActions}>
+          <TouchableOpacity style={styles.iconBtnCircle} onPress={() => setIsDistanceSheetOpen(true)}>
+            <MaterialCommunityIcons name="radius-outline" size={moderateScale(18)} color={tokens.sec} />
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.avatarBtn} onPress={() => router.push("/(tabs)/profile")}>
+            <Ionicons name="person-outline" size={moderateScale(18)} color={tokens.sec} />
+          </TouchableOpacity>
+        </View>
+      </View>
+
+      {/* [scroll-animate-1] Docked copy of the category switcher — always
+          mounted, opacity/translateY driven continuously by scroll position
+          (see dockedBarOpacity/dockedBarTranslateY above) instead of a
+          threshold toggle, so it reads as settling into place rather than
+          popping in. Absolutely positioned right under the pinned address
+          bar; pointerEvents only turns on once fully docked so it can't
+          steal taps from the real tiles while still mid-fade. */}
+      <Animated.View
+        pointerEvents={isCategoryBarInteractive ? "auto" : "none"}
+        style={[
+          styles.categoryBarDocked,
+          { top: addressBarHeight, opacity: dockedBarOpacity, transform: [{ translateY: dockedBarTranslateY }] },
+        ]}
+      >
+        <View style={styles.categoryBar}>
+          <View style={styles.categoryTogglePill}>
+            <TouchableOpacity
+              style={[styles.categoryToggleCell, activeService === "Food" && { backgroundColor: tokens.services.food.skin }]}
+              onPress={() => handleServiceSwitch("Food")}
+            >
+              <Text style={styles.categoryToggleEmoji}>🍛</Text>
+              <Text style={[styles.categoryToggleLabel, activeService === "Food" && { color: tokens.services.food.accent }]}>Food</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.categoryToggleCell, activeService === "Meat" && { backgroundColor: tokens.services.meat.skin }]}
+              onPress={() => handleServiceSwitch("Meat")}
+            >
+              <Text style={styles.categoryToggleEmoji}>🍖</Text>
+              <Text style={[styles.categoryToggleLabel, activeService === "Meat" && { color: tokens.services.meat.accent }]}>Meat</Text>
+            </TouchableOpacity>
+          </View>
+          <TouchableOpacity style={styles.categoryIconBtn} onPress={() => router.push("/all-services")}>
+            <Text style={styles.categoryToggleEmoji}>🛺</Text>
+            <Text style={styles.categoryToggleLabel}>Ride</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.categoryIconBtn} onPress={() => router.push("/helper-task")}>
+            <Text style={styles.categoryToggleEmoji}>🧰</Text>
+            <Text style={styles.categoryToggleLabel}>Task</Text>
+          </TouchableOpacity>
+        </View>
+      </Animated.View>
 
       <Animated.FlatList
         data={listData}
@@ -1211,14 +1268,18 @@ export default function HomeScreen() {
           if (activeService === "Meat") fetchMeatCenters(lat, lng, 1);
           else { fetchVendors(lat, lng, 1); fetch149StoreItems(lat, lng); }
         }}
-        onScroll={Animated.event([{ nativeEvent: { contentOffset: { y: scrollY } } }], {
-          useNativeDriver: true,
-          listener: (event: any) => {
-            const y = event.nativeEvent.contentOffset.y;
-            const visible = y >= 330;
-            if (visible !== isStickyVisible) setIsStickyVisible(visible);
-          },
-        })}
+        onScroll={Animated.event(
+          [{ nativeEvent: { contentOffset: { y: scrollY } } }],
+          {
+            useNativeDriver: true,
+            listener: (event: any) => {
+              const y = event.nativeEvent.contentOffset.y;
+              const interactive = y >= collapseEnd;
+              if (interactive !== isCategoryBarInteractive) setIsCategoryBarInteractive(interactive);
+            },
+          }
+        )}
+        scrollEventThrottle={16}
       />
 
       <AppTabBar active="home" accent={activeService === "Meat" ? "meat" : "food"} cartVendorName={cartVendorName} />
@@ -1394,14 +1455,14 @@ export default function HomeScreen() {
         <Modal visible={hasShownStartupAd && !!activeStartupAd} transparent animationType="fade">
           <View style={styles.startupAdOverlay}>
             <View style={styles.startupAdCard}>
-              <TouchableOpacity style={styles.startupAdCloseBtn} onPress={() => setActiveStartupAd(null)}>
+              <TouchableOpacity style={styles.startupAdCloseBtn} onPress={dismissStartupAd}>
                 <Feather name="x" size={moderateScale(16)} color={tokens.text} />
               </TouchableOpacity>
               <Image source={{ uri: activeStartupAd.imageUrl }} style={styles.startupAdImage} resizeMode="cover" />
               <View style={{ padding: 18 }}>
                 <Text style={styles.startupAdTitle}>{activeStartupAd.title}</Text>
                 {activeStartupAd.description && <Text style={styles.startupAdDescription}>{activeStartupAd.description}</Text>}
-                <TouchableOpacity style={styles.startupAdBtn} onPress={() => setActiveStartupAd(null)}>
+                <TouchableOpacity style={styles.startupAdBtn} onPress={dismissStartupAd}>
                   <Text style={styles.startupAdBtnText}>Continue to app</Text>
                 </TouchableOpacity>
               </View>
@@ -1687,9 +1748,12 @@ const createStyles = (tokens: ThemeTokens, accent: ServiceTokens) => StyleSheet.
   root: { flex: 1, backgroundColor: tokens.bg },
   mainScrollContent: { paddingBottom: 100 },
 
+  // [check1] Small bump to the header's overall breathing room — was feeling
+  // cramped with everything (address bar, headline, search bar, tiles) packed
+  // tightly together.
   topRow: {
     flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between",
-    paddingHorizontal: 16, paddingTop: 6,
+    paddingHorizontal: 16, paddingTop: 6, paddingBottom: 6, backgroundColor: tokens.bg,
   },
   addressBlock: { flex: 1, minWidth: 0 },
   addressEyebrow: { fontFamily: fontFamilies.body.bold, fontSize: moderateScale(11), letterSpacing: 1, textTransform: "uppercase", color: accent.accent },
@@ -1708,22 +1772,22 @@ const createStyles = (tokens: ThemeTokens, accent: ServiceTokens) => StyleSheet.
 
   headline: {
     fontFamily: fontFamilies.heading.bold, fontSize: moderateScale(28), lineHeight: moderateScale(31),
-    letterSpacing: -0.6, color: tokens.text, paddingHorizontal: 16, marginTop: 18,
+    letterSpacing: -0.6, color: tokens.text, paddingHorizontal: 16, marginTop: 22,
   },
 
   searchBar: {
     flexDirection: "row", alignItems: "center", gap: 10, backgroundColor: tokens.surface,
-    borderWidth: 1, borderColor: tokens.border, borderRadius: moderateScale(14), height: moderateScale(48),
-    paddingHorizontal: 14, marginHorizontal: 16, marginTop: 14,
+    borderWidth: 1, borderColor: tokens.border, borderRadius: moderateScale(14), height: moderateScale(52),
+    paddingHorizontal: 14, marginHorizontal: 16, marginTop: 16,
   },
   searchPlaceholder: { flex: 1, fontFamily: fontFamilies.body.regular, fontSize: moderateScale(14), color: tokens.sec },
 
-  tilesRow: { flexDirection: "row", gap: 10, paddingHorizontal: 16, marginTop: 16, alignItems: "stretch" },
+  tilesRow: { flexDirection: "row", gap: 10, paddingHorizontal: 16, marginTop: 18, marginBottom: 2, alignItems: "stretch" },
   togglePill: { flex: 1, flexDirection: "row", gap: 4, backgroundColor: tokens.sunken, borderRadius: moderateScale(22), padding: 4 },
-  toggleCell: { flex: 1, borderRadius: moderateScale(18), borderWidth: 1.5, borderColor: "transparent", paddingVertical: 9, alignItems: "center", gap: 7 },
+  toggleCell: { flex: 1, borderRadius: moderateScale(18), borderWidth: 1.5, borderColor: "transparent", paddingVertical: 12, alignItems: "center", gap: 7 },
   launcherTile: {
     flex: 1, backgroundColor: tokens.surface, borderWidth: 1, borderColor: tokens.border, borderRadius: moderateScale(20),
-    paddingVertical: 10, alignItems: "center", gap: 7, position: "relative",
+    paddingVertical: 13, alignItems: "center", gap: 7, position: "relative",
   },
   launcherArrow: { position: "absolute", top: 6, right: 8, fontFamily: fontFamilies.body.bold, fontSize: moderateScale(11), color: tokens.sec },
   toggleIconCircle: { width: moderateScale(32), height: moderateScale(32), borderRadius: moderateScale(11), alignItems: "center", justifyContent: "center" },
@@ -1734,6 +1798,28 @@ const createStyles = (tokens: ThemeTokens, accent: ServiceTokens) => StyleSheet.
   launcherIconCircle: { width: moderateScale(30), height: moderateScale(30), borderRadius: moderateScale(10), alignItems: "center", justifyContent: "center" },
   launcherEmoji: { fontSize: moderateScale(19), lineHeight: moderateScale(23), textAlign: "center", includeFontPadding: false },
   toggleLabel: { fontFamily: fontFamilies.body.bold, fontSize: moderateScale(12), color: tokens.sec },
+
+  // [scroll-animate-1] Wraps categoryBar so it can be absolutely docked
+  // right under the pinned address bar and driven by scroll-position
+  // interpolation, independent of the FlatList's own document flow.
+  categoryBarDocked: { position: "absolute", left: 0, right: 0, zIndex: 50 },
+  categoryBar: {
+    flexDirection: "row", alignItems: "center", gap: 8,
+    paddingHorizontal: 16, paddingTop: 10, paddingBottom: 10,
+    backgroundColor: tokens.bg, borderBottomWidth: 1, borderBottomColor: tokens.border,
+  },
+  categoryTogglePill: { flexDirection: "row", gap: 4, backgroundColor: tokens.sunken, borderRadius: 999, padding: 4 },
+  categoryToggleCell: {
+    flexDirection: "row", alignItems: "center", gap: 5,
+    paddingHorizontal: 12, height: moderateScale(32), borderRadius: 999,
+  },
+  categoryIconBtn: {
+    flexDirection: "row", alignItems: "center", gap: 5,
+    paddingHorizontal: 12, height: moderateScale(32), borderRadius: 999,
+    borderWidth: 1, borderColor: tokens.border,
+  },
+  categoryToggleEmoji: { fontSize: moderateScale(14) },
+  categoryToggleLabel: { fontFamily: fontFamilies.body.semibold, fontSize: moderateScale(12), color: tokens.sec },
 
   promoSection: { marginTop: 20 },
   promoScrollContent: { paddingHorizontal: 16, gap: CARD_GAP },
@@ -1806,18 +1892,6 @@ const createStyles = (tokens: ThemeTokens, accent: ServiceTokens) => StyleSheet.
   listHeadingMeta: { fontFamily: fontFamilies.body.medium, fontSize: moderateScale(13), color: tokens.sec, marginTop: 2 },
 
   listSectionHeader: { fontFamily: fontFamilies.body.bold, fontSize: moderateScale(11), letterSpacing: 1.2, textTransform: "uppercase", color: tokens.muted, paddingHorizontal: 16, paddingTop: 20, paddingBottom: 8 },
-
-  stickyHeader: {
-    position: "absolute", top: 0, left: 0, right: 0, zIndex: 100, backgroundColor: tokens.surface,
-    borderBottomWidth: 1, borderBottomColor: tokens.border, paddingBottom: 10,
-  },
-  stickyRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 16 },
-  stickyAddress: { flex: 1, fontFamily: fontFamilies.body.semibold, fontSize: moderateScale(15), color: tokens.text, marginRight: 8 },
-  stickyActions: { flexDirection: "row", alignItems: "center", gap: 8 },
-  stickyTogglePill: { flexDirection: "row", gap: 3, backgroundColor: tokens.sunken, borderRadius: 999, padding: 3 },
-  stickyToggleCell: { width: moderateScale(28), height: moderateScale(28), borderRadius: 999, alignItems: "center", justifyContent: "center" },
-  stickyToggleEmoji: { fontSize: moderateScale(13) },
-  stickyIconBtn: { width: moderateScale(30), height: moderateScale(30), borderRadius: 999, borderWidth: 1, borderColor: tokens.border, alignItems: "center", justifyContent: "center" },
 
   emptyIconCircle: {
     width: moderateScale(60), height: moderateScale(60), borderRadius: moderateScale(20),

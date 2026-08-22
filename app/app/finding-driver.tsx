@@ -36,17 +36,16 @@ export default function FindingDriverScreen() {
   const [orderSummary, setOrderSummary] = useState<{ totalPrice?: number; totalDistance?: number; duration?: number; serviceType?: string }>({});
 
   const sweep = useRef(new Animated.Value(0)).current;
-  const ring1 = useRef(new Animated.Value(0)).current;
-  const ring2 = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
+    // Used to just drive the small spinner icon next to the title now — the
+    // big pulsing dot/rings overlaid on the map were removed. That overlay
+    // sat at a fixed screen position (top: "26%") unrelated to any real
+    // coordinate, so on top of a real map with an actual route/driver it
+    // just read as a second, unexplained dot.
     const spin = Animated.loop(Animated.timing(sweep, { toValue: 1, duration: 1000, useNativeDriver: true, isInteraction: false }));
-    const pulse = (value: Animated.Value, delay: number) =>
-      Animated.loop(Animated.sequence([Animated.delay(delay), Animated.timing(value, { toValue: 1, duration: 2600, useNativeDriver: true })]));
-    const p1 = pulse(ring1, 0);
-    const p2 = pulse(ring2, 800);
-    spin.start(); p1.start(); p2.start();
-    return () => { spin.stop(); p1.stop(); p2.stop(); };
+    spin.start();
+    return () => { spin.stop(); };
   }, []);
 
   useEffect(() => {
@@ -246,7 +245,7 @@ export default function FindingDriverScreen() {
 
   if (bookingConfirmed && confirmedDriver) {
     return (
-      <View style={[styles.root, { paddingTop: insets.top + 24, paddingBottom: insets.bottom + 24, alignItems: "center", justifyContent: "center", paddingHorizontal: 24 }]}>
+      <View style={[styles.root, { paddingTop: Math.max(insets.top, 24) + 24, paddingBottom: insets.bottom + 24, alignItems: "center", justifyContent: "center", paddingHorizontal: 24 }]}>
         <View style={styles.confirmedIcon}>
           <Ionicons name="checkmark" size={moderateScale(32)} color="#fff" />
         </View>
@@ -268,19 +267,15 @@ export default function FindingDriverScreen() {
 
   return (
     <View style={styles.root}>
-      <MapBackground stops={stops} driverMarkers={onlineDrivers} style={StyleSheet.absoluteFill} />
+      {/* hideMyLocationDot: the native OS "my location" blue dot doesn't add
+          anything real drivers/route markers on the map don't already show. */}
+      <MapBackground stops={stops} driverMarkers={onlineDrivers} style={StyleSheet.absoluteFill} hideMyLocationDot />
 
-      <View style={styles.radarWrap} pointerEvents="none">
-        <Animated.View style={[styles.radarRing, { opacity: ring1.interpolate({ inputRange: [0, 1], outputRange: [0.18, 0] }), transform: [{ scale: ring1.interpolate({ inputRange: [0, 1], outputRange: [0.3, 1] }) }] }]} />
-        <Animated.View style={[styles.radarRing, { opacity: ring2.interpolate({ inputRange: [0, 1], outputRange: [0.22, 0] }), transform: [{ scale: ring2.interpolate({ inputRange: [0, 1], outputRange: [0.3, 1] }) }] }]} />
-        <View style={styles.radarDot} />
-      </View>
-
-      <TouchableOpacity style={[styles.backBtn, { top: insets.top + 10 }]} onPress={() => setShowCancelSheet(true)}>
+      <TouchableOpacity style={[styles.backBtn, { top: Math.max(insets.top, 24) + 10 }]} onPress={() => setShowCancelSheet(true)}>
         <Ionicons name="chevron-back" size={moderateScale(20)} color={tokens.text} />
       </TouchableOpacity>
 
-      <View style={styles.sheet}>
+      <View style={[styles.sheet, { paddingBottom: insets.bottom + 16 }]}>
         <View style={styles.sheetHandle} />
         <View style={styles.titleRow}>
           <Animated.View style={[styles.spinner, { transform: [{ rotate: spin }] }]} />
@@ -327,7 +322,7 @@ export default function FindingDriverScreen() {
           </View>
         )}
 
-        <View style={{ marginTop: "auto" }}>
+        <View style={{ marginTop: 22 }}>
           <TouchableOpacity style={styles.cancelBtn} onPress={() => setShowCancelSheet(true)} activeOpacity={0.85}>
             <Text style={styles.cancelBtnText}>Cancel ride</Text>
           </TouchableOpacity>
@@ -383,12 +378,14 @@ const createStyles = (tokens: ThemeTokens, accent: ThemeTokens["services"]["ride
       position: "absolute", left: 16, zIndex: 10, width: moderateScale(40), height: moderateScale(40), borderRadius: moderateScale(20),
       backgroundColor: tokens.surface, borderWidth: 1, borderColor: tokens.border, alignItems: "center", justifyContent: "center",
     },
-    radarWrap: { position: "absolute", left: "50%", top: "26%", marginLeft: -110, marginTop: -110, width: 220, height: 220, alignItems: "center", justifyContent: "center" },
-    radarRing: { position: "absolute", width: 220, height: 220, borderRadius: 999, backgroundColor: accent.accent },
-    radarDot: { width: 26, height: 26, borderRadius: 999, backgroundColor: accent.accent, borderWidth: 4, borderColor: tokens.surface },
-
+    // Was a fixed height: "52%" regardless of content — when the sheet's
+    // actual content (title/subtitle/route card/chip) didn't fill that much
+    // space, marginTop:"auto" on the cancel button just stretched a big gap
+    // above it instead of shrinking the sheet. Sizing to content instead
+    // shows more of the map and keeps the cancel button right after the
+    // real content.
     sheet: {
-      position: "absolute", left: 0, right: 0, bottom: 0, height: "52%",
+      position: "absolute", left: 0, right: 0, bottom: 0,
       backgroundColor: tokens.surface, borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingHorizontal: 20, paddingTop: 12,
       borderTopWidth: 1, borderColor: tokens.border,
     },

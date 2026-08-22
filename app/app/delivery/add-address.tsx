@@ -32,7 +32,11 @@ export default function AddAddressScreen() {
 
   const { theme } = useThemeStore();
   const tokens = designTokens[theme];
-  const accent = tokens.services.delivery;
+  // This screen is only ever reached from the food/meat delivery-address
+  // flow (home, checkout, payment, meat centers) — never from package
+  // delivery — so it should carry the food accent, not the unrelated
+  // "delivery" (package courier) service color.
+  const accent = tokens.services.food;
   const styles = useMemo(() => createStyles(tokens, accent), [theme]);
 
   const { user, setUser } = useAuthStore();
@@ -252,7 +256,7 @@ export default function AddAddressScreen() {
             showsMyLocationButton={false}
           />
 
-          <View style={[styles.searchRow, { top: insets.top + 10 }]}>
+          <View style={[styles.searchRow, { top: Math.max(insets.top, 24) + 10 }]}>
             <TouchableOpacity style={styles.iconBtn} onPress={() => router.back()}>
               <Ionicons name="chevron-back" size={moderateScale(20)} color={tokens.text} />
             </TouchableOpacity>
@@ -271,7 +275,7 @@ export default function AddAddressScreen() {
           </View>
 
           {searchResults.length > 0 && (
-            <ScrollView style={[styles.searchResults, { top: insets.top + 62 }]} keyboardShouldPersistTaps="handled">
+            <ScrollView style={[styles.searchResults, { top: Math.max(insets.top, 24) + 62 }]} keyboardShouldPersistTaps="handled">
               {searchResults.map((item) => (
                 <TouchableOpacity key={item.id} style={styles.searchResultRow} onPress={() => handleSelectSearchResult(item)}>
                   <Text style={styles.searchResultName}>{item.name}</Text>
@@ -323,7 +327,7 @@ export default function AddAddressScreen() {
         </View>
       ) : (
         <View style={{ flex: 1 }}>
-          <View style={[styles.header, { paddingTop: insets.top + 6 }]}>
+          <View style={[styles.header, { paddingTop: Math.max(insets.top, 24) + 6 }]}>
             <TouchableOpacity style={styles.iconBtn} onPress={() => router.back()}>
               <Ionicons name="chevron-back" size={moderateScale(20)} color={tokens.text} />
             </TouchableOpacity>

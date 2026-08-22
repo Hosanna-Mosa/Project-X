@@ -169,7 +169,7 @@ export default function MapPickerScreen() {
           </View>
         </View>
 
-        <TouchableOpacity style={[styles.backBtn, { top: insets.top + 10 }]} onPress={() => router.back()}>
+        <TouchableOpacity style={[styles.backBtn, { top: Math.max(insets.top, 24) + 10 }]} onPress={() => router.back()}>
           <Ionicons name="chevron-back" size={moderateScale(20)} color={tokens.text} />
         </TouchableOpacity>
 

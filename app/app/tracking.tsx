@@ -561,7 +561,7 @@ export default function TrackingScreen() {
         : `Delivered by ${driver?.name || "your delivery partner"}${elapsed ? ` in ${elapsed}` : ""}.`;
 
     return (
-      <View style={[styles.doneRoot, { paddingTop: insets.top + 12, paddingBottom: insets.bottom + 16 }]}>
+      <View style={[styles.doneRoot, { paddingTop: Math.max(insets.top, 24) + 12, paddingBottom: insets.bottom + 16 }]}>
         <View style={styles.doneHead}>
           <View style={styles.doneCheck}>
             <Ionicons name="checkmark" size={moderateScale(28)} color="#fff" />
@@ -650,7 +650,7 @@ export default function TrackingScreen() {
         style={StyleSheet.absoluteFill}
       />
 
-      <View style={[styles.topBar, { paddingTop: insets.top + (Platform.OS === "web" ? 67 : 0) + 12 }]} pointerEvents="box-none">
+      <View style={[styles.topBar, { paddingTop: Math.max(insets.top, 24) + (Platform.OS === "web" ? 67 : 0) + 12 }]} pointerEvents="box-none">
         <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
           <Ionicons name="chevron-back" size={moderateScale(20)} color={tokens.text} />
         </TouchableOpacity>

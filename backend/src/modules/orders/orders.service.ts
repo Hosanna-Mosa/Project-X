@@ -307,6 +307,26 @@ export class OrdersService {
         driversToNotify = filteredDrivers;
       }
 
+      // Only offer this order to drivers who've actually toggled on the
+      // matching work (Ride Hailing / Food Delivery) in their "Go online"
+      // sheet. Previously nothing filtered on this server-side — the order
+      // was offered to any nearby online driver regardless, and the driver
+      // app silently discarded a mismatched offer client-side after the
+      // fact, wasting a full dispatch timeout (or reading as "the driver
+      // never got the request" when the only online drivers nearby didn't
+      // do that kind of work). Drivers who haven't set activeServices yet
+      // (pre-update app) are left in rather than excluded, so this can't
+      // strand drivers who haven't picked up the change.
+      const RIDE_SERVICE_TYPES = ["bike", "auto", "cab", "cab_prime", "helper"];
+      const FOOD_SERVICE_TYPES = ["delivery", "helper"];
+      const orderNeedsRide = RIDE_SERVICE_TYPES.includes(effectiveType);
+      const orderNeedsFood = FOOD_SERVICE_TYPES.includes(effectiveType);
+      driversToNotify = driversToNotify.filter((d: any) => {
+        const active: string[] | undefined = d.activeServices;
+        if (!Array.isArray(active) || active.length === 0) return true; // not opted in/out yet — don't exclude
+        return (orderNeedsRide && active.includes("ride")) || (orderNeedsFood && active.includes("food"));
+      });
+
       console.log(`\n📢 [NOTIFIED DRIVERS]: ${driversToNotify.length} drivers selected`);
       driversToNotify.forEach((d: any) => {
         const uName = (d.user as any)?.name || "Unknown";

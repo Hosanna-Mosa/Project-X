@@ -121,7 +121,7 @@ export default function OTPScreen() {
       behavior={Platform.OS === "ios" ? "padding" : "height"}
     >
       {/* Back button — same treatment as screen 2 */}
-      <View style={[styles.headerRow, { paddingTop: insets.top + 4 }]}>
+      <View style={[styles.headerRow, { paddingTop: Math.max(insets.top, 24) + 4 }]}>
         <TouchableOpacity
           style={styles.backBtn}
           onPress={() => (router.canGoBack() ? router.back() : router.replace("/"))}

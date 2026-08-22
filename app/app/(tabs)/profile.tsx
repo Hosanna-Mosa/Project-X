@@ -3,7 +3,9 @@ import {
   ActivityIndicator,
   Alert,
   Image,
+  KeyboardAvoidingView,
   Modal,
+  Platform,
   ScrollView,
   StyleSheet,
   Text,
@@ -158,7 +160,7 @@ export default function ProfileScreen() {
 
   return (
     <View style={styles.root}>
-      <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
+      <View style={[styles.header, { paddingTop: Math.max(insets.top, 24) + 12 }]}>
         <TouchableOpacity style={styles.backBtn} onPress={() => (router.canGoBack() ? router.back() : router.replace("/(tabs)"))}>
           <Ionicons name="chevron-back" size={moderateScale(20)} color={tokens.text} />
         </TouchableOpacity>
@@ -228,7 +230,10 @@ export default function ProfileScreen() {
 
       {/* Security modal */}
       <Modal visible={securityVisible} animationType="slide" transparent>
-        <View style={styles.modalOverlay}>
+        <KeyboardAvoidingView
+          style={styles.modalOverlay}
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+        >
           <View style={styles.modalBody}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Change password</Text>
@@ -254,7 +259,7 @@ export default function ProfileScreen() {
               {changingPassword ? <ActivityIndicator color={accent.on} /> : <Text style={styles.saveBtnText}>Update password</Text>}
             </TouchableOpacity>
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
     </View>
   );

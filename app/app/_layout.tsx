@@ -23,12 +23,13 @@ import * as SplashScreen from "expo-splash-screen";
 import React, { useEffect } from "react";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { KeyboardProvider } from "react-native-keyboard-controller";
-import { SafeAreaProvider, useSafeAreaInsets } from "react-native-safe-area-context";
+import { SafeAreaProvider, initialWindowMetrics } from "react-native-safe-area-context";
 import Constants from "expo-constants";
 import { Platform, View, Modal, TouchableOpacity, Image, Text } from "react-native";
 import { Feather } from "@expo/vector-icons";
 import * as NavigationBar from "expo-navigation-bar";
 import * as Notifications from "expo-notifications";
+import { StatusBar } from "expo-status-bar";
 
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { useAuthStore } from "@/contexts/authStore";
@@ -143,7 +144,6 @@ SplashScreen.preventAutoHideAsync();
 const queryClient = new QueryClient();
 
 function RootLayoutNav() {
-  const insets = useSafeAreaInsets();
   const isInitialized = useAuthStore((s) => s.isInitialized);
   const { theme } = useThemeStore();
   const colors = Colors[theme];
@@ -154,6 +154,13 @@ function RootLayoutNav() {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
+      {/* Nothing in the app ever set a status bar style, so Android fell
+          back to a default that doesn't contrast against this app's mostly
+          light backgrounds — the clock/icons were readable but nearly
+          blended into light screens. Ties the icon color to the same theme
+          the rest of the app uses, translucent so it draws over content
+          (required for edge-to-edge) without punching a solid-color hole. */}
+      <StatusBar style={theme === "dark" ? "light" : "dark"} translucent backgroundColor="transparent" />
       <Stack screenOptions={{ headerShown: false }}>
         <Stack.Screen name="index" options={{ headerShown: false }} />
         <Stack.Screen name="login" options={{ headerShown: false }} />
@@ -174,9 +181,6 @@ function RootLayoutNav() {
         <Stack.Screen name="chat" options={{ headerShown: false }} />
         <Stack.Screen name="149-store" options={{ headerShown: false, animation: "slide_from_right" }} />
       </Stack>
-      {Platform.OS === "android" && insets.bottom > 0 && (
-        <View style={{ height: insets.bottom, backgroundColor: colors.background }} />
-      )}
     </View>
   );
 }
@@ -337,7 +341,14 @@ export default function RootLayout() {
   if (!fontsLoaded && !fontError) return null;
 
   return (
-    <SafeAreaProvider>
+    // `initialMetrics` seeds insets synchronously from the native window
+    // metrics captured at app startup, instead of leaving useSafeAreaInsets()
+    // to report all-zero until the first native measurement round-trips back
+    // (which can take an extra render pass, especially on Android/Fabric).
+    // Screens that compute padding directly from insets.top (most of them —
+    // see (tabs)/index.tsx's topRow) rendered under the status bar during
+    // that zero-inset window without this.
+    <SafeAreaProvider initialMetrics={initialWindowMetrics}>
       <ErrorBoundary>
         <QueryClientProvider client={queryClient}>
           <GestureHandlerRootView style={{ flex: 1 }}>

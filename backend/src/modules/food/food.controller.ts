@@ -103,7 +103,7 @@ export const searchFoodItems = async (req: Request, res: Response) => {
 
 export const getStore149Items = async (req: Request, res: Response) => {
   try {
-    const { lat, lng } = req.query;
+    const { lat, lng, radius } = req.query;
     
     // Function to get distinct Unsplash image based on name
     const getMatchingImage = (name: string): string => {
@@ -144,7 +144,9 @@ export const getStore149Items = async (req: Request, res: Response) => {
           geoQuery.location = { $geoWithin: { $geometry: activeZone.boundary } };
         }
 
-        const maxDist = activeZone.type === "circle" && activeZone.radius ? Math.min(15000, activeZone.radius) : 15000;
+        const maxDefaultRadius = 15000; // 15 km max default radius
+        const radiusInMeters = radius ? Math.max(1000, Number(radius) || 0) : maxDefaultRadius;
+        const maxDist = activeZone.type === "circle" && activeZone.radius ? Math.min(radiusInMeters, activeZone.radius) : radiusInMeters;
 
         vendors = await Vendor.aggregate([
           {

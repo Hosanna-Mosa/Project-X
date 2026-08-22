@@ -27,6 +27,11 @@ interface Props {
   onMarkerPress?: (marker: any) => void;
   radiusCenter?: { lat: number; lng: number } | null;
   radiusMeters?: number;
+  /** Suppresses the native "my location" blue dot even when no custom
+   * userLocation marker is supplied. Screens like finding-driver.tsx already
+   * show their own decorative "searching" indicator over the map and don't
+   * want the OS blue dot competing with it. */
+  hideMyLocationDot?: boolean;
 }
 
 export interface MapBackgroundRef {
@@ -58,7 +63,8 @@ export const MapBackground = forwardRef<MapBackgroundRef, Props>(({
   onLocationUpdate,
   onMarkerPress,
   radiusCenter,
-  radiusMeters
+  radiusMeters,
+  hideMyLocationDot = false,
 }, ref) => {
   const [region, setRegion] = useState<Region>(initialRegion || FALLBACK_REGION);
   const [autoRoutePolyline, setAutoRoutePolyline] = useState<string | null>(null);
@@ -294,7 +300,7 @@ export const MapBackground = forwardRef<MapBackgroundRef, Props>(({
         initialRegion={region}
         onRegionChangeComplete={(r) => setRegion(r)}
         mapType={mapType}
-        showsUserLocation={!userLocation}
+        showsUserLocation={!userLocation && !hideMyLocationDot}
         showsPointsOfInterest={false}
         showsCompass={false}
         showsMyLocationButton={false}
@@ -401,7 +407,18 @@ export const MapBackground = forwardRef<MapBackgroundRef, Props>(({
               coordinate={{ latitude: Number(stop.lat), longitude: Number(stop.lng) }}
               title={stop.storeName || `Pickup ${index + 1}`}
               description={stop.address}
-            />
+              anchor={{ x: 0.5, y: 1 }}
+            >
+              {/* Was a bare <Marker> with no child — rendered the platform's
+                  own default pin (a plain red teardrop), inconsistent with
+                  every custom-styled marker elsewhere in the app. */}
+              <View collapsable={false} style={styles.stopPinWrap}>
+                <View style={styles.stopPinHead}>
+                  <View style={styles.stopPinDot} />
+                </View>
+                <View style={styles.stopPinTail} />
+              </View>
+            </Marker>
           ) : null
         ))}
 
@@ -561,6 +578,18 @@ const styles = StyleSheet.create({
     height: 8,
     backgroundColor: '#EF4444',
     marginTop: -2,
+  },
+  stopPinWrap: { width: 40, height: 44, alignItems: 'center', justifyContent: 'flex-end' },
+  stopPinHead: {
+    width: 26, height: 26, borderRadius: 13, backgroundColor: Colors.light.primary,
+    borderWidth: 3, borderColor: '#fff', alignItems: 'center', justifyContent: 'center',
+    shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.25, shadowRadius: 3, elevation: 4,
+  },
+  stopPinDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: '#fff' },
+  stopPinTail: {
+    width: 0, height: 0, marginTop: -2,
+    borderLeftWidth: 6, borderRightWidth: 6, borderTopWidth: 9,
+    borderLeftColor: 'transparent', borderRightColor: 'transparent', borderTopColor: Colors.light.primary,
   },
   userMarkerWrap: {
     alignItems: 'center',

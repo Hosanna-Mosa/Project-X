@@ -240,10 +240,15 @@ export class SocketManager {
             resolvedDriver.status = DriverStatus.ONLINE;
             resolvedDriver.isAvailable = true; // Set available on active tracking update
             try {
+              // Same fix as drivers.service.ts's updateLocation: re-resolve
+              // on every update instead of only the first time, so a driver
+              // who has actually moved to a different zone gets rematched
+              // instead of staying permanently pinned to wherever they first
+              // pinged from.
               const { ZonesService } = require("../modules/zones/zones.service");
               const zonesService = new ZonesService();
               const activeZone = await zonesService.getZoneForCoordinates(Number(data.lat), Number(data.lng));
-              if (activeZone && !resolvedDriver.preferredZone) {
+              if (activeZone && (!resolvedDriver.preferredZone || resolvedDriver.preferredZone.toString() !== activeZone._id.toString())) {
                 resolvedDriver.preferredZone = activeZone._id;
               }
             } catch (zoneErr) {

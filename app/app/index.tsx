@@ -177,7 +177,7 @@ export default function AuthScreen() {
       behavior={Platform.OS === "ios" ? "padding" : "height"}
     >
       <ScrollView
-        contentContainerStyle={[styles.scrollContainer, { paddingTop: insets.top + 24, minHeight: "100%" }]}
+        contentContainerStyle={[styles.scrollContainer, { paddingTop: Math.max(insets.top, 24) + 24, minHeight: "100%" }]}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >

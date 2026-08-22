@@ -11,7 +11,8 @@
       },
       "env": {
         "EXPO_PUBLIC_API_URL": "https://x-api.triozen.tech",
-        "EXPO_PUBLIC_GOOGLE_MAPS_API_KEY": "AIzaSyD23mZxzw78gBlz6EGEZ6BMgCwc4fygJMA"
+        "EXPO_PUBLIC_GOOGLE_MAPS_API_KEY": "AIzaSyD23mZxzw78gBlz6EGEZ6BMgCwc4fygJMA",
+        "EXPO_PUBLIC_WEB_URL": "https://x-api.triozen.tech"
       }
     },
     "preview": {
@@ -24,7 +25,8 @@
       },
       "env": {
         "EXPO_PUBLIC_API_URL": "https://x-api.triozen.tech",
-        "EXPO_PUBLIC_GOOGLE_MAPS_API_KEY": "AIzaSyD23mZxzw78gBlz6EGEZ6BMgCwc4fygJMA"
+        "EXPO_PUBLIC_GOOGLE_MAPS_API_KEY": "AIzaSyD23mZxzw78gBlz6EGEZ6BMgCwc4fygJMA",
+        "EXPO_PUBLIC_WEB_URL": "https://x-api.triozen.tech"
       }
     },
     "production": {
@@ -34,7 +36,8 @@
       "ios": {},
       "env": {
         "EXPO_PUBLIC_API_URL": "https://x-api.triozen.tech",
-        "EXPO_PUBLIC_GOOGLE_MAPS_API_KEY": "AIzaSyD23mZxzw78gBlz6EGEZ6BMgCwc4fygJMA"
+        "EXPO_PUBLIC_GOOGLE_MAPS_API_KEY": "AIzaSyD23mZxzw78gBlz6EGEZ6BMgCwc4fygJMA",
+        "EXPO_PUBLIC_WEB_URL": "https://x-api.triozen.tech"
       }
     }
   },

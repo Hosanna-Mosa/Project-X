@@ -167,9 +167,9 @@ export const getNearbyVendors = async (req: Request, res: Response) => {
         distance: distanceInKm < 1 
           ? `${Math.round(vendor.distance)} metres` 
           : `${distanceInKm.toFixed(1)} km`,
-        offer: vendor.deliveryFee === 0 
-          ? "FREE delivery fee" 
-          : `USD 0 delivery fee over USD 12`,
+        offer: vendor.deliveryFee === 0
+          ? "FREE delivery fee"
+          : `₹0 delivery fee over ₹${vendor.minOrderValue || 199}`,
       };
     });
 

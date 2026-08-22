@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect, useRef } from "react";
 import {
   View,
   Text,
@@ -10,6 +10,7 @@ import {
   Platform,
   Alert,
   Linking,
+  Animated,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { router, useLocalSearchParams, Stack } from "expo-router";
@@ -73,6 +74,20 @@ export default function HelperTaskScreen() {
   const [totalContacted, setTotalContacted] = useState(0);
   const [startOtp, setStartOtp] = useState<string | null>(null);
   const [assignedDriver, setAssignedDriver] = useState<any>(null);
+
+  // Drives the "Finding a helper" ring — was a plain View before, so it
+  // rendered as a static half-circle with no motion at all, giving no
+  // indication that a search was actually in progress.
+  const spinnerSweep = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    if (step !== "searching") return;
+    const spin = Animated.loop(
+      Animated.timing(spinnerSweep, { toValue: 1, duration: 900, useNativeDriver: true, isInteraction: false })
+    );
+    spin.start();
+    return () => spin.stop();
+  }, [step]);
+  const spinnerRotation = spinnerSweep.interpolate({ inputRange: [0, 1], outputRange: ["0deg", "360deg"] });
 
   const totalHours = durationMode === "1hr" ? 1 : durationMode === "2hr" ? 2 : customHours + customMinutes / 60 || 1;
 
@@ -308,7 +323,7 @@ export default function HelperTaskScreen() {
   return (
     <View style={styles.root}>
       <Stack.Screen options={{ headerShown: false }} />
-      <View style={[styles.header, { paddingTop: insets.top + 6 }]}>
+      <View style={[styles.header, { paddingTop: Math.max(insets.top, 24) + 6 }]}>
         <TouchableOpacity style={styles.iconBtn} onPress={() => (step === "compose" ? router.back() : setStep("compose"))}>
           <Ionicons name="chevron-back" size={moderateScale(20)} color={tokens.text} />
         </TouchableOpacity>
@@ -499,7 +514,7 @@ export default function HelperTaskScreen() {
         <View style={{ flex: 1 }}>
           <ScrollView contentContainerStyle={{ paddingBottom: 20, paddingHorizontal: 16, paddingTop: 8 }}>
             <View style={styles.titleRow}>
-              <View style={styles.spinner} />
+              <Animated.View style={[styles.spinner, { transform: [{ rotate: spinnerRotation }] }]} />
               <Text style={styles.matchingTitle}>Finding a helper</Text>
             </View>
             <Text style={styles.subtitle}>Matching you with helpers nearby.</Text>

@@ -27,6 +27,10 @@ export default function CartScreen() {
   const tokens = designTokens[theme];
   const { vendorName: paramVendorName } = useLocalSearchParams();
   const { items, getTotalPrice, vendorId, updateQuantity, addItem } = useCartStore();
+  // Tracks which menu endpoint actually resolved this vendor's items, so
+  // "Add more items" can route back to the right menu screen with the
+  // correct isMeat flag instead of relying on browser-style back navigation.
+  const [isMeatVendor, setIsMeatVendor] = useState(false);
 
   // The cart doesn't currently track which service (food vs meat) its
   // vendor belongs to, so this always renders in the food accent.
@@ -61,8 +65,10 @@ export default function CartScreen() {
     if (!vendorId) return;
     customFetch<any[]>(`/api/v1/food/vendor/${vendorId}`)
       .then((data) => {
-        if (data?.length) setMenuItems(data);
-        else fetchMeatMenu();
+        if (data?.length) {
+          setMenuItems(data);
+          setIsMeatVendor(false);
+        } else fetchMeatMenu();
       })
       .catch(fetchMeatMenu);
 
@@ -70,6 +76,7 @@ export default function CartScreen() {
       customFetch<any[]>(`/api/v1/meat/menu/${vendorId}`)
         .then((meatData) => {
           if (Array.isArray(meatData)) {
+            setIsMeatVendor(true);
             setMenuItems(
               meatData.map((item: any) => ({
                 ...item,
@@ -164,7 +171,7 @@ export default function CartScreen() {
 
     return (
       <View style={styles.root}>
-        <View style={[styles.header, { paddingTop: insets.top + 6 }]}>
+        <View style={[styles.header, { paddingTop: Math.max(insets.top, 24) + 6 }]}>
           <TouchableOpacity style={styles.iconBtn} onPress={() => router.back()}>
             <Ionicons name="chevron-back" size={moderateScale(20)} color={tokens.text} />
           </TouchableOpacity>
@@ -227,14 +234,17 @@ export default function CartScreen() {
           {loadingRecent && <ActivityIndicator style={{ marginTop: 20 }} color={accent.accent} />}
         </ScrollView>
 
-        <AppTabBar active="home" accent="food" />
+        {/* No `active` tab — this is a pushed screen, not one of the 3 real
+            tabs. Marking "home" active here made the Home tab a no-op
+            (already "active") until the user backed out via the cart icon. */}
+        <AppTabBar accent="food" />
       </View>
     );
   }
 
   return (
     <View style={styles.root}>
-      <View style={[styles.header, { paddingTop: insets.top + 6 }]}>
+      <View style={[styles.header, { paddingTop: Math.max(insets.top, 24) + 6 }]}>
         <TouchableOpacity style={styles.iconBtn} onPress={() => router.back()}>
           <Ionicons name="chevron-back" size={moderateScale(20)} color={tokens.text} />
         </TouchableOpacity>
@@ -281,7 +291,17 @@ export default function CartScreen() {
                 <Text style={styles.itemLinePrice}>₹{item.price * item.quantity}</Text>
               </View>
             ))}
-            <TouchableOpacity style={styles.addMoreRow} onPress={() => router.back()}>
+            <TouchableOpacity
+              style={styles.addMoreRow}
+              onPress={() =>
+                vendorId
+                  ? router.push({
+                      pathname: "/restaurant-menu",
+                      params: { id: vendorId, name: displayVendorName, isMeat: isMeatVendor ? "true" : "false" },
+                    })
+                  : router.back()
+              }
+            >
               <Text style={styles.addMoreText}>+ Add more items</Text>
             </TouchableOpacity>
           </View>

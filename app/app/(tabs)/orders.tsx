@@ -76,8 +76,6 @@ export default function OrdersScreen() {
   const [orders, setOrders] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [serviceFilters, setServiceFilters] = useState<Set<string>>(new Set());
-  const [showFilterSheet, setShowFilterSheet] = useState(false);
-  const [pendingServiceFilters, setPendingServiceFilters] = useState<Set<string>>(new Set());
 
   const [selectedOrderForReview, setSelectedOrderForReview] = useState<any | null>(null);
   const [reviewRating, setReviewRating] = useState(5);
@@ -111,12 +109,6 @@ export default function OrdersScreen() {
   const scheduled = filtered.filter((o) => o.isReserved && ACTIVE_STATUSES.includes(o.status));
   const active = filtered.filter((o) => !o.isReserved && ACTIVE_STATUSES.includes(o.status));
   const past = filtered.filter((o) => !ACTIVE_STATUSES.includes(o.status) || (o.isReserved && !ACTIVE_STATUSES.includes(o.status)));
-
-  const serviceCounts = useMemo(() => {
-    const counts: Record<string, number> = {};
-    withKey.forEach((o) => { counts[o.__serviceKey] = (counts[o.__serviceKey] || 0) + 1; });
-    return counts;
-  }, [withKey]);
 
   const handleOpenReviewModal = (order: any) => {
     setSelectedOrderForReview(order);
@@ -207,36 +199,12 @@ export default function OrdersScreen() {
     router.push("/delivery/entry");
   };
 
-  const openFilterSheet = () => {
-    setPendingServiceFilters(new Set(serviceFilters));
-    setShowFilterSheet(true);
-  };
-  const applyFilters = () => {
-    setServiceFilters(new Set(pendingServiceFilters));
-    setShowFilterSheet(false);
-  };
-  const toggleServiceFilter = (key: string) => {
-    setPendingServiceFilters((prev) => {
-      const next = new Set(prev);
-      if (next.has(key)) next.delete(key);
-      else next.add(key);
-      return next;
-    });
-  };
-  const pendingCount = useMemo(() => {
-    if (pendingServiceFilters.size === 0) return withKey.length;
-    return withKey.filter((o) => pendingServiceFilters.has(o.__serviceKey)).length;
-  }, [withKey, pendingServiceFilters]);
-
   const isEmpty = !loading && orders.length === 0;
 
   return (
     <View style={styles.root}>
-      <View style={[styles.header, { paddingTop: insets.top + 14 }]}>
+      <View style={[styles.header, { paddingTop: Math.max(insets.top, 24) + 14 }]}>
         <Text style={styles.headline}>My orders</Text>
-        <TouchableOpacity style={styles.filterBtn} onPress={openFilterSheet}>
-          <Ionicons name="options-outline" size={moderateScale(17)} color={tokens.text} />
-        </TouchableOpacity>
       </View>
 
       {loading ? (
@@ -377,46 +345,6 @@ export default function OrdersScreen() {
 
       <AppTabBar active="orders" />
 
-      {/* Filter sheet */}
-      <Modal visible={showFilterSheet} transparent animationType="slide" onRequestClose={() => setShowFilterSheet(false)}>
-        <View style={styles.sheetOverlay}>
-          <TouchableOpacity style={styles.sheetScrim} activeOpacity={1} onPress={() => setShowFilterSheet(false)} />
-          <View style={styles.filterSheet}>
-            <View style={styles.sheetHandle} />
-            <Text style={styles.filterSheetTitle}>Filter orders</Text>
-            <Text style={styles.sectionLabel}>Service</Text>
-            <View style={{ gap: 8, marginBottom: 20 }}>
-              {Object.entries(SERVICE_META).filter(([k]) => k !== "bike" && k !== "auto" && k !== "cab" && k !== "cab_prime").map(([key, meta]) => {
-                const isSelected = pendingServiceFilters.has(key);
-                const accent = tokens.services[meta.accent];
-                const count = serviceCounts[key] || 0;
-                return (
-                  <TouchableOpacity
-                    key={key}
-                    style={[styles.filterOptionRow, isSelected && { borderColor: accent.accent, backgroundColor: accent.skin }]}
-                    onPress={() => toggleServiceFilter(key)}
-                  >
-                    <View style={[styles.checkbox, isSelected && { backgroundColor: accent.accent, borderColor: accent.accent }]}>
-                      {isSelected && <Ionicons name="checkmark" size={13} color={accent.on} />}
-                    </View>
-                    <Text style={styles.filterOptionLabel}>{meta.label}</Text>
-                    <Text style={styles.filterOptionCount}>{count}</Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
-            <View style={{ flexDirection: "row", gap: 10 }}>
-              <TouchableOpacity style={styles.clearBtn} onPress={() => setPendingServiceFilters(new Set())}>
-                <Text style={styles.clearBtnText}>Clear all</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={[styles.showBtn, { backgroundColor: tokens.services.food.accent }]} onPress={applyFilters}>
-                <Text style={[styles.showBtnText, { color: tokens.services.food.on }]}>Show {pendingCount} orders</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
-
       {/* Review modal */}
       <Modal visible={!!selectedOrderForReview} transparent animationType="fade" onRequestClose={() => setSelectedOrderForReview(null)}>
         <View style={styles.reviewOverlay}>
@@ -467,10 +395,6 @@ const createStyles = (tokens: ThemeTokens) =>
     root: { flex: 1, backgroundColor: tokens.bg },
     header: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 16, paddingBottom: 10 },
     headline: { fontFamily: fontFamilies.heading.semibold, fontSize: moderateScale(24), letterSpacing: -0.3, color: tokens.text },
-    filterBtn: {
-      width: moderateScale(40), height: moderateScale(40), borderRadius: moderateScale(20),
-      backgroundColor: tokens.surface, borderWidth: 1, borderColor: tokens.border, alignItems: "center", justifyContent: "center",
-    },
 
     chipsRow: { paddingHorizontal: 16, gap: 8 },
     chip: { backgroundColor: tokens.surface, borderWidth: 1, borderColor: tokens.borderStrong, borderRadius: 999, paddingHorizontal: 14, paddingVertical: 9, minHeight: 40 },
@@ -511,20 +435,6 @@ const createStyles = (tokens: ThemeTokens) =>
     emptySubtitle: { fontFamily: fontFamilies.body.regular, fontSize: moderateScale(15), lineHeight: moderateScale(21), color: tokens.sec, textAlign: "center", marginTop: 10, marginBottom: 22 },
     primaryBtn: { width: "100%", borderRadius: 14, minHeight: moderateScale(48), alignItems: "center", justifyContent: "center" },
     primaryBtnText: { fontFamily: fontFamilies.body.bold, fontSize: moderateScale(15) },
-
-    sheetOverlay: { flex: 1, justifyContent: "flex-end" },
-    sheetScrim: { ...StyleSheet.absoluteFillObject, backgroundColor: "rgba(0,0,0,0.5)" },
-    sheetHandle: { width: 38, height: 4, borderRadius: 2, backgroundColor: tokens.borderStrong, alignSelf: "center", marginBottom: 18 },
-    filterSheet: { backgroundColor: tokens.surface, borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingTop: 12, paddingHorizontal: 20, paddingBottom: 24 },
-    filterSheetTitle: { fontFamily: fontFamilies.heading.semibold, fontSize: moderateScale(24), letterSpacing: -0.3, color: tokens.text, marginBottom: 18 },
-    filterOptionRow: { flexDirection: "row", alignItems: "center", gap: 12, borderWidth: 1, borderColor: tokens.borderStrong, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 12, minHeight: 48 },
-    checkbox: { width: 20, height: 20, borderRadius: 6, borderWidth: 2, borderColor: tokens.borderStrong, alignItems: "center", justifyContent: "center" },
-    filterOptionLabel: { flex: 1, fontFamily: fontFamilies.body.medium, fontSize: moderateScale(15), color: tokens.text },
-    filterOptionCount: { fontFamily: fontFamilies.body.medium, fontSize: moderateScale(13), color: tokens.sec },
-    clearBtn: { flex: 1, borderWidth: 1, borderColor: tokens.borderStrong, borderRadius: 14, minHeight: moderateScale(52), alignItems: "center", justifyContent: "center" },
-    clearBtnText: { fontFamily: fontFamilies.body.semibold, fontSize: moderateScale(15), color: tokens.sec },
-    showBtn: { flex: 1, borderRadius: 14, minHeight: moderateScale(52), alignItems: "center", justifyContent: "center" },
-    showBtnText: { fontFamily: fontFamilies.body.bold, fontSize: moderateScale(15) },
 
     reviewOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.5)", justifyContent: "center", alignItems: "center", padding: 20 },
     reviewCard: { width: "100%", borderRadius: 18, borderWidth: 1, borderColor: tokens.border, backgroundColor: tokens.surface, padding: 20 },
