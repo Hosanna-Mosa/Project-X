@@ -287,6 +287,13 @@ export class DriverService {
       if (Array.isArray(activeServices) && activeServices.length > 0) {
         driver.activeServices = activeServices.filter((s) => s === "food" || s === "ride");
       }
+    } else if (status === DriverStatus.OFFLINE) {
+      // The driver app's goOffline() resets its local "Head Home" toggle to
+      // off without telling the backend (it only PATCHes status here), so
+      // without this the two go out of sync: the app shows Head Home as off
+      // on the next "Go online" while this record still silently filters
+      // every ride offer that isn't heading toward the driver's home.
+      driver.homeMode = false;
     }
     return driver.save();
   }
